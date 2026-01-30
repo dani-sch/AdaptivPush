@@ -66,11 +66,9 @@ export default function LoginScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Link href={"/welcome"} asChild>
-          <Pressable style={styles.backButton}>
-            <Text style={styles.backText}>{"<"}</Text>
-          </Pressable>
-        </Link>
+        <Pressable style={styles.backButton} onPress={() => router.back()}>
+          <Text style={styles.backText}>{"<"}</Text>
+        </Pressable>
       </View>
 
       <View style={styles.content}>

@@ -28,11 +28,13 @@ export default function Index() {
   
           {/* Buttons */}
           <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.signInButton}>
+            <TouchableOpacity style={styles.signInButton}
+            onPress={() => router.push('/login')}>
               <Text style={styles.signInButtonText}>Sign In</Text>
             </TouchableOpacity>
   
-            <TouchableOpacity style={styles.joinButton}>
+            <TouchableOpacity style={styles.joinButton}
+            onPress={() => router.push('/join')}>
               <Text style={styles.joinButtonText}>Join Now</Text>
             </TouchableOpacity>
           </View>
@@ -71,7 +73,7 @@ export default function Index() {
     logo: {
         width: 120,
         height: 120,
-        borderRadius: 30,  // Add rounded corners (adjust value as needed)
+        borderRadius: 30,  // Add rounded corners 
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 32,

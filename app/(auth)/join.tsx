@@ -1,6 +1,6 @@
-import React, {useEffect, useState } from 'react';
-import {Platform, Keyboard, View, Text, TextInput, Pressable, StyleSheet} from "react-native";
 import { Link, router } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 export default function JoinScreen() {
     const [email, setEmail] = useState('');
@@ -59,11 +59,9 @@ export default function JoinScreen() {
         <View style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
-                <Link href={"/welcome"} asChild>
-                    <Pressable style={styles.backButton}>
-                        <Text style={styles.backText}>{"<"}</Text>
-                    </Pressable>
-                </Link>
+                <Pressable style={styles.backButton} onPress={() => router.back()}>
+                    <Text style={styles.backText}>{"<"}</Text>
+                </Pressable>
             </View>
 
             <View style={styles.content}>
