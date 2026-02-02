@@ -72,7 +72,8 @@ export default function JoinScreen() {
 
         console.log("[Sign up clicked] Success! User signed up with id: ", data.user?.id);
 
-        //*router.push("/quick-setup")
+        // Navigate to quick setup after successful signup
+        router.push("/(qsetup)");
     };
 
 
