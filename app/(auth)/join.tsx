@@ -4,6 +4,7 @@ import { Link, router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import {KeyboardAvoidingView, ScrollView} from "react-native";
 import {useSafeAreaInsets} from "react-native-safe-area-context";
+import {supabase} from "@/utils/supabase";
 
 export default function JoinScreen() {
     const [email, setEmail] = useState('');
@@ -33,12 +34,47 @@ export default function JoinScreen() {
         }
     };
 
-    const handleSubmit = () => {
-        if (!emailError && !passwordError && email && password && fullName) {
-            // Mock account creation
-            router.push("../quick-setup")
+    const handleSubmit = async () => {
+        console.log("SUPABASE_URL:", process.env.EXPO_PUBLIC_SUPABASE_URL);
+        console.log("SUPABASE_KEY exists:", !!process.env.EXPO_PUBLIC_SUPABASE_KEY);
+        console.log("[Sign up clicked] User attempting to join with: ", fullName, email, password);
+        if (emailError) {
+            console.log("[Sign up clicked] Email error: ", emailError);
+            //TODO: show error in ui
+            return;
+        } else if (passwordError) {
+            console.log("[Sign up clicked] Password error: ", passwordError);
+            //TODO: show error in ui
+            return;
+        } else if (!email || !password || !fullName){
+            console.log("[Sign up clicked] Some fields incomplete")
+            //TODO: show error in ui
+            return;
+        } else {
+            console.log("[Sign up clicked] All fields complete")
         }
+
+        const { data, error}  = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+                data: {
+                    full_name: fullName,
+                },
+            },
+        });
+
+        if (error) {
+            console.log("[Sign up clicked] Error: ", error.message);
+            //TODO: show error in ui
+            return;
+        }
+
+        console.log("[Sign up clicked] Success! User signed up with id: ", data.user?.id);
+
+        //*router.push("/quick-setup")
     };
+
 
     const disabled = !email || !password || !fullName || !!emailError || !!passwordError;
 
@@ -74,7 +110,7 @@ export default function JoinScreen() {
                 >
                     {/* Header */}
                     <View style={[styles.header, { paddingTop: insets.top + 8}]}>
-                        <Link href={"/welcome"} asChild>
+                        <Link href={"/"} asChild>
                             <Pressable style={styles.backButton}>
                                 <Text style={styles.backText}>{"<"}</Text>
                             </Pressable>
@@ -110,6 +146,9 @@ export default function JoinScreen() {
                             style={[styles.input, emailError ? styles.inputError : null]}
                             autoCapitalize={"none"}
                             autoCorrect={false}
+                            keyboardType="email-address"
+                            textContentType="emailAddress"
+                            autoComplete={"email"}
                         />
                         {!!emailError && <Text style={styles.errorText}>{emailError}</Text>}
 
@@ -128,6 +167,9 @@ export default function JoinScreen() {
                             style={[styles.input, passwordError ? styles.inputError : null]}
                             secureTextEntry={true}
                             autoCapitalize={"none"}
+                            autoCorrect={false}
+                            textContentType="newPassword"
+                            autoComplete={"password-new"}
                         />
                         {!!passwordError && <Text style={styles.errorText}>{passwordError}</Text>}
 
@@ -154,6 +196,7 @@ export default function JoinScreen() {
                 </ScrollView>
             </KeyboardAvoidingView>
 
+            {/* Hide keyboard button */}
             {keyboardVisible && (
                 <Pressable
                     onPress={() => {
@@ -175,7 +218,7 @@ export default function JoinScreen() {
 }
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: "#09090b" },
-    header: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
+    header: { paddingHorizontal: 16, paddingBottom: 8 },
     backButton: {
         width: 40,
         height: 40,
