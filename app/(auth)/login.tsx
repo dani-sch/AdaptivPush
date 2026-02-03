@@ -2,26 +2,23 @@ import { Link, router } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import React, { useEffect, useState } from "react";
 import {
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    Keyboard, KeyboardAvoidingView,
+    Platform,
+    Pressable, ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-import { supabase } from "@/utils/supabase";
+import {SymbolView} from "expo-symbols";
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
 
-  const [emailError, setEmailError] = useState("");
-  const [passwordError, setPasswordError] = useState("");
+    const [emailError, setEmailError] = useState("");
+    const [passwordError, setPasswordError] = useState("");
 
   const [authError, setAuthError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -101,12 +98,35 @@ export default function LoginScreen() {
       setKeyboardVisible(false);
       setKeyboardHeight(0);
     });
+    const [keyboardVisible, setKeyboardVisible] = useState(false);
+    const [keyboardHeight, setKeyboardHeight] = useState(0);
 
-    return () => {
-      showSub.remove();
-      hideSub.remove();
+    const insets = useSafeAreaInsets();
+
+    const validateEmail = (value: string) => {
+        if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+            setEmailError("Please enter a valid email address");
+        } else {
+            setEmailError("");
+        }
     };
-  }, []);
+
+    const validatePassword = (value: string) => {
+        {/* Not needed now but maybe replace later with backend validation */}
+        {/*
+        if (value && value.length < 8) {
+            setPasswordError("Password must be at least 8 characters");
+        } else {
+            setPasswordError("");
+        }
+        */}
+    };
+
+    const handleSubmit = () => {
+
+
+        router.replace("/(tabs)");
+    };
 
   return (
     <View style={styles.container}>
