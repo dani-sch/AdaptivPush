@@ -1,14 +1,20 @@
 import { Link, router } from "expo-router";
+import { SymbolView } from "expo-symbols";
 import React, { useEffect, useState } from "react";
 import {
   Keyboard,
+  KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { supabase } from "@/utils/supabase";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -17,8 +23,13 @@ export default function LoginScreen() {
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
 
+  const [authError, setAuthError] = useState("");
+  const [loading, setLoading] = useState(false);
+
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  const insets = useSafeAreaInsets();
 
   const validateEmail = (value: string) => {
     if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
@@ -29,29 +40,64 @@ export default function LoginScreen() {
   };
 
   const validatePassword = (value: string) => {
+    // Optional: enforce min length like your Join page does
+    // If you want it consistent, uncomment this:
+    /*
     if (value && value.length < 8) {
       setPasswordError("Password must be at least 8 characters");
     } else {
       setPasswordError("");
     }
+    */
+    setPasswordError("");
   };
 
-  const handleSubmit = () => {
-    
-    
-    router.replace("/(tabs)");
+  const handleSubmit = async () => {
+    setAuthError("");
+
+    // Guard checks (same idea as join)
+    if (emailError || passwordError) return;
+    if (!email || !password) {
+      setAuthError("Please enter your email and password.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        console.log("[Login] Error:", error.message);
+        setAuthError(error.message);
+        return;
+      }
+
+      console.log("[Login] Success! User id:", data.user?.id);
+
+      // Navigate into the app
+      router.replace("/(tabs)");
+    } catch (e: any) {
+      console.log("[Login] Unexpected error:", e?.message ?? e);
+      setAuthError(e?.message ?? "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const disabled =
-    !email || !password || !!emailError || !!passwordError;
+    loading || !email || !password || !!emailError || !!passwordError;
 
   useEffect(() => {
-    const showSub = Keyboard.addListener("keyboardDidShow", (e) => {
+    const showSub = Keyboard.addListener("keyboardWillShow", (e) => {
       setKeyboardVisible(true);
       setKeyboardHeight(e.endCoordinates?.height ?? 0);
     });
 
-    const hideSub = Keyboard.addListener("keyboardDidHide", () => {
+    const hideSub = Keyboard.addListener("keyboardWillHide", () => {
       setKeyboardVisible(false);
       setKeyboardHeight(0);
     });
@@ -64,93 +110,111 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Link href={"/welcome"} asChild>
-          <Pressable style={styles.backButton}>
-            <Text style={styles.backText}>{"<"}</Text>
-          </Pressable>
-        </Link>
-      </View>
-
-      <View style={styles.content}>
-        <Text style={styles.title}>Sign In</Text>
-        <Text style={styles.subtitle}>Welcome back to AdaptivPush</Text>
-
-        {/* Email */}
-        <Text style={styles.label}>Email</Text>
-        <TextInput
-          value={email}
-          onChangeText={(t) => {
-            setEmail(t);
-            validateEmail(t);
-          }}
-          onBlur={() => validateEmail(email)}
-          placeholder={"you@example.com"}
-          placeholderTextColor={"#71717a"}
-          style={[styles.input, emailError ? styles.inputError : null]}
-          autoCapitalize={"none"}
-          autoCorrect={false}
-          keyboardType="email-address"
-        />
-        {!!emailError && <Text style={styles.errorText}>{emailError}</Text>}
-
-        {/* Password */}
-        <Text style={styles.label}>Password</Text>
-        <TextInput
-          value={password}
-          onChangeText={(t) => {
-            setPassword(t);
-            validatePassword(t);
-          }}
-          onBlur={() => validatePassword(password)}
-          placeholder={"At least 8 characters"}
-          placeholderTextColor={"#71717a"}
-          style={[styles.input, passwordError ? styles.inputError : null]}
-          secureTextEntry={true}
-          autoCapitalize={"none"}
-          autoCorrect={false}
-        />
-        {!!passwordError && (
-          <Text style={styles.errorText}>{passwordError}</Text>
-        )}
-
-        {/* Forgot password (outline) */}
-        <Pressable onPress={() => {}} style={styles.forgotWrap}>
-          <Text style={styles.forgotText}>Forgot password?</Text>
-        </Pressable>
-
-        {/* Primary Button */}
-        <Pressable
-          onPress={handleSubmit}
-          disabled={disabled}
-          style={[
-            styles.primaryButton,
-            disabled ? styles.primaryButtonDisabled : null,
-          ]}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={"padding"} keyboardVerticalOffset={0}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps={"handled"}
+          showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.primaryButtonText}>Sign In</Text>
-        </Pressable>
+          {/* Header */}
+          <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+            <Link href={"/"} asChild>
+              <Pressable style={styles.backButton} onPress={() => router.back()}>
+                <Text style={styles.backText}>{"<"}</Text>
+              </Pressable>
+            </Link>
+          </View>
 
-        {/* Sign up link */}
-        <Text style={styles.signInText}>
-          Don&apos;t have an account?{" "}
-          <Link href={"/join"} style={styles.signInLink}>
-            Join
-          </Link>
-        </Text>
-      </View>
+          <View style={styles.content}>
+            <Text style={styles.title}>Sign In</Text>
+            <Text style={styles.subtitle}>Welcome back to AdaptivPush</Text>
 
-      {/* Hide keyboard button (matches join.tsx behavior) */}
+            {/* Email */}
+            <Text style={styles.label}>Email</Text>
+            <TextInput
+              value={email}
+              onChangeText={(t) => {
+                setEmail(t);
+                validateEmail(t);
+              }}
+              onBlur={() => validateEmail(email)}
+              placeholder={"you@example.com"}
+              placeholderTextColor={"#71717a"}
+              style={[styles.input, emailError ? styles.inputError : null]}
+              autoCapitalize={"none"}
+              autoCorrect={false}
+              keyboardType="email-address"
+            />
+            {!!emailError && <Text style={styles.errorText}>{emailError}</Text>}
+
+            {/* Password */}
+            <Text style={styles.label}>Password</Text>
+            <TextInput
+              value={password}
+              onChangeText={(t) => {
+                setPassword(t);
+                validatePassword(t);
+              }}
+              onBlur={() => validatePassword(password)}
+              placeholder={"At least 8 characters"}
+              placeholderTextColor={"#71717a"}
+              style={[styles.input, passwordError ? styles.inputError : null]}
+              secureTextEntry={true}
+              autoCapitalize={"none"}
+              autoCorrect={false}
+            />
+            {!!passwordError && (
+              <Text style={styles.errorText}>{passwordError}</Text>
+            )}
+
+            {/* Auth error */}
+            {!!authError && <Text style={styles.errorText}>{authError}</Text>}
+
+            {/* Forgot password (outline) */}
+            <Pressable onPress={() => {}} style={styles.forgotWrap}>
+              <Text style={styles.forgotText}>Forgot password?</Text>
+            </Pressable>
+
+            {/* Primary Button */}
+            <Pressable
+              onPress={handleSubmit}
+              disabled={disabled}
+              style={[
+                styles.primaryButton,
+                disabled ? styles.primaryButtonDisabled : null,
+              ]}
+            >
+              <Text style={styles.primaryButtonText}>
+                {loading ? "Signing In..." : "Sign In"}
+              </Text>
+            </Pressable>
+
+            {/* Sign up link */}
+            <Text style={styles.signInText}>
+              Don&apos;t have an account?{" "}
+              <Link href={"/join"} style={styles.signInLink}>
+                Join
+              </Link>
+            </Text>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      {/* Hide keyboard button */}
       {keyboardVisible && (
         <Pressable
-          onPress={() => Keyboard.dismiss()}
-          style={[
-            styles.hideKeyboardButton,
-            { bottom: keyboardHeight + 12 },
-          ]}
+          onPress={() => {
+            setKeyboardVisible(false);
+            Keyboard.dismiss();
+          }}
+          style={[styles.hideKeyboardButton, { bottom: keyboardHeight + 12 }]}
+          hitSlop={10}
         >
-          <Text style={styles.hideKeyboardText}>Hide</Text>
+          <SymbolView
+            name="keyboard.chevron.compact.down"
+            size={18}
+            tintColor="white"
+          />
         </Pressable>
       )}
     </View>
@@ -253,7 +317,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#18181b",
     borderWidth: 1,
     borderColor: "#27272a",
-    // small lift so it feels tappable
     shadowOpacity: Platform.OS === "ios" ? 0.25 : 0,
     shadowRadius: Platform.OS === "ios" ? 6 : 0,
     shadowOffset: { width: 0, height: 2 },
@@ -263,5 +326,9 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "600",
     fontSize: 14,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 24,
   },
 });
