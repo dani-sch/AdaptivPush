@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {SymbolView} from "expo-symbols";
+import {PRIMARY_COLOR} from "@/constants/colors";
 
 export default function LoginScreen() {
     const [email, setEmail] = useState("");
@@ -248,7 +249,7 @@ const styles = StyleSheet.create({
     },
     primaryButton: {
         marginTop: 20,
-        backgroundColor: "#2563eb",
+        backgroundColor: PRIMARY_COLOR,
         paddingVertical: 14,
         borderRadius: 16,
         alignItems: "center",
