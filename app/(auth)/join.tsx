@@ -5,6 +5,7 @@ import { SymbolView } from 'expo-symbols';
 import {KeyboardAvoidingView, ScrollView} from "react-native";
 import {useSafeAreaInsets} from "react-native-safe-area-context";
 import {supabase} from "@/utils/supabase";
+import {PRIMARY_COLOR} from "@/constants/colors";
 
 export default function JoinScreen() {
     const [email, setEmail] = useState('');
@@ -246,7 +247,7 @@ const styles = StyleSheet.create({
     errorText: { color: "#ef4444", marginTop: 8 },
     primaryButton: {
         marginTop: 20,
-        backgroundColor: "#2563eb",
+        backgroundColor: PRIMARY_COLOR,
         paddingVertical: 14,
         borderRadius: 16,
         alignItems: "center",
