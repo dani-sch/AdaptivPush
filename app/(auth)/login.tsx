@@ -13,9 +13,9 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import {SymbolView} from "expo-symbols";
 import {PRIMARY_COLOR} from "@/constants/colors";
 import { supabase } from "@/utils/supabase";
+import BackButton from "@/components/ui/BackButton";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -41,8 +41,6 @@ export default function LoginScreen() {
   };
 
   const validatePassword = (value: string) => {
-    // Optional: enforce min length like your Join page does
-    // If you want it consistent, uncomment this:
     /*
     if (value && value.length < 8) {
       setPasswordError("Password must be at least 8 characters");
@@ -119,11 +117,7 @@ export default function LoginScreen() {
         >
           {/* Header */}
           <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-            <Link href={"/"} asChild>
-              <Pressable style={styles.backButton} onPress={() => router.back()}>
-                <Text style={styles.backText}>{"<"}</Text>
-              </Pressable>
-            </Link>
+              <BackButton/>
           </View>
 
           <View style={styles.content}>

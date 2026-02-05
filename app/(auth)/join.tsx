@@ -6,6 +6,7 @@ import {KeyboardAvoidingView, ScrollView} from "react-native";
 import {useSafeAreaInsets} from "react-native-safe-area-context";
 import {supabase} from "@/utils/supabase";
 import {PRIMARY_COLOR} from "@/constants/colors";
+import BackButton from '@/components/ui/BackButton';
 
 export default function JoinScreen() {
     const [email, setEmail] = useState('');
@@ -74,7 +75,7 @@ export default function JoinScreen() {
         console.log("[Sign up clicked] Success! User signed up with id: ", data.user?.id);
 
         // Navigate to quick setup after successful signup
-        router.push("/(qsetup)");
+        router.push("/QuickSetup");
     };
 
 
@@ -112,11 +113,7 @@ export default function JoinScreen() {
                 >
                     {/* Header */}
                     <View style={[styles.header, { paddingTop: insets.top + 8}]}>
-                        <Link href={"/"} asChild>
-                            <Pressable style={styles.backButton}>
-                                <Text style={styles.backText}>{"<"}</Text>
-                            </Pressable>
-                        </Link>
+                        <BackButton/>
                     </View>
 
                     <View style={styles.content}>
