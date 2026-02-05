@@ -10,6 +10,14 @@ export default function Index() {
   
     return (
       <View style={styles.container}>
+        {/* Dev Skip Button */}
+        <TouchableOpacity 
+          style={styles.devSkipButton}
+          onPress={() => router.push('/QuickSetup')}
+        >
+          <Text style={styles.devSkipText}>DEV: Skip to Setup</Text>
+        </TouchableOpacity>
+
         <View style={styles.content}>
           {/* Logo */}
             <LinearGradient
@@ -59,6 +67,23 @@ export default function Index() {
       flex: 1,
       backgroundColor: '#0a0a0a',
       justifyContent: 'space-between',
+    },
+    devSkipButton: {
+      position: 'absolute',
+      top: 50,
+      right: 16,
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: 'rgba(255, 255, 255, 0.2)',
+      zIndex: 999,
+    },
+    devSkipText: {
+      color: '#9ca3af',
+      fontSize: 12,
+      fontWeight: '500',
     },
     content: {
       flex: 1,
