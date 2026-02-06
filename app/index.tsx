@@ -10,6 +10,7 @@ export default function Index() {
 
 
     return (
+<<<<<<< nicole-updates
         <View style={styles.container}>
             <View style={styles.content}>
                 {/* Logo */}
@@ -62,6 +63,56 @@ export default function Index() {
                     <Text style={styles.footerLink}>Terms</Text>
                 </TouchableOpacity>
             </View>
+=======
+      <View style={styles.container}>
+        {/* Dev Skip Button */}
+        <TouchableOpacity 
+          style={styles.devSkipButton}
+          onPress={() => router.push('/QuickSetup')}
+        >
+          <Text style={styles.devSkipText}>DEV: Skip to Setup</Text>
+        </TouchableOpacity>
+
+        <View style={styles.content}>
+          {/* Logo */}
+            <LinearGradient
+              colors={['#5b7cff', '#a855f7']}
+              style={styles.logo}
+            >
+              <Dumbbell color="white" size={60} />
+            </LinearGradient>
+          {/* Title and Subtitle */}
+          <View>
+            <Text style={styles.title}>Welcome to AdaptivPush</Text>
+            <Text style={styles.subtitle}>
+              Adaptive strength training that fits your body and your schedule.
+            </Text>
+          </View>
+  
+          {/* Buttons */}
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity style={styles.signInButton}
+            onPress={() => router.push('/login')}>
+              <Text style={styles.signInButtonText}>Sign In</Text>
+            </TouchableOpacity>
+  
+            <TouchableOpacity style={styles.joinButton}
+            onPress={() => router.push('/join')}>
+              <Text style={styles.joinButtonText}>Join Now</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+  
+        {/* Footer */}
+        <View style={styles.footer}>
+          <TouchableOpacity>
+            <Text style={styles.footerLink}>Privacy</Text>
+          </TouchableOpacity>
+          <Text style={styles.footerDot}>•</Text>
+          <TouchableOpacity>
+            <Text style={styles.footerLink}>Terms</Text>
+          </TouchableOpacity>
+>>>>>>> main
         </View>
     );
 }
@@ -71,6 +122,23 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#0a0a0a',
         justifyContent: 'space-between',
+    },
+    devSkipButton: {
+      position: 'absolute',
+      top: 50,
+      right: 16,
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: 'rgba(255, 255, 255, 0.2)',
+      zIndex: 999,
+    },
+    devSkipText: {
+      color: '#9ca3af',
+      fontSize: 12,
+      fontWeight: '500',
     },
     content: {
         flex: 1,
