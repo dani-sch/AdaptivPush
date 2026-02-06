@@ -13,7 +13,14 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import {PRIMARY_COLOR} from "@/constants/colors";
+import {
+    BACKGROUND_COLOR,
+    BORDER_COLOR, PLACEHOLDER_TEXT,
+    PRIMARY_COLOR,
+    PRIMARY_COLOR_LIGHT,
+    TEXT_COLOR,
+    WHITE
+} from "@/constants/colors";
 import { supabase } from "@/utils/supabase";
 import BackButton from "@/components/ui/BackButton";
 
@@ -78,7 +85,7 @@ export default function LoginScreen() {
       console.log("[Login] Success! User id:", data.user?.id);
 
       // Navigate into the app
-      router.replace("/(tabs)");
+      //router.replace("/(tabs)");
     } catch (e: any) {
       console.log("[Login] Unexpected error:", e?.message ?? e);
       setAuthError(e?.message ?? "Something went wrong. Please try again.");
@@ -134,7 +141,7 @@ export default function LoginScreen() {
               }}
               onBlur={() => validateEmail(email)}
               placeholder={"you@example.com"}
-              placeholderTextColor={"#71717a"}
+              placeholderTextColor={PLACEHOLDER_TEXT}
               style={[styles.input, emailError ? styles.inputError : null]}
               autoCapitalize={"none"}
               autoCorrect={false}
@@ -152,7 +159,7 @@ export default function LoginScreen() {
               }}
               onBlur={() => validatePassword(password)}
               placeholder={"At least 8 characters"}
-              placeholderTextColor={"#71717a"}
+              placeholderTextColor={PLACEHOLDER_TEXT}
               style={[styles.input, passwordError ? styles.inputError : null]}
               secureTextEntry={true}
               autoCapitalize={"none"}
@@ -166,7 +173,7 @@ export default function LoginScreen() {
             {!!authError && <Text style={styles.errorText}>{authError}</Text>}
 
             {/* Forgot password (outline) */}
-            <Pressable onPress={() => {}} style={styles.forgotWrap}>
+            <Pressable onPress={() => {router.push('/(auth)/forgot-password')}} style={styles.forgotWrap}>
               <Text style={styles.forgotText}>Forgot password?</Text>
             </Pressable>
 
@@ -278,7 +285,7 @@ const styles = StyleSheet.create({
         alignSelf: "flex-end",
     },
     forgotText: {
-        color: "#60a5fa",
+        color: PRIMARY_COLOR_LIGHT,
         fontWeight: "600",
     },
     primaryButton: {
@@ -292,16 +299,16 @@ const styles = StyleSheet.create({
         opacity: 0.5,
     },
     primaryButtonText: {
-        color: "white",
+        color: WHITE,
         fontWeight: "600",
     },
     signInText: {
-        color: "#a1a1aa",
+        color: TEXT_COLOR,
         textAlign: "center",
         marginTop: 16,
     },
     signInLink: {
-        color: "#60a5fa",
+        color: PRIMARY_COLOR_LIGHT,
     },
     hideKeyboardButton: {
         position: "absolute",
@@ -309,9 +316,9 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         paddingHorizontal: 14,
         borderRadius: 999,
-        backgroundColor: "#18181b",
+        backgroundColor: BACKGROUND_COLOR,
         borderWidth: 1,
-        borderColor: "#27272a",
+        borderColor: BORDER_COLOR,
         // small lift so it feels tappable
         shadowOpacity: Platform.OS === "ios" ? 0.25 : 0,
         shadowRadius: Platform.OS === "ios" ? 6 : 0,
@@ -319,7 +326,7 @@ const styles = StyleSheet.create({
         elevation: Platform.OS === "android" ? 6 : 0,
     },
     hideKeyboardText: {
-        color: "white",
+        color: WHITE,
         fontWeight: "600",
         fontSize: 14,
     },
