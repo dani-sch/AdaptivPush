@@ -32,11 +32,11 @@ export default function QSetupPage() {
 
     const handleContinue = () => {
         // TODO: Save data and navigate
-        router.replace("/(tabs)");
+        // router.replace("/(tabs)");
     };
 
     const handleSkip = () => {
-        router.replace("/(tabs)");
+        // router.replace("/(tabs)");
     };
 
     return (

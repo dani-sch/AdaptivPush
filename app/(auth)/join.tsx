@@ -5,7 +5,14 @@ import { SymbolView } from 'expo-symbols';
 import {KeyboardAvoidingView, ScrollView} from "react-native";
 import {useSafeAreaInsets} from "react-native-safe-area-context";
 import {supabase} from "@/utils/supabase";
-import {PRIMARY_COLOR} from "@/constants/colors";
+import {
+    BACKGROUND_COLOR,
+    BACKGROUND_COLOR_DARK, BORDER_COLOR, ERROR_COLOR, ERROR_COLOR_LIGHT,
+    PLACEHOLDER_TEXT,
+    PRIMARY_COLOR,
+    PRIMARY_COLOR_LIGHT,
+    TEXT_COLOR, WHITE
+} from "@/constants/colors";
 import BackButton from '@/components/ui/BackButton';
 
 export default function JoinScreen() {
@@ -75,7 +82,7 @@ export default function JoinScreen() {
         console.log("[Sign up clicked] Success! User signed up with id: ", data.user?.id);
 
         // Navigate to quick setup after successful signup
-        router.push("/QuickSetup");
+        router.push("/quick-setup");
     };
 
 
@@ -126,7 +133,7 @@ export default function JoinScreen() {
                             value={fullName}
                             onChangeText={setFullName}
                             placeholder={"Enter your full name"}
-                            placeholderTextColor={"#71717a"}
+                            placeholderTextColor={PLACEHOLDER_TEXT}
                             style={styles.input}
                             autoCapitalize={"words"}
                         />
@@ -141,7 +148,7 @@ export default function JoinScreen() {
                             }}
                             onBlur={()=> validateEmail(email)}
                             placeholder={"you@example.com"}
-                            placeholderTextColor={"#71717a"}
+                            placeholderTextColor={PLACEHOLDER_TEXT}
                             style={[styles.input, emailError ? styles.inputError : null]}
                             autoCapitalize={"none"}
                             autoCorrect={false}
@@ -162,7 +169,7 @@ export default function JoinScreen() {
                             }}
                             onBlur={()=> validatePassword(password)}
                             placeholder={"At least 8 characters"}
-                            placeholderTextColor={"#71717a"}
+                            placeholderTextColor={PLACEHOLDER_TEXT}
                             style={[styles.input, passwordError ? styles.inputError : null]}
                             secureTextEntry={true}
                             autoCapitalize={"none"}
@@ -216,32 +223,32 @@ export default function JoinScreen() {
     );
 }
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#09090b" },
+    container: { flex: 1, backgroundColor: BACKGROUND_COLOR_DARK },
     header: { paddingHorizontal: 16, paddingBottom: 8 },
     backButton: {
         width: 40,
         height: 40,
         borderRadius: 999,
-        backgroundColor: "#18181b",
+        backgroundColor: BACKGROUND_COLOR,
         alignItems: "center",
         justifyContent: "center",
     },
-    backText: { color: "white", fontSize: 18 },
+    backText: { color: WHITE, fontSize: 18 },
     content: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 24 },
-    title: { color: "white", fontSize: 30, marginBottom: 8, fontWeight: "600" },
-    subtitle: { color: "#a1a1aa", marginBottom: 24 },
-    label: { color: "#a1a1aa", marginBottom: 8, marginTop: 12 },
+    title: { color: WHITE, fontSize: 30, marginBottom: 8, fontWeight: "600" },
+    subtitle: { color: TEXT_COLOR, marginBottom: 24 },
+    label: { color: TEXT_COLOR, marginBottom: 8, marginTop: 12 },
     input: {
-        backgroundColor: "#18181b",
-        borderColor: "#27272a",
+        backgroundColor: BACKGROUND_COLOR,
+        borderColor: BORDER_COLOR,
         borderWidth: 1,
         borderRadius: 16,
         paddingHorizontal: 16,
         paddingVertical: 12,
-        color: "white",
+        color: WHITE,
     },
-    inputError: { borderColor: "#dc2626" },
-    errorText: { color: "#ef4444", marginTop: 8 },
+    inputError: { borderColor: ERROR_COLOR },
+    errorText: { color: ERROR_COLOR_LIGHT, marginTop: 8 },
     primaryButton: {
         marginTop: 20,
         backgroundColor: PRIMARY_COLOR,
@@ -251,8 +258,8 @@ const styles = StyleSheet.create({
     },
     primaryButtonDisabled: { opacity: 0.5 },
     primaryButtonText: { color: "white", fontWeight: "600" },
-    signInText: { color: "#a1a1aa", textAlign: "center", marginTop: 16 },
-    signInLink: { color: "#60a5fa" },
+    signInText: { color: TEXT_COLOR, textAlign: "center", marginTop: 16 },
+    signInLink: { color: PRIMARY_COLOR_LIGHT },
     hideKeyboardButton: {
         position: "absolute",
         right: 16,
@@ -261,9 +268,9 @@ const styles = StyleSheet.create({
         width: 44,
         height: 44,
         borderRadius: 999,
-        backgroundColor: "#18181b",
+        backgroundColor: BACKGROUND_COLOR,
         borderWidth: 1,
-        borderColor: "#27272a",
+        borderColor: BORDER_COLOR,
         shadowOpacity: 0.25,
         shadowRadius: 6,
         shadowOffset: { width: 0, height: 2 },
