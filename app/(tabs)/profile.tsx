@@ -1,9 +1,9 @@
 import { supabase } from '@/utils/supabase';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { Dumbbell, LogOut, Mail, User } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { Calendar, LogOut, RefreshCw } from 'lucide-react-native';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface UserProfile {
   id: string;
@@ -15,7 +15,9 @@ interface UserProfile {
 export default function ProfileScreen() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     fetchUserProfile();
@@ -26,15 +28,16 @@ export default function ProfileScreen() {
       setLoading(true);
       setError(null);
 
-      // Get current user session
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
 
       if (authError || !user) {
         setError('Failed to fetch user');
         return;
       }
 
-      // Fetch user metadata
       setProfile({
         id: user.id,
         email: user.email || '',
@@ -46,7 +49,13 @@ export default function ProfileScreen() {
       setError('An error occurred while loading your profile');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchUserProfile();
   };
 
   const handleLogout = async () => {
@@ -63,11 +72,30 @@ export default function ProfileScreen() {
     }
   };
 
+  const today = useMemo(() => {
+    const now = new Date();
+    return {
+      day: now.toLocaleDateString(undefined, { weekday: 'long' }),
+      date: now.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+    };
+  }, []);
+
+  const memberSince = profile?.created_at
+    ? new Date(profile.created_at).toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : 'N/A';
+
+  const accountStatus = profile?.email ? 'Verified' : 'Missing';
+  const profileScore = profile?.full_name && profile?.email ? '2/2' : '1/2';
+
   if (loading) {
     return (
       <View style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#5b7cff" />
+          <ActivityIndicator size="large" color="#2563eb" />
           <Text style={styles.loadingText}>Loading profile...</Text>
         </View>
       </View>
@@ -77,74 +105,72 @@ export default function ProfileScreen() {
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <LinearGradient colors={['#5b7cff', '#a855f7']} style={styles.headerGradient}>
-          <View style={styles.profileHeader}>
-            <View style={styles.avatarContainer}>
-              <User color="white" size={48} />
-            </View>
-            <Text style={styles.greeting}>Welcome,</Text>
-            <Text style={styles.profileName}>{profile?.full_name || 'User'}</Text>
-          </View>
-        </LinearGradient>
+        <View style={[styles.content, { paddingTop: insets.top + 18 }]}>
+          <Text style={styles.dayText}>{today.day}</Text>
+          <Text style={styles.dateText}>{today.date}</Text>
 
-        {/* Error Message */}
-        {error && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        )}
-
-        {/* Profile Information */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account Information</Text>
-
-          {/* Email */}
-          <View style={styles.infoCard}>
-            <View style={styles.infoIcon}>
-              <Mail color="#5b7cff" size={20} />
+          <View style={styles.primaryCard}>
+            <View style={styles.primaryHeaderRow}>
+              <View>
+                <Text style={styles.primaryLabel}>Your Profile</Text>
+                <Text style={styles.primaryTitle}>{profile?.full_name || 'User'}</Text>
+                <Text style={styles.primarySub}>{profile?.email || 'No email found'}</Text>
+              </View>
+              <View style={styles.primaryIconWrap}>
+                <Calendar color="#dbeafe" size={18} />
+              </View>
             </View>
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Email</Text>
-              <Text style={styles.infoValue}>{profile?.email}</Text>
-            </View>
-          </View>
 
-          {/* Member Since */}
-          <View style={styles.infoCard}>
-            <View style={styles.infoIcon}>
-              <Dumbbell color="#a855f7" size={20} />
-            </View>
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Member Since</Text>
-              <Text style={styles.infoValue}>
-                {profile?.created_at ? new Date(profile.created_at).toLocaleDateString() : 'N/A'}
+            <View style={styles.primaryDetailRow}>
+              <Text style={styles.primaryDetailKey}>Email</Text>
+              <Text style={styles.primaryDetailValue} numberOfLines={1}>
+                {profile?.email || 'N/A'}
               </Text>
             </View>
+            <View style={styles.primaryDetailRow}>
+              <Text style={styles.primaryDetailKey}>Member since</Text>
+              <Text style={styles.primaryDetailValue}>{memberSince}</Text>
+            </View>
+
+            <Pressable
+              style={styles.primaryActionButton}
+              onPress={handleRefresh}
+              android_ripple={{ color: 'rgba(37, 99, 235, 0.15)' }}
+              disabled={refreshing}
+            >
+              <RefreshCw color="#2563eb" size={16} />
+              <Text style={styles.primaryActionButtonText}>{refreshing ? 'Refreshing...' : 'Refresh Profile'}</Text>
+            </Pressable>
           </View>
-        </View>
 
-        {/* Actions */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Actions</Text>
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Member Since</Text>
+              <Text style={styles.statValue}>{memberSince}</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Account</Text>
+              <Text style={styles.statValueAccent}>{accountStatus}</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Profile</Text>
+              <Text style={styles.statValue}>{profileScore}</Text>
+            </View>
+          </View>
 
-          {/* Refresh Button */}
+          {error && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
+
           <Pressable
-            style={styles.actionButton}
-            onPress={fetchUserProfile}
-            android_ripple={{ color: 'rgba(91, 124, 255, 0.2)' }}
-          >
-            <Text style={styles.actionButtonText}>Refresh Profile</Text>
-          </Pressable>
-
-          {/* Logout Button */}
-          <Pressable
-            style={[styles.actionButton, styles.logoutButton]}
+            style={styles.logoutButton}
             onPress={handleLogout}
-            android_ripple={{ color: 'rgba(220, 38, 38, 0.2)' }}
+            android_ripple={{ color: 'rgba(239, 68, 68, 0.18)' }}
           >
-            <LogOut color="#ef4444" size={18} />
-            <Text style={[styles.actionButtonText, styles.logoutButtonText]}>Logout</Text>
+            <LogOut color="#ef4444" size={16} />
+            <Text style={styles.logoutButtonText}>Logout</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -155,11 +181,14 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: '#02040a',
   },
   scrollContent: {
     flexGrow: 1,
     paddingBottom: 24,
+  },
+  content: {
+    paddingHorizontal: 18,
   },
   loadingContainer: {
     flex: 1,
@@ -171,116 +200,146 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 16,
   },
-  headerGradient: {
-    paddingTop: 40,
-    paddingBottom: 32,
-    paddingHorizontal: 24,
-    alignItems: 'center',
+  dayText: {
+    color: '#f4f4f5',
+    fontSize: 40,
+    fontWeight: '600',
+    marginBottom: 4,
   },
-  profileHeader: {
-    alignItems: 'center',
+  dateText: {
+    color: '#71717a',
+    fontSize: 30,
+    fontWeight: '500',
+    marginBottom: 18,
   },
-  avatarContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  primaryCard: {
+    backgroundColor: '#2154f4',
+    borderRadius: 22,
+    padding: 18,
     marginBottom: 16,
   },
-  greeting: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 14,
-    marginBottom: 4,
+  primaryHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+    gap: 12,
   },
-  profileName: {
+  primaryLabel: {
+    color: '#bfdbfe',
+    fontSize: 18,
+    marginBottom: 6,
+  },
+  primaryTitle: {
     color: 'white',
-    fontSize: 28,
-    fontWeight: '700',
+    fontSize: 46,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  primarySub: {
+    color: '#dbeafe',
+    fontSize: 16,
+  },
+  primaryIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  primaryDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  primaryDetailKey: {
+    color: '#dbeafe',
+    fontSize: 15,
+    maxWidth: '48%',
+  },
+  primaryDetailValue: {
+    color: '#f8fafc',
+    fontSize: 15,
+    fontWeight: '500',
+    maxWidth: '50%',
+    textAlign: 'right',
+  },
+  primaryActionButton: {
+    marginTop: 16,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 18,
+    minHeight: 62,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  primaryActionButtonText: {
+    color: '#2563eb',
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: '#12141b',
+    borderColor: '#232734',
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    minHeight: 92,
+  },
+  statLabel: {
+    color: '#71717a',
+    fontSize: 13,
     marginBottom: 8,
   },
-  section: {
-    paddingHorizontal: 24,
-    marginTop: 24,
-  },
-  sectionTitle: {
-    color: '#a1a1aa',
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  infoCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#18181b',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#27272a',
-  },
-  infoIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    backgroundColor: '#27272a',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  infoContent: {
-    flex: 1,
-  },
-  infoLabel: {
-    color: '#71717a',
-    fontSize: 12,
-    marginBottom: 4,
+  statValue: {
+    color: '#f4f4f5',
+    fontSize: 23,
     fontWeight: '500',
   },
-  infoValue: {
-    color: '#ffffff',
-    fontSize: 16,
+  statValueAccent: {
+    color: '#4ade80',
+    fontSize: 23,
     fontWeight: '600',
-  },
-  actionButton: {
-    backgroundColor: '#2563eb',
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    marginBottom: 12,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  actionButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  logoutButton: {
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    borderWidth: 1,
-    borderColor: '#ef4444',
-  },
-  logoutButtonText: {
-    color: '#ef4444',
-    marginLeft: 8,
   },
   errorContainer: {
-    marginHorizontal: 24,
-    marginTop: 16,
-    backgroundColor: 'rgba(220, 38, 38, 0.1)',
-    borderRadius: 8,
+    backgroundColor: 'rgba(220, 38, 38, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(220, 38, 38, 0.4)',
+    borderRadius: 12,
     padding: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#dc2626',
+    marginTop: 14,
   },
   errorText: {
     color: '#ef4444',
     fontSize: 14,
     fontWeight: '500',
+  },
+  logoutButton: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#ef4444',
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    minHeight: 56,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    marginTop: 14,
+    gap: 8,
+  },
+  logoutButtonText: {
+    color: '#ef4444',
+    fontSize: 20,
+    fontWeight: '600',
   },
 });
