@@ -4,7 +4,15 @@ import { router } from 'expo-router';
 import { Dumbbell, LogOut, Mail, User } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-
+import {
+    BACKGROUND_COLOR, BACKGROUND_COLOR_DARK, BORDER_COLOR,
+    BUTTON_PICKED, ERROR_COLOR,
+    ERROR_COLOR_LIGHT, PLACEHOLDER_TEXT, PRIMARY_COLOR,
+    SECONDARY_COLOR,
+    SECONDARY_COLOR_LIGHT,
+    TEXT_COLOR,
+    WHITE
+} from "@/constants/colors";
 interface UserProfile {
   id: string;
   email: string;
@@ -67,7 +75,7 @@ export default function ProfileScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#5b7cff" />
+          <ActivityIndicator size="large" color={BUTTON_PICKED}/>
           <Text style={styles.loadingText}>Loading profile...</Text>
         </View>
       </View>
@@ -78,10 +86,10 @@ export default function ProfileScreen() {
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Header */}
-        <LinearGradient colors={['#5b7cff', '#a855f7']} style={styles.headerGradient}>
+        <LinearGradient colors={[BUTTON_PICKED, SECONDARY_COLOR_LIGHT]} style={styles.headerGradient}>
           <View style={styles.profileHeader}>
             <View style={styles.avatarContainer}>
-              <User color="white" size={48} />
+              <User color={WHITE} size={48} />
             </View>
             <Text style={styles.greeting}>Welcome,</Text>
             <Text style={styles.profileName}>{profile?.full_name || 'User'}</Text>
@@ -102,7 +110,7 @@ export default function ProfileScreen() {
           {/* Email */}
           <View style={styles.infoCard}>
             <View style={styles.infoIcon}>
-              <Mail color="#5b7cff" size={20} />
+              <Mail color={BUTTON_PICKED} size={20} />
             </View>
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Email</Text>
@@ -113,7 +121,7 @@ export default function ProfileScreen() {
           {/* Member Since */}
           <View style={styles.infoCard}>
             <View style={styles.infoIcon}>
-              <Dumbbell color="#a855f7" size={20} />
+              <Dumbbell color={SECONDARY_COLOR} size={20} />
             </View>
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Member Since</Text>
@@ -141,9 +149,8 @@ export default function ProfileScreen() {
           <Pressable
             style={[styles.actionButton, styles.logoutButton]}
             onPress={handleLogout}
-            android_ripple={{ color: 'rgba(220, 38, 38, 0.2)' }}
           >
-            <LogOut color="#ef4444" size={18} />
+            <LogOut color={ERROR_COLOR_LIGHT} size={18} />
             <Text style={[styles.actionButtonText, styles.logoutButtonText]}>Logout</Text>
           </Pressable>
         </View>
@@ -155,7 +162,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: BACKGROUND_COLOR_DARK,
   },
   scrollContent: {
     flexGrow: 1,
@@ -167,7 +174,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    color: '#a1a1aa',
+    color: TEXT_COLOR,
     marginTop: 12,
     fontSize: 16,
   },
@@ -190,7 +197,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   greeting: {
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: WHITE,
     fontSize: 14,
     marginBottom: 4,
   },
@@ -205,7 +212,7 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   sectionTitle: {
-    color: '#a1a1aa',
+    color: TEXT_COLOR,
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 12,
@@ -215,18 +222,18 @@ const styles = StyleSheet.create({
   infoCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#18181b',
+    backgroundColor: BACKGROUND_COLOR,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#27272a',
+    borderColor: BORDER_COLOR,
   },
   infoIcon: {
     width: 44,
     height: 44,
     borderRadius: 10,
-    backgroundColor: '#27272a',
+    backgroundColor: BORDER_COLOR,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -235,18 +242,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   infoLabel: {
-    color: '#71717a',
+    color: PLACEHOLDER_TEXT,
     fontSize: 12,
     marginBottom: 4,
     fontWeight: '500',
   },
   infoValue: {
-    color: '#ffffff',
+    color: WHITE,
     fontSize: 16,
     fontWeight: '600',
   },
   actionButton: {
-    backgroundColor: '#2563eb',
+    backgroundColor: PRIMARY_COLOR,
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 16,
@@ -263,10 +270,10 @@ const styles = StyleSheet.create({
   logoutButton: {
     backgroundColor: 'rgba(239, 68, 68, 0.1)',
     borderWidth: 1,
-    borderColor: '#ef4444',
+    borderColor: ERROR_COLOR_LIGHT,
   },
   logoutButtonText: {
-    color: '#ef4444',
+    color: ERROR_COLOR_LIGHT,
     marginLeft: 8,
   },
   errorContainer: {
@@ -276,10 +283,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     borderLeftWidth: 4,
-    borderLeftColor: '#dc2626',
+    borderLeftColor: ERROR_COLOR,
   },
   errorText: {
-    color: '#ef4444',
+    color: ERROR_COLOR_LIGHT,
     fontSize: 14,
     fontWeight: '500',
   },

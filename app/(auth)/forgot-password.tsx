@@ -17,7 +17,7 @@ import {
     BORDER_COLOR,
     ERROR_COLOR,
     ERROR_COLOR_LIGHT,
-    BUTTON_DISABLED, BACKGROUND_COLOR,
+    BUTTON_DISABLED, BACKGROUND_COLOR, SUCCESS,
 } from '@/constants/colors';
 import {router, Link } from 'expo-router';
 import BackButton from "@/components/ui/BackButton";
@@ -219,8 +219,7 @@ export default function ForgotPasswordScreen() {
             width: 64,
             height: 64,
             borderRadius: 999,
-            // TODO: add green constant to colors.ts
-            backgroundColor: '#16a34a',
+            backgroundColor: SUCCESS,
             alignItems: 'center',
             justifyContent: 'center',
             marginBottom: 20,

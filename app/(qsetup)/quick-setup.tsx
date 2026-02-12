@@ -3,6 +3,13 @@ import { SymbolView } from 'expo-symbols';
 import React, { useEffect, useState } from 'react';
 import { Keyboard, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+    BACKGROUND_COLOR,
+    BACKGROUND_COLOR_DARK,
+    BORDER_COLOR,
+    PLACEHOLDER_TEXT,
+    PRIMARY_COLOR, TEXT_COLOR, WHITE
+} from "@/constants/colors";
 
 export default function QSetupPage() {
     const [dateOfBirth, setDateOfBirth] = useState('');
@@ -86,25 +93,25 @@ export default function QSetupPage() {
                                 value={dateOfBirth}
                                 onChangeText={setDateOfBirth}
                                 placeholder="mm/dd/yyyy"
-                                placeholderTextColor="#71717a"
+                                placeholderTextColor={PLACEHOLDER_TEXT}
                                 style={styles.input}
                                 keyboardType="numbers-and-punctuation"
                             />
-                            <SymbolView name="calendar" size={20} tintColor="#71717a" style={styles.inputIcon} />
+                            <SymbolView name="calendar" size={20} tintColor={PLACEHOLDER_TEXT} style={styles.inputIcon} />
                         </View>
 
                         {/* Sex assigned at birth */}
                         <Text style={styles.label}>Sex assigned at birth</Text>
                         <Pressable style={styles.dropdown}>
                             <Text style={styles.dropdownPlaceholder}>Select...</Text>
-                            <SymbolView name="chevron.down" size={16} tintColor="#71717a" />
+                            <SymbolView name="chevron.down" size={16} tintColor={PLACEHOLDER_TEXT} />
                         </Pressable>
 
                         {/* Gender identity */}
                         <Text style={styles.label}>Gender identity <Text style={styles.optional}>(optional)</Text></Text>
                         <Pressable style={styles.dropdown}>
                             <Text style={styles.dropdownPlaceholder}>Select...</Text>
-                            <SymbolView name="chevron.down" size={16} tintColor="#71717a" />
+                            <SymbolView name="chevron.down" size={16} tintColor={PLACEHOLDER_TEXT} />
                         </Pressable>
 
                         {/* Weight */}
@@ -114,7 +121,7 @@ export default function QSetupPage() {
                                 value={weight}
                                 onChangeText={setWeight}
                                 placeholder="Enter weight"
-                                placeholderTextColor="#71717a"
+                                placeholderTextColor={PLACEHOLDER_TEXT}
                                 style={styles.weightInput}
                                 keyboardType="decimal-pad"
                             />
@@ -152,7 +159,7 @@ export default function QSetupPage() {
                         <Text style={styles.label}>Training experience</Text>
                         <Pressable style={styles.dropdown}>
                             <Text style={styles.dropdownPlaceholder}>Select...</Text>
-                            <SymbolView name="chevron.down" size={16} tintColor="#71717a" />
+                            <SymbolView name="chevron.down" size={16} tintColor={PLACEHOLDER_TEXT} />
                         </Pressable>
 
                         {/* Continue Button */}
@@ -196,7 +203,7 @@ export default function QSetupPage() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#09090b",
+        backgroundColor: BACKGROUND_COLOR_DARK,
     },
     content: {
         paddingHorizontal: 24,
@@ -209,17 +216,17 @@ const styles = StyleSheet.create({
         fontWeight: "600",
     },
     subtitle: {
-        color: "#a1a1aa",
+        color: TEXT_COLOR,
         marginBottom: 24,
         fontSize: 16,
     },
     healthCard: {
-        backgroundColor: "#18181b",
+        backgroundColor: BACKGROUND_COLOR,
         borderRadius: 16,
         padding: 16,
         marginBottom: 24,
         borderWidth: 1,
-        borderColor: "#27272a",
+        borderColor: BORDER_COLOR,
     },
     healthCardHeader: {
         flexDirection: "row",
@@ -229,7 +236,7 @@ const styles = StyleSheet.create({
         width: 48,
         height: 48,
         borderRadius: 12,
-        backgroundColor: "#2563eb",
+        backgroundColor: PRIMARY_COLOR,
         alignItems: "center",
         justifyContent: "center",
         marginRight: 12,
@@ -244,7 +251,7 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     healthCardSubtitle: {
-        color: "#a1a1aa",
+        color: TEXT_COLOR,
         fontSize: 14,
         lineHeight: 18,
     },
@@ -254,7 +261,7 @@ const styles = StyleSheet.create({
         gap: 16,
     },
     healthConnectButton: {
-        backgroundColor: "#2563eb",
+        backgroundColor: PRIMARY_COLOR,
         paddingVertical: 12,
         paddingHorizontal: 32,
         borderRadius: 999,
@@ -267,27 +274,27 @@ const styles = StyleSheet.create({
         fontWeight: "600",
     },
     healthNotNowText: {
-        color: "#a1a1aa",
+        color: TEXT_COLOR,
         fontSize: 16,
         fontWeight: "600",
     },
     label: {
-        color: "#a1a1aa",
+        color: TEXT_COLOR,
         marginBottom: 8,
         marginTop: 16,
         fontSize: 14,
     },
     optional: {
-        color: "#71717a",
+        color: PLACEHOLDER_TEXT,
     },
     input: {
-        backgroundColor: "#18181b",
-        borderColor: "#27272a",
+        backgroundColor: BACKGROUND_COLOR,
+        borderColor: BORDER_COLOR,
         borderWidth: 1,
         borderRadius: 16,
         paddingHorizontal: 16,
         paddingVertical: 14,
-        color: "white",
+        color: WHITE,
         fontSize: 16,
     },
     inputWithIcon: {
@@ -299,8 +306,8 @@ const styles = StyleSheet.create({
         top: 14,
     },
     dropdown: {
-        backgroundColor: "#18181b",
-        borderColor: "#27272a",
+        backgroundColor: BACKGROUND_COLOR,
+        borderColor: BORDER_COLOR,
         borderWidth: 1,
         borderRadius: 16,
         paddingHorizontal: 16,
@@ -310,7 +317,7 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     dropdownPlaceholder: {
-        color: "#71717a",
+        color: PLACEHOLDER_TEXT,
         fontSize: 16,
     },
     weightContainer: {
@@ -319,8 +326,8 @@ const styles = StyleSheet.create({
     },
     weightInput: {
         flex: 1,
-        backgroundColor: "#18181b",
-        borderColor: "#27272a",
+        backgroundColor: BACKGROUND_COLOR,
+        borderColor: BORDER_COLOR,
         borderWidth: 1,
         borderRadius: 16,
         paddingHorizontal: 16,
@@ -330,10 +337,10 @@ const styles = StyleSheet.create({
     },
     weightUnitToggle: {
         flexDirection: "row",
-        backgroundColor: "#18181b",
+        backgroundColor: BACKGROUND_COLOR,
         borderRadius: 16,
         borderWidth: 1,
-        borderColor: "#27272a",
+        borderColor: BORDER_COLOR,
         overflow: "hidden",
     },
     weightUnitButton: {
@@ -351,10 +358,10 @@ const styles = StyleSheet.create({
         borderBottomLeftRadius: 0,
     },
     weightUnitButtonActive: {
-        backgroundColor: "#2563eb",
+        backgroundColor: PRIMARY_COLOR,
     },
     weightUnitText: {
-        color: "#71717a",
+        color: PLACEHOLDER_TEXT,
         fontSize: 16,
         fontWeight: "600",
     },
@@ -363,25 +370,25 @@ const styles = StyleSheet.create({
     },
     primaryButton: {
         marginTop: 24,
-        backgroundColor: "#2563eb",
+        backgroundColor: PRIMARY_COLOR,
         paddingVertical: 14,
         borderRadius: 16,
         alignItems: "center",
     },
     primaryButtonText: {
-        color: "white",
+        color: WHITE,
         fontWeight: "600",
         fontSize: 16,
     },
     secondaryButton: {
         marginTop: 12,
-        backgroundColor: "#27272a",
+        backgroundColor: BORDER_COLOR,
         paddingVertical: 14,
         borderRadius: 16,
         alignItems: "center",
     },
     secondaryButtonText: {
-        color: "#a1a1aa",
+        color: TEXT_COLOR,
         fontWeight: "600",
         fontSize: 16,
     },
@@ -393,9 +400,9 @@ const styles = StyleSheet.create({
         width: 44,
         height: 44,
         borderRadius: 999,
-        backgroundColor: "#18181b",
+        backgroundColor: BACKGROUND_COLOR,
         borderWidth: 1,
-        borderColor: "#27272a",
+        borderColor: BORDER_COLOR,
         shadowOpacity: 0.25,
         shadowRadius: 6,
         shadowOffset: { width: 0, height: 2 },
