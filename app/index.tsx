@@ -4,13 +4,13 @@ import { Dumbbell } from "lucide-react-native";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import {
-    BACKGROUND_COLOR_DARK, BORDER_COLOR, BUTTON_DISABLED,
-    BUTTON_PICKED,
-    PLACEHOLDER_TEXT,
-    SECONDARY_COLOR_LIGHT,
-    TEXT_COLOR,
-    WHITE
-} from "@/constants/colors";
+  BACKGROUND_COLOR_DARK, BORDER_COLOR, BUTTON_DISABLED,
+  BUTTON_PICKED,
+  PLACEHOLDER_TEXT,
+  SECONDARY_COLOR_LIGHT,
+  TEXT_COLOR,
+  WHITE
+} from "../constants/colors";
 
 export default function Index() {
     const router = useRouter();

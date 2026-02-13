@@ -11,8 +11,10 @@ import {
     BACKGROUND_COLOR_DARK,
     BORDER_COLOR,
     PLACEHOLDER_TEXT,
-    PRIMARY_COLOR, TEXT_COLOR, WHITE
-} from "@/constants/colors";
+    PRIMARY_COLOR,
+    TEXT_COLOR,
+    WHITE
+} from '../../constants/colors';
 
 export default function QSetupPage() {
     const [dateOfBirth, setDateOfBirth] = useState('');
@@ -95,27 +97,27 @@ export default function QSetupPage() {
         }
 
         try {
-            // Get current user session - try multiple methods
+            // Get current user session 
             let userId: string | null = null;
             
-            // Method 1: Try getSession (more reliable immediately after signup)
+            // try getSession 
             const { data: { session }, error: sessionError } = await supabase.auth.getSession();
             
             if (session?.user) {
                 userId = session.user.id;
                 console.log('[Quick Setup] User authenticated via getSession:', userId);
             } else {
-                // Method 2: Try getUser as fallback
+                //  Try getUser as fallback
                 const { data: { user }, error: authError } = await supabase.auth.getUser();
                 
                 if (user) {
                     userId = user.id;
                     console.log('[Quick Setup] User authenticated via getUser:', userId);
                 } else {
-                    // DEV MODE: Use hardcoded user ID for testing (REMOVE BEFORE PRODUCTION!)
-                    // This is the user_id from your screenshot: "dani test"
+                    // DEV MODE: Use hardcoded user ID for testing 
+                
                     userId = 'e3f19ef7-9cac-4436-9f15-97fb6d469eba';
-                    console.log('[Quick Setup] ⚠️ DEV MODE: Using hardcoded user_id for testing:', userId);
+                    console.log('[Quick Setup]  DEV MODE: Using hardcoded user_id for testing:', userId);
                     console.log('[Quick Setup] Auth error - session:', sessionError?.message, 'user:', authError?.message);
                 }
             }
@@ -131,7 +133,7 @@ export default function QSetupPage() {
                 weightLb = weightUnit === 'kg' ? kgToLb(weightNum) : weightNum;
             }
 
-            // Use lowercase column names (Postgres default)
+            
             const payload = {
                 date_of_birth: parsedDate,
                 sex_assigned_at_birth: sexAssigned,
@@ -146,16 +148,11 @@ export default function QSetupPage() {
             console.log('[Quick Setup] Updating user_profile with payload:', payload);
             console.log('[Quick Setup] Using user_id:', userId);
 
-            // Upsert user profile (insert if doesn't exist, update if it does)
+            // Update user profile
             const { data, error: updateError } = await supabase
                 .from('user_profile')
-                .upsert({ 
-                    user_id: userId,
-                    ...payload 
-                }, { 
-                    onConflict: 'user_id',
-                    ignoreDuplicates: false 
-                })
+                .update(payload)
+                .eq('user_id', userId)
                 .select();
 
             if (updateError) {
