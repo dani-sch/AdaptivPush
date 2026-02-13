@@ -1,7 +1,659 @@
-import { View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import Slider from "@react-native-community/slider";
+import React, { useState } from "react";
+import {
+    Dimensions,
+    Modal,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import NextWorkoutCard, {
+    WorkoutSummary,
+} from "../../components/NextWorkoutCard";
+import {
+    BACKGROUND_COLOR,
+    BACKGROUND_COLOR_DARK,
+    BORDER_COLOR,
+    BUTTON_DISABLED,
+    PLACEHOLDER_TEXT,
+    PRIMARY_COLOR,
+    TEXT_COLOR,
+    WHITE,
+} from "../../constants/colors";
 
-export default function HomeScreen(){
-    return (
-        <View style={{flex: 1}}/>
-    );
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+
+// pink accent for sliders and cycle selector (not available in colors.ts)
+const PINK_ACCENT = "#ec4899";
+
+type CyclePhase =
+  | "Follicular"
+  | "Ovulation"
+  | "Luteal"
+  | "Menstruation"
+  | "N/A";
+
+// ==================== MOCK DATA ====================
+
+const MOCK_WORKOUT: WorkoutSummary = {
+  name: "Upper Body A",
+  durationMinutes: 75,
+  exercises: [
+    { name: "Barbell Bench Press", prescription: "4×6–8" },
+    { name: "Barbell Row", prescription: "4×8–10" },
+    { name: "Overhead Press", prescription: "3×8–10" },
+    { name: "Lateral Raises", prescription: "3×12–15" },
+    { name: "Tricep Pushdowns", prescription: "3×12–15" },
+  ],
+  remainingExerciseCount: 2,
+};
+
+// ==================== HEADER COMPONENTS ====================
+
+const HeaderDateBlock: React.FC = () => {
+  const dayOfWeek = "Friday";
+  const date = "Feb 13";
+
+  return (
+    <View style={styles.headerDateBlock}>
+      <Text style={styles.dayOfWeek}>{dayOfWeek}</Text>
+      <Text style={styles.date}>{date}</Text>
+    </View>
+  );
+};
+
+// ==================== NEXT WORKOUT SECTION ====================
+
+const NextWorkoutSection: React.FC<{ onPressStart?: () => void }> = ({
+  onPressStart,
+}) => {
+  return (
+    <NextWorkoutCard
+      workout={MOCK_WORKOUT}
+      onPressStart={onPressStart}
+      onPressCalendar={() => console.log("Calendar pressed")}
+    />
+  );
+};
+
+// ==================== STATS ROW ====================
+
+const StatCard: React.FC<{
+  label: string;
+  value: string;
+  showUpArrow?: boolean;
+}> = ({ label, value, showUpArrow }) => {
+  return (
+    <View style={styles.statCard}>
+      <Text style={styles.statLabel}>{label}</Text>
+      <View style={styles.statValueContainer}>
+        <Text style={styles.statValue}>{value}</Text>
+        {showUpArrow && <Text style={styles.upArrow}>↗</Text>}
+      </View>
+    </View>
+  );
+};
+
+const StatsRow: React.FC = () => {
+  return (
+    <View style={styles.statsRow}>
+      <StatCard label="Last Workout" value="Jan 21" />
+      <StatCard label="Readiness" value="8.2" showUpArrow />
+      <StatCard label="Week" value="4/12" />
+    </View>
+  );
+};
+
+// ==================== READINESS PROMPT CARD ====================
+
+const ReadinessPromptCard: React.FC<{ onPress: () => void }> = ({
+  onPress,
+}) => {
+  return (
+    <Pressable
+      style={({ pressed }) => [
+        styles.readinessPromptCard,
+        pressed && { opacity: 0.8 },
+      ]}
+      onPress={onPress}
+    >
+      <Text style={styles.readinessPromptTitle}>
+        How are you feeling today?
+      </Text>
+      <Text style={styles.readinessPromptSubtitle}>
+        Quick readiness check-in
+      </Text>
+    </Pressable>
+  );
+};
+
+const ModalHeader: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  return (
+    <View style={styles.modalHeader}>
+      <Text style={styles.modalTitle}>Readiness Check-in</Text>
+      <Pressable onPress={onClose} style={styles.closeButton} hitSlop={8}>
+        <Ionicons name="close" size={24} color={TEXT_COLOR} />
+      </Pressable>
+    </View>
+  );
+};
+
+const SliderRow: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  minLabel: string;
+  maxLabel: string;
+  sliderValue: number;
+  sliderMin: number;
+  sliderMax: number;
+  onSliderChange: (value: number) => void;
+}> = ({
+  icon,
+  label,
+  value,
+  minLabel,
+  maxLabel,
+  sliderValue,
+  sliderMin,
+  sliderMax,
+  onSliderChange,
+}) => {
+  return (
+    <View style={styles.sliderRowContainer}>
+      <View style={styles.sliderRowHeader}>
+        <View style={styles.sliderRowLeft}>
+          {icon}
+          <Text style={styles.sliderRowLabel}>{label}</Text>
+        </View>
+        <Text style={styles.sliderRowValue}>{value}</Text>
+      </View>
+      <View style={styles.sliderWrapper}>
+        <Slider
+          style={styles.slider}
+          value={sliderValue}
+          minimumValue={sliderMin}
+          maximumValue={sliderMax}
+          step={1}
+          onValueChange={onSliderChange}
+          minimumTrackTintColor={PINK_ACCENT}
+          maximumTrackTintColor={PLACEHOLDER_TEXT}
+          thumbTintColor={PINK_ACCENT}
+        />
+        <View style={styles.sliderLabels}>
+          <Text style={styles.sliderLabelText}>{minLabel}</Text>
+          <Text style={styles.sliderLabelText}>{maxLabel}</Text>
+        </View>
+      </View>
+    </View>
+  );
+};
+
+const CycleSelector: React.FC<{
+  selectedPhase: CyclePhase;
+  onSelectPhase: (phase: CyclePhase) => void;
+}> = ({ selectedPhase, onSelectPhase }) => {
+  const phases: Exclude<CyclePhase, "N/A">[] = [
+    "Follicular",
+    "Ovulation",
+    "Luteal",
+    "Menstruation",
+  ];
+
+  return (
+    <View style={styles.cycleSelectorContainer}>
+      <View style={styles.cycleSelectorHeader}>
+        <Ionicons name="pulse" size={20} color={PINK_ACCENT} />
+        <Text style={styles.cycleSelectorLabel}>Menstrual Cycle</Text>
+      </View>
+      <View style={styles.cycleButtonsGrid}>
+        {phases.map((phase) => (
+          <Pressable
+            key={phase}
+            style={({ pressed }) => [
+              styles.cyclePhaseButton,
+              selectedPhase === phase && styles.cyclePhaseButtonSelected,
+              pressed && { opacity: 0.7 },
+            ]}
+            onPress={() => onSelectPhase(phase)}
+          >
+            <Text
+              style={[
+                styles.cyclePhaseButtonText,
+                selectedPhase === phase && styles.cyclePhaseButtonTextSelected,
+              ]}
+            >
+              {phase}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      <Pressable
+        style={({ pressed }) => [
+          styles.naButton,
+          selectedPhase === "N/A" && styles.naButtonSelected,
+          pressed && { opacity: 0.8 },
+        ]}
+        onPress={() => onSelectPhase("N/A")}
+      >
+        <Text style={styles.naButtonText}>N/A</Text>
+      </Pressable>
+    </View>
+  );
+};
+
+const ModalFooterButtons: React.FC<{
+  onContinue: () => void;
+  onSkip: () => void;
+}> = ({ onContinue, onSkip }) => {
+  return (
+    <View style={styles.modalFooter}>
+      <Pressable
+        style={({ pressed }) => [
+          styles.continueButton,
+          pressed && { opacity: 0.8 },
+        ]}
+        onPress={onContinue}
+      >
+        <Text style={styles.continueButtonText}>Continue</Text>
+      </Pressable>
+      <Pressable
+        style={({ pressed }) => [
+          styles.skipButton,
+          pressed && { opacity: 0.7 },
+        ]}
+        onPress={onSkip}
+      >
+        <Text style={styles.skipButtonText}>Skip for now</Text>
+      </Pressable>
+    </View>
+  );
+};
+
+// ==================== READINESS CHECK-IN MODAL ====================
+
+const ReadinessCheckInModal: React.FC<{
+  visible: boolean;
+  onClose: () => void;
+}> = ({ visible, onClose }) => {
+  const [sleepHours, setSleepHours] = useState<number>(7);
+  const [stressLevel, setStressLevel] = useState<number>(5);
+  const [cyclePhase, setCyclePhase] = useState<CyclePhase>("N/A");
+
+  const handleContinue = () => {
+    console.log("Readiness data:", { sleepHours, stressLevel, cyclePhase });
+    onClose();
+  };
+
+  const handleSkip = () => {
+    onClose();
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContainer}>
+          <ScrollView
+            contentContainerStyle={styles.modalContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <ModalHeader onClose={onClose} />
+
+            <View style={styles.modalDivider} />
+
+            <SliderRow
+              icon={<Ionicons name="moon" size={20} color="#60a5fa" />}
+              label="Sleep Quality"
+              value={`${sleepHours}h`}
+              minLabel="3h"
+              maxLabel="12h"
+              sliderValue={sleepHours}
+              sliderMin={3}
+              sliderMax={12}
+              onSliderChange={setSleepHours}
+            />
+
+            <SliderRow
+              icon={<Ionicons name="analytics" size={20} color="#a855f7" />}
+              label="Stress Level"
+              value={`${stressLevel}/10`}
+              minLabel="Low"
+              maxLabel="High"
+              sliderValue={stressLevel}
+              sliderMin={0}
+              sliderMax={10}
+              onSliderChange={setStressLevel}
+            />
+
+            <CycleSelector
+              selectedPhase={cyclePhase}
+              onSelectPhase={setCyclePhase}
+            />
+
+            <ModalFooterButtons
+              onContinue={handleContinue}
+              onSkip={handleSkip}
+            />
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+// ==================== MAIN HOME SCREEN ====================
+
+export default function HomeScreen() {
+  const [isModalVisible, setIsModalVisible] = useState(false);
+
+  const handleStartWorkout = () => {
+    console.log("Start workout pressed");
+  };
+
+  const handleOpenReadinessModal = () => {
+    setIsModalVisible(true);
+  };
+
+  const handleCloseReadinessModal = () => {
+    setIsModalVisible(false);
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <HeaderDateBlock />
+        <NextWorkoutSection onPressStart={handleStartWorkout} />
+        <StatsRow />
+        <ReadinessPromptCard onPress={handleOpenReadinessModal} />
+      </ScrollView>
+
+      <ReadinessCheckInModal
+        visible={isModalVisible}
+        onClose={handleCloseReadinessModal}
+      />
+    </SafeAreaView>
+  );
 }
+
+// ==================== STYLES ====================
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: BACKGROUND_COLOR,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 32,
+  },
+
+  headerDateBlock: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 16,
+  },
+  dayOfWeek: {
+    color: WHITE,
+    fontSize: 32,
+    fontWeight: "700",
+    marginBottom: 2,
+  },
+  date: {
+    color: TEXT_COLOR,
+    fontSize: 16,
+    fontWeight: "500",
+  },
+
+  statsRow: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    gap: 12,
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: BORDER_COLOR,
+    borderRadius: 16,
+    padding: 16,
+    paddingVertical: 18,
+  },
+  statLabel: {
+    color: TEXT_COLOR,
+    fontSize: 12,
+    fontWeight: "500",
+    marginBottom: 8,
+  },
+  statValueContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  statValue: {
+    color: WHITE,
+    fontSize: 20,
+    fontWeight: "700",
+  },
+  upArrow: {
+    color: "#16a34a",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+
+  readinessPromptCard: {
+    backgroundColor: BORDER_COLOR,
+    borderRadius: 20,
+    padding: 24,
+    marginHorizontal: 16,
+    marginTop: 8,
+  },
+  readinessPromptTitle: {
+    color: WHITE,
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 6,
+  },
+  readinessPromptSubtitle: {
+    color: TEXT_COLOR,
+    fontSize: 14,
+    fontWeight: "500",
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.85)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  modalContainer: {
+    backgroundColor: BACKGROUND_COLOR_DARK,
+    borderRadius: 24,
+    width: "100%",
+    maxWidth: 500,
+    maxHeight: SCREEN_HEIGHT * 0.75,
+  },
+  modalContent: {
+    padding: 24,
+    paddingBottom: 32,
+  },
+
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  modalTitle: {
+    color: WHITE,
+    fontSize: 22,
+    fontWeight: "700",
+  },
+  closeButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: BUTTON_DISABLED,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalDivider: {
+    height: 1,
+    backgroundColor: BORDER_COLOR,
+    marginBottom: 24,
+  },
+
+  sliderRowContainer: {
+    marginBottom: 28,
+  },
+  sliderRowHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  sliderRowLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  sliderRowLabel: {
+    color: WHITE,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  sliderRowValue: {
+    color: WHITE,
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  sliderWrapper: {
+    marginTop: 4,
+  },
+  slider: {
+    width: "100%",
+    height: 40,
+  },
+  sliderLabels: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 4,
+  },
+  sliderLabelText: {
+    color: TEXT_COLOR,
+    fontSize: 13,
+    fontWeight: "500",
+  },
+
+  cycleSelectorContainer: {
+    marginBottom: 24,
+  },
+  cycleSelectorHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 16,
+  },
+  cycleSelectorLabel: {
+    color: WHITE,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  cycleButtonsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    marginBottom: 12,
+    gap: 12,
+  },
+  cyclePhaseButton: {
+    width: "48%",
+    backgroundColor: BUTTON_DISABLED,
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  cyclePhaseButtonSelected: {
+    backgroundColor: "rgba(236, 72, 153, 0.2)", // PINK_ACCENT with opacity
+    borderColor: PINK_ACCENT,
+  },
+  cyclePhaseButtonText: {
+    color: TEXT_COLOR,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  cyclePhaseButtonTextSelected: {
+    color: WHITE,
+  },
+  naButton: {
+    width: "100%",
+    backgroundColor: PINK_ACCENT,
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "transparent",
+  },
+  naButtonSelected: {
+    borderColor: "#f9a8d4", // lighter pink for selected state
+    shadowColor: PINK_ACCENT,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  naButtonText: {
+    color: WHITE,
+    fontSize: 17,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+
+  modalFooter: {
+    marginTop: 8,
+    gap: 16,
+  },
+  continueButton: {
+    backgroundColor: PRIMARY_COLOR,
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  continueButtonText: {
+    color: WHITE,
+    fontSize: 17,
+    fontWeight: "700",
+  },
+  skipButton: {
+    backgroundColor: "transparent",
+    paddingVertical: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  skipButtonText: {
+    color: TEXT_COLOR,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+});

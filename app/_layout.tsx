@@ -19,6 +19,7 @@ export default function RootLayout() {
                 <Stack.Screen name="(auth)" options={{ headerShown: false }} />
                 <Stack.Screen name="(qsetup)" options={{ headerShown: false }} />
                 <Stack.Screen name="index" options={{ headerShown: false }} />
+                <Stack.Screen name="workout-history" options={{ headerShown: false }} />
                 <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
             </Stack>
             <StatusBar style="auto" />

@@ -1,8 +1,17 @@
 import { supabase } from '@/utils/supabase';
 import { router } from 'expo-router';
-import { Calendar, LogOut, RefreshCw } from 'lucide-react-native';
+import { Calendar, ChevronRight, LogOut, RefreshCw } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+    BACKGROUND_COLOR, BACKGROUND_COLOR_DARK, BORDER_COLOR,
+    BUTTON_PICKED, ERROR_COLOR,
+    ERROR_COLOR_LIGHT, PLACEHOLDER_TEXT, PRIMARY_COLOR,
+    SECONDARY_COLOR,
+    SECONDARY_COLOR_LIGHT,
+    TEXT_COLOR,
+    WHITE
+} from "@/constants/colors";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface UserProfile {
@@ -72,6 +81,10 @@ export default function ProfileScreen() {
     }
   };
 
+  const goToWorkoutHistory = () => {
+    router.push('/workout-history');
+  };
+
   const today = useMemo(() => {
     const now = new Date();
     return {
@@ -95,7 +108,7 @@ export default function ProfileScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2563eb" />
+          <ActivityIndicator size="large" color={BUTTON_PICKED}/>
           <Text style={styles.loadingText}>Loading profile...</Text>
         </View>
       </View>
@@ -158,6 +171,18 @@ export default function ProfileScreen() {
             </View>
           </View>
 
+          <Pressable
+            style={styles.workoutHistoryButton}
+            onPress={goToWorkoutHistory}
+            android_ripple={{ color: 'rgba(37, 99, 235, 0.15)' }}
+          >
+            <View>
+              <Text style={styles.workoutHistoryLabel}>Training</Text>
+              <Text style={styles.workoutHistoryTitle}>Workout History</Text>
+            </View>
+            <ChevronRight color="#dbeafe" size={18} />
+          </Pressable>
+
           {error && (
             <View style={styles.errorContainer}>
               <Text style={styles.errorText}>{error}</Text>
@@ -167,10 +192,9 @@ export default function ProfileScreen() {
           <Pressable
             style={styles.logoutButton}
             onPress={handleLogout}
-            android_ripple={{ color: 'rgba(239, 68, 68, 0.18)' }}
           >
-            <LogOut color="#ef4444" size={16} />
-            <Text style={styles.logoutButtonText}>Logout</Text>
+            <LogOut color={ERROR_COLOR_LIGHT} size={18} />
+            <Text style={[styles.actionButtonText, styles.logoutButtonText]}>Logout</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -181,7 +205,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#02040a',
+    backgroundColor: BACKGROUND_COLOR_DARK,
   },
   scrollContent: {
     flexGrow: 1,
@@ -196,7 +220,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    color: '#a1a1aa',
+    color: TEXT_COLOR,
     marginTop: 12,
     fontSize: 16,
   },
@@ -285,6 +309,7 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     gap: 10,
+    marginBottom: 12,
   },
   statCard: {
     flex: 1,
@@ -311,6 +336,26 @@ const styles = StyleSheet.create({
     fontSize: 23,
     fontWeight: '600',
   },
+  workoutHistoryButton: {
+    backgroundColor: '#1d4ed8',
+    borderRadius: 16,
+    minHeight: 72,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexDirection: 'row',
+  },
+  workoutHistoryLabel: {
+    color: '#bfdbfe',
+    fontSize: 13,
+    marginBottom: 4,
+  },
+  workoutHistoryTitle: {
+    color: '#ffffff',
+    fontSize: 19,
+    fontWeight: '600',
+  },
   errorContainer: {
     backgroundColor: 'rgba(220, 38, 38, 0.12)',
     borderWidth: 1,
@@ -320,7 +365,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   errorText: {
-    color: '#ef4444',
+    color: ERROR_COLOR_LIGHT,
     fontSize: 14,
     fontWeight: '500',
   },

@@ -14,8 +14,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
-    BACKGROUND_COLOR,
-    BORDER_COLOR, PLACEHOLDER_TEXT,
+    BACKGROUND_COLOR, BACKGROUND_COLOR_DARK,
+    BORDER_COLOR, ERROR_COLOR, ERROR_COLOR_LIGHT, PLACEHOLDER_TEXT,
     PRIMARY_COLOR,
     PRIMARY_COLOR_LIGHT,
     TEXT_COLOR,
@@ -226,7 +226,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#09090b", // zinc-950-ish
+        backgroundColor: BACKGROUND_COLOR_DARK
     },
     header: {
         paddingHorizontal: 16,
@@ -237,12 +237,12 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 999,
-        backgroundColor: "#18181b", // zinc-900-ish
+        backgroundColor: BACKGROUND_COLOR,
         alignItems: "center",
         justifyContent: "center",
     },
     backText: {
-        color: "white",
+        color: WHITE,
         fontSize: 18,
     },
     content: {
@@ -250,23 +250,23 @@ const styles = StyleSheet.create({
         paddingTop: 24,
     },
     title: {
-        color: "white",
+        color: WHITE,
         fontSize: 30,
         marginBottom: 8,
         fontWeight: "600",
     },
     subtitle: {
-        color: "#a1a1aa",
+        color: TEXT_COLOR,
         marginBottom: 24,
     },
     label: {
-        color: "#a1a1aa",
+        color: TEXT_COLOR,
         marginBottom: 8,
         marginTop: 12,
     },
     input: {
-        backgroundColor: "#18181b",
-        borderColor: "#27272a",
+        backgroundColor: BACKGROUND_COLOR,
+        borderColor: BORDER_COLOR,
         borderWidth: 1,
         borderRadius: 16,
         paddingHorizontal: 16,
@@ -274,10 +274,10 @@ const styles = StyleSheet.create({
         color: "white",
     },
     inputError: {
-        borderColor: "#dc2626",
+        borderColor: ERROR_COLOR,
     },
     errorText: {
-        color: "#ef4444",
+        color: ERROR_COLOR_LIGHT,
         marginTop: 8,
     },
     forgotWrap: {
@@ -320,10 +320,10 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: BORDER_COLOR,
         // small lift so it feels tappable
-        shadowOpacity: Platform.OS === "ios" ? 0.25 : 0,
-        shadowRadius: Platform.OS === "ios" ? 6 : 0,
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
         shadowOffset: { width: 0, height: 2 },
-        elevation: Platform.OS === "android" ? 6 : 0,
+        elevation: 6,
     },
     hideKeyboardText: {
         color: WHITE,

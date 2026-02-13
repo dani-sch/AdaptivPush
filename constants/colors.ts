@@ -1,12 +1,13 @@
-// reusable color palatte for easy switching...
+// reusable color palette for easy switching...
 
 // Primary color for buttons and accents
 export const PRIMARY_COLOR = '#2563EB';
 export const PRIMARY_COLOR_LIGHT = '#60a5fa'
 
 export const SECONDARY_COLOR = '#9333EA';
+export const SECONDARY_COLOR_LIGHT = '#a855f7';
 
-export const BUTTON_PICKED = '#3B82F6';
+export const BUTTON_PICKED = '#5b7cff';
 export const BUTTON_DISABLED = '#3F3F46';
 
 export const BACKGROUND_COLOR = '#18181b';
@@ -26,3 +27,4 @@ export const ERROR_COLOR_LIGHT = '#ef4444';
 export const CARD_BG = '#111113';          // slightly darker than BACKGROUND_COLOR
 export const SURFACE_BG = '#0f0f12';       // for dropdowns / surfaces
 export const MUTED_BG = '#222226';         // subtle chip/background
+export const SUCCESS = '#16a34a';
