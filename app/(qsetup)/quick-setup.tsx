@@ -11,10 +11,8 @@ import {
     BACKGROUND_COLOR_DARK,
     BORDER_COLOR,
     PLACEHOLDER_TEXT,
-    PRIMARY_COLOR,
-    TEXT_COLOR,
-    WHITE
-} from '../../constants/colors';
+    PRIMARY_COLOR, TEXT_COLOR, WHITE
+} from "@/constants/colors";
 
 export default function QSetupPage() {
     const [dateOfBirth, setDateOfBirth] = useState('');

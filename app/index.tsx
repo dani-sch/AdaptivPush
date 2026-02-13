@@ -3,7 +3,14 @@ import { useRouter } from "expo-router";
 import { Dumbbell } from "lucide-react-native";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import {PLACEHOLDER_TEXT, WHITE} from "@/constants/colors";
+import {
+    BACKGROUND_COLOR_DARK, BORDER_COLOR, BUTTON_DISABLED,
+    BUTTON_PICKED,
+    PLACEHOLDER_TEXT,
+    SECONDARY_COLOR_LIGHT,
+    TEXT_COLOR,
+    WHITE
+} from "@/constants/colors";
 
 export default function Index() {
     const router = useRouter();
@@ -14,7 +21,7 @@ export default function Index() {
             <View style={styles.content}>
                 {/* Logo */}
                 <LinearGradient
-                    colors={['#5b7cff', '#a855f7']}
+                    colors={[BUTTON_PICKED, SECONDARY_COLOR_LIGHT]}
                     style={styles.logo}
                 >
                     <Dumbbell color="white" size={60} />
@@ -69,23 +76,23 @@ export default function Index() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#0a0a0a',
+        backgroundColor: BACKGROUND_COLOR_DARK,
         justifyContent: 'space-between',
     },
     devSkipButton: {
       position: 'absolute',
       top: 50,
       right: 16,
-      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      backgroundColor: BUTTON_DISABLED,
       paddingHorizontal: 12,
       paddingVertical: 6,
       borderRadius: 8,
       borderWidth: 1,
-      borderColor: 'rgba(255, 255, 255, 0.2)',
+      borderColor: PLACEHOLDER_TEXT,
       zIndex: 999,
     },
     devSkipText: {
-      color: '#9ca3af',
+      color: TEXT_COLOR,
       fontSize: 12,
       fontWeight: '500',
     },
@@ -119,7 +126,7 @@ const styles = StyleSheet.create({
     },
     subtitle: {
         fontSize: 16,
-        color: '#9ca3af',
+        color: TEXT_COLOR,
         textAlign: 'center',
         lineHeight: 24,
         marginBottom: 64,
@@ -130,18 +137,18 @@ const styles = StyleSheet.create({
         gap: 16,
     },
     signInButton: {
-        backgroundColor: '#5b7cff',
+        backgroundColor: BUTTON_PICKED,
         paddingVertical: 18,
         borderRadius: 16,
         alignItems: 'center',
     },
     signInButtonText: {
-        color: '#ffffff',
+        color: WHITE,
         fontSize: 18,
         fontWeight: '600',
     },
     joinButton: {
-        backgroundColor: '#2d2d2d',
+        backgroundColor: BORDER_COLOR,
         paddingVertical: 18,
         borderRadius: 16,
         alignItems: 'center',

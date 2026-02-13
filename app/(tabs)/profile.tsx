@@ -3,6 +3,15 @@ import { router } from 'expo-router';
 import { Calendar, ChevronRight, LogOut, RefreshCw } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+    BACKGROUND_COLOR, BACKGROUND_COLOR_DARK, BORDER_COLOR,
+    BUTTON_PICKED, ERROR_COLOR,
+    ERROR_COLOR_LIGHT, PLACEHOLDER_TEXT, PRIMARY_COLOR,
+    SECONDARY_COLOR,
+    SECONDARY_COLOR_LIGHT,
+    TEXT_COLOR,
+    WHITE
+} from "@/constants/colors";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface UserProfile {
@@ -99,7 +108,7 @@ export default function ProfileScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2563eb" />
+          <ActivityIndicator size="large" color={BUTTON_PICKED}/>
           <Text style={styles.loadingText}>Loading profile...</Text>
         </View>
       </View>
@@ -183,10 +192,9 @@ export default function ProfileScreen() {
           <Pressable
             style={styles.logoutButton}
             onPress={handleLogout}
-            android_ripple={{ color: 'rgba(239, 68, 68, 0.18)' }}
           >
-            <LogOut color="#ef4444" size={16} />
-            <Text style={styles.logoutButtonText}>Logout</Text>
+            <LogOut color={ERROR_COLOR_LIGHT} size={18} />
+            <Text style={[styles.actionButtonText, styles.logoutButtonText]}>Logout</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -197,7 +205,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#02040a',
+    backgroundColor: BACKGROUND_COLOR_DARK,
   },
   scrollContent: {
     flexGrow: 1,
@@ -212,7 +220,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    color: '#a1a1aa',
+    color: TEXT_COLOR,
     marginTop: 12,
     fontSize: 16,
   },
@@ -357,7 +365,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   errorText: {
-    color: '#ef4444',
+    color: ERROR_COLOR_LIGHT,
     fontSize: 14,
     fontWeight: '500',
   },
