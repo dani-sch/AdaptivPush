@@ -15,7 +15,6 @@ import NextWorkoutCard, {
     WorkoutSummary,
 } from "../../components/NextWorkoutCard";
 import {
-    BACKGROUND_COLOR,
     BACKGROUND_COLOR_DARK,
     BORDER_COLOR,
     BUTTON_DISABLED,
@@ -37,7 +36,7 @@ type CyclePhase =
   | "Menstruation"
   | "N/A";
 
-// ==================== MOCK DATA ====================
+// mock data
 
 const MOCK_WORKOUT: WorkoutSummary = {
   name: "Upper Body A",
@@ -52,7 +51,7 @@ const MOCK_WORKOUT: WorkoutSummary = {
   remainingExerciseCount: 2,
 };
 
-// ==================== HEADER COMPONENTS ====================
+// header component
 
 const HeaderDateBlock: React.FC = () => {
   const dayOfWeek = "Friday";
@@ -66,7 +65,7 @@ const HeaderDateBlock: React.FC = () => {
   );
 };
 
-// ==================== NEXT WORKOUT SECTION ====================
+// next workout card section
 
 const NextWorkoutSection: React.FC<{ onPressStart?: () => void }> = ({
   onPressStart,
@@ -80,7 +79,7 @@ const NextWorkoutSection: React.FC<{ onPressStart?: () => void }> = ({
   );
 };
 
-// ==================== STATS ROW ====================
+// stats row section
 
 const StatCard: React.FC<{
   label: string;
@@ -108,7 +107,7 @@ const StatsRow: React.FC = () => {
   );
 };
 
-// ==================== READINESS PROMPT CARD ====================
+// readiness card and modal components
 
 const ReadinessPromptCard: React.FC<{ onPress: () => void }> = ({
   onPress,
@@ -274,7 +273,7 @@ const ModalFooterButtons: React.FC<{
   );
 };
 
-// ==================== READINESS CHECK-IN MODAL ====================
+// readiness check-in modal
 
 const ReadinessCheckInModal: React.FC<{
   visible: boolean;
@@ -350,7 +349,7 @@ const ReadinessCheckInModal: React.FC<{
   );
 };
 
-// ==================== MAIN HOME SCREEN ====================
+// main screen
 
 export default function HomeScreen() {
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -388,12 +387,12 @@ export default function HomeScreen() {
   );
 }
 
-// ==================== STYLES ====================
+// stylesheet
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: BACKGROUND_COLOR,
+    backgroundColor: BACKGROUND_COLOR_DARK,
   },
   scrollView: {
     flex: 1,
@@ -593,7 +592,7 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
   },
   cyclePhaseButtonSelected: {
-    backgroundColor: "rgba(236, 72, 153, 0.2)", // PINK_ACCENT with opacity
+    backgroundColor: "rgba(236, 72, 153, 0.2)",
     borderColor: PINK_ACCENT,
   },
   cyclePhaseButtonText: {
@@ -615,7 +614,7 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
   },
   naButtonSelected: {
-    borderColor: "#f9a8d4", // lighter pink for selected state
+    borderColor: "#f9a8d4",
     shadowColor: PINK_ACCENT,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
