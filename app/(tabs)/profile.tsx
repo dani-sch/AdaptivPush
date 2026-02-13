@@ -1,6 +1,6 @@
 import { supabase } from '@/utils/supabase';
 import { router } from 'expo-router';
-import { Calendar, LogOut, RefreshCw } from 'lucide-react-native';
+import { Calendar, ChevronRight, LogOut, RefreshCw } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -70,6 +70,10 @@ export default function ProfileScreen() {
       console.error('Logout error:', err);
       setError('Failed to logout');
     }
+  };
+
+  const goToWorkoutHistory = () => {
+    router.push('/workout-history');
   };
 
   const today = useMemo(() => {
@@ -157,6 +161,18 @@ export default function ProfileScreen() {
               <Text style={styles.statValue}>{profileScore}</Text>
             </View>
           </View>
+
+          <Pressable
+            style={styles.workoutHistoryButton}
+            onPress={goToWorkoutHistory}
+            android_ripple={{ color: 'rgba(37, 99, 235, 0.15)' }}
+          >
+            <View>
+              <Text style={styles.workoutHistoryLabel}>Training</Text>
+              <Text style={styles.workoutHistoryTitle}>Workout History</Text>
+            </View>
+            <ChevronRight color="#dbeafe" size={18} />
+          </Pressable>
 
           {error && (
             <View style={styles.errorContainer}>
@@ -285,6 +301,7 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     gap: 10,
+    marginBottom: 12,
   },
   statCard: {
     flex: 1,
@@ -309,6 +326,26 @@ const styles = StyleSheet.create({
   statValueAccent: {
     color: '#4ade80',
     fontSize: 23,
+    fontWeight: '600',
+  },
+  workoutHistoryButton: {
+    backgroundColor: '#1d4ed8',
+    borderRadius: 16,
+    minHeight: 72,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexDirection: 'row',
+  },
+  workoutHistoryLabel: {
+    color: '#bfdbfe',
+    fontSize: 13,
+    marginBottom: 4,
+  },
+  workoutHistoryTitle: {
+    color: '#ffffff',
+    fontSize: 19,
     fontWeight: '600',
   },
   errorContainer: {
