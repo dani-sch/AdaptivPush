@@ -51,6 +51,11 @@ export default function PlanScreen() {
         return Math.max(0, Math.min(100, pct));
     }, [program]);
 
+    const selectedWorkoutObj = useMemo(
+        () => program?.workouts.find((workout) => workout.id === selectedWorkout) ?? null,
+        [program, selectedWorkout],
+    );
+
     if (loading) return <LoadingState />;
     if (!program) return <EmptyState />;
 
@@ -77,7 +82,7 @@ export default function PlanScreen() {
                 {/* Menu Dropdown */}
                 {showMenu && (
                     <View style={styles.menuCard}>
-                        <Link href="/program/create" asChild>
+                        <Link href="/home">
                             <Pressable style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}>
                                 <Text style={styles.menuText}>Create Custom Program</Text>
                             </Pressable>
@@ -110,7 +115,7 @@ export default function PlanScreen() {
 
                 {/* Week View */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>This Week's Workouts</Text>
+                    <Text style={styles.sectionTitle}>This Week’s Workouts</Text>
 
                     {/* Day Headers */}
                     <View style={styles.weekRow}>
@@ -171,8 +176,8 @@ export default function PlanScreen() {
                     </View>
                 </View>
 
-                {/* Create Program CTA */}
-                <Link href="/program/create" asChild>
+                {/* Create Program */}
+                <Link href="/home">
                     <Pressable style={({ pressed }) => [styles.ctaCard, pressed && { opacity: 0.9 }]}>
                         <View style={styles.ctaLeft}>
                             <View style={styles.ctaIcon}>
@@ -186,7 +191,7 @@ export default function PlanScreen() {
             </ScrollView>
 
             {/* Workout Template Modal */}
-            {!!selectedWorkout && (
+            {!!selectedWorkoutObj && (
                 <Modal transparent animationType="slide" onRequestClose={() => setSelectedWorkout(null)}>
                     <WorkoutTemplateModal
                         workout={selectedWorkoutObj}

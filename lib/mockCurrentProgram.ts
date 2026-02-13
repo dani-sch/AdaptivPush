@@ -1,14 +1,54 @@
-import type {CurrentProgram} from "@/types/program";
+import type { CurrentProgram, Equipment, MuscleGroup, WorkoutExercise } from '@/types/program';
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
 export function makeMockCurrentProgram(): CurrentProgram {
     const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
     const templates = [
-        { name: "Upper A", time: 55, exercises: ["Bench Press", "Row", "Incline DB Press", "Lat Pulldown", "Lateral Raise"] },
-        { name: "Lower A", time: 50, exercises: ["Squat", "RDL", "Leg Press", "Calf Raise", "Core"] },
-        { name: "Upper B", time: 55, exercises: ["Overhead Press", "Pull-up", "Chest Fly", "Cable Row", "Biceps Curl"] },
-        { name: "Lower B", time: 50, exercises: ["Deadlift", "Lunge", "Hamstring Curl", "Leg Extension", "Core"] },
+        {
+            name: 'Upper A',
+            time: 55,
+            exercises: [
+                ['Bench Press', 'Chest', 'Barbell'],
+                ['Barbell Row', 'Back', 'Barbell'],
+                ['Incline DB Press', 'Chest', 'Dumbbell'],
+                ['Lat Pulldown', 'Back', 'Machine'],
+                ['Lateral Raise', 'Shoulders', 'Dumbbell'],
+            ],
+        },
+        {
+            name: 'Lower A',
+            time: 50,
+            exercises: [
+                ['Back Squat', 'Legs', 'Barbell'],
+                ['Romanian Deadlift', 'Glutes', 'Barbell'],
+                ['Leg Press', 'Legs', 'Machine'],
+                ['Walking Lunge', 'Legs', 'Dumbbell'],
+                ['Plank', 'Core', 'Bodyweight'],
+            ],
+        },
+        {
+            name: 'Upper B',
+            time: 55,
+            exercises: [
+                ['Overhead Press', 'Shoulders', 'Barbell'],
+                ['Pull-up', 'Back', 'Bodyweight'],
+                ['Chest Fly', 'Chest', 'Machine'],
+                ['Seated Cable Row', 'Back', 'Cable'],
+                ['Biceps Curl', 'Biceps', 'Dumbbell'],
+            ],
+        },
+        {
+            name: 'Lower B',
+            time: 50,
+            exercises: [
+                ['Hip Thrust', 'Glutes', 'Barbell'],
+                ['Walking Lunge', 'Legs', 'Dumbbell'],
+                ['Leg Extension', 'Legs', 'Machine'],
+                ['Hamstring Curl', 'Glutes', 'Machine'],
+                ['Cable Crunch', 'Core', 'Cable'],
+            ],
+        },
     ];
 
     const daysPerWeek = 4;
@@ -17,20 +57,20 @@ export function makeMockCurrentProgram(): CurrentProgram {
         name: t.name,
         day: days[i],
         estimatedTime: t.time,
-        exercises: t.exercises.map((e) => ({
+        exercises: t.exercises.map(([name, muscleGroup, equipment]) => ({
             id: uid(),
-            name: e,
+            name,
             sets: 3,
-            reps: "8–12",
-            muscleGroup: "Back",   // pick appropriate per exercise
-            equipment: "Machine",  // etc
-        })),
+            reps: '8–12',
+            muscleGroup: muscleGroup as MuscleGroup,
+            equipment: equipment as Equipment,
+        })) as WorkoutExercise[],
     }));
 
     return {
         id: uid(),
-        name: "Strength + Mobility",
-        goal: "Build strength while staying consistent",
+        name: 'Strength + Mobility',
+        goal: 'Build strength while staying consistent',
         currentWeek: 2,
         totalWeeks: 8,
         daysPerWeek,

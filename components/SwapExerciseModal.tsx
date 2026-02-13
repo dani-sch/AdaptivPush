@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Switch } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, Switch } from 'react-native';
 import { X, Search, Check } from 'lucide-react-native';
 
 import type { CurrentProgram, WorkoutExercise } from '@/types/program'; // adjust to your types
@@ -43,19 +43,25 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
         return null;
     }, [program, exerciseId]);
 
+    {/*
     const alternatives = useMemo(() => {
         if (!currentExercise) return [];
         return exerciseAlternatives[currentExercise.muscleGroup] ?? [];
     }, [currentExercise]);
+    */}
 
+    {/*
     const filteredAlternatives = useMemo(() => {
         const q = searchQuery.trim().toLowerCase();
+
         return alternatives.filter((ex) => {
             if (ex.id === exerciseId) return false;
+            if (currentExercise && ex.name === currentExercise.name) return false;
             if (!q) return true;
             return ex.name.toLowerCase().includes(q);
         });
-    }, [alternatives, searchQuery, exerciseId]);
+    }, [alternatives, searchQuery, exerciseId, currentExercise]);
+    */}
 
     const handleSwap = () => {
         if (!selectedExercise) return;
@@ -105,8 +111,8 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
 
                 {/* List */}
                 <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
-                    <Text style={styles.sectionLabel}>{currentExercise.muscleGroup.toUpperCase()} EXERCISES</Text>
-
+                    <Text style={styles.sectionLabel}>{(currentExercise.muscleGroup ?? 'General').toUpperCase()} EXERCISES</Text>
+                    {/*
                     {filteredAlternatives.map((ex) => {
                         const isSelected = selectedExercise?.id === ex.id;
 
@@ -138,12 +144,15 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
                             </Pressable>
                         );
                     })}
+                    */}
 
+                    {/*
                     {filteredAlternatives.length === 0 && (
                         <View style={styles.emptyWrap}>
                             <Text style={styles.emptyText}>No exercises found</Text>
                         </View>
                     )}
+                    */}
                 </ScrollView>
 
                 {/* Footer */}
