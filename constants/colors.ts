@@ -22,4 +22,9 @@ export const BORDER_COLOR = '#27272a';
 
 export const ERROR_COLOR = '#dc2626';
 export const ERROR_COLOR_LIGHT = '#ef4444';
+
+
+export const CARD_BG = '#111113';          // slightly darker than BACKGROUND_COLOR
+export const SURFACE_BG = '#0f0f12';       // for dropdowns / surfaces
+export const MUTED_BG = '#222226';         // subtle chip/background
 export const SUCCESS = '#16a34a';
