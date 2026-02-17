@@ -1,38 +1,216 @@
-import { supabase } from '@/utils/supabase';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { Calendar, ChevronRight, LogOut, RefreshCw } from 'lucide-react-native';
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
-    BACKGROUND_COLOR, BACKGROUND_COLOR_DARK, BORDER_COLOR,
-    BUTTON_PICKED, ERROR_COLOR,
-    ERROR_COLOR_LIGHT, PLACEHOLDER_TEXT, PRIMARY_COLOR,
-    SECONDARY_COLOR,
-    SECONDARY_COLOR_LIGHT,
-    TEXT_COLOR,
-    WHITE
-} from "@/constants/colors";
+  Bell,
+  ChevronRight,
+  CircleHelp,
+  Heart,
+  LogOut,
+  Shield,
+  UserRound,
+} from 'lucide-react-native';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { supabase } from '@/utils/supabase';
 
 interface UserProfile {
   id: string;
   email: string;
   full_name?: string;
-  created_at?: string;
 }
 
+interface WorkoutHistoryRow {
+  completed_at?: string | null;
+  created_at?: string | null;
+  pr_count?: number | string | null;
+  prs?: number | string | null;
+  personal_records?: number | string | null;
+  personal_record_count?: number | string | null;
+  prs_hit?: number | string | null;
+  is_pr?: boolean | null;
+  notes?: string | null;
+}
+
+interface ProgressSummary {
+  workouts: number;
+  weekStreak: number;
+  prs: number;
+}
+
+type MenuIcon = 'user' | 'bell' | 'heart' | 'shield' | 'help';
+
+interface MenuSection {
+  title: string;
+  items: {
+    label: string;
+    icon: MenuIcon;
+  }[];
+}
+
+const DEFAULT_PROGRESS: ProgressSummary = {
+  workouts: 0,
+  weekStreak: 0,
+  prs: 0,
+};
+
+const MENU_SECTIONS: MenuSection[] = [
+  {
+    title: 'ACCOUNT',
+    items: [
+      { label: 'Personal Information', icon: 'user' },
+      { label: 'Notifications', icon: 'bell' },
+    ],
+  },
+  {
+    title: 'HEALTH & DATA',
+    items: [
+      { label: 'Readiness Settings', icon: 'heart' },
+      { label: 'Privacy & Data', icon: 'shield' },
+    ],
+  },
+  {
+    title: 'SUPPORT',
+    items: [{ label: 'Help & Support', icon: 'help' }],
+  },
+];
+
+const parseNumericValue = (value: number | string | null | undefined): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const cleaned = value.trim();
+    if (cleaned.length === 0) {
+      return null;
+    }
+
+    const numeric = Number(cleaned);
+    return Number.isFinite(numeric) ? numeric : null;
+  }
+
+  return null;
+};
+
+const parsePrCount = (row: WorkoutHistoryRow): number => {
+  const directCount =
+    parseNumericValue(row.pr_count) ??
+    parseNumericValue(row.prs) ??
+    parseNumericValue(row.personal_records) ??
+    parseNumericValue(row.personal_record_count) ??
+    parseNumericValue(row.prs_hit);
+
+  if (directCount !== null) {
+    return Math.max(0, Math.round(directCount));
+  }
+
+  if (row.is_pr) {
+    return 1;
+  }
+
+  if (!row.notes) {
+    return 0;
+  }
+
+  const explicitMatch = row.notes.match(/(\d+)\s*PR/i);
+  if (explicitMatch) {
+    return Number(explicitMatch[1]);
+  }
+
+  return /\bPR\b/i.test(row.notes) ? 1 : 0;
+};
+
+const getWeekKey = (value: string): string => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  date.setHours(0, 0, 0, 0);
+  const mondayOffset = (date.getDay() + 6) % 7;
+  date.setDate(date.getDate() - mondayOffset);
+
+  return date.toISOString().slice(0, 10);
+};
+
+const computeWeekStreak = (rows: WorkoutHistoryRow[]): number => {
+  const weekKeys = new Set(
+    rows
+      .map((row) => row.completed_at ?? row.created_at ?? '')
+      .map(getWeekKey)
+      .filter(Boolean),
+  );
+
+  if (weekKeys.size === 0) {
+    return 0;
+  }
+
+  const cursor = new Date();
+  cursor.setHours(0, 0, 0, 0);
+  const mondayOffset = (cursor.getDay() + 6) % 7;
+  cursor.setDate(cursor.getDate() - mondayOffset);
+
+  let streak = 0;
+  while (weekKeys.has(cursor.toISOString().slice(0, 10))) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 7);
+  }
+
+  return streak;
+};
+
+const renderMenuIcon = (icon: MenuIcon) => {
+  switch (icon) {
+    case 'user':
+      return <UserRound color="#747a8f" size={24} />;
+    case 'bell':
+      return <Bell color="#747a8f" size={24} />;
+    case 'heart':
+      return <Heart color="#747a8f" size={24} />;
+    case 'shield':
+      return <Shield color="#747a8f" size={24} />;
+    case 'help':
+      return <CircleHelp color="#747a8f" size={24} />;
+    default:
+      return null;
+  }
+};
+
+const isMissingWorkoutHistoryTableError = (error: { code?: string | null; message?: string | null } | null | undefined): boolean => {
+  if (!error) {
+    return false;
+  }
+
+  if (error.code === 'PGRST205') {
+    return true;
+  }
+
+  return Boolean(
+    error.message?.toLowerCase().includes("could not find the table 'public.workout_history'"),
+  );
+};
+
 export default function ProfileScreen() {
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [progress, setProgress] = useState<ProgressSummary>(DEFAULT_PROGRESS);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchUserProfile();
+    fetchProfileData();
   }, []);
 
-  const fetchUserProfile = async () => {
+  const fetchProfileData = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -43,72 +221,74 @@ export default function ProfileScreen() {
       } = await supabase.auth.getUser();
 
       if (authError || !user) {
-        setError('Failed to fetch user');
+        setError('Unable to load profile.');
+        setProfile(null);
+        setProgress(DEFAULT_PROGRESS);
         return;
       }
 
       setProfile({
         id: user.id,
         email: user.email || '',
-        full_name: user.user_metadata?.full_name || 'User',
-        created_at: user.created_at,
+        full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
       });
-    } catch (err) {
-      console.error('Error fetching profile:', err);
-      setError('An error occurred while loading your profile');
+
+      const { data: historyRows, error: historyError } = await supabase
+        .from('workout_history')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('completed_at', { ascending: false });
+
+      if (historyError) {
+        if (isMissingWorkoutHistoryTableError(historyError)) {
+          setProgress(DEFAULT_PROGRESS);
+          setError(null);
+          return;
+        }
+
+        setError(historyError.message);
+        setProgress(DEFAULT_PROGRESS);
+        return;
+      }
+
+      const rows = (historyRows ?? []) as WorkoutHistoryRow[];
+      setProgress({
+        workouts: rows.length,
+        weekStreak: computeWeekStreak(rows),
+        prs: rows.reduce((total, row) => total + parsePrCount(row), 0),
+      });
+    } catch (fetchError) {
+      console.error('Failed to load profile screen:', fetchError);
+      setError('Failed to load profile data.');
+      setProgress(DEFAULT_PROGRESS);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
-  };
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await fetchUserProfile();
   };
 
   const handleLogout = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        setError(error.message);
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (signOutError) {
+        setError(signOutError.message);
         return;
       }
+
       router.replace('/');
-    } catch (err) {
-      console.error('Logout error:', err);
-      setError('Failed to logout');
+    } catch (logoutError) {
+      console.error('Logout error:', logoutError);
+      setError('Unable to log out right now.');
     }
   };
 
-  const goToWorkoutHistory = () => {
-    router.push('/workout-history');
-  };
+  const displayName = useMemo(() => profile?.full_name?.trim() || 'User', [profile?.full_name]);
+  const avatarLabel = displayName.slice(0, 1).toUpperCase();
 
-  const today = useMemo(() => {
-    const now = new Date();
-    return {
-      day: now.toLocaleDateString(undefined, { weekday: 'long' }),
-      date: now.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
-    };
-  }, []);
-
-  const memberSince = profile?.created_at
-    ? new Date(profile.created_at).toLocaleDateString(undefined, {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      })
-    : 'N/A';
-
-  const accountStatus = profile?.email ? 'Verified' : 'Missing';
-  const profileScore = profile?.full_name && profile?.email ? '2/2' : '1/2';
-
-  if (loading) {
+  if (loading && !profile) {
     return (
       <View style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={BUTTON_PICKED}/>
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color="#2f7cff" />
           <Text style={styles.loadingText}>Loading profile...</Text>
         </View>
       </View>
@@ -117,86 +297,102 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={[styles.content, { paddingTop: insets.top + 18 }]}>
-          <Text style={styles.dayText}>{today.day}</Text>
-          <Text style={styles.dateText}>{today.date}</Text>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: insets.top + 18, paddingBottom: insets.bottom + 124 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.headerRow}>
+          <LinearGradient colors={['#2c81ff', '#8626ff']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatar}>
+            <Text style={styles.avatarText}>{avatarLabel}</Text>
+          </LinearGradient>
 
-          <View style={styles.primaryCard}>
-            <View style={styles.primaryHeaderRow}>
-              <View>
-                <Text style={styles.primaryLabel}>Your Profile</Text>
-                <Text style={styles.primaryTitle}>{profile?.full_name || 'User'}</Text>
-                <Text style={styles.primarySub}>{profile?.email || 'No email found'}</Text>
-              </View>
-              <View style={styles.primaryIconWrap}>
-                <Calendar color="#dbeafe" size={18} />
-              </View>
-            </View>
-
-            <View style={styles.primaryDetailRow}>
-              <Text style={styles.primaryDetailKey}>Email</Text>
-              <Text style={styles.primaryDetailValue} numberOfLines={1}>
-                {profile?.email || 'N/A'}
-              </Text>
-            </View>
-            <View style={styles.primaryDetailRow}>
-              <Text style={styles.primaryDetailKey}>Member since</Text>
-              <Text style={styles.primaryDetailValue}>{memberSince}</Text>
-            </View>
-
-            <Pressable
-              style={styles.primaryActionButton}
-              onPress={handleRefresh}
-              android_ripple={{ color: 'rgba(37, 99, 235, 0.15)' }}
-              disabled={refreshing}
-            >
-              <RefreshCw color="#2563eb" size={16} />
-              <Text style={styles.primaryActionButtonText}>{refreshing ? 'Refreshing...' : 'Refresh Profile'}</Text>
-            </Pressable>
+          <View style={styles.userMeta}>
+            <Text numberOfLines={1} style={styles.nameText}>
+              {displayName}
+            </Text>
+            <Text numberOfLines={1} style={styles.emailText}>
+              {profile?.email || 'No email address'}
+            </Text>
           </View>
-
-          <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Member Since</Text>
-              <Text style={styles.statValue}>{memberSince}</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Account</Text>
-              <Text style={styles.statValueAccent}>{accountStatus}</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Profile</Text>
-              <Text style={styles.statValue}>{profileScore}</Text>
-            </View>
-          </View>
-
-          <Pressable
-            style={styles.workoutHistoryButton}
-            onPress={goToWorkoutHistory}
-            android_ripple={{ color: 'rgba(37, 99, 235, 0.15)' }}
-          >
-            <View>
-              <Text style={styles.workoutHistoryLabel}>Training</Text>
-              <Text style={styles.workoutHistoryTitle}>Workout History</Text>
-            </View>
-            <ChevronRight color="#dbeafe" size={18} />
-          </Pressable>
-
-          {error && (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          )}
-
-          <Pressable
-            style={styles.logoutButton}
-            onPress={handleLogout}
-          >
-            <LogOut color={ERROR_COLOR_LIGHT} size={18} />
-            <Text style={[styles.actionButtonText, styles.logoutButtonText]}>Logout</Text>
-          </Pressable>
         </View>
+
+        <LinearGradient
+          colors={['#181b26', '#12141b']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.progressCard}
+        >
+          <Text style={styles.progressTitle}>Your Progress</Text>
+          <View style={styles.progressRow}>
+            <View style={styles.progressItem}>
+              <Text style={styles.progressValue}>{progress.workouts}</Text>
+              <Text style={styles.progressLabel}>Workouts</Text>
+            </View>
+            <View style={styles.progressItem}>
+              <Text style={styles.progressValue}>{progress.weekStreak}</Text>
+              <Text style={styles.progressLabel}>Week Streak</Text>
+            </View>
+            <View style={styles.progressItem}>
+              <Text style={styles.progressValue}>{progress.prs}</Text>
+              <Text style={styles.progressLabel}>PRs</Text>
+            </View>
+          </View>
+        </LinearGradient>
+
+        {error ? (
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : null}
+
+        {MENU_SECTIONS.map((section) => (
+          <View key={section.title} style={styles.sectionWrap}>
+            <Text style={styles.sectionTitle}>{section.title}</Text>
+            <LinearGradient
+              colors={['#171a24', '#12141b']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.groupCard}
+            >
+              {section.items.map((item, index) => {
+                const isLast = index === section.items.length - 1;
+
+                return (
+                  <Pressable
+                    key={item.label}
+                    onPress={() => undefined}
+                    style={({ pressed }) => [styles.menuRow, pressed && styles.menuRowPressed]}
+                  >
+                    <View style={styles.menuRowLeft}>
+                      {renderMenuIcon(item.icon)}
+                      <Text style={styles.menuLabel}>{item.label}</Text>
+                    </View>
+                    <ChevronRight color="#4d5265" size={24} />
+                    {!isLast ? <View style={styles.rowDivider} /> : null}
+                  </Pressable>
+                );
+              })}
+            </LinearGradient>
+          </View>
+        ))}
+
+        <LinearGradient
+          colors={['#171a24', '#12141b']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.logoutCard}
+        >
+          <Pressable
+            onPress={handleLogout}
+            style={({ pressed }) => [styles.logoutInner, pressed && styles.logoutPressed]}
+          >
+            <LogOut color="#ff3c46" size={24} />
+            <Text style={styles.logoutText}>Log Out</Text>
+          </Pressable>
+        </LinearGradient>
       </ScrollView>
     </View>
   );
@@ -205,186 +401,162 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: BACKGROUND_COLOR_DARK,
+    backgroundColor: '#03040b',
   },
   scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 24,
-  },
-  content: {
     paddingHorizontal: 18,
   },
-  loadingContainer: {
+  loadingWrap: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingText: {
-    color: TEXT_COLOR,
     marginTop: 12,
-    fontSize: 16,
+    color: '#83889a',
+    fontSize: 15,
   },
-  dayText: {
-    color: '#f4f4f5',
-    fontSize: 40,
-    fontWeight: '600',
-    marginBottom: 4,
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
   },
-  dateText: {
-    color: '#71717a',
-    fontSize: 30,
+  avatar: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  avatarText: {
+    color: '#e9edff',
+    fontSize: 21,
     fontWeight: '500',
+    lineHeight: 22,
+  },
+  userMeta: {
+    flex: 1,
+  },
+  nameText: {
+    color: '#f4f6ff',
+    fontSize: 21,
+    fontWeight: '500',
+  },
+  emailText: {
+    color: '#6f7485',
+    fontSize: 14,
+    marginTop: 4,
+  },
+  progressCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#202433',
+    paddingHorizontal: 18,
+    paddingVertical: 24,
+    marginBottom: 22,
+  },
+  progressTitle: {
+    color: '#8f95a8',
+    fontSize: 16,
     marginBottom: 18,
   },
-  primaryCard: {
-    backgroundColor: '#2154f4',
-    borderRadius: 22,
-    padding: 18,
-    marginBottom: 16,
-  },
-  primaryHeaderRow: {
+  progressRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-    gap: 12,
   },
-  primaryLabel: {
-    color: '#bfdbfe',
-    fontSize: 18,
-    marginBottom: 6,
-  },
-  primaryTitle: {
-    color: 'white',
-    fontSize: 46,
-    fontWeight: '600',
-    marginBottom: 6,
-  },
-  primarySub: {
-    color: '#dbeafe',
-    fontSize: 16,
-  },
-  primaryIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  primaryDetailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  primaryDetailKey: {
-    color: '#dbeafe',
-    fontSize: 15,
-    maxWidth: '48%',
-  },
-  primaryDetailValue: {
-    color: '#f8fafc',
-    fontSize: 15,
-    fontWeight: '500',
-    maxWidth: '50%',
-    textAlign: 'right',
-  },
-  primaryActionButton: {
-    marginTop: 16,
-    backgroundColor: '#e5e7eb',
-    borderRadius: 18,
-    minHeight: 62,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  primaryActionButtonText: {
-    color: '#2563eb',
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 12,
-  },
-  statCard: {
+  progressItem: {
     flex: 1,
-    backgroundColor: '#12141b',
-    borderColor: '#232734',
-    borderWidth: 1,
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    minHeight: 92,
+    alignItems: 'center',
   },
-  statLabel: {
-    color: '#71717a',
-    fontSize: 13,
-    marginBottom: 8,
-  },
-  statValue: {
-    color: '#f4f4f5',
-    fontSize: 23,
+  progressValue: {
+    color: '#f4f6ff',
+    fontSize: 44,
+    lineHeight: 48,
     fontWeight: '500',
   },
-  statValueAccent: {
-    color: '#4ade80',
-    fontSize: 23,
-    fontWeight: '600',
+  progressLabel: {
+    color: '#6f7485',
+    fontSize: 14,
+    marginTop: 4,
   },
-  workoutHistoryButton: {
-    backgroundColor: '#1d4ed8',
-    borderRadius: 16,
-    minHeight: 72,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flexDirection: 'row',
-  },
-  workoutHistoryLabel: {
-    color: '#bfdbfe',
-    fontSize: 13,
-    marginBottom: 4,
-  },
-  workoutHistoryTitle: {
-    color: '#ffffff',
-    fontSize: 19,
-    fontWeight: '600',
-  },
-  errorContainer: {
-    backgroundColor: 'rgba(220, 38, 38, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(220, 38, 38, 0.4)',
+  errorBanner: {
     borderRadius: 12,
-    padding: 12,
-    marginTop: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 59, 69, 0.35)',
+    backgroundColor: 'rgba(255, 59, 69, 0.08)',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 16,
   },
   errorText: {
-    color: ERROR_COLOR_LIGHT,
-    fontSize: 14,
+    color: '#ff747c',
+    fontSize: 13,
+  },
+  sectionWrap: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    color: '#696f82',
+    fontSize: 15,
+    letterSpacing: 1.2,
+    marginBottom: 11,
+  },
+  groupCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#202433',
+    overflow: 'hidden',
+  },
+  menuRow: {
+    minHeight: 84,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    position: 'relative',
+  },
+  menuRowPressed: {
+    opacity: 0.84,
+  },
+  menuRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  menuLabel: {
+    color: '#e8ebf5',
+    fontSize: 17,
     fontWeight: '500',
   },
-  logoutButton: {
-    borderRadius: 16,
+  rowDivider: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    bottom: 0,
+    height: 1,
+    backgroundColor: 'rgba(93, 100, 121, 0.28)',
+  },
+  logoutCard: {
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: '#ef4444',
-    backgroundColor: 'rgba(239, 68, 68, 0.08)',
-    minHeight: 56,
-    paddingHorizontal: 16,
+    borderColor: '#202433',
+    minHeight: 96,
+    justifyContent: 'center',
+  },
+  logoutInner: {
+    minHeight: 96,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    marginTop: 14,
-    gap: 8,
+    gap: 10,
   },
-  logoutButtonText: {
-    color: '#ef4444',
-    fontSize: 20,
-    fontWeight: '600',
+  logoutPressed: {
+    opacity: 0.84,
+  },
+  logoutText: {
+    color: '#ff3c46',
+    fontSize: 17,
+    fontWeight: '500',
   },
 });
