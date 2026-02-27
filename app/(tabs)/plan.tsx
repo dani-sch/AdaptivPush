@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, Pressable, Modal } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, View, Pressable, Modal } from 'react-native';
 import { Link } from 'expo-router';
 import { Plus, ChevronRight, MoreVertical } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Alert } from 'react-native';
 
 import { useCurrentProgram } from '@/hooks/useCurrentProgram';
 import { WorkoutTemplateModal } from '@/components/WorkoutTemplateModal';
@@ -19,7 +21,6 @@ import {
     ERROR_COLOR_LIGHT,
 } from '@/constants/colors';
 
-// Temporary placeholder components (replace with yours)
 function LoadingState() {
     return (
         <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -27,21 +28,77 @@ function LoadingState() {
         </View>
     );
 }
-function EmptyState() {
+
+
+function EmptyState({
+                        onCreateProgram,
+                        onCreateDevProgram,
+                        busy,
+                    }: {
+    onCreateProgram: () => void;
+    onCreateDevProgram: () => void;
+    busy: boolean;
+}) {
     return (
         <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 16 }]}>
-            <Text style={{ color: TEXT_COLOR, textAlign: 'center' }}>
+            <Text style={{ color: TEXT_COLOR, textAlign: 'center', marginBottom: 14 }}>
                 No current program yet. Create one to get started.
             </Text>
+
+            <Pressable
+                disabled={busy}
+                onPress={onCreateProgram}
+                style={({ pressed }) => [
+                    {
+                        width: '100%',
+                        maxWidth: 420,
+                        backgroundColor: CARD_BG,
+                        borderWidth: 1,
+                        borderColor: BORDER_COLOR,
+                        borderRadius: 16,
+                        paddingVertical: 14,
+                        paddingHorizontal: 14,
+                        alignItems: 'center',
+                        opacity: busy ? 0.6 : pressed ? 0.85 : 1,
+                        marginBottom: 10,
+                    },
+                ]}
+            >
+                <Text style={{ color: WHITE, fontWeight: '700' }}>{busy ? 'Working…' : 'Create Program'}</Text>
+            </Pressable>
+
+            <Pressable
+                disabled={busy}
+                onPress={onCreateDevProgram}
+                style={({ pressed }) => [
+                    {
+                        width: '100%',
+                        maxWidth: 420,
+                        backgroundColor: MUTED_BG,
+                        borderWidth: 1,
+                        borderColor: BORDER_COLOR,
+                        borderRadius: 16,
+                        paddingVertical: 14,
+                        paddingHorizontal: 14,
+                        alignItems: 'center',
+                        opacity: busy ? 0.6 : pressed ? 0.85 : 1,
+                    },
+                ]}
+            >
+                <Text style={{ color: WHITE, fontWeight: '700' }}>{busy ? 'Working…' : 'Dev: Create Default Program'}</Text>
+            </Pressable>
         </View>
     );
 }
 
 export default function PlanScreen() {
+    const insets = useSafeAreaInsets();
+
     const [selectedWorkout, setSelectedWorkout] = useState<string | null>(null);
     const [showMenu, setShowMenu] = useState(false);
 
-    const { program, loading, swapExercise } = useCurrentProgram();
+    const { program, loading, swapExercise, endCurrentProgram, createBlankProgram, createDevTestProgram } = useCurrentProgram();
+    const [creating, setCreating] = useState(false);
 
     const daysOfWeek = useMemo(() => ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], []);
 
@@ -56,12 +113,39 @@ export default function PlanScreen() {
         [program, selectedWorkout],
     );
 
-    if (loading) return <LoadingState />;
-    if (!program) return <EmptyState />;
+    const contentPaddingTop = useMemo(() => {
+        return (Platform.OS === 'ios' ? insets.top : 0) + 18;
+    }, [insets.top]);
 
+    if (loading) return <LoadingState />;
+    if (!program)
+        return (
+            <EmptyState
+                busy={creating}
+                onCreateProgram={async () => {
+                    try {
+                        setCreating(true);
+                        await createBlankProgram();
+                    } finally {
+                        setCreating(false);
+                    }
+                }}
+                onCreateDevProgram={async () => {
+                    try {
+                        setCreating(true);
+                        await createDevTestProgram();
+                    } finally {
+                        setCreating(false);
+                    }
+                }}
+            />
+        );
     return (
         <View style={styles.container}>
-            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+            <ScrollView
+                contentContainerStyle={[styles.content, { paddingTop: contentPaddingTop }]}
+                showsVerticalScrollIndicator={false}
+            >
                 {/* Header */}
                 <View style={styles.headerRow}>
                     <View style={{ flex: 1 }}>
@@ -91,7 +175,28 @@ export default function PlanScreen() {
                         <View style={styles.menuDivider} />
 
                         <Pressable
-                            onPress={() => setShowMenu(false)}
+                            onPress={() => {
+                                Alert.alert(
+                                    'End current program?',
+                                    'This will stop the current program and return you to the program setup screen.',
+                                    [
+                                        { text: 'Cancel', style: 'cancel' },
+                                        {
+                                            text: 'End Program',
+                                            style: 'destructive',
+                                            onPress: async () => {
+                                                try {
+                                                    await endCurrentProgram();
+                                                    setShowMenu(false);
+                                                } catch (e) {
+                                                    console.error(e);
+                                                    setShowMenu(false);
+                                                }
+                                            },
+                                        },
+                                    ],
+                                );
+                            }}
                             style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
                         >
                             <Text style={[styles.menuText, { color: ERROR_COLOR_LIGHT }]}>End Current Program</Text>

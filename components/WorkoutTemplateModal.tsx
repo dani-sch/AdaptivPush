@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { X, ArrowLeftRight } from 'lucide-react-native';
 
 import { SwapExerciseModal } from '@/components/SwapExerciseModal';
@@ -25,13 +25,16 @@ type Props = {
 export function WorkoutTemplateModal({ workout, program, onSwapExercise, onClose }: Props) {
     const [swapExerciseId, setSwapExerciseId] = useState<string | null>(null);
 
+    const closeSwap = () => setSwapExerciseId(null);
+    const openSwap = (id: string) => setSwapExerciseId(id);
+
     return (
         <View style={styles.backdrop}>
-            {/* Tap outside to close */}
-            <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+            {/* Tap outside to close only when swap sheet isn't open */}
+            {!swapExerciseId && <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />}
 
-            {/* Bottom sheet */}
-            <View style={styles.sheet}>
+            {/* Main bottom sheet */}
+            <View style={[styles.sheet, swapExerciseId && { opacity: 0.25 }]}>
                 {/* Header */}
                 <View style={styles.header}>
                     <View style={{ flex: 1 }}>
@@ -68,7 +71,7 @@ export function WorkoutTemplateModal({ workout, program, onSwapExercise, onClose
                                 </View>
 
                                 <Pressable
-                                    onPress={() => setSwapExerciseId(exercise.id)}
+                                    onPress={() => openSwap(exercise.id)}
                                     style={({ pressed }) => [styles.swapButton, pressed && { opacity: 0.85 }]}
                                     accessibilityRole="button"
                                     accessibilityLabel={`Swap exercise ${exercise.name}`}
@@ -87,22 +90,24 @@ export function WorkoutTemplateModal({ workout, program, onSwapExercise, onClose
                 </ScrollView>
             </View>
 
-            {/* Swap Exercise Modal (nested) */}
+            {/* Swap overlay sheet (not a modal due to nesting issues) */}
             {!!swapExerciseId && (
-                <Modal transparent animationType="slide" onRequestClose={() => setSwapExerciseId(null)}>
-                    <View style={styles.backdrop}>
-                        <Pressable style={StyleSheet.absoluteFill} onPress={() => setSwapExerciseId(null)} />
-                        <View style={styles.nestedSheet}>
+                <View style={styles.swapOverlay} pointerEvents="auto">
+                    <Pressable style={StyleSheet.absoluteFill} onPress={closeSwap} />
+
+                    <View style={styles.nestedSheet}>
+                        {/* Wrapper guarantees minimum height to display all content */}
+                        <View style={{ flex: 1 }}>
                             <SwapExerciseModal
                                 program={program}
                                 exerciseId={swapExerciseId}
                                 context="program"
-                                onClose={() => setSwapExerciseId(null)}
+                                onClose={closeSwap}
                                 onSwap={onSwapExercise}
                             />
                         </View>
                     </View>
-                </Modal>
+                </View>
             )}
         </View>
     );
@@ -223,6 +228,12 @@ const styles = StyleSheet.create({
         fontSize: 13,
     },
 
+    swapOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.82)',
+        justifyContent: 'flex-end',
+    },
+
     nestedSheet: {
         backgroundColor: SURFACE_BG,
         borderTopLeftRadius: 24,
@@ -231,5 +242,6 @@ const styles = StyleSheet.create({
         borderColor: BORDER_COLOR,
         overflow: 'hidden',
         maxHeight: '85%',
+        minHeight: 280,
     },
 });
