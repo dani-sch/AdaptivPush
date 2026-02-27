@@ -1,28 +1,31 @@
+import BackButton from "@/components/ui/BackButton";
+import {
+  BACKGROUND_COLOR,
+  BACKGROUND_COLOR_DARK,
+  BORDER_COLOR,
+  ERROR_COLOR,
+  ERROR_COLOR_LIGHT,
+  PLACEHOLDER_TEXT,
+  PRIMARY_COLOR,
+  PRIMARY_COLOR_LIGHT,
+  TEXT_COLOR,
+  WHITE,
+} from "@/constants/colors";
+import { supabase } from "@/utils/supabase";
 import { Link, router } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import React, { useEffect, useState } from "react";
 import {
   Keyboard,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  View,
+  View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import {
-    BACKGROUND_COLOR, BACKGROUND_COLOR_DARK,
-    BORDER_COLOR, ERROR_COLOR, ERROR_COLOR_LIGHT, PLACEHOLDER_TEXT,
-    PRIMARY_COLOR,
-    PRIMARY_COLOR_LIGHT,
-    TEXT_COLOR,
-    WHITE
-} from "@/constants/colors";
-import { supabase } from "@/utils/supabase";
-import BackButton from "@/components/ui/BackButton";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -85,7 +88,7 @@ export default function LoginScreen() {
       console.log("[Login] Success! User id:", data.user?.id);
 
       // Navigate into the app
-      //router.replace("/(tabs)");
+      router.replace("/(tabs)/home");
     } catch (e: any) {
       console.log("[Login] Unexpected error:", e?.message ?? e);
       setAuthError(e?.message ?? "Something went wrong. Please try again.");
@@ -116,7 +119,11 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={"padding"} keyboardVerticalOffset={0}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={"padding"}
+        keyboardVerticalOffset={0}
+      >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps={"handled"}
@@ -124,7 +131,7 @@ export default function LoginScreen() {
         >
           {/* Header */}
           <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-              <BackButton/>
+            <BackButton />
           </View>
 
           <View style={styles.content}>
@@ -173,7 +180,12 @@ export default function LoginScreen() {
             {!!authError && <Text style={styles.errorText}>{authError}</Text>}
 
             {/* Forgot password (outline) */}
-            <Pressable onPress={() => {router.push('/(auth)/forgot-password')}} style={styles.forgotWrap}>
+            <Pressable
+              onPress={() => {
+                router.push("/(auth)/forgot-password");
+              }}
+              style={styles.forgotWrap}
+            >
               <Text style={styles.forgotText}>Forgot password?</Text>
             </Pressable>
 
@@ -224,115 +236,114 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: BACKGROUND_COLOR_DARK
-    },
-    header: {
-        paddingHorizontal: 16,
-        paddingTop: 16,
-        paddingBottom: 8,
-    },
-    backButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 999,
-        backgroundColor: BACKGROUND_COLOR,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    backText: {
-        color: WHITE,
-        fontSize: 18,
-    },
-    content: {
-        paddingHorizontal: 24,
-        paddingTop: 24,
-    },
-    title: {
-        color: WHITE,
-        fontSize: 30,
-        marginBottom: 8,
-        fontWeight: "600",
-    },
-    subtitle: {
-        color: TEXT_COLOR,
-        marginBottom: 24,
-    },
-    label: {
-        color: TEXT_COLOR,
-        marginBottom: 8,
-        marginTop: 12,
-    },
-    input: {
-        backgroundColor: BACKGROUND_COLOR,
-        borderColor: BORDER_COLOR,
-        borderWidth: 1,
-        borderRadius: 16,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        color: "white",
-    },
-    inputError: {
-        borderColor: ERROR_COLOR,
-    },
-    errorText: {
-        color: ERROR_COLOR_LIGHT,
-        marginTop: 8,
-    },
-    forgotWrap: {
-        marginTop: 12,
-        alignSelf: "flex-end",
-    },
-    forgotText: {
-        color: PRIMARY_COLOR_LIGHT,
-        fontWeight: "600",
-    },
-    primaryButton: {
-        marginTop: 20,
-        backgroundColor: PRIMARY_COLOR,
-        paddingVertical: 14,
-        borderRadius: 16,
-        alignItems: "center",
-    },
-    primaryButtonDisabled: {
-        opacity: 0.5,
-    },
-    primaryButtonText: {
-        color: WHITE,
-        fontWeight: "600",
-    },
-    signInText: {
-        color: TEXT_COLOR,
-        textAlign: "center",
-        marginTop: 16,
-    },
-    signInLink: {
-        color: PRIMARY_COLOR_LIGHT,
-    },
-    hideKeyboardButton: {
-        position: "absolute",
-        right: 16,
-        paddingVertical: 10,
-        paddingHorizontal: 14,
-        borderRadius: 999,
-        backgroundColor: BACKGROUND_COLOR,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-        // small lift so it feels tappable
-        shadowOpacity: 0.25,
-        shadowRadius: 6,
-        shadowOffset: { width: 0, height: 2 },
-        elevation: 6,
-    },
-    hideKeyboardText: {
-        color: WHITE,
-        fontWeight: "600",
-        fontSize: 14,
-    },
-    scrollContent: {
-        flexGrow: 1,
-        paddingBottom: 24,
-    },
+  container: {
+    flex: 1,
+    backgroundColor: BACKGROUND_COLOR_DARK,
+  },
+  header: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 999,
+    backgroundColor: BACKGROUND_COLOR,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  backText: {
+    color: WHITE,
+    fontSize: 18,
+  },
+  content: {
+    paddingHorizontal: 24,
+    paddingTop: 24,
+  },
+  title: {
+    color: WHITE,
+    fontSize: 30,
+    marginBottom: 8,
+    fontWeight: "600",
+  },
+  subtitle: {
+    color: TEXT_COLOR,
+    marginBottom: 24,
+  },
+  label: {
+    color: TEXT_COLOR,
+    marginBottom: 8,
+    marginTop: 12,
+  },
+  input: {
+    backgroundColor: BACKGROUND_COLOR,
+    borderColor: BORDER_COLOR,
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    color: "white",
+  },
+  inputError: {
+    borderColor: ERROR_COLOR,
+  },
+  errorText: {
+    color: ERROR_COLOR_LIGHT,
+    marginTop: 8,
+  },
+  forgotWrap: {
+    marginTop: 12,
+    alignSelf: "flex-end",
+  },
+  forgotText: {
+    color: PRIMARY_COLOR_LIGHT,
+    fontWeight: "600",
+  },
+  primaryButton: {
+    marginTop: 20,
+    backgroundColor: PRIMARY_COLOR,
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: "center",
+  },
+  primaryButtonDisabled: {
+    opacity: 0.5,
+  },
+  primaryButtonText: {
+    color: WHITE,
+    fontWeight: "600",
+  },
+  signInText: {
+    color: TEXT_COLOR,
+    textAlign: "center",
+    marginTop: 16,
+  },
+  signInLink: {
+    color: PRIMARY_COLOR_LIGHT,
+  },
+  hideKeyboardButton: {
+    position: "absolute",
+    right: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: BACKGROUND_COLOR,
+    borderWidth: 1,
+    borderColor: BORDER_COLOR,
+    // small lift so it feels tappable
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 6,
+  },
+  hideKeyboardText: {
+    color: WHITE,
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 24,
+  },
 });
-
