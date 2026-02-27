@@ -1,32 +1,32 @@
 import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
-    Dimensions,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  Dimensions,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import NextWorkoutCard, {
-    WorkoutSummary,
+  WorkoutSummary,
 } from "../../components/NextWorkoutCard";
 import {
-    BACKGROUND_COLOR_DARK,
-    BORDER_COLOR,
-    BUTTON_DISABLED,
-    PLACEHOLDER_TEXT,
-    PRIMARY_COLOR,
-    TEXT_COLOR,
-    WHITE,
+  BACKGROUND_COLOR_DARK,
+  BORDER_COLOR,
+  BUTTON_DISABLED,
+  PLACEHOLDER_TEXT,
+  PRIMARY_COLOR,
+  TEXT_COLOR,
+  WHITE,
 } from "../../constants/colors";
+import { supabase } from "../../utils/supabase";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
-// pink accent for sliders and cycle selector (not available in colors.ts)
 const PINK_ACCENT = "#ec4899";
 
 type CyclePhase =
@@ -54,8 +54,12 @@ const MOCK_WORKOUT: WorkoutSummary = {
 // header component
 
 const HeaderDateBlock: React.FC = () => {
-  const dayOfWeek = "Friday";
-  const date = "Feb 13";
+  const now = new Date();
+  const dayOfWeek = now.toLocaleDateString(undefined, { weekday: "long" });
+  const date = now.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
 
   return (
     <View style={styles.headerDateBlock}>
@@ -97,11 +101,11 @@ const StatCard: React.FC<{
   );
 };
 
-const StatsRow: React.FC = () => {
+const StatsRow: React.FC<{ readiness: string }> = ({ readiness }) => {
   return (
     <View style={styles.statsRow}>
       <StatCard label="Last Workout" value="Jan 21" />
-      <StatCard label="Readiness" value="8.2" showUpArrow />
+      <StatCard label="Readiness" value={readiness} showUpArrow />
       <StatCard label="Week" value="4/12" />
     </View>
   );
@@ -273,18 +277,61 @@ const ModalFooterButtons: React.FC<{
   );
 };
 
+// readiness scoring
+
+const computeSleepScore = (hours: number): number => {
+  if (hours >= 8 && hours <= 9) return 5; // optimal range
+  if (hours === 10) return 4;
+  if (hours === 11) return 3;
+  if (hours >= 12) return 2;
+  return Math.max(0, hours - 3); // under 8h scales down from 3h baseline
+};
+
+const computeReadinessScore = (
+  sleepHours: number,
+  stressLevel: number,
+): number => {
+  const sleepScore = computeSleepScore(sleepHours);
+  const stressScore = ((10 - stressLevel) / 10) * 5; // inverted: low stress = high score
+  return Math.round((sleepScore + stressScore) * 10) / 10;
+};
+
 // readiness check-in modal
 
 const ReadinessCheckInModal: React.FC<{
   visible: boolean;
   onClose: () => void;
-}> = ({ visible, onClose }) => {
+  onSaved: (score: number) => void;
+}> = ({ visible, onClose, onSaved }) => {
   const [sleepHours, setSleepHours] = useState<number>(7);
   const [stressLevel, setStressLevel] = useState<number>(5);
   const [cyclePhase, setCyclePhase] = useState<CyclePhase>("N/A");
 
-  const handleContinue = () => {
-    console.log("Readiness data:", { sleepHours, stressLevel, cyclePhase });
+  const handleContinue = async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        console.log("[Readiness] No authenticated user");
+        onClose();
+        return;
+      }
+
+      await supabase.from("readiness_checkins").insert({
+        user_id: user.id,
+        sleep_hours: sleepHours,
+        stress_level: stressLevel,
+        cycle_phase: cyclePhase,
+        checked_at: new Date().toISOString(),
+      });
+
+      onSaved(computeReadinessScore(sleepHours, stressLevel));
+    } catch (e) {
+      console.log("[Readiness] Error saving check-in:", e);
+    }
+
     onClose();
   };
 
@@ -353,6 +400,33 @@ const ReadinessCheckInModal: React.FC<{
 
 export default function HomeScreen() {
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [readinessScore, setReadinessScore] = useState<string>("--");
+
+  useEffect(() => {
+    const fetchHomeData = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from("readiness_checkins")
+        .select("sleep_hours, stress_level")
+        .eq("user_id", user.id)
+        .order("checked_at", { ascending: false })
+        .limit(1);
+
+      if (data && data.length > 0) {
+        const score = computeReadinessScore(
+          data[0].sleep_hours,
+          data[0].stress_level,
+        );
+        setReadinessScore(score.toFixed(1));
+      }
+    };
+
+    fetchHomeData();
+  }, []);
 
   const handleStartWorkout = () => {
     console.log("Start workout pressed");
@@ -375,13 +449,14 @@ export default function HomeScreen() {
       >
         <HeaderDateBlock />
         <NextWorkoutSection onPressStart={handleStartWorkout} />
-        <StatsRow />
+        <StatsRow readiness={readinessScore} />
         <ReadinessPromptCard onPress={handleOpenReadinessModal} />
       </ScrollView>
 
       <ReadinessCheckInModal
         visible={isModalVisible}
         onClose={handleCloseReadinessModal}
+        onSaved={(score) => setReadinessScore(score.toFixed(1))}
       />
     </SafeAreaView>
   );
