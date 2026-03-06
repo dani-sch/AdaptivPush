@@ -166,7 +166,7 @@ export default function PlanScreen() {
                 {/* Menu Dropdown */}
                 {showMenu && (
                     <View style={styles.menuCard}>
-                        <Link href="/home">
+                        <Link href="/create-program" asChild>
                             <Pressable style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}>
                                 <Text style={styles.menuText}>Create Custom Program</Text>
                             </Pressable>
