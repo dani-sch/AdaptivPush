@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
+import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   Dimensions,
@@ -429,7 +430,7 @@ export default function HomeScreen() {
   }, []);
 
   const handleStartWorkout = () => {
-    console.log("Start workout pressed");
+    router.push("/next-workout");
   };
 
   const handleOpenReadinessModal = () => {
