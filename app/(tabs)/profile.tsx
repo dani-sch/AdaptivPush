@@ -2,19 +2,23 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import {
   Bell,
+  Check,
   ChevronRight,
   CircleHelp,
   Heart,
   LogOut,
   Shield,
   UserRound,
+  X,
 } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from 'react-native';
@@ -46,6 +50,8 @@ interface ProgressSummary {
   prs: number;
 }
 
+type ReadinessSource = 'apple' | 'manual';
+type ReadinessQuestionKey = 'sleep' | 'stress' | 'menstrualCycle';
 type MenuIcon = 'user' | 'bell' | 'heart' | 'shield' | 'help';
 
 interface MenuSection {
@@ -81,6 +87,12 @@ const MENU_SECTIONS: MenuSection[] = [
     title: 'SUPPORT',
     items: [{ label: 'Help & Support', icon: 'help' }],
   },
+];
+
+const READINESS_QUESTIONS: { key: ReadinessQuestionKey; label: string }[] = [
+  { key: 'sleep', label: 'Sleep' },
+  { key: 'stress', label: 'Stress' },
+  { key: 'menstrualCycle', label: 'Menstrual Cycle' },
 ];
 
 const parseNumericValue = (value: number | string | null | undefined): number | null => {
@@ -205,6 +217,15 @@ export default function ProfileScreen() {
   const [progress, setProgress] = useState<ProgressSummary>(DEFAULT_PROGRESS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isReadinessModalVisible, setIsReadinessModalVisible] = useState(false);
+  const [isAppleHealthConnected, setIsAppleHealthConnected] = useState(false);
+  const [readinessSource, setReadinessSource] = useState<ReadinessSource>('manual');
+  const [isReadinessPromptsEnabled, setIsReadinessPromptsEnabled] = useState(true);
+  const [readinessQuestions, setReadinessQuestions] = useState<Record<ReadinessQuestionKey, boolean>>({
+    sleep: true,
+    stress: true,
+    menstrualCycle: true,
+  });
 
   useEffect(() => {
     fetchProfileData();
@@ -278,6 +299,32 @@ export default function ProfileScreen() {
     } catch (logoutError) {
       console.error('Logout error:', logoutError);
       setError('Unable to log out right now.');
+    }
+  };
+
+  const toggleAppleHealthConnection = () => {
+    setIsAppleHealthConnected((current) => {
+      const next = !current;
+      if (!next && readinessSource === 'apple') {
+        setReadinessSource('manual');
+      }
+      if (next) {
+        setReadinessSource('apple');
+      }
+      return next;
+    });
+  };
+
+  const toggleReadinessQuestion = (key: ReadinessQuestionKey) => {
+    setReadinessQuestions((current) => ({
+      ...current,
+      [key]: !current[key],
+    }));
+  };
+
+  const handleMenuItemPress = (label: string) => {
+    if (label === 'Readiness Settings') {
+      setIsReadinessModalVisible(true);
     }
   };
 
@@ -363,7 +410,7 @@ export default function ProfileScreen() {
                 return (
                   <Pressable
                     key={item.label}
-                    onPress={() => undefined}
+                    onPress={() => handleMenuItemPress(item.label)}
                     style={({ pressed }) => [styles.menuRow, pressed && styles.menuRowPressed]}
                   >
                     <View style={styles.menuRowLeft}>
@@ -394,6 +441,168 @@ export default function ProfileScreen() {
           </Pressable>
         </LinearGradient>
       </ScrollView>
+
+      <Modal
+        visible={isReadinessModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsReadinessModalVisible(false)}
+      >
+        <View style={styles.readinessOverlay}>
+          <LinearGradient
+            colors={['#1a1d2a', '#11131b']}
+            start={{ x: 0.08, y: 0.04 }}
+            end={{ x: 1, y: 1 }}
+            style={[
+              styles.readinessModal,
+              {
+                marginTop: insets.top + 18,
+                marginBottom: insets.bottom + 18,
+              },
+            ]}
+          >
+            <View style={styles.readinessHeader}>
+              <Text style={styles.readinessHeaderTitle}>Readiness Settings</Text>
+              <Pressable
+                onPress={() => setIsReadinessModalVisible(false)}
+                style={({ pressed }) => [styles.readinessCloseButton, pressed && styles.readinessCloseButtonPressed]}
+              >
+                <X color="#d0d4e4" size={24} />
+              </Pressable>
+            </View>
+
+            <View style={styles.readinessHeaderDivider} />
+
+            <ScrollView
+              style={styles.readinessBodyScroll}
+              contentContainerStyle={styles.readinessBodyContent}
+              showsVerticalScrollIndicator
+            >
+              <Text style={styles.readinessSectionLabel}>Apple Health Integration</Text>
+              <Pressable
+                onPress={toggleAppleHealthConnection}
+                style={({ pressed }) => [
+                  styles.appleHealthCard,
+                  isAppleHealthConnected ? styles.appleHealthCardConnected : styles.appleHealthCardDisconnected,
+                  pressed && styles.readinessPressablePressed,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.appleHealthIconWrap,
+                    isAppleHealthConnected ? styles.appleHealthIconWrapConnected : styles.appleHealthIconWrapDisconnected,
+                  ]}
+                >
+                  <Heart
+                    color={isAppleHealthConnected ? '#f5fff9' : '#f0f2f9'}
+                    size={26}
+                    strokeWidth={2.2}
+                  />
+                </View>
+
+                <View style={styles.appleHealthTextWrap}>
+                  <View style={styles.appleHealthTitleRow}>
+                    <Text style={styles.appleHealthTitle}>Apple Health</Text>
+                    {isAppleHealthConnected ? (
+                      <Text style={styles.appleHealthConnectedText}>✓ Connected</Text>
+                    ) : null}
+                  </View>
+                  <Text style={styles.appleHealthSubtitle}>
+                    {isAppleHealthConnected
+                      ? 'Automatically sync sleep and activity data'
+                      : 'Connect to auto-fill readiness data'}
+                  </Text>
+                </View>
+              </Pressable>
+
+              {isAppleHealthConnected ? (
+                <View style={styles.permissionsCard}>
+                  <Text style={styles.permissionsTitle}>Permissions Granted:</Text>
+                  <Text style={styles.permissionsItem}>• Sleep Analysis</Text>
+                  <Text style={styles.permissionsItem}>• Heart Rate Data</Text>
+                  <Text style={styles.permissionsItem}>• Activity Data</Text>
+                </View>
+              ) : null}
+
+              <Text style={styles.readinessSectionLabel}>Readiness Source</Text>
+              <Pressable
+                onPress={() => setReadinessSource('apple')}
+                style={({ pressed }) => [styles.readinessSourceRow, pressed && styles.readinessPressablePressed]}
+              >
+                <View style={[styles.radioOuter, readinessSource === 'apple' && styles.radioOuterSelected]}>
+                  {readinessSource === 'apple' ? <View style={styles.radioInner} /> : null}
+                </View>
+                <View style={styles.readinessSourceTextWrap}>
+                  <Text style={styles.readinessSourceTitle}>Apple Health Auto-fill</Text>
+                  <Text style={styles.readinessSourceSubtitle}>Automatically sync data (editable)</Text>
+                </View>
+              </Pressable>
+
+              <Pressable
+                onPress={() => setReadinessSource('manual')}
+                style={({ pressed }) => [styles.readinessSourceRow, pressed && styles.readinessPressablePressed]}
+              >
+                <View style={[styles.radioOuter, readinessSource === 'manual' && styles.radioOuterSelected]}>
+                  {readinessSource === 'manual' ? <View style={styles.radioInner} /> : null}
+                </View>
+                <View style={styles.readinessSourceTextWrap}>
+                  <Text style={styles.readinessSourceTitle}>Manual Check-in</Text>
+                  <Text style={styles.readinessSourceSubtitle}>Enter data manually each time</Text>
+                </View>
+              </Pressable>
+
+              <Text style={styles.readinessSectionLabel}>Readiness Prompts</Text>
+              <View style={styles.promptsToggleRow}>
+                <View style={styles.promptsToggleTextWrap}>
+                  <Text style={styles.promptsToggleTitle}>Enable Prompts</Text>
+                  <Text style={styles.promptsToggleSubtitle}>Show readiness check-in on home screen</Text>
+                </View>
+                <Switch
+                  value={isReadinessPromptsEnabled}
+                  onValueChange={setIsReadinessPromptsEnabled}
+                  trackColor={{ false: '#4f5568', true: '#2f7cff' }}
+                  thumbColor="#f4f6ff"
+                  ios_backgroundColor="#4f5568"
+                />
+              </View>
+
+              <Text style={styles.readinessSectionLabel}>Questions to Include</Text>
+              {READINESS_QUESTIONS.map((question) => {
+                const isChecked = readinessQuestions[question.key];
+
+                return (
+                  <Pressable
+                    key={question.key}
+                    onPress={() => toggleReadinessQuestion(question.key)}
+                    style={({ pressed }) => [styles.questionRow, pressed && styles.readinessPressablePressed]}
+                  >
+                    <Text style={styles.questionLabel}>{question.label}</Text>
+                    <View style={[styles.checkbox, isChecked && styles.checkboxChecked]}>
+                      {isChecked ? <Check color="#ffffff" size={16} strokeWidth={3} /> : null}
+                    </View>
+                  </Pressable>
+                );
+              })}
+
+              <View style={styles.privacyCard}>
+                <Text style={styles.privacyText}>
+                  <Text style={styles.privacyLabel}>Privacy:</Text> All health data is stored locally on your
+                  device and encrypted. We never share your personal health information with third parties.
+                </Text>
+              </View>
+            </ScrollView>
+
+            <View style={styles.readinessFooter}>
+              <Pressable
+                onPress={() => setIsReadinessModalVisible(false)}
+                style={({ pressed }) => [styles.readinessSaveButton, pressed && styles.readinessSaveButtonPressed]}
+              >
+                <Text style={styles.readinessSaveButtonText}>Save Settings</Text>
+              </Pressable>
+            </View>
+          </LinearGradient>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -558,5 +767,283 @@ const styles = StyleSheet.create({
     color: '#ff3c46',
     fontSize: 17,
     fontWeight: '500',
+  },
+  readinessOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    paddingHorizontal: 18,
+  },
+  readinessModal: {
+    width: '100%',
+    maxWidth: 520,
+    height: '86%',
+    alignSelf: 'center',
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: '#252a3a',
+    overflow: 'hidden',
+  },
+  readinessHeader: {
+    minHeight: 84,
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  readinessHeaderTitle: {
+    color: '#f4f6ff',
+    fontSize: 20,
+    fontWeight: '500',
+  },
+  readinessCloseButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(95, 102, 120, 0.3)',
+  },
+  readinessCloseButtonPressed: {
+    opacity: 0.82,
+  },
+  readinessHeaderDivider: {
+    height: 1,
+    backgroundColor: 'rgba(106, 111, 130, 0.25)',
+  },
+  readinessBodyScroll: {
+    flex: 1,
+  },
+  readinessBodyContent: {
+    paddingHorizontal: 24,
+    paddingTop: 18,
+    paddingBottom: 18,
+  },
+  readinessSectionLabel: {
+    color: '#f0f3ff',
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 12,
+    marginTop: 2,
+  },
+  appleHealthCard: {
+    borderRadius: 22,
+    borderWidth: 2,
+    paddingHorizontal: 18,
+    paddingVertical: 17,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  appleHealthCardDisconnected: {
+    borderColor: '#3e4457',
+    backgroundColor: 'rgba(72, 76, 89, 0.32)',
+  },
+  appleHealthCardConnected: {
+    borderColor: '#00bc57',
+    backgroundColor: 'rgba(6, 134, 73, 0.2)',
+  },
+  appleHealthIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  appleHealthIconWrapDisconnected: {
+    backgroundColor: 'rgba(146, 151, 169, 0.22)',
+  },
+  appleHealthIconWrapConnected: {
+    backgroundColor: '#16ba5f',
+  },
+  appleHealthTextWrap: {
+    flex: 1,
+  },
+  appleHealthTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    columnGap: 9,
+    marginBottom: 6,
+  },
+  appleHealthTitle: {
+    color: '#f4f6ff',
+    fontSize: 17,
+    fontWeight: '500',
+  },
+  appleHealthConnectedText: {
+    color: '#08cf61',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  appleHealthSubtitle: {
+    color: '#a2a8ba',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  permissionsCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#1445a4',
+    backgroundColor: 'rgba(31, 60, 119, 0.26)',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 20,
+  },
+  permissionsTitle: {
+    color: '#7dc4ff',
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 5,
+  },
+  permissionsItem: {
+    color: '#c4d6ff',
+    fontSize: 15,
+    lineHeight: 23,
+  },
+  readinessSourceRow: {
+    borderRadius: 20,
+    minHeight: 94,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: 'rgba(76, 82, 97, 0.35)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  radioOuter: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 3,
+    borderColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+    backgroundColor: '#f6f8ff',
+  },
+  radioOuterSelected: {
+    borderColor: '#2f7cff',
+    backgroundColor: '#2f7cff',
+  },
+  radioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#ffffff',
+  },
+  readinessSourceTextWrap: {
+    flex: 1,
+  },
+  readinessSourceTitle: {
+    color: '#f4f6ff',
+    fontSize: 17,
+    fontWeight: '500',
+  },
+  readinessSourceSubtitle: {
+    color: '#7f8599',
+    fontSize: 14,
+    marginTop: 2,
+  },
+  promptsToggleRow: {
+    borderRadius: 20,
+    minHeight: 104,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(76, 82, 97, 0.35)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  promptsToggleTextWrap: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  promptsToggleTitle: {
+    color: '#f4f6ff',
+    fontSize: 17,
+    fontWeight: '500',
+  },
+  promptsToggleSubtitle: {
+    color: '#7f8599',
+    fontSize: 14,
+    marginTop: 3,
+  },
+  questionRow: {
+    borderRadius: 20,
+    minHeight: 88,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(76, 82, 97, 0.35)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  questionLabel: {
+    color: '#f4f6ff',
+    fontSize: 17,
+    fontWeight: '500',
+  },
+  checkbox: {
+    width: 34,
+    height: 34,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: '#5c6478',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(26, 29, 38, 0.6)',
+  },
+  checkboxChecked: {
+    borderColor: '#2f7cff',
+    backgroundColor: '#2f7cff',
+  },
+  privacyCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#464d61',
+    backgroundColor: 'rgba(82, 87, 102, 0.26)',
+    paddingHorizontal: 15,
+    paddingVertical: 14,
+    marginTop: 10,
+  },
+  privacyText: {
+    color: '#9ba1b4',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  privacyLabel: {
+    color: '#c6ccdc',
+    fontWeight: '500',
+  },
+  readinessFooter: {
+    paddingHorizontal: 24,
+    paddingTop: 14,
+    paddingBottom: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(90, 96, 114, 0.25)',
+    backgroundColor: 'rgba(19, 21, 30, 0.96)',
+  },
+  readinessSaveButton: {
+    minHeight: 78,
+    borderRadius: 20,
+    backgroundColor: '#2b68f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  readinessSaveButtonPressed: {
+    opacity: 0.85,
+  },
+  readinessSaveButtonText: {
+    color: '#f4f6ff',
+    fontSize: 18,
+    fontWeight: '500',
+  },
+  readinessPressablePressed: {
+    opacity: 0.9,
   },
 });
