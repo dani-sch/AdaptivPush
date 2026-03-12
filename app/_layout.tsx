@@ -33,6 +33,7 @@ export default function RootLayout() {
         <Stack.Screen name="(qsetup)" options={{ headerShown: false }} />
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="workout-history" options={{ headerShown: false }} />
+        <Stack.Screen name="next-workout" options={{ headerShown: false }} />
         <Stack.Screen name="create-program" options={{ headerShown: false }} />
       </Stack>
       <StatusBar style="auto" />
