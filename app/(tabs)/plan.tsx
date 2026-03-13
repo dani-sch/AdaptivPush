@@ -102,7 +102,8 @@ export default function PlanScreen() {
 
     // TODO: Replace fake completion count with real workout session / completion data.
     const completedCount = program?.workouts.filter((_, i) => i < 2).length ?? 0;
-    const totalCount = program?.workouts.length ?? 0;
+    const totalCoun
+    t = program?.workouts.length ?? 0;
 
     const progressPct = useMemo(() => {
         if (!program) return 0;
