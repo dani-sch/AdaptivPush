@@ -8,7 +8,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "seed:exercises": "tsx scripts/seedExercises.ts"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -48,8 +49,10 @@
   "devDependencies": {
     "@types/react": "~19.1.0",
     "@types/react-native-linear-gradient": "^2.3.1",
+    "dotenv": "^17.3.1",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
+    "tsx": "^4.21.0",
     "typescript": "~5.9.2"
   },
   "private": true
