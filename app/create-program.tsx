@@ -371,7 +371,6 @@ export default function CreateProgramScreen() {
                                         placeholder="12"
                                         placeholderTextColor={PLACEHOLDER_TEXT}
                                         style={styles.input}
-                                        returnKeyType="done"
                                     />
                                 </View>
 
@@ -498,7 +497,7 @@ export default function CreateProgramScreen() {
                             }}
                             style={[
                                 styles.hideKeyboardButton,
-                                { bottom: keyboardHeight + 12 },
+                                { bottom: 12 },
                             ]}
                             hitSlop={10}
                         >

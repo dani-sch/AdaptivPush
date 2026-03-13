@@ -100,7 +100,9 @@ export default function PlanScreen() {
     const { program, loading, swapExercise, endCurrentProgram, createBlankProgram, createDevTestProgram } = useCurrentProgram();
     const [creating, setCreating] = useState(false);
 
-    const daysOfWeek = useMemo(() => ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], []);
+    // TODO: Replace fake completion count with real workout session / completion data.
+    const completedCount = program?.workouts.filter((_, i) => i < 2).length ?? 0;
+    const totalCount = program?.workouts.length ?? 0;
 
     const progressPct = useMemo(() => {
         if (!program) return 0;
@@ -114,7 +116,7 @@ export default function PlanScreen() {
     );
 
     const contentPaddingTop = useMemo(() => {
-        return (Platform.OS === 'ios' ? insets.top : 0) + 18;
+        return insets.top + 18;
     }, [insets.top]);
 
     if (loading) return <LoadingState />;
@@ -168,7 +170,9 @@ export default function PlanScreen() {
                     <View style={styles.menuCard}>
                         <Link href="/create-program" asChild>
                             <Pressable style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}>
-                                <Text style={styles.menuText}>Create Custom Program</Text>
+                                <View style={styles.menuItem}>
+                                    <Text style={styles.menuText}>Create Custom Program</Text>
+                                </View>
                             </Pressable>
                         </Link>
 
@@ -222,29 +226,26 @@ export default function PlanScreen() {
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>This Week’s Workouts</Text>
 
-                    {/* Day Headers */}
-                    <View style={styles.weekRow}>
-                        {daysOfWeek.map((day) => (
-                            <View key={day} style={styles.weekCell}>
-                                <Text style={styles.weekHeaderText}>{day}</Text>
-                            </View>
-                        ))}
-                    </View>
+                    {/* Weekly Progress */}
+                    <View style={styles.section}>
 
-                    {/* Day Indicators */}
-                    <View style={[styles.weekRow, { marginTop: 10 }]}>
-                        {daysOfWeek.map((day, idx) => {
-                            const hasWorkout = idx < program.daysPerWeek;
-                            return (
-                                <View key={day} style={styles.weekCell}>
-                                    <View style={[styles.dayBox, hasWorkout ? styles.dayBoxActive : styles.dayBoxInactive]}>
-                                        <Text style={[styles.dayBoxText, hasWorkout ? { color: WHITE } : { color: PLACEHOLDER_TEXT }]}>
-                                            {idx + 1}
-                                        </Text>
-                                    </View>
-                                </View>
-                            );
-                        })}
+                        <View style={styles.summaryCard}>
+                            <View style={styles.rowBetween}>
+                                <Text style={styles.summaryTitle}>Week {program.currentWeek}</Text>
+                                <Text style={styles.summaryMeta}>
+                                    {completedCount}/{totalCount} completed
+                                </Text>
+                            </View>
+
+                            <View style={styles.progressTrack}>
+                                <View
+                                    style={[
+                                        styles.progressFill,
+                                        { width: `${totalCount ? (completedCount / totalCount) * 100 : 0}%` },
+                                    ]}
+                                />
+                            </View>
+                        </View>
                     </View>
 
                     {/* Workout List */}
@@ -260,7 +261,7 @@ export default function PlanScreen() {
                                         <View style={{ flex: 1 }}>
                                             <Text style={styles.workoutName}>{workout.name}</Text>
                                             <Text style={styles.workoutMeta}>
-                                                {workout.day} • {workout.estimatedTime} min
+                                                Day {idx + 1} • {workout.estimatedTime} min
                                             </Text>
                                         </View>
                                     </View>
@@ -282,17 +283,19 @@ export default function PlanScreen() {
                 </View>
 
                 {/* Create Program */}
-                <Link href="/home">
-                    <Pressable style={({ pressed }) => [styles.ctaCard, pressed && { opacity: 0.9 }]}>
-                        <View style={styles.ctaLeft}>
-                            <View style={styles.ctaIcon}>
-                                <Plus color={WHITE} size={20} />
+                <View style={styles.ctaCard}>
+                    <Link href="/create-program" asChild>
+                        <Pressable style={({ pressed }) => [styles.ctaCard, pressed && { opacity: 0.9 }]}>
+                            <View style={styles.ctaLeft}>
+                                <View style={styles.ctaIcon}>
+                                    <Plus color={WHITE} size={20} />
+                                </View>
+                                <Text style={styles.ctaText}>Create Custom Program</Text>
+                                <ChevronRight color={PLACEHOLDER_TEXT} size={20} />
                             </View>
-                            <Text style={styles.ctaText}>Create Custom Program</Text>
-                        </View>
-                        <ChevronRight color={PLACEHOLDER_TEXT} size={20} />
-                    </Pressable>
-                </Link>
+                        </Pressable>
+                    </Link>
+                </View>
             </ScrollView>
 
             {/* Workout Template Modal */}
@@ -335,6 +338,23 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     subtitle: {
+        color: TEXT_COLOR,
+        fontSize: 13,
+    },
+    summaryCard: {
+        backgroundColor: CARD_BG,
+        borderWidth: 1,
+        borderColor: BORDER_COLOR,
+        borderRadius: 18,
+        padding: 14,
+        gap: 12,
+    },
+    summaryTitle: {
+        color: WHITE,
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    summaryMeta: {
         color: TEXT_COLOR,
         fontSize: 13,
     },
