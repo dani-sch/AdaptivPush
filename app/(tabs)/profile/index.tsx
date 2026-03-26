@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { type Href, router } from 'expo-router';
 import {
   Bell,
   Check,
@@ -53,11 +53,17 @@ interface ProgressSummary {
 type ReadinessSource = 'apple' | 'manual';
 type ReadinessQuestionKey = 'sleep' | 'stress' | 'menstrualCycle';
 type MenuIcon = 'user' | 'bell' | 'heart' | 'shield' | 'help';
+type MenuLabel =
+  | 'Personal Information'
+  | 'Notifications'
+  | 'Readiness Settings'
+  | 'Privacy & Data'
+  | 'Help & Support';
 
 interface MenuSection {
   title: string;
   items: {
-    label: string;
+    label: MenuLabel;
     icon: MenuIcon;
   }[];
 }
@@ -88,6 +94,13 @@ const MENU_SECTIONS: MenuSection[] = [
     items: [{ label: 'Help & Support', icon: 'help' }],
   },
 ];
+
+const MENU_ITEM_ROUTES: Partial<Record<MenuLabel, Href>> = {
+  'Personal Information': '/(tabs)/profile/personal-information',
+  Notifications: '/(tabs)/profile/notifications',
+  'Privacy & Data': '/(tabs)/profile/privacy-data',
+  'Help & Support': '/(tabs)/profile/help-support',
+};
 
 const READINESS_QUESTIONS: { key: ReadinessQuestionKey; label: string }[] = [
   { key: 'sleep', label: 'Sleep' },
@@ -322,9 +335,15 @@ export default function ProfileScreen() {
     }));
   };
 
-  const handleMenuItemPress = (label: string) => {
+  const handleMenuItemPress = (label: MenuLabel) => {
     if (label === 'Readiness Settings') {
       setIsReadinessModalVisible(true);
+      return;
+    }
+
+    const route = MENU_ITEM_ROUTES[label];
+    if (route) {
+      router.push(route);
     }
   };
 
