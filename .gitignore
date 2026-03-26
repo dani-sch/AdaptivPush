@@ -185,3 +185,7 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
+# Instruction files
+.claude/*
+.github/*
+
