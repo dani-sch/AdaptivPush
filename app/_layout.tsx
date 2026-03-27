@@ -22,6 +22,8 @@ export default function RootLayout() {
       if (session) {
         router.replace("/(tabs)/home");
       }
+    }).catch(() => {
+      // Network unavailable or credentials not yet configured — stay on current screen
     });
   }, [navigationState?.key]);
 

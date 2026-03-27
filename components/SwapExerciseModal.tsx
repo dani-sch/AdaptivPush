@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, Switch } from 'react-native';
+import React, { useMemo, useState, useEffect } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Switch } from 'react-native';
 import { X, Search, Check } from 'lucide-react-native';
 
-import type { CurrentProgram, WorkoutExercise } from '@/types/program'; // adjust to your types
-import { exerciseAlternatives } from '@/lib/mockData'; // your dummy map: muscleGroup -> Exercise[]
+import type { CurrentProgram, WorkoutExercise, MuscleGroup, Equipment } from '@/types/program';
+import { getAlternativesFor, exercisesByMuscleGroup } from '@/lib/exerciseDatabase';
+import { supabase } from '@/utils/supabase';
 
 import {
     BORDER_COLOR,
@@ -43,25 +44,76 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
         return null;
     }, [program, exerciseId]);
 
-    {/*
-    const alternatives = useMemo(() => {
-        if (!currentExercise) return [];
-        return exerciseAlternatives[currentExercise.muscleGroup] ?? [];
-    }, [currentExercise]);
-    */}
+    const [alternatives, setAlternatives] = useState<WorkoutExercise[]>([]);
+    const [loadingExercises, setLoadingExercises] = useState(false);
+    const [resolvedMuscleGroup, setResolvedMuscleGroup] = useState<MuscleGroup | undefined>(undefined);
 
-    {/*
+    useEffect(() => {
+        if (!currentExercise) return;
+        // If muscleGroup is missing from DB, look it up by exercise name in the local DB
+        let muscleGroup = currentExercise.muscleGroup;
+        if (!muscleGroup && currentExercise.name) {
+            const name = currentExercise.name.toLowerCase();
+            for (const [group, exercises] of Object.entries(exercisesByMuscleGroup)) {
+                if (exercises.some(ex => ex.name.toLowerCase() === name)) {
+                    muscleGroup = group as MuscleGroup;
+                    break;
+                }
+            }
+        }
+        loadAlternatives(muscleGroup);
+        setResolvedMuscleGroup(muscleGroup);
+    }, [currentExercise?.id]);
+
+    async function loadAlternatives(muscleGroup: MuscleGroup | undefined) {
+        setLoadingExercises(true);
+        try {
+            let query = supabase
+                .from('exercises')
+                .select('id, name, primary_muscle, equipment')
+                .order('name');
+
+            if (muscleGroup) {
+                query = query.eq('primary_muscle', muscleGroup);
+            }
+
+            const { data, error } = await query;
+
+            if (!error && data && data.length > 0) {
+                setAlternatives(data.map(ex => ({
+                    id:          ex.id,
+                    name:        ex.name,
+                    muscleGroup: ex.primary_muscle as MuscleGroup,
+                    equipment:   ex.equipment as Equipment,
+                    sets:        3,
+                    reps:        '8–12',
+                })));
+            } else if (muscleGroup) {
+                // Fallback: use local exercise database (only when muscle group is known)
+                const local = getAlternativesFor(muscleGroup, [exerciseId]);
+                setAlternatives(local.map(ex => ({
+                    id:          ex.id,
+                    name:        ex.name,
+                    muscleGroup: ex.muscleGroup,
+                    equipment:   ex.equipment,
+                    sets:        ex.defaultSets,
+                    reps:        `${ex.defaultRepMin}–${ex.defaultRepMax}`,
+                })));
+            }
+        } finally {
+            setLoadingExercises(false);
+        }
+    }
+
     const filteredAlternatives = useMemo(() => {
         const q = searchQuery.trim().toLowerCase();
-
-        return alternatives.filter((ex) => {
+        return alternatives.filter(ex => {
             if (ex.id === exerciseId) return false;
             if (currentExercise && ex.name === currentExercise.name) return false;
             if (!q) return true;
             return ex.name.toLowerCase().includes(q);
         });
     }, [alternatives, searchQuery, exerciseId, currentExercise]);
-    */}
 
     const handleSwap = () => {
         if (!selectedExercise) return;
@@ -111,48 +163,39 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
 
                 {/* List */}
                 <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
-                    <Text style={styles.sectionLabel}>{(currentExercise.muscleGroup ?? 'General').toUpperCase()} EXERCISES</Text>
-                    {/*
-                    {filteredAlternatives.map((ex) => {
-                        const isSelected = selectedExercise?.id === ex.id;
-
-                        return (
-                            <Pressable
-                                key={ex.id}
-                                onPress={() => setSelectedExercise(ex)}
-                                style={({ pressed }) => [
-                                    styles.exerciseRow,
-                                    isSelected && styles.exerciseRowSelected,
-                                    pressed && { opacity: 0.92 },
-                                ]}
-                            >
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.exerciseName}>{ex.name}</Text>
-                                    <Text style={styles.exerciseMeta}>{ex.equipment}</Text>
-
-                                    <View style={styles.exerciseStatsRow}>
-                                        <Text style={styles.statText}>{ex.sets} sets</Text>
-                                        <Text style={styles.statText}>{ex.reps} reps</Text>
-                                    </View>
-                                </View>
-
-                                {isSelected ? (
-                                    <View style={styles.checkCircle}>
-                                        <Check color={WHITE} size={14} />
-                                    </View>
-                                ) : null}
-                            </Pressable>
-                        );
-                    })}
-                    */}
-
-                    {/*
-                    {filteredAlternatives.length === 0 && (
+                    <Text style={styles.sectionLabel}>{(resolvedMuscleGroup ?? 'General').toUpperCase()} EXERCISES</Text>
+                    {loadingExercises ? (
+                        <ActivityIndicator color={PRIMARY_COLOR} style={{ marginTop: 20 }} />
+                    ) : filteredAlternatives.length === 0 ? (
                         <View style={styles.emptyWrap}>
                             <Text style={styles.emptyText}>No exercises found</Text>
                         </View>
+                    ) : (
+                        filteredAlternatives.map(ex => {
+                            const isSelected = selectedExercise?.id === ex.id;
+                            return (
+                                <Pressable
+                                    key={ex.id}
+                                    onPress={() => setSelectedExercise(ex)}
+                                    style={({ pressed }) => [styles.exerciseRow, isSelected && styles.exerciseRowSelected, pressed && { opacity: 0.92 }]}
+                                >
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.exerciseName}>{ex.name}</Text>
+                                        <Text style={styles.exerciseMeta}>{ex.equipment}</Text>
+                                        <View style={styles.exerciseStatsRow}>
+                                            <Text style={styles.statText}>{ex.sets} sets</Text>
+                                            <Text style={styles.statText}>{ex.reps} reps</Text>
+                                        </View>
+                                    </View>
+                                    {isSelected && (
+                                        <View style={styles.checkCircle}>
+                                            <Check color={WHITE} size={14} />
+                                        </View>
+                                    )}
+                                </Pressable>
+                            );
+                        })
                     )}
-                    */}
                 </ScrollView>
 
                 {/* Footer */}
@@ -200,6 +243,7 @@ const styles = StyleSheet.create({
         borderColor: BORDER_COLOR,
         overflow: 'hidden',
         maxHeight: '90%',
+        height: '75%',
     },
 
     header: {

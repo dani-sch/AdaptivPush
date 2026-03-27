@@ -7,6 +7,7 @@ import { Alert } from 'react-native';
 
 import { useCurrentProgram } from '@/hooks/useCurrentProgram';
 import { WorkoutTemplateModal } from '@/components/WorkoutTemplateModal';
+import { GenerateProgramModal } from '@/components/GenerateProgramModal';
 
 import {
     BACKGROUND_COLOR_DARK,
@@ -33,10 +34,12 @@ function LoadingState() {
 function EmptyState({
                         onCreateProgram,
                         onCreateDevProgram,
+                        onGenerateProgram,
                         busy,
                     }: {
     onCreateProgram: () => void;
     onCreateDevProgram: () => void;
+    onGenerateProgram: () => void;
     busy: boolean;
 }) {
     return (
@@ -44,6 +47,28 @@ function EmptyState({
             <Text style={{ color: TEXT_COLOR, textAlign: 'center', marginBottom: 14 }}>
                 No current program yet. Create one to get started.
             </Text>
+
+            <Pressable
+                disabled={busy}
+                onPress={onGenerateProgram}
+                style={({ pressed }) => [
+                    {
+                        width: '100%',
+                        maxWidth: 420,
+                        backgroundColor: PRIMARY_COLOR,
+                        borderWidth: 1,
+                        borderColor: BORDER_COLOR,
+                        borderRadius: 16,
+                        paddingVertical: 14,
+                        paddingHorizontal: 14,
+                        alignItems: 'center' as const,
+                        opacity: busy ? 0.6 : pressed ? 0.85 : 1,
+                        marginBottom: 10,
+                    },
+                ]}
+            >
+                <Text style={{ color: WHITE, fontWeight: '700' }}>Generate Personal Program</Text>
+            </Pressable>
 
             <Pressable
                 disabled={busy}
@@ -96,8 +121,9 @@ export default function PlanScreen() {
 
     const [selectedWorkout, setSelectedWorkout] = useState<string | null>(null);
     const [showMenu, setShowMenu] = useState(false);
+    const [showGenModal, setShowGenModal] = useState(false);
 
-    const { program, loading, swapExercise, endCurrentProgram, createBlankProgram, createDevTestProgram } = useCurrentProgram();
+    const { program, loading, refresh, swapExercise, endCurrentProgram, createBlankProgram, createDevTestProgram } = useCurrentProgram();
     const [creating, setCreating] = useState(false);
 
     // TODO: Replace fake completion count with real workout session / completion data.
@@ -122,25 +148,38 @@ export default function PlanScreen() {
     if (loading) return <LoadingState />;
     if (!program)
         return (
-            <EmptyState
-                busy={creating}
-                onCreateProgram={async () => {
-                    try {
-                        setCreating(true);
-                        await createBlankProgram();
-                    } finally {
-                        setCreating(false);
-                    }
-                }}
-                onCreateDevProgram={async () => {
-                    try {
-                        setCreating(true);
-                        await createDevTestProgram();
-                    } finally {
-                        setCreating(false);
-                    }
-                }}
-            />
+            <>
+                <EmptyState
+                    busy={creating}
+                    onGenerateProgram={() => setShowGenModal(true)}
+                    onCreateProgram={async () => {
+                        try {
+                            setCreating(true);
+                            await createBlankProgram();
+                        } finally {
+                            setCreating(false);
+                        }
+                    }}
+                    onCreateDevProgram={async () => {
+                        try {
+                            setCreating(true);
+                            await createDevTestProgram();
+                        } finally {
+                            setCreating(false);
+                        }
+                    }}
+                />
+                <Modal visible={showGenModal} transparent animationType="slide">
+                    <GenerateProgramModal
+                        visible={showGenModal}
+                        onClose={() => setShowGenModal(false)}
+                        onProgramCreated={() => {
+                            setShowGenModal(false);
+                            refresh();
+                        }}
+                    />
+                </Modal>
+            </>
         );
     return (
         <View style={styles.container}>
@@ -168,6 +207,18 @@ export default function PlanScreen() {
                 {/* Menu Dropdown */}
                 {showMenu && (
                     <View style={styles.menuCard}>
+                        <Pressable
+                            style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
+                            onPress={() => {
+                                setShowMenu(false);
+                                setShowGenModal(true);
+                            }}
+                        >
+                            <Text style={styles.menuText}>Generate New Program</Text>
+                        </Pressable>
+
+                        <View style={styles.menuDivider} />
+
                         <Link href="/create-program" asChild>
                             <Pressable style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}>
                                 <View style={styles.menuItem}>
@@ -309,6 +360,18 @@ export default function PlanScreen() {
                     />
                 </Modal>
             )}
+
+            {/* Generate Program Modal */}
+            <Modal visible={showGenModal} transparent animationType="slide">
+                <GenerateProgramModal
+                    visible={showGenModal}
+                    onClose={() => setShowGenModal(false)}
+                    onProgramCreated={() => {
+                        setShowGenModal(false);
+                        refresh();
+                    }}
+                />
+            </Modal>
         </View>
     );
 }

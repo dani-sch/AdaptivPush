@@ -127,6 +127,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: BORDER_COLOR,
         overflow: 'hidden',
+        height: '75%',
         maxHeight: '90%',
     },
 
@@ -241,6 +242,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: BORDER_COLOR,
         overflow: 'hidden',
+        height: '72%',
         maxHeight: '85%',
         minHeight: 280,
     },

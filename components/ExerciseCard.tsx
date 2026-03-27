@@ -12,6 +12,7 @@ import {
     TEXT_COLOR,
     WHITE,
 } from "../constants/colors";
+import type { MuscleGroup } from "@/types/program";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -29,6 +30,7 @@ export interface Exercise {
     prescription: string;
     sets: WorkoutSet[];
     completed: boolean;
+    muscleGroup?: MuscleGroup;
 }
 
 // ─── SetRow ───────────────────────────────────────────────────────────────────
