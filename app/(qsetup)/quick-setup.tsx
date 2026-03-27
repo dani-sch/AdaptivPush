@@ -1,9 +1,10 @@
 import { isOldEnough, kgToLb, parseDateInput } from '@/utils/conversions';
 import { supabase } from '@/utils/supabase';
+import { GenerateProgramModal } from '@/components/GenerateProgramModal';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import React, { useEffect, useState } from 'react';
-import { Keyboard, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Keyboard, KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Dropdown } from 'react-native-element-dropdown';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -24,6 +25,7 @@ export default function QSetupPage() {
     const [weightUnit, setWeightUnit] = useState<'lb' | 'kg'>('lb');
     const [experienceLevel, setExperienceLevel] = useState('');
     const [healthKitConnected, setHealthKitConnected] = useState(false);
+    const [showGenModal, setShowGenModal] = useState(false);
 
     const [keyboardVisible, setKeyboardVisible] = useState(false);
     const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -164,7 +166,7 @@ export default function QSetupPage() {
             console.log('[Quick Setup] Success! Profile updated');
             console.log('[Quick Setup] Updated data:', data);
             
-            router.replace("/");
+            setShowGenModal(true);
         } catch (e: any) {
             console.log('[Quick Setup] Unexpected error:', e?.message ?? e);
             console.log('[Quick Setup] Full error:', e);
@@ -173,7 +175,7 @@ export default function QSetupPage() {
 
     const handleSkip = () => {
         console.log('[Quick Setup] Skip pressed');
-        router.replace("/");
+        router.replace("/(tabs)/home");
     };
 
     const handleHealthConnect = () => {
@@ -188,6 +190,7 @@ export default function QSetupPage() {
     };
 
     return (
+        <>
         <View style={styles.container}>
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
@@ -387,6 +390,22 @@ export default function QSetupPage() {
                 </Pressable>
             )}
         </View>
+
+        <Modal visible={showGenModal} transparent animationType="slide">
+            <GenerateProgramModal
+                visible={showGenModal}
+                onClose={() => {
+                    setShowGenModal(false);
+                    router.replace('/(tabs)/home');
+                }}
+                onProgramCreated={() => {
+                    setShowGenModal(false);
+                    router.replace('/(tabs)/home');
+                }}
+                defaultParams={{ daysPerWeek: 3, durationWeeks: 8, goal: 'general_fitness', focusMuscleGroups: [] }}
+            />
+        </Modal>
+        </>
     );
 }
 

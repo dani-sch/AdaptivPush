@@ -24,6 +24,8 @@ import {
   TEXT_COLOR,
   WHITE,
 } from "../../constants/colors";
+import { useCurrentProgram } from "../../hooks/useCurrentProgram";
+import { getReadinessModifier } from "../../utils/progressionEngine";
 import { supabase } from "../../utils/supabase";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -320,12 +322,12 @@ const ReadinessCheckInModal: React.FC<{
         return;
       }
 
-      await supabase.from("readiness_checkins").insert({
+      await supabase.from("readiness_logs").insert({
         user_id: user.id,
-        sleep_hours: sleepHours,
-        stress_level: stressLevel,
-        cycle_phase: cyclePhase,
-        checked_at: new Date().toISOString(),
+        log_date: new Date().toISOString().split("T")[0],
+        sleep_score: computeSleepScore(sleepHours) * 2,
+        stress: stressLevel,
+        readiness_score: computeReadinessScore(sleepHours, stressLevel),
       });
 
       onSaved(computeReadinessScore(sleepHours, stressLevel));
@@ -397,11 +399,90 @@ const ReadinessCheckInModal: React.FC<{
   );
 };
 
+// readiness adjustment confirmation popup
+
+const ReadinessAdjustmentModal: React.FC<{
+  visible: boolean;
+  score: number;
+  onApply: () => void;
+  onDismiss: () => void;
+}> = ({ visible, score, onApply, onDismiss }) => {
+  const modifier = getReadinessModifier(score);
+  const isIncrease = modifier.weightMultiplier > 1.0;
+  const isDecrease = modifier.weightMultiplier < 1.0;
+  const accentColor = isIncrease ? "#16a34a" : "#f59e0b";
+  const iconName = isIncrease ? "trending-up" : "trending-down";
+  const pctLabel = isIncrease
+    ? `+${Math.round((modifier.weightMultiplier - 1) * 100)}%`
+    : `${Math.round((modifier.weightMultiplier - 1) * 100)}%`;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onDismiss}
+    >
+      <View style={styles.adjOverlay}>
+        <View style={styles.adjContainer}>
+          {/* Score badge */}
+          <View style={[styles.adjScoreBadge, { backgroundColor: accentColor + "22", borderColor: accentColor }]}>
+            <Ionicons name={iconName as any} size={22} color={accentColor} />
+            <Text style={[styles.adjScoreText, { color: accentColor }]}>
+              {score.toFixed(1)}/10 — {modifier.label}
+            </Text>
+          </View>
+
+          <Text style={styles.adjTitle}>Readiness Adjustment</Text>
+
+          <Text style={styles.adjDescription}>{modifier.description}</Text>
+
+          {/* Adjustment pill */}
+          <View style={[styles.adjPill, { borderColor: accentColor }]}>
+            <Text style={[styles.adjPillLabel, { color: accentColor }]}>
+              Weight {pctLabel}
+            </Text>
+          </View>
+
+          <Text style={styles.adjSubtext}>
+            Apply this adjustment to your next workout?
+          </Text>
+
+          {/* Buttons */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.adjApplyButton,
+              { backgroundColor: accentColor },
+              pressed && { opacity: 0.85 },
+            ]}
+            onPress={onApply}
+          >
+            <Text style={styles.adjApplyButtonText}>Apply Adjustment</Text>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.adjKeepButton,
+              pressed && { opacity: 0.7 },
+            ]}
+            onPress={onDismiss}
+          >
+            <Text style={styles.adjKeepButtonText}>Keep Weights As-Is</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
 // main screen
 
 export default function HomeScreen() {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [readinessScore, setReadinessScore] = useState<string>("--");
+  const [pendingAdjustmentScore, setPendingAdjustmentScore] = useState<number | null>(null);
+
+  const { applyReadinessAdjustmentOnly } = useCurrentProgram();
 
   useEffect(() => {
     const fetchHomeData = async () => {
@@ -411,18 +492,14 @@ export default function HomeScreen() {
       if (!user) return;
 
       const { data } = await supabase
-        .from("readiness_checkins")
-        .select("sleep_hours, stress_level")
+        .from("readiness_logs")
+        .select("readiness_score")
         .eq("user_id", user.id)
-        .order("checked_at", { ascending: false })
+        .order("created_at", { ascending: false })
         .limit(1);
 
-      if (data && data.length > 0) {
-        const score = computeReadinessScore(
-          data[0].sleep_hours,
-          data[0].stress_level,
-        );
-        setReadinessScore(score.toFixed(1));
+      if (data && data.length > 0 && data[0].readiness_score != null) {
+        setReadinessScore(Number(data[0].readiness_score).toFixed(1));
       }
     };
 
@@ -441,6 +518,25 @@ export default function HomeScreen() {
     setIsModalVisible(false);
   };
 
+  const handleReadinessSaved = (score: number) => {
+    setReadinessScore(score.toFixed(1));
+    const modifier = getReadinessModifier(score);
+    if (!modifier.isNeutral) {
+      setPendingAdjustmentScore(score);
+    }
+  };
+
+  const handleApplyAdjustment = async () => {
+    if (pendingAdjustmentScore !== null) {
+      await applyReadinessAdjustmentOnly(pendingAdjustmentScore);
+    }
+    setPendingAdjustmentScore(null);
+  };
+
+  const handleDismissAdjustment = () => {
+    setPendingAdjustmentScore(null);
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <ScrollView
@@ -457,8 +553,17 @@ export default function HomeScreen() {
       <ReadinessCheckInModal
         visible={isModalVisible}
         onClose={handleCloseReadinessModal}
-        onSaved={(score) => setReadinessScore(score.toFixed(1))}
+        onSaved={handleReadinessSaved}
       />
+
+      {pendingAdjustmentScore !== null && (
+        <ReadinessAdjustmentModal
+          visible
+          score={pendingAdjustmentScore}
+          onApply={handleApplyAdjustment}
+          onDismiss={handleDismissAdjustment}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -729,6 +834,92 @@ const styles = StyleSheet.create({
   skipButtonText: {
     color: TEXT_COLOR,
     fontSize: 16,
+    fontWeight: "600",
+  },
+
+  // readiness adjustment popup
+  adjOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.88)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  adjContainer: {
+    backgroundColor: BACKGROUND_COLOR_DARK,
+    borderRadius: 24,
+    width: "100%",
+    maxWidth: 380,
+    padding: 28,
+    alignItems: "center",
+  },
+  adjScoreBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1.5,
+    borderRadius: 100,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    marginBottom: 20,
+  },
+  adjScoreText: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  adjTitle: {
+    color: WHITE,
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  adjDescription: {
+    color: TEXT_COLOR,
+    fontSize: 14,
+    fontWeight: "500",
+    textAlign: "center",
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  adjPill: {
+    borderWidth: 1.5,
+    borderRadius: 100,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    marginBottom: 20,
+  },
+  adjPillLabel: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  adjSubtext: {
+    color: PLACEHOLDER_TEXT,
+    fontSize: 13,
+    fontWeight: "500",
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  adjApplyButton: {
+    width: "100%",
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  adjApplyButtonText: {
+    color: WHITE,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  adjKeepButton: {
+    width: "100%",
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  adjKeepButtonText: {
+    color: TEXT_COLOR,
+    fontSize: 15,
     fontWeight: "600",
   },
 });

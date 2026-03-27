@@ -1,6 +1,9 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { supabase} from "@/utils/supabase";
 import type { CurrentProgram, ProgramWorkout, WorkoutExercise } from '@/types/program';
+import { computeProgression, getReadinessModifier } from '@/utils/progressionEngine';
+import type { ProgressionContext, LoggedSet } from '@/types/progression';
+import type { TrainingExperience } from '@/types/database';
 
 type SwapArgs = { exerciseId: string; replacement: WorkoutExercise; applyToProgram: boolean };
 
@@ -77,6 +80,9 @@ async function requireUserId() {
 export function useCurrentProgram() {
     const [program, setProgram] = useState<CurrentProgram | null>(null);
     const [loading, setLoading] = useState(true);
+
+    const prevWeekRef = useRef<number>(0);
+    const applyProgressionRef = useRef<(() => Promise<void>) | undefined>(undefined);
 
     const refresh = useCallback(async () => {
         setLoading(true);
@@ -190,6 +196,12 @@ export function useCurrentProgram() {
             };
 
             setProgram(mapped);
+
+            // Trigger progression when week advances
+            if (mapped.currentWeek > prevWeekRef.current && prevWeekRef.current !== 0) {
+                applyProgressionRef.current?.();
+            }
+            prevWeekRef.current = mapped.currentWeek;
         } catch (e) {
             console.error('useCurrentProgram refresh error', e);
             setProgram(null);
@@ -201,6 +213,118 @@ export function useCurrentProgram() {
     useEffect(() => {
         refresh();
     }, [refresh]);
+
+    const applyProgressionToNextWeek = useCallback(async () => {
+        if (!program) return;
+
+        const userId = await requireUserId();
+        const nextWeek = program.currentWeek + 1;
+        if (nextWeek > program.totalWeeks) return;
+
+        // Get most recent readiness score from readiness_logs
+        const { data: checkin } = await supabase
+            .from('readiness_logs')
+            .select('readiness_score')
+            .eq('user_id', userId)
+            .order('log_date', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        const readinessScore: number | null = checkin?.readiness_score != null
+            ? Number(checkin.readiness_score)
+            : null;
+
+        // Fetch user experience level from user_profile (field: experience_level)
+        const { data: profile } = await supabase
+            .from('user_profile')
+            .select('experience_level')
+            .eq('user_id', userId)
+            .single();
+        const experienceLevel = (profile?.experience_level ?? 'beginner') as TrainingExperience;
+
+        // Get next week's program_days with nested program_day_exercises
+        const { data: nextDays } = await supabase
+            .from('program_days')
+            .select(`
+              id,
+              program_day_exercises (
+                id,
+                exercise_id,
+                set_count,
+                rep_range_min,
+                rep_range_max,
+                suggested_weight_lb,
+                exercises ( name )
+              )
+            `)
+            .eq('program_id', program.id)
+            .eq('week_number', nextWeek);
+
+        if (!nextDays) return;
+
+        const updates: Promise<void>[] = [];
+
+        for (const day of nextDays) {
+            const pdes = (day as any).program_day_exercises ?? [];
+            for (const pde of pdes) {
+                const exerciseName: string = (pde.exercises as any)?.name ?? '';
+
+                // Fetch most recent logged sets for this exercise (scoped to this user)
+                const { data: recentSets } = await supabase
+                    .from('workout_exercise_sets')
+                    .select('set_number, weight_lb, reps, rpe, workout_sessions!inner(user_id)')
+                    .eq('exercise_id', pde.exercise_id)
+                    .eq('workout_sessions.user_id', userId)
+                    .order('created_at', { ascending: false })
+                    .limit(pde.set_count);
+
+                const lastSessionSets: LoggedSet[] = (recentSets ?? [])
+                    .filter((s: any) => s.weight_lb !== null && s.reps !== null)
+                    .map((s: any) => ({
+                        setNumber: s.set_number,
+                        weightLb:  Number(s.weight_lb),
+                        reps:      Number(s.reps),
+                        rpe:       s.rpe != null ? Number(s.rpe) : null,
+                    }));
+
+                const ctx: ProgressionContext = {
+                    pdeId:           pde.id,
+                    exerciseName,
+                    currentWeightLb: pde.suggested_weight_lb ?? 0,
+                    currentRepMin:   pde.rep_range_min,
+                    currentRepMax:   pde.rep_range_max,
+                    currentTargetRPE: pde.target_rpe,
+                    experienceLevel,
+                    lastSessionSets,
+                    readinessScore,
+                };
+
+                const result = computeProgression(ctx);
+
+                const dbUpdate: Record<string, unknown> = {
+                    suggested_weight_lb: result.suggestedWeightLb,
+                    updated_at: new Date().toISOString(),
+                };
+                if (result.suggestedRPE !== null) {
+                    dbUpdate.target_rpe = result.suggestedRPE;
+                }
+
+                updates.push(
+                    Promise.resolve(
+                        supabase
+                            .from('program_day_exercises')
+                            .update(dbUpdate)
+                            .eq('id', pde.id)
+                    ).then(() => { return; })
+                );
+            }
+        }
+
+        await Promise.all(updates);
+        await refresh();
+    }, [program, refresh]);
+
+    applyProgressionRef.current = applyProgressionToNextWeek;
 
     const swapExercise = useCallback(
         async ({ exerciseId, replacement, applyToProgram }: SwapArgs) => {
@@ -521,5 +645,51 @@ export function useCurrentProgram() {
         return prog.id;
     }, [refresh]);
 
-    return { program, loading, refresh, swapExercise, createBlankProgram, createDevTestProgram, endCurrentProgram };
+    // Applies only the readiness modifier to the next upcoming workout's exercises.
+    // Called after the user confirms the readiness adjustment popup on the home screen.
+    const applyReadinessAdjustmentOnly = useCallback(async (readinessScore: number) => {
+        if (!program) return;
+
+        const { weightMultiplier, rpeDelta } = getReadinessModifier(readinessScore);
+
+        // Fetch the first program day for the current week (soonest upcoming workout)
+        const { data: days } = await supabase
+            .from('program_days')
+            .select(`
+              id,
+              program_day_exercises (
+                id,
+                suggested_weight_lb,
+                target_rpe
+              )
+            `)
+            .eq('program_id', program.id)
+            .eq('week_number', program.currentWeek)
+            .order('day_index', { ascending: true })
+            .limit(1);
+
+        if (!days?.length) return;
+
+        const pdes = (days[0] as any).program_day_exercises ?? [];
+
+        const updates = pdes.map((pde: any) => {
+            const newWeight = Math.max(
+                0,
+                Math.round(((pde.suggested_weight_lb ?? 0) * weightMultiplier) / 2.5) * 2.5,
+            );
+            const dbUpdate: Record<string, unknown> = {
+                suggested_weight_lb: newWeight,
+                updated_at: new Date().toISOString(),
+            };
+            if (pde.target_rpe !== null) {
+                dbUpdate.target_rpe = Math.min(10, Math.max(5, pde.target_rpe + rpeDelta));
+            }
+            return supabase.from('program_day_exercises').update(dbUpdate).eq('id', pde.id);
+        });
+
+        await Promise.all(updates);
+        await refresh();
+    }, [program, refresh]);
+
+    return { program, loading, refresh, swapExercise, createBlankProgram, createDevTestProgram, endCurrentProgram, applyProgressionToNextWeek, applyReadinessAdjustmentOnly };
 }

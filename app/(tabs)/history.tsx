@@ -20,8 +20,10 @@ import { supabase } from '@/utils/supabase';
 
 interface WorkoutHistoryRow {
   id?: string;
+  workout_name?: string | null;
   title?: string | null;
   name?: string | null;
+  ended_at?: string | null;
   completed_at?: string | null;
   created_at?: string | null;
   duration_min?: number | string | null;
@@ -158,8 +160,8 @@ const formatWorkoutDate = (dateValue: string): string => {
 
 const toWorkoutEntry = (row: WorkoutHistoryRow, index: number): WorkoutEntry => ({
   id: row.id || `workout-${index}`,
-  title: row.title || row.name || 'Workout',
-  completedAt: row.completed_at || row.created_at || new Date().toISOString(),
+  title: row.workout_name || row.title || row.name || 'Workout',
+  completedAt: row.ended_at || row.completed_at || row.created_at || new Date().toISOString(),
   durationMin: parseDuration(row),
   totalVolumeLb: parseVolume(row),
   personalRecords: parsePrCount(row),
@@ -175,7 +177,7 @@ const isMissingWorkoutHistoryTableError = (error: { code?: string | null; messag
   }
 
   return Boolean(
-    error.message?.toLowerCase().includes("could not find the table 'public.workout_history'"),
+    error.message?.toLowerCase().includes("could not find the table 'public.workout_sessions'"),
   );
 };
 
@@ -225,10 +227,10 @@ export default function HistoryScreen() {
       }
 
       const { data, error: historyError } = await supabase
-        .from('workout_history')
+        .from('workout_sessions')
         .select('*')
         .eq('user_id', user.id)
-        .order('completed_at', { ascending: false });
+        .order('ended_at', { ascending: false });
 
       if (historyError) {
         if (isMissingWorkoutHistoryTableError(historyError)) {

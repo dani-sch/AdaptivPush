@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
     KeyboardAvoidingView,
     Modal,
@@ -12,6 +12,10 @@ import {
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { supabase } from '@/utils/supabase';
+import { SwapExerciseModal } from '@/components/SwapExerciseModal';
+import { ExerciseHistoryModal } from '@/components/ExerciseHistoryModal';
+import type { CurrentProgram, MuscleGroup } from '@/types/program';
 import {
     BACKGROUND_COLOR_DARK,
     BORDER_COLOR,
@@ -33,6 +37,7 @@ const INITIAL_WORKOUT: { name: string; exercises: Exercise[] } = {
             name: "Barbell Bench Press",
             prescription: "4×6–8 @ RPE 8",
             completed: false,
+            muscleGroup: 'Chest' as MuscleGroup,
             sets: [
                 { id: "1-1", weight: "185", reps: "8", rpe: "7", logged: false },
                 { id: "1-2", weight: "185", reps: "8", rpe: "8", logged: false },
@@ -45,6 +50,7 @@ const INITIAL_WORKOUT: { name: string; exercises: Exercise[] } = {
             name: "Barbell Row",
             prescription: "4×8–10 @ RPE 7",
             completed: false,
+            muscleGroup: 'Back' as MuscleGroup,
             sets: [
                 { id: "2-1", weight: "155", reps: "10", rpe: "7", logged: false },
                 { id: "2-2", weight: "155", reps: "10", rpe: "7", logged: false },
@@ -57,6 +63,7 @@ const INITIAL_WORKOUT: { name: string; exercises: Exercise[] } = {
             name: "Overhead Press",
             prescription: "3×8–10 @ RPE 8",
             completed: false,
+            muscleGroup: 'Shoulders' as MuscleGroup,
             sets: [
                 { id: "3-1", weight: "95", reps: "10", rpe: "7", logged: false },
                 { id: "3-2", weight: "95", reps: "9", rpe: "8", logged: false },
@@ -68,6 +75,7 @@ const INITIAL_WORKOUT: { name: string; exercises: Exercise[] } = {
             name: "Lateral Raises",
             prescription: "3×12–15 @ RPE 8",
             completed: false,
+            muscleGroup: 'Shoulders' as MuscleGroup,
             sets: [
                 { id: "4-1", weight: "25", reps: "15", rpe: "7", logged: false },
                 { id: "4-2", weight: "25", reps: "14", rpe: "8", logged: false },
@@ -79,6 +87,7 @@ const INITIAL_WORKOUT: { name: string; exercises: Exercise[] } = {
             name: "Tricep Pushdowns",
             prescription: "3×12–15 @ RPE 8",
             completed: false,
+            muscleGroup: 'Triceps' as MuscleGroup,
             sets: [
                 { id: "5-1", weight: "60", reps: "15", rpe: "7", logged: false },
                 { id: "5-2", weight: "60", reps: "14", rpe: "8", logged: false },
@@ -103,9 +112,10 @@ const FinishModal: React.FC<{
     elapsed: number;
     completedCount: number;
     totalCount: number;
+    saving: boolean;
     onConfirm: () => void;
     onCancel: () => void;
-}> = ({ visible, elapsed, completedCount, totalCount, onConfirm, onCancel }) => (
+}> = ({ visible, elapsed, completedCount, totalCount, saving, onConfirm, onCancel }) => (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
         <View style={styles.modalOverlay}>
             <View style={styles.modalContainer}>
@@ -121,10 +131,11 @@ const FinishModal: React.FC<{
                         <Text style={styles.modalCancelText}>Keep Going</Text>
                     </Pressable>
                     <Pressable
-                        style={({ pressed }) => [styles.modalConfirm, pressed && { opacity: 0.8 }]}
-                        onPress={onConfirm}
+                        style={({ pressed }) => [styles.modalConfirm, (pressed || saving) && { opacity: 0.8 }]}
+                        onPress={saving ? undefined : onConfirm}
+                        disabled={saving}
                     >
-                        <Text style={styles.modalConfirmText}>Finish</Text>
+                        <Text style={styles.modalConfirmText}>{saving ? 'Saving…' : 'Finish'}</Text>
                     </Pressable>
                 </View>
             </View>
@@ -143,7 +154,32 @@ export default function NextWorkoutScreen() {
     );
     const [elapsed, setElapsed] = useState(0);
     const [showFinishModal, setShowFinishModal] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [swapTargetId, setSwapTargetId] = useState<string | null>(null);
+    const [historyExerciseId, setHistoryExerciseId] = useState<string | null>(null);
+    const [historyExerciseName, setHistoryExerciseName] = useState<string | null>(null);
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    const mockProgramForSwap = useMemo<CurrentProgram>(() => ({
+        id: 'active-session',
+        name: INITIAL_WORKOUT.name,
+        goal: '',
+        currentWeek: 1,
+        totalWeeks: 1,
+        daysPerWeek: 1,
+        workouts: [{
+            id: 'active-day',
+            name: INITIAL_WORKOUT.name,
+            day: 'Today',
+            estimatedTime: 0,
+            exercises: exercises.map(ex => ({
+                id: ex.id,
+                name: ex.name,
+                muscleGroup: ex.muscleGroup,
+                equipment: undefined,
+            })),
+        }],
+    }), [exercises]);
 
     useEffect(() => {
         intervalRef.current = setInterval(() => setElapsed((prev) => prev + 1), 1000);
@@ -173,10 +209,76 @@ export default function NextWorkoutScreen() {
         );
     };
 
-    const handleFinish = () => {
+    const handleFinish = async () => {
         if (intervalRef.current) clearInterval(intervalRef.current);
         setShowFinishModal(false);
-        router.back();
+        setSaving(true);
+
+        try {
+            const { data: { user }, error: authErr } = await supabase.auth.getUser();
+            if (authErr || !user) throw new Error('Not signed in');
+
+            // Compute total volume from all logged sets
+            const totalVolumeLb = exercises.reduce((total, ex) =>
+                total + ex.sets
+                    .filter(s => s.logged)
+                    .reduce((setTotal, s) => {
+                        const weight = parseFloat(s.weight) || 0;
+                        const reps   = parseInt(s.reps)   || 0;
+                        return setTotal + weight * reps;
+                    }, 0),
+                0
+            );
+
+            // Insert workout_sessions row
+            const { data: sessionRow, error: sessionErr } = await supabase
+                .from('workout_sessions')
+                .insert({
+                    user_id:         user.id,
+                    program_day_id:  null,
+                    workout_name:    INITIAL_WORKOUT.name,
+                    started_at:      new Date(Date.now() - elapsed * 1000).toISOString(),
+                    ended_at:        new Date().toISOString(),
+                    duration_min:    Math.round(elapsed / 60),
+                    total_volume_lb: Math.round(totalVolumeLb),
+                })
+                .select('id')
+                .single();
+
+            if (sessionErr) throw sessionErr;
+
+            // Collect all logged sets
+            // Note: exercise_id is null because static dummy data has no real exercise UUIDs.
+            // Sets insert is skipped for MVP to avoid FK constraint violation.
+            const setRows = exercises.flatMap(ex =>
+                ex.sets
+                    .filter(s => s.logged)
+                    .map((s, idx) => ({
+                        session_id:  sessionRow?.id,
+                        exercise_id: null,
+                        set_number:  idx + 1,
+                        weight_lb:   parseFloat(s.weight) || null,
+                        reps:        parseInt(s.reps)     || null,
+                        rpe:         parseFloat(s.rpe)    || null,
+                    }))
+            );
+
+            if (setRows.length > 0) {
+                const { error: setsErr } = await supabase
+                    .from('workout_exercise_sets')
+                    .insert(setRows);
+                if (setsErr) {
+                    // Non-fatal: exercise_id FK constraint will fail with null; skip sets for MVP
+                    console.warn('[handleFinish] Skipping sets insert:', setsErr.message);
+                }
+            }
+        } catch (err) {
+            // Non-blocking: log but don't prevent navigation
+            console.error('[handleFinish] Failed to save workout:', err);
+        } finally {
+            setSaving(false);
+            router.back();
+        }
     };
 
     return (
@@ -232,8 +334,11 @@ export default function NextWorkoutScreen() {
                                 updateSet(exercise.id, setId, field, value)
                             }
                             onToggleComplete={() => toggleExerciseComplete(exercise.id)}
-                            onPressHistory={() => console.log("History:", exercise.name)}
-                            onPressSwap={() => console.log("Swap:", exercise.name)}
+                            onPressHistory={() => {
+                                setHistoryExerciseId(exercise.id);
+                                setHistoryExerciseName(exercise.name);
+                            }}
+                            onPressSwap={() => setSwapTargetId(exercise.id)}
                         />
                     ))}
 
@@ -257,9 +362,46 @@ export default function NextWorkoutScreen() {
                 elapsed={elapsed}
                 completedCount={completedCount}
                 totalCount={exercises.length}
+                saving={saving}
                 onConfirm={handleFinish}
                 onCancel={() => setShowFinishModal(false)}
             />
+
+            {/* Swap Exercise Modal */}
+            <Modal visible={swapTargetId !== null} transparent animationType="slide">
+                {swapTargetId !== null && (
+                    <SwapExerciseModal
+                        program={mockProgramForSwap}
+                        exerciseId={swapTargetId}
+                        context="workout"
+                        onClose={() => setSwapTargetId(null)}
+                        onSwap={({ exerciseId, replacement }) => {
+                            setExercises(prev =>
+                                prev.map(ex =>
+                                    ex.id === exerciseId
+                                        ? { ...ex, id: replacement.id, name: replacement.name, muscleGroup: replacement.muscleGroup }
+                                        : ex
+                                )
+                            );
+                            setSwapTargetId(null);
+                        }}
+                    />
+                )}
+            </Modal>
+
+            {/* Exercise History Modal */}
+            <Modal visible={historyExerciseId !== null} transparent animationType="slide">
+                {historyExerciseId !== null && historyExerciseName !== null && (
+                    <ExerciseHistoryModal
+                        exerciseId={historyExerciseId}
+                        exerciseName={historyExerciseName}
+                        onClose={() => {
+                            setHistoryExerciseId(null);
+                            setHistoryExerciseName(null);
+                        }}
+                    />
+                )}
+            </Modal>
         </SafeAreaView>
     );
 }
