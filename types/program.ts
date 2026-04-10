@@ -39,6 +39,7 @@ export type ProgramWorkout = {
     day: string;            // e.g. "Monday"
     estimatedTime: number;  // minutes
     exercises: WorkoutExercise[];
+    isCompleted?: boolean;  // true if a workout_session exists for this day in the current week
 };
 
 export type CurrentProgram = {

@@ -153,6 +153,20 @@ export function useCurrentProgram() {
 
             if (daysErr) throw daysErr;
 
+            // Find which days in this week already have a completed session
+            const dayIds = (days ?? []).map((d) => d.id);
+            let completedDayIds = new Set<string>();
+            if (dayIds.length > 0) {
+                const { data: sessions } = await supabase
+                    .from('workout_sessions')
+                    .select('program_day_id')
+                    .eq('user_id', user.id)
+                    .in('program_day_id', dayIds);
+                completedDayIds = new Set(
+                    (sessions ?? []).map((s: { program_day_id: string }) => s.program_day_id)
+                );
+            }
+
             // Map DB -> UI types
             const workouts: ProgramWorkout[] =
                 (days ?? []).map((d) => {
@@ -180,8 +194,15 @@ export function useCurrentProgram() {
                         day: DAY_NAMES[(d.day_index ?? 1) - 1] ?? `Day ${d.day_index}`,
                         estimatedTime: d.estimated_duration_min ?? 0,
                         exercises,
+                        isCompleted: completedDayIds.has(d.id),
                     };
                 }) ?? [];
+
+            // Sort: uncompleted workouts first (preserving order_in_week DB order), completed last
+            workouts.sort((a, b) => {
+                if (a.isCompleted === b.isCompleted) return 0;
+                return a.isCompleted ? 1 : -1;
+            });
 
             // daysPerWeek is not stored on programs; infer from this week’s days count
             // may need to pull from user_profile.days_per_week instead
