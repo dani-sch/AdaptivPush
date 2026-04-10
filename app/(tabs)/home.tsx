@@ -39,20 +39,7 @@ type CyclePhase =
   | "Menstruation"
   | "N/A";
 
-// mock data
-
-const MOCK_WORKOUT: WorkoutSummary = {
-  name: "Upper Body A",
-  durationMinutes: 75,
-  exercises: [
-    { name: "Barbell Bench Press", prescription: "4×6–8" },
-    { name: "Barbell Row", prescription: "4×8–10" },
-    { name: "Overhead Press", prescription: "3×8–10" },
-    { name: "Lateral Raises", prescription: "3×12–15" },
-    { name: "Tricep Pushdowns", prescription: "3×12–15" },
-  ],
-  remainingExerciseCount: 2,
-};
+// mock data removed — card now uses real program data from useCurrentProgram
 
 // header component
 
@@ -74,12 +61,13 @@ const HeaderDateBlock: React.FC = () => {
 
 // next workout card section
 
-const NextWorkoutSection: React.FC<{ onPressStart?: () => void }> = ({
-  onPressStart,
-}) => {
+const NextWorkoutSection: React.FC<{
+  workout?: WorkoutSummary;
+  onPressStart?: () => void;
+}> = ({ workout, onPressStart }) => {
   return (
     <NextWorkoutCard
-      workout={MOCK_WORKOUT}
+      workout={workout}
       onPressStart={onPressStart}
       onPressCalendar={() => console.log("Calendar pressed")}
     />
@@ -426,7 +414,12 @@ const ReadinessAdjustmentModal: React.FC<{
       <View style={styles.adjOverlay}>
         <View style={styles.adjContainer}>
           {/* Score badge */}
-          <View style={[styles.adjScoreBadge, { backgroundColor: accentColor + "22", borderColor: accentColor }]}>
+          <View
+            style={[
+              styles.adjScoreBadge,
+              { backgroundColor: accentColor + "22", borderColor: accentColor },
+            ]}
+          >
             <Ionicons name={iconName as any} size={22} color={accentColor} />
             <Text style={[styles.adjScoreText, { color: accentColor }]}>
               {score.toFixed(1)}/10 — {modifier.label}
@@ -480,9 +473,24 @@ const ReadinessAdjustmentModal: React.FC<{
 export default function HomeScreen() {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [readinessScore, setReadinessScore] = useState<string>("--");
-  const [pendingAdjustmentScore, setPendingAdjustmentScore] = useState<number | null>(null);
+  const [pendingAdjustmentScore, setPendingAdjustmentScore] = useState<
+    number | null
+  >(null);
 
-  const { applyReadinessAdjustmentOnly } = useCurrentProgram();
+  const { program, applyReadinessAdjustmentOnly } = useCurrentProgram();
+
+  // Build the next workout summary from the first workout in the current week
+  const nextWorkout = program?.workouts[0];
+  const nextWorkoutSummary: WorkoutSummary | undefined = nextWorkout
+    ? {
+        name: nextWorkout.name,
+        durationMinutes: nextWorkout.estimatedTime || 60,
+        exercises: nextWorkout.exercises.map((ex) => ({
+          name: ex.name,
+          prescription: `${ex.sets ?? 3}×${(ex.reps ?? "8-12").replace("-", "–")}`,
+        })),
+      }
+    : undefined;
 
   useEffect(() => {
     const fetchHomeData = async () => {
@@ -507,7 +515,12 @@ export default function HomeScreen() {
   }, []);
 
   const handleStartWorkout = () => {
-    router.push("/next-workout");
+    const workoutId = nextWorkout?.id;
+    if (workoutId) {
+      router.push({ pathname: "/next-workout", params: { workoutId } });
+    } else {
+      router.push("/next-workout");
+    }
   };
 
   const handleOpenReadinessModal = () => {
@@ -545,7 +558,10 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         <HeaderDateBlock />
-        <NextWorkoutSection onPressStart={handleStartWorkout} />
+        <NextWorkoutSection
+          workout={nextWorkoutSummary}
+          onPressStart={handleStartWorkout}
+        />
         <StatsRow readiness={readinessScore} />
         <ReadinessPromptCard onPress={handleOpenReadinessModal} />
       </ScrollView>

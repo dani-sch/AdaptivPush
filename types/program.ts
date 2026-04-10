@@ -20,12 +20,14 @@ export type Equipment =
     | 'Other';
 
 export type WorkoutExercise = {
-    id: string;
+    id: string;         // program_day_exercises.id (used for swap targeting)
+    exerciseId?: string; // exercises.id (used for DB set writes)
     name: string;
 
     sets?: number;
     reps?: string;
     weight?: number;
+    targetRpe?: number | null;
 
     muscleGroup?: MuscleGroup;
     equipment?: Equipment;

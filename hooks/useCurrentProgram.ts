@@ -163,10 +163,12 @@ export function useCurrentProgram() {
                             const ex = pde.exercises;
                             return {
                                 id: pde.id, // program_day_exercises row id (swap targets this)
+                                exerciseId: ex?.id ?? undefined, // exercises table id (for set writes)
                                 name: ex?.name ?? 'Unknown exercise',
                                 sets: pde.set_count,
                                 reps: `${pde.rep_range_min}-${pde.rep_range_max}`,
                                 weight: pde.suggested_weight_lb ?? undefined,
+                                targetRpe: pde.target_rpe ?? undefined,
                                 muscleGroup: (ex?.primary_muscle as any) ?? undefined,
                                 equipment: (ex?.equipment as any) ?? undefined,
                             };

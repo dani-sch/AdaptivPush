@@ -1,7 +1,13 @@
+import { ExerciseHistoryModal } from "@/components/ExerciseHistoryModal";
+import { SwapExerciseModal } from "@/components/SwapExerciseModal";
+import { useCurrentProgram } from "@/hooks/useCurrentProgram";
+import type { CurrentProgram, ProgramWorkout } from "@/types/program";
+import { supabase } from "@/utils/supabase";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+    ActivityIndicator,
     KeyboardAvoidingView,
     Modal,
     Platform,
@@ -12,10 +18,7 @@ import {
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { supabase } from '@/utils/supabase';
-import { SwapExerciseModal } from '@/components/SwapExerciseModal';
-import { ExerciseHistoryModal } from '@/components/ExerciseHistoryModal';
-import type { CurrentProgram, MuscleGroup } from '@/types/program';
+import ExerciseCard, { Exercise, WorkoutSet } from "../components/ExerciseCard";
 import {
     BACKGROUND_COLOR_DARK,
     BORDER_COLOR,
@@ -25,541 +28,595 @@ import {
     TEXT_COLOR,
     WHITE,
 } from "../constants/colors";
-import ExerciseCard, { Exercise, WorkoutSet } from "../components/ExerciseCard";
-
-// ─── Dummy Data ───────────────────────────────────────────────────────────────
-
-const INITIAL_WORKOUT: { name: string; exercises: Exercise[] } = {
-    name: "Upper Body A",
-    exercises: [
-        {
-            id: "1",
-            name: "Barbell Bench Press",
-            prescription: "4×6–8 @ RPE 8",
-            completed: false,
-            muscleGroup: 'Chest' as MuscleGroup,
-            sets: [
-                { id: "1-1", weight: "185", reps: "8", rpe: "7", logged: false },
-                { id: "1-2", weight: "185", reps: "8", rpe: "8", logged: false },
-                { id: "1-3", weight: "185", reps: "7", rpe: "8", logged: false },
-                { id: "1-4", weight: "185", reps: "6", rpe: "9", logged: false },
-            ],
-        },
-        {
-            id: "2",
-            name: "Barbell Row",
-            prescription: "4×8–10 @ RPE 7",
-            completed: false,
-            muscleGroup: 'Back' as MuscleGroup,
-            sets: [
-                { id: "2-1", weight: "155", reps: "10", rpe: "7", logged: false },
-                { id: "2-2", weight: "155", reps: "10", rpe: "7", logged: false },
-                { id: "2-3", weight: "155", reps: "9", rpe: "8", logged: false },
-                { id: "2-4", weight: "155", reps: "8", rpe: "8", logged: false },
-            ],
-        },
-        {
-            id: "3",
-            name: "Overhead Press",
-            prescription: "3×8–10 @ RPE 8",
-            completed: false,
-            muscleGroup: 'Shoulders' as MuscleGroup,
-            sets: [
-                { id: "3-1", weight: "95", reps: "10", rpe: "7", logged: false },
-                { id: "3-2", weight: "95", reps: "9", rpe: "8", logged: false },
-                { id: "3-3", weight: "95", reps: "8", rpe: "9", logged: false },
-            ],
-        },
-        {
-            id: "4",
-            name: "Lateral Raises",
-            prescription: "3×12–15 @ RPE 8",
-            completed: false,
-            muscleGroup: 'Shoulders' as MuscleGroup,
-            sets: [
-                { id: "4-1", weight: "25", reps: "15", rpe: "7", logged: false },
-                { id: "4-2", weight: "25", reps: "14", rpe: "8", logged: false },
-                { id: "4-3", weight: "25", reps: "12", rpe: "9", logged: false },
-            ],
-        },
-        {
-            id: "5",
-            name: "Tricep Pushdowns",
-            prescription: "3×12–15 @ RPE 8",
-            completed: false,
-            muscleGroup: 'Triceps' as MuscleGroup,
-            sets: [
-                { id: "5-1", weight: "60", reps: "15", rpe: "7", logged: false },
-                { id: "5-2", weight: "60", reps: "14", rpe: "8", logged: false },
-                { id: "5-3", weight: "60", reps: "12", rpe: "9", logged: false },
-            ],
-        },
-    ],
-};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+/** Build ExerciseCard Exercise[] from a real ProgramWorkout */
+function buildExercises(workout: ProgramWorkout): Exercise[] {
+  return workout.exercises.map((ex) => {
+    const setCount = ex.sets ?? 3;
+    const weightStr = ex.weight != null ? String(ex.weight) : "";
+    const rpeStr = ex.targetRpe != null ? String(ex.targetRpe) : "";
+
+    const sets: WorkoutSet[] = Array.from({ length: setCount }, (_, i) => ({
+      id: `${ex.id}-${i + 1}`,
+      weight: weightStr,
+      reps: "",
+      rpe: rpeStr,
+      logged: false,
+    }));
+
+    const repDisplay = (ex.reps ?? "8-12").replace("-", "–");
+    const prescription =
+      ex.targetRpe != null
+        ? `${setCount}×${repDisplay} @ RPE ${ex.targetRpe}`
+        : `${setCount}×${repDisplay}`;
+
+    return {
+      id: ex.id,
+      exerciseId: ex.exerciseId,
+      name: ex.name,
+      prescription,
+      muscleGroup: ex.muscleGroup,
+      sets,
+      completed: false,
+    };
+  });
+}
+
 function formatTime(seconds: number): string {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
 // ─── Finish Modal ─────────────────────────────────────────────────────────────
 
 const FinishModal: React.FC<{
-    visible: boolean;
-    elapsed: number;
-    completedCount: number;
-    totalCount: number;
-    saving: boolean;
-    onConfirm: () => void;
-    onCancel: () => void;
-}> = ({ visible, elapsed, completedCount, totalCount, saving, onConfirm, onCancel }) => (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
-        <View style={styles.modalOverlay}>
-            <View style={styles.modalContainer}>
-                <Text style={styles.modalTitle}>Finish Workout?</Text>
-                <Text style={styles.modalBody}>
-                    {completedCount}/{totalCount} exercises completed · {formatTime(elapsed)}
-                </Text>
-                <View style={styles.modalButtons}>
-                    <Pressable
-                        style={({ pressed }) => [styles.modalCancel, pressed && { opacity: 0.7 }]}
-                        onPress={onCancel}
-                    >
-                        <Text style={styles.modalCancelText}>Keep Going</Text>
-                    </Pressable>
-                    <Pressable
-                        style={({ pressed }) => [styles.modalConfirm, (pressed || saving) && { opacity: 0.8 }]}
-                        onPress={saving ? undefined : onConfirm}
-                        disabled={saving}
-                    >
-                        <Text style={styles.modalConfirmText}>{saving ? 'Saving…' : 'Finish'}</Text>
-                    </Pressable>
-                </View>
-            </View>
+  visible: boolean;
+  elapsed: number;
+  completedCount: number;
+  totalCount: number;
+  saving: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}> = ({
+  visible,
+  elapsed,
+  completedCount,
+  totalCount,
+  saving,
+  onConfirm,
+  onCancel,
+}) => (
+  <Modal
+    visible={visible}
+    transparent
+    animationType="fade"
+    onRequestClose={onCancel}
+  >
+    <View style={styles.modalOverlay}>
+      <View style={styles.modalContainer}>
+        <Text style={styles.modalTitle}>Finish Workout?</Text>
+        <Text style={styles.modalBody}>
+          {completedCount}/{totalCount} exercises completed ·{" "}
+          {formatTime(elapsed)}
+        </Text>
+        <View style={styles.modalButtons}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.modalCancel,
+              pressed && { opacity: 0.7 },
+            ]}
+            onPress={onCancel}
+          >
+            <Text style={styles.modalCancelText}>Keep Going</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [
+              styles.modalConfirm,
+              (pressed || saving) && { opacity: 0.8 },
+            ]}
+            onPress={saving ? undefined : onConfirm}
+            disabled={saving}
+          >
+            <Text style={styles.modalConfirmText}>
+              {saving ? "Saving…" : "Finish"}
+            </Text>
+          </Pressable>
         </View>
-    </Modal>
+      </View>
+    </View>
+  </Modal>
 );
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function NextWorkoutScreen() {
-    const [exercises, setExercises] = useState<Exercise[]>(
-        INITIAL_WORKOUT.exercises.map((e) => ({
-            ...e,
-            sets: e.sets.map((s) => ({ ...s })),
-        }))
+  const { workoutId } = useLocalSearchParams<{ workoutId?: string }>();
+  const { program, loading } = useCurrentProgram();
+
+  // Find the matching workout day; fall back to first in current week
+  const programWorkout = workoutId
+    ? (program?.workouts.find((w) => w.id === workoutId) ??
+      program?.workouts[0])
+    : program?.workouts[0];
+
+  const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [workoutName, setWorkoutName] = useState("Workout");
+  const [programDayId, setProgramDayId] = useState<string | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  const [showFinishModal, setShowFinishModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [swapTargetId, setSwapTargetId] = useState<string | null>(null);
+  const [historyExerciseId, setHistoryExerciseId] = useState<string | null>(
+    null,
+  );
+  const [historyExerciseName, setHistoryExerciseName] = useState<string | null>(
+    null,
+  );
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Populate exercises once the program workout is available
+  useEffect(() => {
+    if (programWorkout) {
+      setExercises(buildExercises(programWorkout));
+      setWorkoutName(programWorkout.name);
+      setProgramDayId(programWorkout.id);
+    }
+  }, [programWorkout?.id]);
+
+  const programForSwap = useMemo<CurrentProgram | null>(() => {
+    if (!program || !programWorkout) return null;
+    return {
+      ...program,
+      workouts: [
+        {
+          id: programWorkout.id,
+          name: programWorkout.name,
+          day: programWorkout.day,
+          estimatedTime: programWorkout.estimatedTime,
+          exercises: exercises.map((ex) => ({
+            id: ex.id,
+            exerciseId: ex.exerciseId,
+            name: ex.name,
+            muscleGroup: ex.muscleGroup,
+            equipment: undefined,
+          })),
+        },
+      ],
+    };
+  }, [program, programWorkout, exercises]);
+
+  useEffect(() => {
+    intervalRef.current = setInterval(
+      () => setElapsed((prev) => prev + 1),
+      1000,
     );
-    const [elapsed, setElapsed] = useState(0);
-    const [showFinishModal, setShowFinishModal] = useState(false);
-    const [saving, setSaving] = useState(false);
-    const [swapTargetId, setSwapTargetId] = useState<string | null>(null);
-    const [historyExerciseId, setHistoryExerciseId] = useState<string | null>(null);
-    const [historyExerciseName, setHistoryExerciseName] = useState<string | null>(null);
-    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-    const mockProgramForSwap = useMemo<CurrentProgram>(() => ({
-        id: 'active-session',
-        name: INITIAL_WORKOUT.name,
-        goal: '',
-        currentWeek: 1,
-        totalWeeks: 1,
-        daysPerWeek: 1,
-        workouts: [{
-            id: 'active-day',
-            name: INITIAL_WORKOUT.name,
-            day: 'Today',
-            estimatedTime: 0,
-            exercises: exercises.map(ex => ({
-                id: ex.id,
-                name: ex.name,
-                muscleGroup: ex.muscleGroup,
-                equipment: undefined,
-            })),
-        }],
-    }), [exercises]);
-
-    useEffect(() => {
-        intervalRef.current = setInterval(() => setElapsed((prev) => prev + 1), 1000);
-        return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-    }, []);
-
-    const completedCount = exercises.filter((e) => e.completed).length;
-
-    const updateSet = (
-        exerciseId: string,
-        setId: string,
-        field: keyof WorkoutSet,
-        value: string | boolean
-    ) => {
-        setExercises((prev) =>
-            prev.map((ex) =>
-                ex.id !== exerciseId
-                    ? ex
-                    : { ...ex, sets: ex.sets.map((s) => s.id === setId ? { ...s, [field]: value } : s) }
-            )
-        );
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
     };
+  }, []);
 
-    const toggleExerciseComplete = (exerciseId: string) => {
-        setExercises((prev) =>
-            prev.map((ex) => ex.id === exerciseId ? { ...ex, completed: !ex.completed } : ex)
-        );
-    };
+  const completedCount = exercises.filter((e) => e.completed).length;
 
-    const handleFinish = async () => {
-        if (intervalRef.current) clearInterval(intervalRef.current);
-        setShowFinishModal(false);
-        setSaving(true);
+  const updateSet = (
+    exerciseId: string,
+    setId: string,
+    field: keyof WorkoutSet,
+    value: string | boolean,
+  ) => {
+    setExercises((prev) =>
+      prev.map((ex) =>
+        ex.id !== exerciseId
+          ? ex
+          : {
+              ...ex,
+              sets: ex.sets.map((s) =>
+                s.id === setId ? { ...s, [field]: value } : s,
+              ),
+            },
+      ),
+    );
+  };
 
-        try {
-            const { data: { user }, error: authErr } = await supabase.auth.getUser();
-            if (authErr || !user) throw new Error('Not signed in');
+  const toggleExerciseComplete = (exerciseId: string) => {
+    setExercises((prev) =>
+      prev.map((ex) =>
+        ex.id === exerciseId ? { ...ex, completed: !ex.completed } : ex,
+      ),
+    );
+  };
 
-            // Compute total volume from all logged sets
-            const totalVolumeLb = exercises.reduce((total, ex) =>
-                total + ex.sets
-                    .filter(s => s.logged)
-                    .reduce((setTotal, s) => {
-                        const weight = parseFloat(s.weight) || 0;
-                        const reps   = parseInt(s.reps)   || 0;
-                        return setTotal + weight * reps;
-                    }, 0),
-                0
-            );
+  const handleFinish = async () => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    setShowFinishModal(false);
+    setSaving(true);
 
-            // Insert workout_sessions row
-            const { data: sessionRow, error: sessionErr } = await supabase
-                .from('workout_sessions')
-                .insert({
-                    user_id:         user.id,
-                    program_day_id:  null,
-                    workout_name:    INITIAL_WORKOUT.name,
-                    started_at:      new Date(Date.now() - elapsed * 1000).toISOString(),
-                    ended_at:        new Date().toISOString(),
-                    duration_min:    Math.round(elapsed / 60),
-                    total_volume_lb: Math.round(totalVolumeLb),
-                })
-                .select('id')
-                .single();
+    try {
+      const {
+        data: { user },
+        error: authErr,
+      } = await supabase.auth.getUser();
+      if (authErr || !user) throw new Error("Not signed in");
 
-            if (sessionErr) throw sessionErr;
+      const totalVolumeLb = exercises.reduce(
+        (total, ex) =>
+          total +
+          ex.sets
+            .filter((s) => s.logged)
+            .reduce((setTotal, s) => {
+              const weight = parseFloat(s.weight) || 0;
+              const reps = parseInt(s.reps) || 0;
+              return setTotal + weight * reps;
+            }, 0),
+        0,
+      );
 
-            // Collect all logged sets
-            // Note: exercise_id is null because static dummy data has no real exercise UUIDs.
-            // Sets insert is skipped for MVP to avoid FK constraint violation.
-            const setRows = exercises.flatMap(ex =>
-                ex.sets
-                    .filter(s => s.logged)
-                    .map((s, idx) => ({
-                        session_id:  sessionRow?.id,
-                        exercise_id: null,
-                        set_number:  idx + 1,
-                        weight_lb:   parseFloat(s.weight) || null,
-                        reps:        parseInt(s.reps)     || null,
-                        rpe:         parseFloat(s.rpe)    || null,
-                    }))
-            );
+      const { data: sessionRow, error: sessionErr } = await supabase
+        .from("workout_sessions")
+        .insert({
+          user_id: user.id,
+          program_day_id: programDayId,
+          workout_name: workoutName,
+          started_at: new Date(Date.now() - elapsed * 1000).toISOString(),
+          ended_at: new Date().toISOString(),
+          duration_min: Math.round(elapsed / 60),
+          total_volume_lb: Math.round(totalVolumeLb),
+        })
+        .select("id")
+        .single();
 
-            if (setRows.length > 0) {
-                const { error: setsErr } = await supabase
-                    .from('workout_exercise_sets')
-                    .insert(setRows);
-                if (setsErr) {
-                    // Non-fatal: exercise_id FK constraint will fail with null; skip sets for MVP
-                    console.warn('[handleFinish] Skipping sets insert:', setsErr.message);
-                }
-            }
-        } catch (err) {
-            // Non-blocking: log but don't prevent navigation
-            console.error('[handleFinish] Failed to save workout:', err);
-        } finally {
-            setSaving(false);
-            router.back();
+      if (sessionErr) throw sessionErr;
+
+      const setRows = exercises.flatMap((ex) =>
+        ex.sets
+          .filter((s) => s.logged)
+          .map((s, idx) => ({
+            session_id: sessionRow?.id,
+            exercise_id: ex.exerciseId ?? null,
+            set_number: idx + 1,
+            weight_lb: parseFloat(s.weight) || null,
+            reps: parseInt(s.reps) || null,
+            rpe: parseFloat(s.rpe) || null,
+          })),
+      );
+
+      if (setRows.length > 0) {
+        const { error: setsErr } = await supabase
+          .from("workout_exercise_sets")
+          .insert(setRows);
+        if (setsErr) {
+          console.warn("[handleFinish] Sets insert failed:", setsErr.message);
         }
-    };
+      }
+    } catch (err) {
+      console.error("[handleFinish] Failed to save workout:", err);
+    } finally {
+      setSaving(false);
+      router.back();
+    }
+  };
 
+  if (loading && exercises.length === 0) {
     return (
-        <SafeAreaView style={styles.safeArea} edges={["top"]}>
-            <KeyboardAvoidingView
-                style={{ flex: 1 }}
-                behavior={Platform.OS === "ios" ? "padding" : undefined}
-            >
-                {/* Header */}
-                <View style={styles.header}>
-                    <Pressable
-                        style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.6 }]}
-                        onPress={() => router.back()}
-                        hitSlop={8}
-                    >
-                        <Ionicons name="chevron-back" size={24} color={WHITE} />
-                    </Pressable>
-                    <View style={styles.headerCenter}>
-                        <Text style={styles.headerTitle}>{INITIAL_WORKOUT.name}</Text>
-                        <Text style={styles.headerSubtitle}>
-                            {completedCount}/{exercises.length} done
-                        </Text>
-                    </View>
-                    <View style={styles.headerRight} />
-                </View>
-
-                {/* Progress bar */}
-                <View style={styles.progressBarTrack}>
-                    <View
-                        style={[
-                            styles.progressBarFill,
-                            {
-                                width: `${exercises.length > 0
-                                    ? (completedCount / exercises.length) * 100
-                                    : 0}%`,
-                            },
-                        ]}
-                    />
-                </View>
-
-                {/* Exercise list */}
-                <ScrollView
-                    style={styles.scrollView}
-                    contentContainerStyle={styles.scrollContent}
-                    keyboardShouldPersistTaps="handled"
-                    showsVerticalScrollIndicator={false}
-                >
-                    {exercises.map((exercise) => (
-                        <ExerciseCard
-                            key={exercise.id}
-                            exercise={exercise}
-                            onUpdateSet={(setId, field, value) =>
-                                updateSet(exercise.id, setId, field, value)
-                            }
-                            onToggleComplete={() => toggleExerciseComplete(exercise.id)}
-                            onPressHistory={() => {
-                                setHistoryExerciseId(exercise.id);
-                                setHistoryExerciseName(exercise.name);
-                            }}
-                            onPressSwap={() => setSwapTargetId(exercise.id)}
-                        />
-                    ))}
-
-                    <Pressable
-                        style={({ pressed }) => [styles.finishButton, pressed && { opacity: 0.85 }]}
-                        onPress={() => setShowFinishModal(true)}
-                    >
-                        <Text style={styles.finishButtonText}>Finish Workout</Text>
-                    </Pressable>
-                </ScrollView>
-
-                {/* Floating timer */}
-                <View style={styles.timerBubble} pointerEvents="none">
-                    <Ionicons name="timer-outline" size={14} color={TEXT_COLOR} />
-                    <Text style={styles.timerText}>{formatTime(elapsed)}</Text>
-                </View>
-            </KeyboardAvoidingView>
-
-            <FinishModal
-                visible={showFinishModal}
-                elapsed={elapsed}
-                completedCount={completedCount}
-                totalCount={exercises.length}
-                saving={saving}
-                onConfirm={handleFinish}
-                onCancel={() => setShowFinishModal(false)}
-            />
-
-            {/* Swap Exercise Modal */}
-            <Modal visible={swapTargetId !== null} transparent animationType="slide">
-                {swapTargetId !== null && (
-                    <SwapExerciseModal
-                        program={mockProgramForSwap}
-                        exerciseId={swapTargetId}
-                        context="workout"
-                        onClose={() => setSwapTargetId(null)}
-                        onSwap={({ exerciseId, replacement }) => {
-                            setExercises(prev =>
-                                prev.map(ex =>
-                                    ex.id === exerciseId
-                                        ? { ...ex, id: replacement.id, name: replacement.name, muscleGroup: replacement.muscleGroup }
-                                        : ex
-                                )
-                            );
-                            setSwapTargetId(null);
-                        }}
-                    />
-                )}
-            </Modal>
-
-            {/* Exercise History Modal */}
-            <Modal visible={historyExerciseId !== null} transparent animationType="slide">
-                {historyExerciseId !== null && historyExerciseName !== null && (
-                    <ExerciseHistoryModal
-                        exerciseId={historyExerciseId}
-                        exerciseName={historyExerciseName}
-                        onClose={() => {
-                            setHistoryExerciseId(null);
-                            setHistoryExerciseName(null);
-                        }}
-                    />
-                )}
-            </Modal>
-        </SafeAreaView>
+      <SafeAreaView style={styles.safeArea} edges={["top"]}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={PRIMARY_COLOR} />
+          <Text style={styles.loadingText}>Loading workout…</Text>
+        </View>
+      </SafeAreaView>
     );
+  }
+
+  return (
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.backButton,
+              pressed && { opacity: 0.6 },
+            ]}
+            onPress={() => router.back()}
+            hitSlop={8}
+          >
+            <Ionicons name="chevron-back" size={24} color={WHITE} />
+          </Pressable>
+          <View style={styles.headerCenter}>
+            <Text style={styles.headerTitle}>{workoutName}</Text>
+            <Text style={styles.headerSubtitle}>
+              {completedCount}/{exercises.length} done
+            </Text>
+          </View>
+          <View style={styles.headerRight} />
+        </View>
+
+        {/* Progress bar */}
+        <View style={styles.progressBarTrack}>
+          <View
+            style={[
+              styles.progressBarFill,
+              {
+                width: `${
+                  exercises.length > 0
+                    ? (completedCount / exercises.length) * 100
+                    : 0
+                }%`,
+              },
+            ]}
+          />
+        </View>
+
+        {/* Exercise list */}
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {exercises.map((exercise) => (
+            <ExerciseCard
+              key={exercise.id}
+              exercise={exercise}
+              onUpdateSet={(setId, field, value) =>
+                updateSet(exercise.id, setId, field, value)
+              }
+              onToggleComplete={() => toggleExerciseComplete(exercise.id)}
+              onPressHistory={() => {
+                setHistoryExerciseId(exercise.id);
+                setHistoryExerciseName(exercise.name);
+              }}
+              onPressSwap={() => setSwapTargetId(exercise.id)}
+            />
+          ))}
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.finishButton,
+              pressed && { opacity: 0.85 },
+            ]}
+            onPress={() => setShowFinishModal(true)}
+          >
+            <Text style={styles.finishButtonText}>Finish Workout</Text>
+          </Pressable>
+        </ScrollView>
+
+        {/* Floating timer */}
+        <View style={styles.timerBubble} pointerEvents="none">
+          <Ionicons name="timer-outline" size={14} color={TEXT_COLOR} />
+          <Text style={styles.timerText}>{formatTime(elapsed)}</Text>
+        </View>
+      </KeyboardAvoidingView>
+
+      <FinishModal
+        visible={showFinishModal}
+        elapsed={elapsed}
+        completedCount={completedCount}
+        totalCount={exercises.length}
+        saving={saving}
+        onConfirm={handleFinish}
+        onCancel={() => setShowFinishModal(false)}
+      />
+
+      {/* Swap Exercise Modal */}
+      <Modal visible={swapTargetId !== null} transparent animationType="slide">
+        {swapTargetId !== null && programForSwap !== null && (
+          <SwapExerciseModal
+            program={programForSwap}
+            exerciseId={swapTargetId}
+            context="workout"
+            onClose={() => setSwapTargetId(null)}
+            onSwap={({ exerciseId, replacement }) => {
+              setExercises((prev) =>
+                prev.map((ex) =>
+                  ex.id === exerciseId
+                    ? {
+                        ...ex,
+                        id: replacement.id,
+                        exerciseId: replacement.exerciseId,
+                        name: replacement.name,
+                        muscleGroup: replacement.muscleGroup,
+                      }
+                    : ex,
+                ),
+              );
+              setSwapTargetId(null);
+            }}
+          />
+        )}
+      </Modal>
+
+      {/* Exercise History Modal */}
+      <Modal
+        visible={historyExerciseId !== null}
+        transparent
+        animationType="slide"
+      >
+        {historyExerciseId !== null && historyExerciseName !== null && (
+          <ExerciseHistoryModal
+            exerciseId={historyExerciseId}
+            exerciseName={historyExerciseName}
+            onClose={() => {
+              setHistoryExerciseId(null);
+              setHistoryExerciseName(null);
+            }}
+          />
+        )}
+      </Modal>
+    </SafeAreaView>
+  );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-    safeArea: {
-        flex: 1,
-        backgroundColor: BACKGROUND_COLOR_DARK,
-    },
-    header: {
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-    },
-    backButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: MUTED_BG,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    headerCenter: {
-        flex: 1,
-        alignItems: "center",
-    },
-    headerTitle: {
-        color: WHITE,
-        fontSize: 18,
-        fontWeight: "700",
-    },
-    headerSubtitle: {
-        color: TEXT_COLOR,
-        fontSize: 13,
-        fontWeight: "500",
-        marginTop: 2,
-    },
-    headerRight: {
-        width: 36,
-    },
-    progressBarTrack: {
-        height: 3,
-        backgroundColor: BORDER_COLOR,
-        marginHorizontal: 16,
-        borderRadius: 2,
-        marginBottom: 8,
-    },
-    progressBarFill: {
-        height: 3,
-        backgroundColor: PRIMARY_COLOR,
-        borderRadius: 2,
-    },
-    scrollView: {
-        flex: 1,
-    },
-    scrollContent: {
-        paddingHorizontal: 16,
-        paddingTop: 8,
-        paddingBottom: 120,
-    },
-    finishButton: {
-        backgroundColor: PRIMARY_COLOR,
-        borderRadius: 18,
-        paddingVertical: 16,
-        alignItems: "center",
-        justifyContent: "center",
-        marginTop: 8,
-    },
-    finishButtonText: {
-        color: WHITE,
-        fontSize: 17,
-        fontWeight: "700",
-    },
-    timerBubble: {
-        position: "absolute",
-        bottom: 32,
-        right: 20,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 6,
-        backgroundColor: CARD_BG,
-        borderRadius: 20,
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 6,
-        elevation: 6,
-    },
-    timerText: {
-        color: WHITE,
-        fontSize: 15,
-        fontWeight: "700",
-        fontVariant: ["tabular-nums"],
-    },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: "rgba(0,0,0,0.85)",
-        justifyContent: "center",
-        alignItems: "center",
-        padding: 24,
-    },
-    modalContainer: {
-        backgroundColor: CARD_BG,
-        borderRadius: 24,
-        padding: 28,
-        width: "100%",
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-    },
-    modalTitle: {
-        color: WHITE,
-        fontSize: 22,
-        fontWeight: "700",
-        marginBottom: 8,
-        textAlign: "center",
-    },
-    modalBody: {
-        color: TEXT_COLOR,
-        fontSize: 15,
-        fontWeight: "500",
-        textAlign: "center",
-        marginBottom: 28,
-    },
-    modalButtons: {
-        flexDirection: "row",
-        gap: 12,
-    },
-    modalCancel: {
-        flex: 1,
-        backgroundColor: MUTED_BG,
-        borderRadius: 14,
-        paddingVertical: 14,
-        alignItems: "center",
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-    },
-    modalCancelText: {
-        color: WHITE,
-        fontSize: 16,
-        fontWeight: "600",
-    },
-    modalConfirm: {
-        flex: 1,
-        backgroundColor: PRIMARY_COLOR,
-        borderRadius: 14,
-        paddingVertical: 14,
-        alignItems: "center",
-    },
-    modalConfirmText: {
-        color: WHITE,
-        fontSize: 16,
-        fontWeight: "700",
-    },
+  safeArea: {
+    flex: 1,
+    backgroundColor: BACKGROUND_COLOR_DARK,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 16,
+  },
+  loadingText: {
+    color: TEXT_COLOR,
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: MUTED_BG,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: "center",
+  },
+  headerTitle: {
+    color: WHITE,
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  headerSubtitle: {
+    color: TEXT_COLOR,
+    fontSize: 13,
+    fontWeight: "500",
+    marginTop: 2,
+  },
+  headerRight: {
+    width: 36,
+  },
+  progressBarTrack: {
+    height: 3,
+    backgroundColor: BORDER_COLOR,
+    marginHorizontal: 16,
+    borderRadius: 2,
+    marginBottom: 8,
+  },
+  progressBarFill: {
+    height: 3,
+    backgroundColor: PRIMARY_COLOR,
+    borderRadius: 2,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 120,
+  },
+  finishButton: {
+    backgroundColor: PRIMARY_COLOR,
+    borderRadius: 18,
+    paddingVertical: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 8,
+  },
+  finishButtonText: {
+    color: WHITE,
+    fontSize: 17,
+    fontWeight: "700",
+  },
+  timerBubble: {
+    position: "absolute",
+    bottom: 32,
+    right: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: CARD_BG,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: BORDER_COLOR,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  timerText: {
+    color: WHITE,
+    fontSize: 15,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.85)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  modalContainer: {
+    backgroundColor: CARD_BG,
+    borderRadius: 24,
+    padding: 28,
+    width: "100%",
+    borderWidth: 1,
+    borderColor: BORDER_COLOR,
+  },
+  modalTitle: {
+    color: WHITE,
+    fontSize: 22,
+    fontWeight: "700",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  modalBody: {
+    color: TEXT_COLOR,
+    fontSize: 15,
+    fontWeight: "500",
+    textAlign: "center",
+    marginBottom: 28,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  modalCancel: {
+    flex: 1,
+    backgroundColor: MUTED_BG,
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: BORDER_COLOR,
+  },
+  modalCancelText: {
+    color: WHITE,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  modalConfirm: {
+    flex: 1,
+    backgroundColor: PRIMARY_COLOR,
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  modalConfirmText: {
+    color: WHITE,
+    fontSize: 16,
+    fontWeight: "700",
+  },
 });
