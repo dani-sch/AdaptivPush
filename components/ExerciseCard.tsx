@@ -26,6 +26,7 @@ export interface WorkoutSet {
 
 export interface Exercise {
     id: string;
+    exerciseId?: string; // exercises table UUID — used for DB set writes
     name: string;
     prescription: string;
     sets: WorkoutSet[];
@@ -141,12 +142,14 @@ export default function ExerciseCard({
                             <Ionicons name="checkmark" size={16} color={WHITE} />
                         )}
                     </Pressable>
-                    <View>
+                    <View style={styles.exerciseNameWrapper}>
                         <Text
                             style={[
                                 styles.exerciseName,
                                 exercise.completed && styles.exerciseNameCompleted,
                             ]}
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
                         >
                             {exercise.name}
                         </Text>
@@ -175,7 +178,7 @@ export default function ExerciseCard({
             {/* Sets table */}
             <View style={styles.setsTable}>
                 <View style={styles.setRow}>
-                    <Text style={styles.setHeaderLabel}>SET</Text>
+                    <Text style={styles.setHeaderSet}>SET</Text>
                     <Text style={styles.setHeaderLabel}>LBS</Text>
                     <Text style={styles.setHeaderLabel}>REPS</Text>
                     <Text style={styles.setHeaderLabel}>RPE</Text>
@@ -241,6 +244,10 @@ const styles = StyleSheet.create({
         backgroundColor: SUCCESS,
         borderColor: SUCCESS,
     },
+    exerciseNameWrapper: {
+        flex: 1,
+        flexShrink: 1,
+    },
     exerciseName: {
         color: WHITE,
         fontSize: 16,
@@ -295,6 +302,14 @@ const styles = StyleSheet.create({
         color: PLACEHOLDER_TEXT,
         fontSize: 14,
         fontWeight: "600",
+        width: 24,
+        textAlign: "center",
+    },
+    setHeaderSet: {
+        color: PLACEHOLDER_TEXT,
+        fontSize: 11,
+        fontWeight: "700",
+        letterSpacing: 0.8,
         width: 24,
         textAlign: "center",
     },
