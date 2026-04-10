@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
-import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Dimensions,
   Modal,
@@ -477,10 +477,14 @@ export default function HomeScreen() {
     number | null
   >(null);
 
-  const { program, applyReadinessAdjustmentOnly } = useCurrentProgram();
+  const { program, refresh, applyReadinessAdjustmentOnly } = useCurrentProgram();
 
-  // Build the next workout summary from the first workout in the current week
-  const nextWorkout = program?.workouts[0];
+  // Refresh program data every time the home screen comes into focus
+  // so that finishing a workout advances to the next one immediately
+  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
+
+  // workouts[0] is always the next uncompleted workout (hook sorts completed last)
+  const nextWorkout = program?.workouts.find((w) => !w.isCompleted);
   const nextWorkoutSummary: WorkoutSummary | undefined = nextWorkout
     ? {
         name: nextWorkout.name,
@@ -558,10 +562,20 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         <HeaderDateBlock />
-        <NextWorkoutSection
-          workout={nextWorkoutSummary}
-          onPressStart={handleStartWorkout}
-        />
+        {program && program.workouts.every((w) => w.isCompleted) ? (
+          <View style={styles.weekCompleteCard}>
+            <Ionicons name="checkmark-circle" size={32} color={PRIMARY_COLOR} />
+            <Text style={styles.weekCompleteTitle}>Week Complete!</Text>
+            <Text style={styles.weekCompleteSubtitle}>
+              All workouts this week are done. Rest up — next week's plan is ready.
+            </Text>
+          </View>
+        ) : (
+          <NextWorkoutSection
+            workout={nextWorkoutSummary}
+            onPressStart={handleStartWorkout}
+          />
+        )}
         <StatsRow readiness={readinessScore} />
         <ReadinessPromptCard onPress={handleOpenReadinessModal} />
       </ScrollView>
@@ -596,6 +610,27 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 32,
+  },
+  weekCompleteCard: {
+    margin: 16,
+    padding: 24,
+    borderRadius: 16,
+    backgroundColor: BACKGROUND_COLOR_DARK,
+    borderWidth: 1,
+    borderColor: PRIMARY_COLOR + "44",
+    alignItems: "center",
+    gap: 8,
+  },
+  weekCompleteTitle: {
+    color: PRIMARY_COLOR,
+    fontSize: 20,
+    fontWeight: "700",
+  },
+  weekCompleteSubtitle: {
+    color: PLACEHOLDER_TEXT,
+    fontSize: 14,
+    textAlign: "center",
+    lineHeight: 20,
   },
 
   headerDateBlock: {
