@@ -10,8 +10,9 @@ import {
   ShieldCheck,
   Trash2,
 } from 'lucide-react-native';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,6 +21,13 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import {
+  DEFAULT_PRIVACY_PREFERENCES,
+  mergeUserMetadata,
+  parsePrivacyPreferences,
+} from '@/utils/profilePreferences';
+import { supabase } from '@/utils/supabase';
 
 type PrivacyToggleRowProps = {
   label: string;
@@ -62,6 +70,8 @@ type DataActionCardProps = {
   icon: ReactNode;
   buttonText: string;
   destructive?: boolean;
+  disabled?: boolean;
+  loading?: boolean;
   onPress: () => void;
 };
 
@@ -71,6 +81,8 @@ const DataActionCard = ({
   icon,
   buttonText,
   destructive = false,
+  disabled = false,
+  loading = false,
   onPress,
 }: DataActionCardProps) => {
   return (
@@ -84,11 +96,13 @@ const DataActionCard = ({
       </View>
 
       <Pressable
+        disabled={disabled}
         onPress={onPress}
         style={({ pressed }) => [
           styles.dataActionButton,
           destructive ? styles.dataActionButtonDanger : styles.dataActionButtonPrimary,
-          pressed && styles.pressed,
+          disabled && styles.dataActionButtonDisabled,
+          pressed && !disabled && styles.pressed,
         ]}
       >
         <Text
@@ -97,7 +111,7 @@ const DataActionCard = ({
             destructive ? styles.dataActionButtonTextDanger : styles.dataActionButtonTextPrimary,
           ]}
         >
-          {buttonText}
+          {loading ? 'Submitting...' : buttonText}
         </Text>
       </Pressable>
     </View>
@@ -106,13 +120,146 @@ const DataActionCard = ({
 
 export default function PrivacyDataScreen() {
   const insets = useSafeAreaInsets();
-  const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
-  const [crashReportsEnabled, setCrashReportsEnabled] = useState(true);
-  const [sensitiveDataMasking, setSensitiveDataMasking] = useState(true);
+  const [analyticsEnabled, setAnalyticsEnabled] = useState(
+    DEFAULT_PRIVACY_PREFERENCES.analyticsEnabled,
+  );
+  const [crashReportsEnabled, setCrashReportsEnabled] = useState(
+    DEFAULT_PRIVACY_PREFERENCES.crashReportsEnabled,
+  );
+  const [sensitiveDataMasking, setSensitiveDataMasking] = useState(
+    DEFAULT_PRIVACY_PREFERENCES.sensitiveDataMasking,
+  );
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [activeRequest, setActiveRequest] = useState<'export' | 'deletion' | null>(null);
+  const [errorMessage, setErrorMessage] = useState('');
   const [saveMessage, setSaveMessage] = useState('');
 
-  const handleSave = () => {
-    setSaveMessage('Privacy controls saved locally.');
+  useEffect(() => {
+    const loadPrivacySettings = async () => {
+      try {
+        setIsLoading(true);
+        setErrorMessage('');
+        setSaveMessage('');
+
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
+
+        if (authError || !user) {
+          setErrorMessage('Unable to load privacy settings.');
+          return;
+        }
+
+        const preferences = parsePrivacyPreferences(user.user_metadata?.privacy_preferences);
+        setAnalyticsEnabled(preferences.analyticsEnabled);
+        setCrashReportsEnabled(preferences.crashReportsEnabled);
+        setSensitiveDataMasking(preferences.sensitiveDataMasking);
+      } catch (loadError) {
+        console.error('Failed to load privacy settings:', loadError);
+        setErrorMessage('Failed to load privacy settings.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void loadPrivacySettings();
+  }, []);
+
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      setErrorMessage('');
+      setSaveMessage('');
+
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError || !user) {
+        setErrorMessage('Unable to save privacy settings.');
+        return;
+      }
+
+      const nextPreferences = {
+        analyticsEnabled,
+        crashReportsEnabled,
+        sensitiveDataMasking,
+      };
+
+      const { error: saveError } = await supabase.auth.updateUser({
+        data: mergeUserMetadata(user.user_metadata, {
+          privacy_preferences: nextPreferences,
+        }),
+      });
+
+      if (saveError) {
+        setErrorMessage(saveError.message);
+        return;
+      }
+
+      setSaveMessage('Privacy controls saved to backend.');
+    } catch (saveError) {
+      console.error('Failed to save privacy settings:', saveError);
+      setErrorMessage('Failed to save privacy settings.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDataRequest = async (requestType: 'export' | 'deletion') => {
+    try {
+      setActiveRequest(requestType);
+      setErrorMessage('');
+      setSaveMessage('');
+
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError || !user) {
+        setErrorMessage('Unable to submit data request right now.');
+        return;
+      }
+
+      const existingMetadata = mergeUserMetadata(user.user_metadata, {});
+      const existingRequests =
+        typeof existingMetadata.privacy_data_requests === 'object' &&
+        existingMetadata.privacy_data_requests !== null &&
+        !Array.isArray(existingMetadata.privacy_data_requests)
+          ? (existingMetadata.privacy_data_requests as Record<string, unknown>)
+          : {};
+
+      const nextRequests = {
+        ...existingRequests,
+        [requestType === 'export' ? 'exportRequestedAt' : 'deletionRequestedAt']: new Date().toISOString(),
+      };
+
+      const { error: requestError } = await supabase.auth.updateUser({
+        data: mergeUserMetadata(user.user_metadata, {
+          privacy_data_requests: nextRequests,
+        }),
+      });
+
+      if (requestError) {
+        setErrorMessage(requestError.message);
+        return;
+      }
+
+      setSaveMessage(
+        requestType === 'export'
+          ? 'Export request submitted to backend.'
+          : 'Account deletion request submitted to backend.',
+      );
+    } catch (requestError) {
+      console.error('Failed to submit data request:', requestError);
+      setErrorMessage('Failed to submit data request.');
+    } finally {
+      setActiveRequest(null);
+    }
   };
 
   return (
@@ -183,7 +330,9 @@ export default function PrivacyDataScreen() {
           description="Generate a downloadable file of your account and training records."
           icon={<Download color="#8fc4ff" size={18} />}
           buttonText="Create Export"
-          onPress={() => undefined}
+          disabled={activeRequest !== null}
+          loading={activeRequest === 'export'}
+          onPress={() => void handleDataRequest('export')}
         />
 
         <DataActionCard
@@ -192,7 +341,9 @@ export default function PrivacyDataScreen() {
           icon={<Trash2 color="#ff8f96" size={18} />}
           buttonText="Request Deletion"
           destructive
-          onPress={() => undefined}
+          disabled={activeRequest !== null}
+          loading={activeRequest === 'deletion'}
+          onPress={() => void handleDataRequest('deletion')}
         />
 
         <Pressable style={({ pressed }) => [styles.learnMoreRow, pressed && styles.pressed]}>
@@ -200,13 +351,27 @@ export default function PrivacyDataScreen() {
           <ChevronRight color="#6f758a" size={18} />
         </Pressable>
 
+        {isLoading ? (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator size="small" color="#7aa0ff" />
+            <Text style={styles.loadingText}>Loading from backend...</Text>
+          </View>
+        ) : null}
+        {errorMessage ? <Text style={styles.errorFeedback}>{errorMessage}</Text> : null}
         {saveMessage ? <Text style={styles.saveFeedback}>{saveMessage}</Text> : null}
 
         <Pressable
+          disabled={isSaving || isLoading}
           onPress={handleSave}
-          style={({ pressed }) => [styles.saveButton, pressed && styles.pressed]}
+          style={({ pressed }) => [
+            styles.saveButton,
+            (isSaving || isLoading) && styles.saveButtonDisabled,
+            pressed && !isSaving && !isLoading && styles.pressed,
+          ]}
         >
-          <Text style={styles.saveButtonText}>Save Privacy Settings</Text>
+          <Text style={styles.saveButtonText}>
+            {isSaving ? 'Saving...' : 'Save Privacy Settings'}
+          </Text>
         </Pressable>
       </ScrollView>
     </View>
@@ -372,6 +537,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
   },
+  dataActionButtonDisabled: {
+    opacity: 0.65,
+  },
   dataActionButtonPrimary: {
     borderColor: '#325ec2',
     backgroundColor: '#1d376f',
@@ -406,6 +574,23 @@ const styles = StyleSheet.create({
     color: '#c7cedf',
     fontSize: 15,
   },
+  loadingRow: {
+    minHeight: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  loadingText: {
+    color: '#98a1b8',
+    fontSize: 13,
+  },
+  errorFeedback: {
+    color: '#ff8088',
+    fontSize: 13,
+    marginBottom: 10,
+    marginLeft: 2,
+  },
   saveFeedback: {
     color: '#7ae4a7',
     fontSize: 13,
@@ -420,6 +605,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#2b68f0',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  saveButtonDisabled: {
+    opacity: 0.65,
   },
   saveButtonText: {
     color: '#eef2ff',

@@ -9,8 +9,9 @@ import {
   Save,
   UserRound,
 } from 'lucide-react-native';
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -19,6 +20,10 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { parseDateInput } from '@/utils/conversions';
+import { mergeUserMetadata } from '@/utils/profilePreferences';
+import { supabase } from '@/utils/supabase';
 
 type FieldProps = {
   label: string;
@@ -56,13 +61,56 @@ const ProfileField = ({
   );
 };
 
+const isMissingUserProfileSchemaError = (error: {
+  code?: string | null;
+  message?: string | null;
+}): boolean => {
+  if (error.code === 'PGRST205' || error.code === 'PGRST204') {
+    return true;
+  }
+
+  const normalized = error.message?.toLowerCase() ?? '';
+  return (
+    normalized.includes("could not find the table 'public.user_profile'") ||
+    normalized.includes("could not find the 'date_of_birth' column")
+  );
+};
+
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+const formatBirthdayForInput = (value: string): string => {
+  const trimmed = value.trim();
+  if (!ISO_DATE_PATTERN.test(trimmed)) {
+    return trimmed;
+  }
+
+  const [year, month, day] = trimmed.split('-');
+  return `${month}/${day}/${year}`;
+};
+
+const normalizeBirthdayForStorage = (value: string): string | null => {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+
+  if (ISO_DATE_PATTERN.test(trimmed)) {
+    return trimmed;
+  }
+
+  return parseDateInput(trimmed);
+};
+
 export default function PersonalInformationScreen() {
   const insets = useSafeAreaInsets();
   const [fullName, setFullName] = useState('');
   const [preferredName, setPreferredName] = useState('');
-  const [email] = useState('');
+  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [birthday, setBirthday] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [saveMessage, setSaveMessage] = useState('');
 
   const avatarLabel = useMemo(() => {
@@ -70,8 +118,112 @@ export default function PersonalInformationScreen() {
     return clean.slice(0, 1).toUpperCase();
   }, [fullName, preferredName]);
 
-  const handleSave = () => {
-    setSaveMessage('Changes saved locally.');
+  useEffect(() => {
+    const loadPersonalInformation = async () => {
+      try {
+        setIsLoading(true);
+        setErrorMessage('');
+        setSaveMessage('');
+
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
+
+        if (authError || !user) {
+          setErrorMessage('Unable to load personal information.');
+          return;
+        }
+
+        const metadata = mergeUserMetadata(user.user_metadata, {});
+        setEmail(user.email ?? '');
+        setFullName(typeof metadata.full_name === 'string' ? metadata.full_name : '');
+        setPreferredName(typeof metadata.preferred_name === 'string' ? metadata.preferred_name : '');
+        setPhone(typeof metadata.phone === 'string' ? metadata.phone : '');
+
+        const { data: profileData, error: profileError } = await supabase
+          .from('user_profile')
+          .select('date_of_birth')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (profileError && !isMissingUserProfileSchemaError(profileError)) {
+          setErrorMessage(profileError.message);
+          return;
+        }
+
+        setBirthday(profileData?.date_of_birth ? formatBirthdayForInput(profileData.date_of_birth) : '');
+      } catch (loadError) {
+        console.error('Failed to load personal information screen:', loadError);
+        setErrorMessage('Failed to load personal information.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void loadPersonalInformation();
+  }, []);
+
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      setErrorMessage('');
+      setSaveMessage('');
+
+      const trimmedBirthday = birthday.trim();
+      const parsedBirthday = normalizeBirthdayForStorage(trimmedBirthday);
+
+      if (trimmedBirthday.length > 0 && !parsedBirthday) {
+        setErrorMessage('Use MM/DD/YYYY for birthday.');
+        return;
+      }
+
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError || !user) {
+        setErrorMessage('Unable to save changes right now.');
+        return;
+      }
+
+      const metadataPayload = mergeUserMetadata(user.user_metadata, {
+        full_name: fullName.trim(),
+        preferred_name: preferredName.trim(),
+        phone: phone.trim(),
+      });
+
+      const { error: metadataError } = await supabase.auth.updateUser({
+        data: metadataPayload,
+      });
+
+      if (metadataError) {
+        setErrorMessage(metadataError.message);
+        return;
+      }
+
+      const { error: profileError } = await supabase.from('user_profile').upsert(
+        {
+          user_id: user.id,
+          date_of_birth: parsedBirthday,
+        },
+        { onConflict: 'user_id' },
+      );
+
+      if (profileError && !isMissingUserProfileSchemaError(profileError)) {
+        setErrorMessage(profileError.message);
+        return;
+      }
+
+      setBirthday(parsedBirthday ? formatBirthdayForInput(parsedBirthday) : '');
+      setSaveMessage('Changes saved to backend.');
+    } catch (saveError) {
+      console.error('Failed to save personal information:', saveError);
+      setErrorMessage('Failed to save personal information.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -164,14 +316,27 @@ export default function PersonalInformationScreen() {
           </Text>
         </View>
 
+        {isLoading ? (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator size="small" color="#7aa0ff" />
+            <Text style={styles.loadingText}>Loading from backend...</Text>
+          </View>
+        ) : null}
+
+        {errorMessage ? <Text style={styles.errorFeedback}>{errorMessage}</Text> : null}
         {saveMessage ? <Text style={styles.saveFeedback}>{saveMessage}</Text> : null}
 
         <Pressable
+          disabled={isSaving || isLoading}
           onPress={handleSave}
-          style={({ pressed }) => [styles.saveButton, pressed && styles.pressed]}
+          style={({ pressed }) => [
+            styles.saveButton,
+            (isSaving || isLoading) && styles.saveButtonDisabled,
+            pressed && !isSaving && !isLoading && styles.pressed,
+          ]}
         >
           <Save color="#eef2ff" size={18} />
-          <Text style={styles.saveButtonText}>Save Changes</Text>
+          <Text style={styles.saveButtonText}>{isSaving ? 'Saving...' : 'Save Changes'}</Text>
         </Pressable>
       </ScrollView>
     </View>
@@ -331,6 +496,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
   },
+  loadingRow: {
+    minHeight: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  loadingText: {
+    color: '#98a1b8',
+    fontSize: 13,
+  },
+  errorFeedback: {
+    color: '#ff8088',
+    fontSize: 13,
+    marginBottom: 10,
+    marginLeft: 2,
+  },
   saveFeedback: {
     color: '#7ae4a7',
     fontSize: 13,
@@ -347,6 +529,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+  },
+  saveButtonDisabled: {
+    opacity: 0.65,
   },
   saveButtonText: {
     color: '#eef2ff',

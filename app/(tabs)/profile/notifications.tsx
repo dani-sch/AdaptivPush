@@ -10,8 +10,9 @@ import {
   Smartphone,
   Sparkles,
 } from 'lucide-react-native';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,6 +21,13 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import {
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  mergeUserMetadata,
+  parseNotificationPreferences,
+} from '@/utils/profilePreferences';
+import { supabase } from '@/utils/supabase';
 
 type ToggleRowProps = {
   label: string;
@@ -52,17 +60,117 @@ const ToggleRow = ({ label, hint, icon, value, onValueChange }: ToggleRowProps) 
 
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
-  const [pushEnabled, setPushEnabled] = useState(true);
-  const [emailEnabled, setEmailEnabled] = useState(true);
-  const [smsEnabled, setSmsEnabled] = useState(false);
-  const [workoutReminder, setWorkoutReminder] = useState(true);
-  const [deloadReminder, setDeloadReminder] = useState(true);
-  const [prCelebrations, setPrCelebrations] = useState(true);
-  const [quietHoursEnabled, setQuietHoursEnabled] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(DEFAULT_NOTIFICATION_PREFERENCES.pushEnabled);
+  const [emailEnabled, setEmailEnabled] = useState(DEFAULT_NOTIFICATION_PREFERENCES.emailEnabled);
+  const [smsEnabled, setSmsEnabled] = useState(DEFAULT_NOTIFICATION_PREFERENCES.smsEnabled);
+  const [workoutReminder, setWorkoutReminder] = useState(
+    DEFAULT_NOTIFICATION_PREFERENCES.workoutReminder,
+  );
+  const [deloadReminder, setDeloadReminder] = useState(
+    DEFAULT_NOTIFICATION_PREFERENCES.deloadReminder,
+  );
+  const [prCelebrations, setPrCelebrations] = useState(
+    DEFAULT_NOTIFICATION_PREFERENCES.prCelebrations,
+  );
+  const [quietHoursEnabled, setQuietHoursEnabled] = useState(
+    DEFAULT_NOTIFICATION_PREFERENCES.quietHoursEnabled,
+  );
+  const [quietHoursStart, setQuietHoursStart] = useState(
+    DEFAULT_NOTIFICATION_PREFERENCES.quietHoursStart,
+  );
+  const [quietHoursEnd, setQuietHoursEnd] = useState(DEFAULT_NOTIFICATION_PREFERENCES.quietHoursEnd);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [saveMessage, setSaveMessage] = useState('');
 
-  const handleSave = () => {
-    setSaveMessage('Notification preferences saved locally.');
+  useEffect(() => {
+    const loadNotificationSettings = async () => {
+      try {
+        setIsLoading(true);
+        setErrorMessage('');
+        setSaveMessage('');
+
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
+
+        if (authError || !user) {
+          setErrorMessage('Unable to load notification settings.');
+          return;
+        }
+
+        const preferences = parseNotificationPreferences(
+          user.user_metadata?.notification_preferences,
+        );
+
+        setPushEnabled(preferences.pushEnabled);
+        setEmailEnabled(preferences.emailEnabled);
+        setSmsEnabled(preferences.smsEnabled);
+        setWorkoutReminder(preferences.workoutReminder);
+        setDeloadReminder(preferences.deloadReminder);
+        setPrCelebrations(preferences.prCelebrations);
+        setQuietHoursEnabled(preferences.quietHoursEnabled);
+        setQuietHoursStart(preferences.quietHoursStart);
+        setQuietHoursEnd(preferences.quietHoursEnd);
+      } catch (loadError) {
+        console.error('Failed to load notification settings:', loadError);
+        setErrorMessage('Failed to load notification settings.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void loadNotificationSettings();
+  }, []);
+
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      setErrorMessage('');
+      setSaveMessage('');
+
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError || !user) {
+        setErrorMessage('Unable to save notification settings.');
+        return;
+      }
+
+      const nextPreferences = {
+        pushEnabled,
+        emailEnabled,
+        smsEnabled,
+        workoutReminder,
+        deloadReminder,
+        prCelebrations,
+        quietHoursEnabled,
+        quietHoursStart,
+        quietHoursEnd,
+      };
+
+      const { error: saveError } = await supabase.auth.updateUser({
+        data: mergeUserMetadata(user.user_metadata, {
+          notification_preferences: nextPreferences,
+        }),
+      });
+
+      if (saveError) {
+        setErrorMessage(saveError.message);
+        return;
+      }
+
+      setSaveMessage('Notification preferences saved to backend.');
+    } catch (saveError) {
+      console.error('Failed to save notification settings:', saveError);
+      setErrorMessage('Failed to save notification settings.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -165,7 +273,7 @@ export default function NotificationsScreen() {
           <Pressable style={({ pressed }) => [styles.timeRow, pressed && styles.pressed]}>
             <Text style={styles.timeLabel}>Start Time</Text>
             <View style={styles.timeValueWrap}>
-              <Text style={styles.timeValue}>10:00 PM</Text>
+              <Text style={styles.timeValue}>{quietHoursStart}</Text>
               <ChevronRight color="#6f758a" size={18} />
             </View>
           </Pressable>
@@ -173,19 +281,33 @@ export default function NotificationsScreen() {
           <Pressable style={({ pressed }) => [styles.timeRow, pressed && styles.pressed]}>
             <Text style={styles.timeLabel}>End Time</Text>
             <View style={styles.timeValueWrap}>
-              <Text style={styles.timeValue}>7:00 AM</Text>
+              <Text style={styles.timeValue}>{quietHoursEnd}</Text>
               <ChevronRight color="#6f758a" size={18} />
             </View>
           </Pressable>
         </View>
 
+        {isLoading ? (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator size="small" color="#7aa0ff" />
+            <Text style={styles.loadingText}>Loading from backend...</Text>
+          </View>
+        ) : null}
+        {errorMessage ? <Text style={styles.errorFeedback}>{errorMessage}</Text> : null}
         {saveMessage ? <Text style={styles.saveFeedback}>{saveMessage}</Text> : null}
 
         <Pressable
+          disabled={isSaving || isLoading}
           onPress={handleSave}
-          style={({ pressed }) => [styles.saveButton, pressed && styles.pressed]}
+          style={({ pressed }) => [
+            styles.saveButton,
+            (isSaving || isLoading) && styles.saveButtonDisabled,
+            pressed && !isSaving && !isLoading && styles.pressed,
+          ]}
         >
-          <Text style={styles.saveButtonText}>Save Notification Settings</Text>
+          <Text style={styles.saveButtonText}>
+            {isSaving ? 'Saving...' : 'Save Notification Settings'}
+          </Text>
         </Pressable>
       </ScrollView>
     </View>
@@ -331,6 +453,23 @@ const styles = StyleSheet.create({
     color: '#8d95ac',
     fontSize: 14,
   },
+  loadingRow: {
+    minHeight: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  loadingText: {
+    color: '#98a1b8',
+    fontSize: 13,
+  },
+  errorFeedback: {
+    color: '#ff8088',
+    fontSize: 13,
+    marginBottom: 10,
+    marginLeft: 2,
+  },
   saveFeedback: {
     color: '#7ae4a7',
     fontSize: 13,
@@ -345,6 +484,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#2b68f0',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  saveButtonDisabled: {
+    opacity: 0.65,
   },
   saveButtonText: {
     color: '#eef2ff',

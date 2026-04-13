@@ -9,19 +9,34 @@ import {
   LifeBuoy,
   MessageCircle,
 } from 'lucide-react-native';
-import { type ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { type ReactNode, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { mergeUserMetadata } from '@/utils/profilePreferences';
+import { supabase } from '@/utils/supabase';
 
 type SupportActionProps = {
   icon: ReactNode;
   title: string;
   description: string;
+  disabled?: boolean;
+  onPress: () => void;
 };
 
-const SupportAction = ({ icon, title, description }: SupportActionProps) => {
+const SupportAction = ({
+  icon,
+  title,
+  description,
+  disabled = false,
+  onPress,
+}: SupportActionProps) => {
   return (
-    <Pressable style={({ pressed }) => [styles.actionRow, pressed && styles.pressed]}>
+    <Pressable
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [styles.actionRow, disabled && styles.actionRowDisabled, pressed && !disabled && styles.pressed]}
+    >
       <View style={styles.actionLeft}>
         <View style={styles.iconShell}>{icon}</View>
         <View style={styles.actionTextWrap}>
@@ -50,6 +65,62 @@ const FaqItem = ({ question, answer }: FaqItemProps) => {
 
 export default function HelpSupportScreen() {
   const insets = useSafeAreaInsets();
+  const [activeRequest, setActiveRequest] = useState<'contact' | 'bug' | 'feature' | null>(null);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+
+  const handleSupportAction = async (requestType: 'contact' | 'bug' | 'feature') => {
+    try {
+      setActiveRequest(requestType);
+      setErrorMessage('');
+      setSuccessMessage('');
+
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError || !user) {
+        setErrorMessage('Unable to submit support request right now.');
+        return;
+      }
+
+      const baseMetadata = mergeUserMetadata(user.user_metadata, {});
+      const existingRequests =
+        typeof baseMetadata.support_requests === 'object' &&
+        baseMetadata.support_requests !== null &&
+        !Array.isArray(baseMetadata.support_requests)
+          ? (baseMetadata.support_requests as Record<string, unknown>)
+          : {};
+
+      const nextRequests = {
+        ...existingRequests,
+        [requestType === 'contact'
+          ? 'contactRequestedAt'
+          : requestType === 'bug'
+            ? 'bugReportRequestedAt'
+            : 'featureRequestRequestedAt']: new Date().toISOString(),
+      };
+
+      const { error: saveError } = await supabase.auth.updateUser({
+        data: mergeUserMetadata(user.user_metadata, {
+          support_requests: nextRequests,
+        }),
+      });
+
+      if (saveError) {
+        setErrorMessage(saveError.message);
+        return;
+      }
+
+      setSuccessMessage('Support request submitted to backend.');
+    } catch (requestError) {
+      console.error('Failed to submit support request:', requestError);
+      setErrorMessage('Failed to submit support request.');
+    } finally {
+      setActiveRequest(null);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -91,21 +162,36 @@ export default function HelpSupportScreen() {
         <Text style={styles.sectionTitle}>Get In Touch</Text>
         <View style={styles.sectionCard}>
           <SupportAction
+            disabled={activeRequest !== null}
             icon={<MessageCircle color="#9ba3b9" size={18} />}
             title="Contact Support"
             description="Chat with the team about account or training issues"
+            onPress={() => void handleSupportAction('contact')}
           />
           <SupportAction
+            disabled={activeRequest !== null}
             icon={<Bug color="#9ba3b9" size={18} />}
             title="Report a Bug"
             description="Share a screenshot and reproduction steps"
+            onPress={() => void handleSupportAction('bug')}
           />
           <SupportAction
+            disabled={activeRequest !== null}
             icon={<Lightbulb color="#9ba3b9" size={18} />}
             title="Feature Request"
             description="Tell us what would improve your workflow"
+            onPress={() => void handleSupportAction('feature')}
           />
         </View>
+
+        {activeRequest ? (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator size="small" color="#7aa0ff" />
+            <Text style={styles.loadingText}>Submitting to backend...</Text>
+          </View>
+        ) : null}
+        {errorMessage ? <Text style={styles.errorFeedback}>{errorMessage}</Text> : null}
+        {successMessage ? <Text style={styles.successFeedback}>{successMessage}</Text> : null}
 
         <Text style={styles.sectionTitle}>Support Hours</Text>
         <View style={styles.hoursCard}>
@@ -226,6 +312,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(95, 103, 124, 0.24)',
   },
+  actionRowDisabled: {
+    opacity: 0.65,
+  },
   actionLeft: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -253,6 +342,29 @@ const styles = StyleSheet.create({
     color: '#8d95ac',
     fontSize: 12,
     marginTop: 2,
+  },
+  loadingRow: {
+    minHeight: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  loadingText: {
+    color: '#98a1b8',
+    fontSize: 13,
+  },
+  errorFeedback: {
+    color: '#ff8088',
+    fontSize: 13,
+    marginBottom: 8,
+    marginLeft: 2,
+  },
+  successFeedback: {
+    color: '#7ae4a7',
+    fontSize: 13,
+    marginBottom: 12,
+    marginLeft: 2,
   },
   hoursCard: {
     borderRadius: 18,
