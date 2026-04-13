@@ -1,5 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { type Href, router } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   Bell,
   Check,
@@ -11,7 +12,7 @@ import {
   UserRound,
   X,
 } from 'lucide-react-native';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -24,6 +25,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { mergeUserMetadata, parseReadinessPreferences } from '@/utils/profilePreferences';
 import { supabase } from '@/utils/supabase';
 
 interface UserProfile {
@@ -33,6 +35,7 @@ interface UserProfile {
 }
 
 interface WorkoutHistoryRow {
+  ended_at?: string | null;
   completed_at?: string | null;
   created_at?: string | null;
   pr_count?: number | string | null;
@@ -49,6 +52,8 @@ interface ProgressSummary {
   weekStreak: number;
   prs: number;
 }
+
+type WorkoutHistoryTable = 'workout_sessions' | 'workout_history';
 
 type ReadinessSource = 'apple' | 'manual';
 type ReadinessQuestionKey = 'sleep' | 'stress' | 'menstrualCycle';
@@ -170,7 +175,7 @@ const getWeekKey = (value: string): string => {
 const computeWeekStreak = (rows: WorkoutHistoryRow[]): number => {
   const weekKeys = new Set(
     rows
-      .map((row) => row.completed_at ?? row.created_at ?? '')
+      .map((row) => row.ended_at ?? row.completed_at ?? row.created_at ?? '')
       .map(getWeekKey)
       .filter(Boolean),
   );
@@ -210,7 +215,10 @@ const renderMenuIcon = (icon: MenuIcon) => {
   }
 };
 
-const isMissingWorkoutHistoryTableError = (error: { code?: string | null; message?: string | null } | null | undefined): boolean => {
+const isMissingTableError = (
+  error: { code?: string | null; message?: string | null } | null | undefined,
+  tableName: WorkoutHistoryTable,
+): boolean => {
   if (!error) {
     return false;
   }
@@ -220,7 +228,47 @@ const isMissingWorkoutHistoryTableError = (error: { code?: string | null; messag
   }
 
   return Boolean(
-    error.message?.toLowerCase().includes("could not find the table 'public.workout_history'"),
+    error.message?.toLowerCase().includes(`could not find the table 'public.${tableName}'`),
+  );
+};
+
+const fetchRowsFromTable = async (
+  tableName: WorkoutHistoryTable,
+  userId: string,
+): Promise<{
+  rows: WorkoutHistoryRow[];
+  error: { code?: string | null; message?: string | null } | null;
+}> => {
+  const orderColumn = tableName === 'workout_sessions' ? 'ended_at' : 'completed_at';
+
+  const { data, error } = await supabase
+    .from(tableName)
+    .select('*')
+    .eq('user_id', userId)
+    .order(orderColumn, { ascending: false });
+
+  return {
+    rows: (data ?? []) as WorkoutHistoryRow[],
+    error,
+  };
+};
+
+const isMissingUserProfileSchemaError = (error: {
+  code?: string | null;
+  message?: string | null;
+} | null | undefined): boolean => {
+  if (!error) {
+    return false;
+  }
+
+  if (error.code === 'PGRST205' || error.code === 'PGRST204') {
+    return true;
+  }
+
+  const normalized = error.message?.toLowerCase() ?? '';
+  return (
+    normalized.includes("could not find the table 'public.user_profile'") ||
+    normalized.includes("could not find the 'healthkit_enabled' column")
   );
 };
 
@@ -239,12 +287,11 @@ export default function ProfileScreen() {
     stress: true,
     menstrualCycle: true,
   });
+  const [isReadinessSaving, setIsReadinessSaving] = useState(false);
+  const [readinessStatusMessage, setReadinessStatusMessage] = useState<string | null>(null);
+  const [readinessStatusType, setReadinessStatusType] = useState<'success' | 'error'>('success');
 
-  useEffect(() => {
-    fetchProfileData();
-  }, []);
-
-  const fetchProfileData = async () => {
+  const fetchProfileData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -267,30 +314,73 @@ export default function ProfileScreen() {
         full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
       });
 
-      const { data: historyRows, error: historyError } = await supabase
-        .from('workout_history')
-        .select('*')
+      const readinessPreferences = parseReadinessPreferences(
+        user.user_metadata?.readiness_preferences,
+      );
+      setReadinessSource(readinessPreferences.source);
+      setIsReadinessPromptsEnabled(readinessPreferences.promptsEnabled);
+      setReadinessQuestions({
+        sleep: readinessPreferences.questions.sleep,
+        stress: readinessPreferences.questions.stress,
+        menstrualCycle: readinessPreferences.questions.menstrualCycle,
+      });
+
+      let nextError: string | null = null;
+
+      const { data: userProfileData, error: userProfileError } = await supabase
+        .from('user_profile')
+        .select('healthkit_enabled')
         .eq('user_id', user.id)
-        .order('completed_at', { ascending: false });
+        .maybeSingle();
 
-      if (historyError) {
-        if (isMissingWorkoutHistoryTableError(historyError)) {
-          setProgress(DEFAULT_PROGRESS);
-          setError(null);
-          return;
+      if (userProfileError) {
+        if (!isMissingUserProfileSchemaError(userProfileError)) {
+          nextError = userProfileError.message;
         }
+        setIsAppleHealthConnected(readinessPreferences.source === 'apple');
+      } else {
+        const healthkitEnabled =
+          typeof userProfileData?.healthkit_enabled === 'boolean'
+            ? userProfileData.healthkit_enabled
+            : readinessPreferences.source === 'apple';
 
-        setError(historyError.message);
+        setIsAppleHealthConnected(healthkitEnabled);
+        if (!healthkitEnabled && readinessPreferences.source === 'apple') {
+          setReadinessSource('manual');
+        }
+      }
+
+      const sessionsResult = await fetchRowsFromTable('workout_sessions', user.id);
+      const sessionsMissing = isMissingTableError(sessionsResult.error, 'workout_sessions');
+      if (sessionsResult.error && !sessionsMissing) {
+        setError(sessionsResult.error.message ?? 'Failed to load workout progress.');
         setProgress(DEFAULT_PROGRESS);
         return;
       }
 
-      const rows = (historyRows ?? []) as WorkoutHistoryRow[];
+      let rows = sessionsResult.rows;
+      const shouldTryLegacyHistory = sessionsMissing || sessionsResult.rows.length === 0;
+      if (shouldTryLegacyHistory) {
+        const historyResult = await fetchRowsFromTable('workout_history', user.id);
+        const historyMissing = isMissingTableError(historyResult.error, 'workout_history');
+
+        if (historyResult.error && !historyMissing) {
+          setError(historyResult.error.message ?? 'Failed to load workout progress.');
+          setProgress(DEFAULT_PROGRESS);
+          return;
+        }
+
+        if (historyResult.rows.length > 0) {
+          rows = historyResult.rows;
+        }
+      }
+
       setProgress({
         workouts: rows.length,
         weekStreak: computeWeekStreak(rows),
         prs: rows.reduce((total, row) => total + parsePrCount(row), 0),
       });
+      setError(nextError);
     } catch (fetchError) {
       console.error('Failed to load profile screen:', fetchError);
       setError('Failed to load profile data.');
@@ -298,7 +388,17 @@ export default function ProfileScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    void fetchProfileData();
+  }, [fetchProfileData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void fetchProfileData();
+    }, [fetchProfileData]),
+  );
 
   const handleLogout = async () => {
     try {
@@ -335,8 +435,73 @@ export default function ProfileScreen() {
     }));
   };
 
+  const handleSaveReadinessSettings = async () => {
+    try {
+      setIsReadinessSaving(true);
+      setReadinessStatusMessage(null);
+
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError || !user) {
+        setReadinessStatusType('error');
+        setReadinessStatusMessage('Unable to save readiness settings right now.');
+        return;
+      }
+
+      const normalizedSource: ReadinessSource = isAppleHealthConnected ? readinessSource : 'manual';
+
+      const { error: profileError } = await supabase.from('user_profile').upsert(
+        {
+          user_id: user.id,
+          healthkit_enabled: isAppleHealthConnected,
+        },
+        { onConflict: 'user_id' },
+      );
+
+      if (profileError && !isMissingUserProfileSchemaError(profileError)) {
+        setReadinessStatusType('error');
+        setReadinessStatusMessage(profileError.message);
+        return;
+      }
+
+      const { error: metadataError } = await supabase.auth.updateUser({
+        data: mergeUserMetadata(user.user_metadata, {
+          readiness_preferences: {
+            source: normalizedSource,
+            promptsEnabled: isReadinessPromptsEnabled,
+            questions: {
+              sleep: readinessQuestions.sleep,
+              stress: readinessQuestions.stress,
+              menstrualCycle: readinessQuestions.menstrualCycle,
+            },
+          },
+        }),
+      });
+
+      if (metadataError) {
+        setReadinessStatusType('error');
+        setReadinessStatusMessage(metadataError.message);
+        return;
+      }
+
+      setReadinessSource(normalizedSource);
+      setReadinessStatusType('success');
+      setReadinessStatusMessage('Readiness settings saved to backend.');
+    } catch (saveError) {
+      console.error('Failed to save readiness settings:', saveError);
+      setReadinessStatusType('error');
+      setReadinessStatusMessage('Failed to save readiness settings.');
+    } finally {
+      setIsReadinessSaving(false);
+    }
+  };
+
   const handleMenuItemPress = (label: MenuLabel) => {
     if (label === 'Readiness Settings') {
+      setReadinessStatusMessage(null);
       setIsReadinessModalVisible(true);
       return;
     }
@@ -612,11 +777,30 @@ export default function ProfileScreen() {
             </ScrollView>
 
             <View style={styles.readinessFooter}>
+              {readinessStatusMessage ? (
+                <Text
+                  style={[
+                    styles.readinessStatusText,
+                    readinessStatusType === 'error'
+                      ? styles.readinessStatusError
+                      : styles.readinessStatusSuccess,
+                  ]}
+                >
+                  {readinessStatusMessage}
+                </Text>
+              ) : null}
               <Pressable
-                onPress={() => setIsReadinessModalVisible(false)}
-                style={({ pressed }) => [styles.readinessSaveButton, pressed && styles.readinessSaveButtonPressed]}
+                disabled={isReadinessSaving}
+                onPress={handleSaveReadinessSettings}
+                style={({ pressed }) => [
+                  styles.readinessSaveButton,
+                  isReadinessSaving && styles.readinessSaveButtonDisabled,
+                  pressed && !isReadinessSaving && styles.readinessSaveButtonPressed,
+                ]}
               >
-                <Text style={styles.readinessSaveButtonText}>Save Settings</Text>
+                <Text style={styles.readinessSaveButtonText}>
+                  {isReadinessSaving ? 'Saving...' : 'Save Settings'}
+                </Text>
               </Pressable>
             </View>
           </LinearGradient>
@@ -1047,12 +1231,26 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(90, 96, 114, 0.25)',
     backgroundColor: 'rgba(19, 21, 30, 0.96)',
   },
+  readinessStatusText: {
+    fontSize: 13,
+    marginBottom: 10,
+    marginLeft: 2,
+  },
+  readinessStatusSuccess: {
+    color: '#7ae4a7',
+  },
+  readinessStatusError: {
+    color: '#ff8088',
+  },
   readinessSaveButton: {
     minHeight: 78,
     borderRadius: 20,
     backgroundColor: '#2b68f0',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  readinessSaveButtonDisabled: {
+    opacity: 0.65,
   },
   readinessSaveButtonPressed: {
     opacity: 0.85,

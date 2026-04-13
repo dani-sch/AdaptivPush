@@ -56,6 +56,8 @@ interface MonthSection {
   workouts: WorkoutEntry[];
 }
 
+type WorkoutHistoryTable = 'workout_sessions' | 'workout_history';
+
 const parseNumericValue = (value: number | string | null | undefined): number | null => {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
@@ -167,7 +169,10 @@ const toWorkoutEntry = (row: WorkoutHistoryRow, index: number): WorkoutEntry => 
   personalRecords: parsePrCount(row),
 });
 
-const isMissingWorkoutHistoryTableError = (error: { code?: string | null; message?: string | null } | null | undefined): boolean => {
+const isMissingTableError = (
+  error: { code?: string | null; message?: string | null } | null | undefined,
+  tableName: WorkoutHistoryTable,
+): boolean => {
   if (!error) {
     return false;
   }
@@ -177,8 +182,29 @@ const isMissingWorkoutHistoryTableError = (error: { code?: string | null; messag
   }
 
   return Boolean(
-    error.message?.toLowerCase().includes("could not find the table 'public.workout_sessions'"),
+    error.message?.toLowerCase().includes(`could not find the table 'public.${tableName}'`),
   );
+};
+
+const fetchRowsFromTable = async (
+  tableName: WorkoutHistoryTable,
+  userId: string,
+): Promise<{
+  rows: WorkoutHistoryRow[];
+  error: { code?: string | null; message?: string | null } | null;
+}> => {
+  const orderColumn = tableName === 'workout_sessions' ? 'ended_at' : 'completed_at';
+
+  const { data, error } = await supabase
+    .from(tableName)
+    .select('*')
+    .eq('user_id', userId)
+    .order(orderColumn, { ascending: false });
+
+  return {
+    rows: (data ?? []) as WorkoutHistoryRow[],
+    error,
+  };
 };
 
 interface SummaryMetricCardProps {
@@ -226,26 +252,46 @@ export default function HistoryScreen() {
         return;
       }
 
-      const { data, error: historyError } = await supabase
-        .from('workout_sessions')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('ended_at', { ascending: false });
-
-      if (historyError) {
-        if (isMissingWorkoutHistoryTableError(historyError)) {
-          setWorkouts([]);
-          setError(null);
-          return;
-        }
-
-        setError(historyError.message);
+      const sessionsResult = await fetchRowsFromTable('workout_sessions', user.id);
+      const sessionsMissing = isMissingTableError(sessionsResult.error, 'workout_sessions');
+      if (sessionsResult.error && !sessionsMissing) {
+        setError(sessionsResult.error.message ?? 'Failed to load workout history.');
         setWorkouts([]);
         return;
       }
 
-      const normalizedRows = (data ?? []) as WorkoutHistoryRow[];
-      setWorkouts(normalizedRows.map(toWorkoutEntry));
+      const shouldTryLegacyHistory =
+        sessionsMissing || sessionsResult.rows.length === 0;
+
+      if (shouldTryLegacyHistory) {
+        const historyResult = await fetchRowsFromTable('workout_history', user.id);
+        const historyMissing = isMissingTableError(historyResult.error, 'workout_history');
+
+        if (historyResult.error && !historyMissing) {
+          setError(historyResult.error.message ?? 'Failed to load workout history.');
+          setWorkouts([]);
+          return;
+        }
+
+        if (historyResult.rows.length > 0) {
+          setWorkouts(historyResult.rows.map(toWorkoutEntry));
+          setError(null);
+          return;
+        }
+
+        if (sessionsResult.rows.length > 0) {
+          setWorkouts(sessionsResult.rows.map(toWorkoutEntry));
+          setError(null);
+          return;
+        }
+
+        setWorkouts([]);
+        setError(null);
+        return;
+      }
+
+      setWorkouts(sessionsResult.rows.map(toWorkoutEntry));
+      setError(null);
     } catch (fetchError) {
       console.error('Failed to fetch workout history:', fetchError);
       setError('Failed to load workout history.');
