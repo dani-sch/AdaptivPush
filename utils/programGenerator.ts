@@ -212,7 +212,8 @@ function buildSlot(
   goalParams: GoalParams,
   userWeightLb: number,
   experienceLevel: TrainingExperience,
-  weekNumber: number,
+  effectiveWeek: number,
+  isDeload: boolean,
 ): GeneratedExerciseSlot {
   const expMult = exercise.experienceMultipliers[experienceLevel];
   const baseWeight =
@@ -223,9 +224,11 @@ function buildSlot(
         goalParams.weightMultiplier *
         expMult;
 
-  // Apply linear 5% progressive overload per week beyond week 1
-  const weeklyFactor = 1 + 0.05 * (weekNumber - 1);
-  const suggested = roundWeight(baseWeight * weeklyFactor);
+  // Progressive overload: +5% per effective loading week.
+  // Deload weeks use 70% of the last loading week's weight.
+  const weeklyFactor = 1 + 0.05 * (effectiveWeek - 1);
+  const deloadFactor = isDeload ? 0.70 : 1.0;
+  const suggested = roundWeight(baseWeight * weeklyFactor * deloadFactor);
 
   return {
     localExerciseId: exercise.id,
@@ -251,10 +254,61 @@ function estimateDuration(exerciseCount: number, setCount: number): number {
   return exerciseCount * setCount * 4.5 + exerciseCount * 2;
 }
 
+// ─── Slot-map helper ─────────────────────────────────────────────────────────
+
+/**
+ * Distribute exercise budget across muscle groups for a day.
+ * Focus groups get 2 slots; others get 1. Surplus/deficit adjusted from
+ * first (compound) or last (isolation) groups.
+ */
+function buildSlotMap(
+  groupList: MuscleGroup[],
+  focusSet: Set<MuscleGroup>,
+  budget: number,
+): Map<MuscleGroup, number> {
+  const slotMap = new Map<MuscleGroup, number>();
+  let allocated = 0;
+
+  for (const mg of groupList) {
+    const slots = focusSet.has(mg) ? 2 : 1;
+    slotMap.set(mg, slots);
+    allocated += slots;
+  }
+
+  if (allocated < budget) {
+    for (const mg of groupList) {
+      if (allocated >= budget) break;
+      slotMap.set(mg, (slotMap.get(mg) ?? 1) + 1);
+      allocated++;
+    }
+  }
+
+  if (allocated > budget) {
+    for (let i = groupList.length - 1; i >= 0 && allocated > budget; i--) {
+      const mg = groupList[i];
+      const current = slotMap.get(mg) ?? 1;
+      if (current > 1) {
+        slotMap.set(mg, current - 1);
+        allocated--;
+      }
+    }
+  }
+
+  return slotMap;
+}
+
 // ─── Core generation ──────────────────────────────────────────────────────────
 
 /**
  * Generates a complete multi-week workout program from the given parameters.
+ *
+ * Key principles:
+ *  - Exercises are chosen ONCE (week-1 template) and reused across all weeks
+ *    so users progressively overload the same movements.
+ *  - Every 4th week is automatically a deload (3:1 loading-to-deload ratio —
+ *    standard hypertrophy/strength best-practice).
+ *  - Deload parameters: −2 sets (min 2), 70% of normal week weight, −2 RPE.
+ *  - Progressive overload: +5% weight per effective loading week.
  *
  * Pure function — no async, no network calls.
  */
@@ -271,104 +325,75 @@ export function generateProgram(
   const targetExercisesPerDay = exercisesPerDay(daysPerWeek);
   const focusSet = new Set<MuscleGroup>(focusMuscleGroups);
 
-  const allDays: GeneratedProgramDay[] = [];
+  // ── Phase 1: pin exercise selection (done once, reused every week) ─────────
+  // Each entry: ordered list of exercises for that day slot (index = orderInWeek).
+  type DayTemplate = { exercise: LocalExercise; position: number }[];
+  const dayTemplates = new Map<number, DayTemplate>();
 
-  for (let week = 1; week <= durationWeeks; week++) {
-    // Track exercise IDs used so far this week to prevent exact repeats.
-    const weekUsedIds = new Set<string>();
-
+  {
+    const usedIds = new Set<string>();
     for (let orderInWeek = 0; orderInWeek < daysPerWeek; orderInWeek++) {
       const splitType = splitTypes[orderInWeek];
       const splitDay = SPLIT_DAYS[splitType];
-      const dayIndex = dayIndexes[orderInWeek];
-
-      // Deload day: lighter params
-      const isDeload = splitType === 'Full Body Deload';
-      const dayGoalParams: GoalParams = isDeload
-        ? { ...goalParams, sets: Math.max(goalParams.sets - 1, 2), weightMultiplier: goalParams.weightMultiplier * 0.6 }
-        : goalParams;
-
-      // For Full Body days (including deload), allow repeating primary compounds
       const isFullBody = splitType === 'Full Body' || splitType === 'Full Body Deload';
+      const slotMap = buildSlotMap(splitDay.muscleGroups, focusSet, targetExercisesPerDay);
 
-      // Build exercise list across all required muscle groups for this day
-      const exercises: GeneratedExerciseSlot[] = [];
+      const template: DayTemplate = [];
       let position = 1;
 
-      // Track how many exercises we've collected so far
-      const groupList = splitDay.muscleGroups;
-
-      // Distribute exercise budget across groups proportionally.
-      // Focus groups get 2 slots; others get 1.
-      const baseSlots = groupList.map((mg) => (focusSet.has(mg) ? 2 : 1));
-      const totalBaseSlots = baseSlots.reduce((a, b) => a + b, 0);
-
-      // Scale up if we're under budget; scale down if over.
-      // We use a simple approach: fill up to targetExercisesPerDay by giving
-      // extra slots to the first N groups (compound first).
-      const budget = targetExercisesPerDay;
-      const slotMap = new Map<MuscleGroup, number>();
-
-      let allocated = 0;
-      for (let i = 0; i < groupList.length; i++) {
-        slotMap.set(groupList[i], baseSlots[i]);
-        allocated += baseSlots[i];
-      }
-
-      // If totalBaseSlots < budget, add 1 extra to first groups that have compound exercises
-      if (allocated < budget) {
-        for (const mg of groupList) {
-          if (allocated >= budget) break;
-          slotMap.set(mg, (slotMap.get(mg) ?? 1) + 1);
-          allocated++;
-        }
-      }
-
-      // If totalBaseSlots > budget, trim from the end (isolation groups)
-      if (allocated > budget) {
-        for (let i = groupList.length - 1; i >= 0 && allocated > budget; i--) {
-          const mg = groupList[i];
-          const current = slotMap.get(mg) ?? 1;
-          if (current > 1) {
-            slotMap.set(mg, current - 1);
-            allocated--;
-          }
-        }
-      }
-
-      // Select exercises for each muscle group
-      for (const muscleGroup of groupList) {
+      for (const muscleGroup of splitDay.muscleGroups) {
         const count = slotMap.get(muscleGroup) ?? 1;
-
-        const selected = selectExercises(
-          muscleGroup,
-          count,
-          splitDay.compoundEmphasis,
-          weekUsedIds,
-          isFullBody, // allow repeats on full body days
-        );
-
+        const selected = selectExercises(muscleGroup, count, splitDay.compoundEmphasis, usedIds, isFullBody);
         for (const ex of selected) {
-          exercises.push(
-            buildSlot(ex, position, dayGoalParams, userWeightLb, experienceLevel, week),
-          );
+          template.push({ exercise: ex, position });
           position++;
-          if (!isFullBody) {
-            weekUsedIds.add(ex.id);
-          }
+          if (!isFullBody) usedIds.add(ex.id);
         }
       }
 
-      const estimatedDurationMin = Math.round(
-        estimateDuration(exercises.length, dayGoalParams.sets),
+      dayTemplates.set(orderInWeek, template);
+    }
+  }
+
+  // ── Phase 2: build all weeks using the pinned template ────────────────────
+  const allDays: GeneratedProgramDay[] = [];
+
+  // effectiveWeek counts only loading weeks (deloads don't advance progression).
+  let effectiveWeek = 0;
+
+  for (let week = 1; week <= durationWeeks; week++) {
+    // Every 4th week is a deload (weeks 4, 8, 12, 16, …).
+    const isDeloadWeek = week % 4 === 0;
+    if (!isDeloadWeek) effectiveWeek++;
+
+    for (let orderInWeek = 0; orderInWeek < daysPerWeek; orderInWeek++) {
+      const splitType = splitTypes[orderInWeek];
+      const dayIndex = dayIndexes[orderInWeek];
+
+      const dayGoalParams: GoalParams = isDeloadWeek
+        ? {
+            ...goalParams,
+            sets: Math.max(goalParams.sets - 2, 2),
+            rpe: Math.max(goalParams.rpe - 2.0, 5.0),
+            weightMultiplier: goalParams.weightMultiplier, // handled in buildSlot
+          }
+        : goalParams;
+
+      const template = dayTemplates.get(orderInWeek) ?? [];
+      const exercises: GeneratedExerciseSlot[] = template.map(({ exercise, position }) =>
+        buildSlot(exercise, position, dayGoalParams, userWeightLb, experienceLevel, effectiveWeek, isDeloadWeek),
       );
+
+      const workoutName = isDeloadWeek
+        ? `${WORKOUT_NAMES[splitType]} (Deload)`
+        : WORKOUT_NAMES[splitType];
 
       allDays.push({
         weekNumber: week,
         dayIndex,
         orderInWeek: orderInWeek + 1,
-        workoutName: WORKOUT_NAMES[splitType],
-        estimatedDurationMin,
+        workoutName,
+        estimatedDurationMin: Math.round(estimateDuration(exercises.length, dayGoalParams.sets)),
         exercises,
       });
     }

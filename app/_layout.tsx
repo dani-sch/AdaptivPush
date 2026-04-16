@@ -1,7 +1,7 @@
 import {
-    DarkTheme,
-    DefaultTheme,
-    ThemeProvider,
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider,
 } from "@react-navigation/native";
 import { Stack, router, useRootNavigationState } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -18,13 +18,16 @@ export default function RootLayout() {
   useEffect(() => {
     if (!navigationState?.key) return;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        router.replace("/(tabs)/home");
-      }
-    }).catch(() => {
-      // Network unavailable or credentials not yet configured — stay on current screen
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        if (session) {
+          router.replace("/(tabs)/home");
+        }
+      })
+      .catch(() => {
+        // Network unavailable or credentials not yet configured — stay on current screen
+      });
   }, [navigationState?.key]);
 
   return (
@@ -37,6 +40,10 @@ export default function RootLayout() {
         <Stack.Screen name="workout-history" options={{ headerShown: false }} />
         <Stack.Screen name="next-workout" options={{ headerShown: false }} />
         <Stack.Screen name="create-program" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="program-overview"
+          options={{ headerShown: false }}
+        />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>
