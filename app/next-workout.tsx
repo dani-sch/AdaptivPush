@@ -3,11 +3,13 @@ import { SwapExerciseModal } from "@/components/SwapExerciseModal";
 import { useCurrentProgram } from "@/hooks/useCurrentProgram";
 import type { CurrentProgram, ProgramWorkout } from "@/types/program";
 import { supabase } from "@/utils/supabase";
+import { getReadinessModifier } from "@/utils/progressionEngine";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
     ActivityIndicator,
+    Alert,
     KeyboardAvoidingView,
     Modal,
     Platform,
@@ -31,12 +33,26 @@ import {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Build ExerciseCard Exercise[] from a real ProgramWorkout */
-function buildExercises(workout: ProgramWorkout): Exercise[] {
+/** Build ExerciseCard Exercise[] from a real ProgramWorkout, with optional readiness overlay */
+function buildExercises(workout: ProgramWorkout, readinessScore: number | null): Exercise[] {
+  const modifier = readinessScore !== null ? getReadinessModifier(readinessScore) : null;
+
   return workout.exercises.map((ex) => {
     const setCount = ex.sets ?? 3;
-    const weightStr = ex.weight != null ? String(ex.weight) : "";
-    const rpeStr = ex.targetRpe != null ? String(ex.targetRpe) : "";
+    const baseWeight = ex.weight != null ? ex.weight : 0;
+
+    // Apply readiness modifier to the displayed weight (UI overlay only — not persisted)
+    const adjustedWeight = modifier
+      ? Math.max(0, Math.round((baseWeight * modifier.weightMultiplier) / 2.5) * 2.5)
+      : baseWeight;
+    const weightStr = adjustedWeight > 0 ? String(adjustedWeight) : "";
+
+    // Apply readiness RPE delta
+    const baseRpe = ex.targetRpe != null ? ex.targetRpe : null;
+    const adjustedRpe = baseRpe !== null && modifier
+      ? Math.min(10, Math.max(5, baseRpe + modifier.rpeDelta))
+      : baseRpe;
+    const rpeStr = adjustedRpe != null ? String(adjustedRpe) : "";
 
     const sets: WorkoutSet[] = Array.from({ length: setCount }, (_, i) => ({
       id: `${ex.id}-${i + 1}`,
@@ -51,6 +67,10 @@ function buildExercises(workout: ProgramWorkout): Exercise[] {
       ex.targetRpe != null
         ? `${setCount}×${repDisplay} @ RPE ${ex.targetRpe}`
         : `${setCount}×${repDisplay}`;
+
+    if (!ex.exerciseId) {
+      console.warn(`[buildExercises] Missing exerciseId for "${ex.name}" (pde.id=${ex.id})`);
+    }
 
     return {
       id: ex.id,
@@ -134,7 +154,7 @@ const FinishModal: React.FC<{
 
 export default function NextWorkoutScreen() {
   const { workoutId } = useLocalSearchParams<{ workoutId?: string }>();
-  const { program, loading } = useCurrentProgram();
+  const { program, loading, applyProgressionToNextWeek } = useCurrentProgram();
 
   // Find the matching workout day; fall back to first in current week
   const programWorkout = workoutId
@@ -149,6 +169,7 @@ export default function NextWorkoutScreen() {
   const [showFinishModal, setShowFinishModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [swapTargetId, setSwapTargetId] = useState<string | null>(null);
+  const [readinessScore, setReadinessScore] = useState<number | null>(null);
   const [historyExerciseId, setHistoryExerciseId] = useState<string | null>(
     null,
   );
@@ -157,14 +178,36 @@ export default function NextWorkoutScreen() {
   );
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Populate exercises once the program workout is available
+  // Fetch latest readiness score once on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data } = await supabase
+          .from("readiness_logs")
+          .select("readiness_score")
+          .eq("user_id", user.id)
+          .order("log_date", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (data?.readiness_score != null) {
+          setReadinessScore(Number(data.readiness_score));
+        }
+      } catch {
+        // Readiness fetch is best-effort; proceed without overlay
+      }
+    })();
+  }, []);
+
+  // Populate exercises once the program workout and readiness score are available
   useEffect(() => {
     if (programWorkout) {
-      setExercises(buildExercises(programWorkout));
+      setExercises(buildExercises(programWorkout, readinessScore));
       setWorkoutName(programWorkout.name);
       setProgramDayId(programWorkout.id);
     }
-  }, [programWorkout?.id]);
+  }, [programWorkout?.id, readinessScore]);
 
   const programForSwap = useMemo<CurrentProgram | null>(() => {
     if (!program || !programWorkout) return null;
@@ -269,32 +312,61 @@ export default function NextWorkoutScreen() {
 
       if (sessionErr) throw sessionErr;
 
-      const setRows = exercises.flatMap((ex) =>
-        ex.sets
-          .filter((s) => s.logged)
+      // Filter to only sets with valid exerciseId (FK constraint requires non-null)
+      const setRows = exercises.flatMap((ex) => {
+        if (!ex.exerciseId) {
+          console.warn(`[handleFinish] Skipping sets for "${ex.name}" — missing exerciseId`);
+          return [];
+        }
+        return ex.sets
+          .filter((s) => s.logged && parseInt(s.reps) > 0)
           .map((s, idx) => ({
             session_id: sessionRow?.id,
-            exercise_id: ex.exerciseId ?? null,
+            exercise_id: ex.exerciseId!,
             set_number: idx + 1,
             weight_lb: parseFloat(s.weight) || null,
-            reps: parseInt(s.reps) || null,
+            reps: parseInt(s.reps),
             rpe: parseFloat(s.rpe) || null,
-          })),
-      );
+          }));
+      });
 
       if (setRows.length > 0) {
         const { error: setsErr } = await supabase
           .from("workout_exercise_sets")
           .insert(setRows);
         if (setsErr) {
-          console.warn("[handleFinish] Sets insert failed:", setsErr.message);
+          console.error("[handleFinish] Sets insert failed:", setsErr.message);
+          Alert.alert(
+            "Workout Saved Partially",
+            `Your session was recorded but individual set data failed to save: ${setsErr.message}`,
+            [{ text: "OK" }],
+          );
+          setSaving(false);
+          router.back();
+          return;
         }
       }
-    } catch (err) {
-      console.error("[handleFinish] Failed to save workout:", err);
-    } finally {
+
+      // Trigger progression for next week now that new data is available
+      try {
+        await applyProgressionToNextWeek();
+      } catch (progressionErr) {
+        console.warn("[handleFinish] Progression update failed:", progressionErr);
+      }
+
       setSaving(false);
       router.back();
+    } catch (err) {
+      console.error("[handleFinish] Failed to save workout:", err);
+      setSaving(false);
+      Alert.alert(
+        "Save Failed",
+        "Could not save your workout. Please try again.",
+        [
+          { text: "Retry", onPress: () => handleFinish() },
+          { text: "Discard", style: "destructive", onPress: () => router.back() },
+        ],
+      );
     }
   };
 
@@ -368,7 +440,7 @@ export default function NextWorkoutScreen() {
               }
               onToggleComplete={() => toggleExerciseComplete(exercise.id)}
               onPressHistory={() => {
-                setHistoryExerciseId(exercise.id);
+                setHistoryExerciseId(exercise.exerciseId ?? null);
                 setHistoryExerciseName(exercise.name);
               }}
               onPressSwap={() => setSwapTargetId(exercise.id)}
@@ -448,6 +520,14 @@ export default function NextWorkoutScreen() {
           />
         )}
       </Modal>
+
+      {/* Saving overlay */}
+      {saving && (
+        <View style={styles.savingOverlay}>
+          <ActivityIndicator size="large" color={PRIMARY_COLOR} />
+          <Text style={styles.savingText}>Saving workout…</Text>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -618,5 +698,18 @@ const styles = StyleSheet.create({
     color: WHITE,
     fontSize: 16,
     fontWeight: "700",
+  },
+  savingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.75)",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 16,
+    zIndex: 999,
+  },
+  savingText: {
+    color: WHITE,
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
