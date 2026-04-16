@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, View, Pressable, Modal } from 'react-native';
-import { Link } from 'expo-router';
-import { Plus, ChevronRight, MoreVertical } from 'lucide-react-native';
+import { Link, router } from 'expo-router';
+import { Plus, ChevronRight, MoreVertical, LayoutList } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Alert } from 'react-native';
 
@@ -333,6 +333,17 @@ export default function PlanScreen() {
                     </View>
                 </View>
 
+                {/* View Full Program */}
+                <Pressable
+                    style={({ pressed }) => [styles.viewFullProgramBtn, pressed && { opacity: 0.8 }]}
+                    onPress={() => router.push('/program-overview')}
+                    accessibilityRole="button"
+                >
+                    <LayoutList color={PRIMARY_COLOR} size={18} />
+                    <Text style={styles.viewFullProgramText}>View Full Program</Text>
+                    <ChevronRight color={PLACEHOLDER_TEXT} size={18} style={{ marginLeft: 'auto' }} />
+                </Pressable>
+
                 {/* Create Program */}
                 <View style={styles.ctaCard}>
                     <Link href="/create-program" asChild>
@@ -600,6 +611,24 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     ctaText: {
+        color: WHITE,
+        fontSize: 15,
+        fontWeight: '600',
+    },
+    viewFullProgramBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        backgroundColor: CARD_BG,
+        borderWidth: 1,
+        borderColor: BORDER_COLOR,
+        borderRadius: 14,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        marginTop: 16,
+        marginBottom: 4,
+    },
+    viewFullProgramText: {
         color: WHITE,
         fontSize: 15,
         fontWeight: '600',
