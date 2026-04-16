@@ -1,3 +1,4 @@
+import { ExerciseHistoryModal } from '@/components/ExerciseHistoryModal';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   CalendarDays,
@@ -5,16 +6,20 @@ import {
   Clock3,
   Medal,
   TrendingUp,
+  X,
 } from 'lucide-react-native';
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Modal,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from 'expo-router';
 
 import { supabase } from '@/utils/supabase';
 
@@ -49,6 +54,19 @@ interface WorkoutEntry {
   durationMin: number;
   totalVolumeLb: number;
   personalRecords: number;
+}
+
+interface SessionExerciseSet {
+  setNumber: number;
+  weightLb: number | null;
+  reps: number | null;
+  rpe: number | null;
+}
+
+interface SessionExercise {
+  exerciseId: string;
+  name: string;
+  sets: SessionExerciseSet[];
 }
 
 interface MonthSection {
@@ -207,6 +225,41 @@ const fetchRowsFromTable = async (
   };
 };
 
+const fetchSessionExercises = async (sessionId: string): Promise<SessionExercise[]> => {
+  const { data, error } = await supabase
+    .from('workout_exercise_sets')
+    .select(`
+      set_number,
+      weight_lb,
+      reps,
+      rpe,
+      exercise_id,
+      exercises ( id, name )
+    `)
+    .eq('session_id', sessionId)
+    .order('set_number', { ascending: true });
+
+  if (error || !data) return [];
+
+  // Group sets by exercise
+  const map = new Map<string, SessionExercise>();
+  for (const row of data as any[]) {
+    const exId: string = row.exercise_id;
+    const exName: string = row.exercises?.name ?? 'Unknown exercise';
+    if (!map.has(exId)) {
+      map.set(exId, { exerciseId: exId, name: exName, sets: [] });
+    }
+    map.get(exId)!.sets.push({
+      setNumber: row.set_number,
+      weightLb: row.weight_lb != null ? Number(row.weight_lb) : null,
+      reps: row.reps != null ? Number(row.reps) : null,
+      rpe: row.rpe != null ? Number(row.rpe) : null,
+    });
+  }
+
+  return Array.from(map.values());
+};
+
 interface SummaryMetricCardProps {
   icon: ReactNode;
   value: string;
@@ -232,9 +285,44 @@ export default function HistoryScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchWorkoutHistory();
-  }, []);
+  // Session detail sheet state
+  const [detailWorkout, setDetailWorkout] = useState<WorkoutEntry | null>(null);
+  const [sessionExercises, setSessionExercises] = useState<SessionExercise[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  // Exercise history modal state (drill-down from detail sheet)
+  const [historyExerciseId, setHistoryExerciseId] = useState<string | null>(null);
+  const [historyExerciseName, setHistoryExerciseName] = useState<string | null>(null);
+
+  const handleOpenDetail = async (workout: WorkoutEntry) => {
+    setDetailWorkout(workout);
+    setSessionExercises([]);
+    setDetailLoading(true);
+    const exercises = await fetchSessionExercises(workout.id);
+    setSessionExercises(exercises);
+    setDetailLoading(false);
+  };
+
+  const handleCloseDetail = () => {
+    setDetailWorkout(null);
+    setSessionExercises([]);
+  };
+
+  const handleOpenExerciseHistory = (exerciseId: string, exerciseName: string) => {
+    setHistoryExerciseId(exerciseId);
+    setHistoryExerciseName(exerciseName);
+  };
+
+  const handleCloseExerciseHistory = () => {
+    setHistoryExerciseId(null);
+    setHistoryExerciseName(null);
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchWorkoutHistory();
+    }, [])
+  );
 
   const fetchWorkoutHistory = async () => {
     try {
@@ -388,47 +476,143 @@ export default function HistoryScreen() {
               <Text style={styles.sectionTitle}>{section.label}</Text>
 
               {section.workouts.map((workout) => (
-                <LinearGradient
+                <Pressable
                   key={workout.id}
-                  colors={['#181b26', '#12141b']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.workoutCard}
+                  onPress={() => handleOpenDetail(workout)}
+                  style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
                 >
-                  <View style={styles.workoutHeaderRow}>
-                    <View style={styles.workoutHeaderTextWrap}>
-                      <Text style={styles.workoutTitle}>{workout.title}</Text>
-                      <Text style={styles.workoutDate}>{formatWorkoutDate(workout.completedAt)}</Text>
-                    </View>
-                    <ChevronRight color="#4d5265" size={26} style={styles.workoutChevron} />
-                  </View>
-
-                  <View style={styles.workoutMetaRow}>
-                    <View style={styles.workoutMetaItem}>
-                      <Clock3 color="#8d93a7" size={18} />
-                      <Text style={styles.workoutMetaText}>{workout.durationMin} min</Text>
-                    </View>
-
-                    <View style={styles.workoutMetaItem}>
-                      <TrendingUp color="#8d93a7" size={18} />
-                      <Text style={styles.workoutMetaText}>{formatExactVolume(workout.totalVolumeLb)} lbs</Text>
-                    </View>
-
-                    {workout.personalRecords > 0 ? (
-                      <View style={styles.workoutMetaItem}>
-                        <Medal color="#ffc200" size={18} />
-                        <Text style={styles.workoutMetaPrText}>
-                          {workout.personalRecords} {workout.personalRecords === 1 ? 'PR' : 'PRs'}
-                        </Text>
+                  <LinearGradient
+                    colors={['#181b26', '#12141b']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.workoutCard}
+                  >
+                    <View style={styles.workoutHeaderRow}>
+                      <View style={styles.workoutHeaderTextWrap}>
+                        <Text style={styles.workoutTitle}>{workout.title}</Text>
+                        <Text style={styles.workoutDate}>{formatWorkoutDate(workout.completedAt)}</Text>
                       </View>
-                    ) : null}
-                  </View>
-                </LinearGradient>
+                      <ChevronRight color="#4d5265" size={26} style={styles.workoutChevron} />
+                    </View>
+
+                    <View style={styles.workoutMetaRow}>
+                      <View style={styles.workoutMetaItem}>
+                        <Clock3 color="#8d93a7" size={18} />
+                        <Text style={styles.workoutMetaText}>{workout.durationMin} min</Text>
+                      </View>
+
+                      <View style={styles.workoutMetaItem}>
+                        <TrendingUp color="#8d93a7" size={18} />
+                        <Text style={styles.workoutMetaText}>{formatExactVolume(workout.totalVolumeLb)} lbs</Text>
+                      </View>
+
+                      {workout.personalRecords > 0 ? (
+                        <View style={styles.workoutMetaItem}>
+                          <Medal color="#ffc200" size={18} />
+                          <Text style={styles.workoutMetaPrText}>
+                            {workout.personalRecords} {workout.personalRecords === 1 ? 'PR' : 'PRs'}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </LinearGradient>
+                </Pressable>
               ))}
             </View>
           ))
         )}
       </ScrollView>
+
+      {/* Single Modal for session detail + exercise history drill-down.
+          Using one Modal avoids stacked-transparent-modal scroll breakage on RN. */}
+      <Modal
+        visible={detailWorkout !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={historyExerciseId !== null ? handleCloseExerciseHistory : handleCloseDetail}
+      >
+        {/* Session detail sheet */}
+        <View style={styles.sheetBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={handleCloseDetail} />
+          <View style={styles.sheet}>
+            {/* Sheet header */}
+            <View style={styles.sheetHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sheetTitle}>{detailWorkout?.title ?? ''}</Text>
+                <Text style={styles.sheetSubtitle}>
+                  {detailWorkout ? formatWorkoutDate(detailWorkout.completedAt) : ''}
+                </Text>
+              </View>
+              <Pressable
+                style={styles.sheetCloseBtn}
+                onPress={handleCloseDetail}
+                accessibilityRole="button"
+                accessibilityLabel="Close workout detail"
+              >
+                <X color="#f4f6ff" size={18} />
+              </Pressable>
+            </View>
+
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={styles.sheetContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {detailLoading ? (
+                <View style={styles.sheetStateWrap}>
+                  <ActivityIndicator size="small" color="#2f7cff" />
+                  <Text style={styles.sheetStateText}>Loading exercises…</Text>
+                </View>
+              ) : sessionExercises.length === 0 ? (
+                <View style={styles.sheetStateWrap}>
+                  <Text style={styles.sheetStateText}>No exercise data recorded for this session.</Text>
+                </View>
+              ) : (
+                sessionExercises.map((ex) => (
+                  <View key={ex.exerciseId} style={styles.exerciseRow}>
+                    <View style={styles.exerciseRowHeader}>
+                      <Text style={styles.exerciseName}>{ex.name}</Text>
+                      <Pressable
+                        style={({ pressed }) => [
+                          styles.historyBtn,
+                          pressed && { opacity: 0.7 },
+                        ]}
+                        onPress={() => handleOpenExerciseHistory(ex.exerciseId, ex.name)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`View history for ${ex.name}`}
+                      >
+                        <TrendingUp size={14} color="#2f7cff" />
+                        <Text style={styles.historyBtnText}>History</Text>
+                      </Pressable>
+                    </View>
+
+                    {ex.sets.map((s) => (
+                      <Text key={s.setNumber} style={styles.setRow}>
+                        {`Set ${s.setNumber}`}
+                        {'   '}
+                        {s.weightLb !== null ? `${s.weightLb} lb × ` : ''}
+                        {s.reps !== null ? `${s.reps} reps` : '—'}
+                        {s.rpe !== null ? `   @ RPE ${s.rpe}` : ''}
+                      </Text>
+                    ))}
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+
+        {/* Exercise history drill-down — absolute overlay so it covers the session detail sheet */}
+        {historyExerciseId !== null && historyExerciseName !== null && (
+          <View style={StyleSheet.absoluteFill}>
+            <ExerciseHistoryModal
+              exerciseId={historyExerciseId}
+              exerciseName={historyExerciseName}
+              onClose={handleCloseExerciseHistory}
+            />
+          </View>
+        )}
+      </Modal>
     </View>
   );
 }
@@ -571,5 +755,111 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#ff747c',
     fontSize: 13,
+  },
+
+  // Session detail bottom sheet
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.82)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: '#12141b',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    borderColor: '#202433',
+    overflow: 'hidden',
+    maxHeight: '88%',
+    height: '75%',
+  },
+  sheetHeader: {
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#202433',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  sheetTitle: {
+    color: '#f4f6ff',
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  sheetSubtitle: {
+    color: '#6f7485',
+    fontSize: 13,
+  },
+  sheetCloseBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#1e2130',
+    borderWidth: 1,
+    borderColor: '#202433',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetContent: {
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    paddingBottom: 32,
+    gap: 12,
+  },
+  sheetStateWrap: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    gap: 10,
+  },
+  sheetStateText: {
+    color: '#6f7485',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+
+  // Exercise rows in detail sheet
+  exerciseRow: {
+    backgroundColor: '#181b26',
+    borderWidth: 1,
+    borderColor: '#202433',
+    borderRadius: 16,
+    padding: 14,
+  },
+  exerciseRowHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  exerciseName: {
+    color: '#f4f6ff',
+    fontSize: 15,
+    fontWeight: '700',
+    flex: 1,
+    paddingRight: 8,
+  },
+  historyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(47,124,255,0.12)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(47,124,255,0.25)',
+  },
+  historyBtnText: {
+    color: '#2f7cff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  setRow: {
+    color: '#a8adbc',
+    fontSize: 13,
+    marginBottom: 4,
+    fontVariant: ['tabular-nums'],
   },
 });
