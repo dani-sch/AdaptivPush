@@ -438,7 +438,7 @@ const ReadinessAdjustmentModal: React.FC<{
           </View>
 
           <Text style={styles.adjSubtext}>
-            Apply this adjustment to your next workout?
+            This adjustment will be applied when you start your next workout.
           </Text>
 
           {/* Buttons */}
@@ -450,7 +450,7 @@ const ReadinessAdjustmentModal: React.FC<{
             ]}
             onPress={onApply}
           >
-            <Text style={styles.adjApplyButtonText}>Apply Adjustment</Text>
+            <Text style={styles.adjApplyButtonText}>Got It</Text>
           </Pressable>
 
           <Pressable
@@ -460,7 +460,7 @@ const ReadinessAdjustmentModal: React.FC<{
             ]}
             onPress={onDismiss}
           >
-            <Text style={styles.adjKeepButtonText}>Keep Weights As-Is</Text>
+            <Text style={styles.adjKeepButtonText}>Dismiss</Text>
           </Pressable>
         </View>
       </View>
@@ -477,7 +477,7 @@ export default function HomeScreen() {
     number | null
   >(null);
 
-  const { program, refresh, applyReadinessAdjustmentOnly } = useCurrentProgram();
+  const { program, refresh, applyReadinessAdjustmentOnly, advanceToNextWeek } = useCurrentProgram();
 
   // Refresh program data every time the home screen comes into focus
   // so that finishing a workout advances to the next one immediately
@@ -563,13 +563,29 @@ export default function HomeScreen() {
       >
         <HeaderDateBlock />
         {program && program.workouts.every((w) => w.isCompleted) ? (
-          <View style={styles.weekCompleteCard}>
-            <Ionicons name="checkmark-circle" size={32} color={PRIMARY_COLOR} />
-            <Text style={styles.weekCompleteTitle}>Week Complete!</Text>
-            <Text style={styles.weekCompleteSubtitle}>
-              All workouts this week are done. Rest up — next week's plan is ready.
-            </Text>
-          </View>
+          <>
+            <View style={styles.weekCompleteCard}>
+              <Ionicons name="checkmark-circle" size={32} color={PRIMARY_COLOR} />
+              <Text style={styles.weekCompleteTitle}>Week Complete!</Text>
+              <Text style={styles.weekCompleteSubtitle}>
+                All workouts this week are done. Rest up — next week&apos;s plan is ready.
+              </Text>
+            </View>
+            {program.currentWeek < program.totalWeeks && (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.startNextWeekBtn,
+                  pressed && { opacity: 0.8 },
+                ]}
+                onPress={advanceToNextWeek}
+                accessibilityRole="button"
+              >
+                <Text style={styles.startNextWeekBtnText}>
+                  Start Week {program.currentWeek + 1}
+                </Text>
+              </Pressable>
+            )}
+          </>
         ) : (
           <NextWorkoutSection
             workout={nextWorkoutSummary}
@@ -631,6 +647,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: "center",
     lineHeight: 20,
+  },
+  startNextWeekBtn: {
+    marginHorizontal: 20,
+    marginTop: 12,
+    marginBottom: 4,
+    backgroundColor: PRIMARY_COLOR,
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  startNextWeekBtnText: {
+    color: WHITE,
+    fontSize: 16,
+    fontWeight: "700",
   },
 
   headerDateBlock: {
