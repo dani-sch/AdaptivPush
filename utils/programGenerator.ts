@@ -242,11 +242,19 @@ function buildSlot(
   };
 }
 
-/** Number of exercises to target per day based on total days/week. */
-function exercisesPerDay(daysPerWeek: number): number {
-  if (daysPerWeek <= 2) return 6; // midpoint of 5–7
-  if (daysPerWeek <= 4) return 5; // midpoint of 4–6
-  return 4;                        // midpoint of 4–5
+/** Number of exercises to target per day based on total days/week and optional time cap. */
+function exercisesPerDay(daysPerWeek: number, targetMinutes?: number | null, setCount?: number): number {
+  // Default uncapped counts (same as before)
+  let uncapped: number;
+  if (daysPerWeek <= 2) uncapped = 6;
+  else if (daysPerWeek <= 4) uncapped = 5;
+  else uncapped = 4;
+
+  if (!targetMinutes || !setCount) return uncapped;
+
+  // Invert estimateDuration: exerciseCount * (sets * 4.5 + 2) = targetMinutes
+  const maxFromTime = Math.max(2, Math.floor(targetMinutes / (setCount * 4.5 + 2)));
+  return Math.min(uncapped, maxFromTime);
 }
 
 /** Estimated session duration in minutes. */
@@ -317,12 +325,12 @@ export function generateProgram(
   userWeightLb: number,
   experienceLevel: TrainingExperience,
 ): GeneratedProgram {
-  const { daysPerWeek, durationWeeks, goal, focusMuscleGroups } = params;
+  const { daysPerWeek, durationWeeks, goal, focusMuscleGroups, targetSessionMinutes } = params;
   const goalParams = GOAL_PARAMS[goal];
 
   const splitTypes = SPLIT_STRUCTURE[daysPerWeek];
   const dayIndexes = DAY_INDEXES[daysPerWeek];
-  const targetExercisesPerDay = exercisesPerDay(daysPerWeek);
+  const targetExercisesPerDay = exercisesPerDay(daysPerWeek, targetSessionMinutes, goalParams.sets);
   const focusSet = new Set<MuscleGroup>(focusMuscleGroups);
 
   // ── Phase 1: pin exercise selection (done once, reused every week) ─────────
