@@ -732,21 +732,20 @@ export default function HomeScreen() {
           style={({ pressed }) => ({
             flexDirection: 'row',
             alignItems: 'center',
-            backgroundColor: pressed ? '#1a1d28' : '#121621',
-            borderRadius: 16,
-            borderWidth: 1,
-            borderColor: '#242a3b',
-            padding: 16,
+            backgroundColor: BORDER_COLOR,
+            borderRadius: 20,
+            padding: 20,
             marginTop: 14,
-            gap: 12,
+            gap: 14,
+            opacity: pressed ? 0.8 : 1,
           })}
         >
           <Text style={{ fontSize: 24 }}>🧘</Text>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: '#f4f6ff', fontSize: 15, fontWeight: '600' }}>Recovery & Mobility</Text>
-            <Text style={{ color: '#6f758a', fontSize: 13, marginTop: 2 }}>Stretches, foam rolling & active recovery</Text>
+            <Text style={{ color: WHITE, fontSize: 16, fontWeight: '600' }}>Recovery & Mobility</Text>
+            <Text style={{ color: TEXT_COLOR, fontSize: 13, marginTop: 3 }}>Stretches, foam rolling & active recovery</Text>
           </View>
-          <Text style={{ color: '#2f7cff', fontSize: 13, fontWeight: '600' }}>→</Text>
+          <Ionicons name="chevron-forward" size={18} color={TEXT_COLOR} />
         </Pressable>
       </ScrollView>
 

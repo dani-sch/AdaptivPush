@@ -763,12 +763,11 @@ const styles = StyleSheet.create({
     marginBottom: 11,
   },
   workoutCard: {
-    minHeight: 154,
     borderRadius: 22,
     borderWidth: 1,
     borderColor: '#202433',
     paddingHorizontal: 18,
-    paddingVertical: 18,
+    paddingVertical: 16,
     marginBottom: 14,
   },
   workoutHeaderRow: {
