@@ -732,25 +732,42 @@ export function useCurrentProgram() {
 
     // Advance to the next week immediately by back-dating start_date so computeWeekNumber returns currentWeek+1.
     const advanceToNextWeek = useCallback(async () => {
+        console.log('[advanceToNextWeek] Pressed. program:', program?.id, 'currentWeek:', program?.currentWeek, 'totalWeeks:', program?.totalWeeks);
         if (!program) return;
         const nextWeek = program.currentWeek + 1;
-        if (nextWeek > program.totalWeeks) return;
+        if (nextWeek > program.totalWeeks) {
+            console.log('[advanceToNextWeek] Already at last week, skipping');
+            return;
+        }
 
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        if (!user) {
+            console.log('[advanceToNextWeek] No user');
+            return;
+        }
 
-        // Set start_date so that (today - start_date) puts us at the start of nextWeek
+        // Use local date (not UTC) to match computeWeekNumber which parses as local
         const daysToSubtract = (nextWeek - 1) * 7;
         const newStart = new Date();
         newStart.setDate(newStart.getDate() - daysToSubtract);
-        const newStartISO = newStart.toISOString().split('T')[0]; // YYYY-MM-DD
+        const y = newStart.getFullYear();
+        const m = String(newStart.getMonth() + 1).padStart(2, '0');
+        const d = String(newStart.getDate()).padStart(2, '0');
+        const newStartISO = `${y}-${m}-${d}`;
+        console.log('[advanceToNextWeek] Updating start_date to', newStartISO, 'for week', nextWeek);
 
-        await supabase
+        const { error: updateErr } = await supabase
             .from('programs')
             .update({ start_date: newStartISO })
             .eq('id', program.id)
             .eq('user_id', user.id);
 
+        if (updateErr) {
+            console.error('[advanceToNextWeek] Update failed:', updateErr.message);
+            return;
+        }
+
+        console.log('[advanceToNextWeek] Success, refreshing');
         await refresh();
     }, [program, refresh]);
 
