@@ -64,6 +64,8 @@ export interface ProgramGenParams {
   durationWeeks: number;         // allowed: 4, 6, 8, 10, 12, 16
   goal: TrainingGoal;
   focusMuscleGroups: MuscleGroup[];
+  /** Desired session length in minutes. null = no cap (90+ option). */
+  targetSessionMinutes?: number | null;
 }
 
 export interface GeneratedExerciseSlot {
