@@ -332,37 +332,52 @@ export function useCurrentProgram() {
                     readinessScore:  null, // Readiness is applied as UI overlay only, not baked into progression
                 };
 
-                const result = computeProgression(ctx);
-
-                // Per-set analysis: check if individual sets hit their target
-                // A set misses if reps < repMin OR rpe > 9.0
-                const setsMissed = lastSessionSets.filter(
-                    (s) => s.reps < pde.rep_range_min || (s.rpe !== null && s.rpe > 9.0)
+                // Per-set analysis: a set "hits" if reps >= repMin AND (rpe is null OR rpe <= targetRPE + 0.5)
+                const targetRPE = pde.target_rpe ?? 8.0;
+                const setsHit = lastSessionSets.filter(
+                    (s) => s.reps >= pde.rep_range_min && (s.rpe === null || s.rpe <= targetRPE + 0.5)
                 );
-                const someMissed = setsMissed.length > 0 && lastSessionSets.length > 0;
-                const allMissed = setsMissed.length === lastSessionSets.length && lastSessionSets.length > 0;
+                const allHit = setsHit.length === lastSessionSets.length && lastSessionSets.length > 0;
+                const noneHit = setsHit.length === 0 && lastSessionSets.length > 0;
+
+                // Experience-based increment (matches progressionEngine)
+                const incrementLb: Record<string, number> = { beginner: 5.0, intermediate: 2.5, advanced: 1.25 };
+                const increment = incrementLb[experienceLevel] ?? 2.5;
 
                 let perSetWeightsLb: number[] | null = null;
+                let newUniformWeight: number;
 
-                if (someMissed && !allMissed) {
-                    // Mixed: build per-set weight array
-                    // Missed sets → hold current weight; hit sets → hold (not increase since session was inconsistent)
-                    const missedSetNumbers = new Set(setsMissed.map((s) => s.setNumber));
+                if (lastSessionSets.length === 0) {
+                    // No data — hold
+                    newUniformWeight = baselineWeight;
+                } else if (allHit) {
+                    // All sets met targets → progress uniformly
+                    newUniformWeight = Math.max(0, Math.round((baselineWeight + increment) / 2.5) * 2.5);
+                } else if (noneHit) {
+                    // All sets missed → uniform decrease 5%
+                    newUniformWeight = Math.max(0, Math.round((baselineWeight * 0.95) / 2.5) * 2.5);
+                } else {
+                    // Mixed: hit sets hold, missed sets decrease 5%
+                    const hitSetNumbers = new Set(setsHit.map((s) => s.setNumber));
                     perSetWeightsLb = Array.from({ length: pde.set_count }, (_, i) => {
                         const setNum = i + 1;
                         const logged = lastSessionSets.find((s) => s.setNumber === setNum);
                         const currentSetWeight = logged?.weightLb ?? baselineWeight;
-                        const missed = missedSetNumbers.has(setNum);
-                        const adjusted = missed
-                            ? Math.max(0, Math.round((currentSetWeight * 0.95) / 2.5) * 2.5)
-                            : Math.round(currentSetWeight / 2.5) * 2.5;
-                        return adjusted;
+                        const hit = hitSetNumbers.has(setNum);
+                        return hit
+                            ? Math.round(currentSetWeight / 2.5) * 2.5           // hold
+                            : Math.max(0, Math.round((currentSetWeight * 0.95) / 2.5) * 2.5); // decrease
                     });
+                    // Uniform weight stays at baseline (per-set array overrides display)
+                    newUniformWeight = baselineWeight;
                 }
 
+                // Still run computeProgression for RPE adjustment
+                const result = computeProgression(ctx);
+
                 const dbUpdate: Record<string, unknown> = {
-                    suggested_weight_lb: result.suggestedWeightLb,
-                    per_set_weights_lb: perSetWeightsLb, // null clears per-set on uniform sessions
+                    suggested_weight_lb: Math.round(newUniformWeight / 2.5) * 2.5,
+                    per_set_weights_lb: perSetWeightsLb,
                     updated_at: new Date().toISOString(),
                 };
                 if (result.suggestedRPE !== null) {
