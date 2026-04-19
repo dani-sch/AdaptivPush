@@ -13,6 +13,7 @@ type DbProgram = {
     goal: string | null;
     duration_weeks: number;
     start_date: string | null; // YYYY-MM-DD
+    swap_interval_weeks?: number | null;
 };
 
 type DbProgramDay = {
@@ -30,6 +31,7 @@ type DbProgramDay = {
         rep_range_max: number;
         target_rpe: number | null;
         suggested_weight_lb: number | null;
+        per_set_weights_lb: number[] | null;
         notes: string | null;
         exercises: {
             id: string;
@@ -101,7 +103,7 @@ export function useCurrentProgram() {
             // Get active program
             const { data: prog, error: progErr } = await supabase
                 .from('programs')
-                .select('id,name,goal,duration_weeks,start_date')
+                .select('id,name,goal,duration_weeks,start_date,swap_interval_weeks')
                 .eq('user_id', user.id)
                 .eq('is_active', true)
                 .order('created_at', { ascending: false })
@@ -135,6 +137,7 @@ export function useCurrentProgram() {
             rep_range_max,
             target_rpe,
             suggested_weight_lb,
+            per_set_weights_lb,
             notes,
             exercises (
               id,
@@ -182,6 +185,7 @@ export function useCurrentProgram() {
                                 sets: pde.set_count,
                                 reps: `${pde.rep_range_min}-${pde.rep_range_max}`,
                                 weight: pde.suggested_weight_lb ?? undefined,
+                                perSetWeights: pde.per_set_weights_lb ?? undefined,
                                 targetRpe: pde.target_rpe ?? undefined,
                                 muscleGroup: (ex?.primary_muscle as any) ?? undefined,
                                 equipment: (ex?.equipment as any) ?? undefined,
@@ -215,6 +219,7 @@ export function useCurrentProgram() {
                 currentWeek,
                 totalWeeks: prog.duration_weeks,
                 daysPerWeek,
+                swapIntervalWeeks: prog.swap_interval_weeks ?? 4,
                 workouts,
             };
 
@@ -263,6 +268,7 @@ export function useCurrentProgram() {
                 set_count,
                 rep_range_min,
                 rep_range_max,
+                target_rpe,
                 suggested_weight_lb,
                 exercises ( name )
               )
@@ -279,14 +285,27 @@ export function useCurrentProgram() {
             for (const pde of pdes) {
                 const exerciseName: string = (pde.exercises as any)?.name ?? '';
 
-                // Fetch most recent logged sets for this exercise (scoped to this user)
-                const { data: recentSets } = await supabase
+                // Fetch most recent logged sets for this exercise (scoped to this user).
+                // First find the most recent session_id, then get all sets from that session.
+                const { data: latestSession } = await supabase
                     .from('workout_exercise_sets')
-                    .select('set_number, weight_lb, reps, rpe, workout_sessions!inner(user_id)')
+                    .select('session_id, workout_sessions!inner(user_id)')
                     .eq('exercise_id', pde.exercise_id)
                     .eq('workout_sessions.user_id', userId)
                     .order('created_at', { ascending: false })
-                    .limit(pde.set_count);
+                    .limit(1);
+
+                const latestSessionId = (latestSession?.[0] as any)?.session_id;
+
+                const recentSets = latestSessionId
+                    ? (await supabase
+                        .from('workout_exercise_sets')
+                        .select('set_number, weight_lb, reps, rpe')
+                        .eq('exercise_id', pde.exercise_id)
+                        .eq('session_id', latestSessionId)
+                        .order('set_number', { ascending: true })
+                    ).data
+                    : null;
 
                 const lastSessionSets: LoggedSet[] = (recentSets ?? [])
                     .filter((s: any) => s.weight_lb !== null && s.reps !== null)
@@ -315,10 +334,52 @@ export function useCurrentProgram() {
                     readinessScore:  null, // Readiness is applied as UI overlay only, not baked into progression
                 };
 
+                // Per-set analysis: a set "hits" if reps >= repMin AND (rpe is null OR rpe <= targetRPE + 0.5)
+                const targetRPE = pde.target_rpe ?? 8.0;
+                const setsHit = lastSessionSets.filter(
+                    (s) => s.reps >= pde.rep_range_min && (s.rpe === null || s.rpe <= targetRPE + 0.5)
+                );
+                const allHit = setsHit.length === lastSessionSets.length && lastSessionSets.length > 0;
+                const noneHit = setsHit.length === 0 && lastSessionSets.length > 0;
+
+                // Experience-based increment (matches progressionEngine)
+                const incrementLb: Record<string, number> = { beginner: 5.0, intermediate: 2.5, advanced: 1.25 };
+                const increment = incrementLb[experienceLevel] ?? 2.5;
+
+                let perSetWeightsLb: number[] | null = null;
+                let newUniformWeight: number;
+
+                if (lastSessionSets.length === 0) {
+                    // No data — hold
+                    newUniformWeight = baselineWeight;
+                } else if (allHit) {
+                    // All sets met targets → progress uniformly
+                    newUniformWeight = Math.max(0, Math.round((baselineWeight + increment) / 2.5) * 2.5);
+                } else if (noneHit) {
+                    // All sets missed → uniform decrease 5%
+                    newUniformWeight = Math.max(0, Math.round((baselineWeight * 0.95) / 2.5) * 2.5);
+                } else {
+                    // Mixed: hit sets hold, missed sets decrease 5%
+                    const hitSetNumbers = new Set(setsHit.map((s) => s.setNumber));
+                    perSetWeightsLb = Array.from({ length: pde.set_count }, (_, i) => {
+                        const setNum = i + 1;
+                        const logged = lastSessionSets.find((s) => s.setNumber === setNum);
+                        const currentSetWeight = logged?.weightLb ?? baselineWeight;
+                        const hit = hitSetNumbers.has(setNum);
+                        return hit
+                            ? Math.round(currentSetWeight / 2.5) * 2.5           // hold
+                            : Math.max(0, Math.round((currentSetWeight * 0.95) / 2.5) * 2.5); // decrease
+                    });
+                    // Uniform weight stays at baseline (per-set array overrides display)
+                    newUniformWeight = baselineWeight;
+                }
+
+                // Still run computeProgression for RPE adjustment
                 const result = computeProgression(ctx);
 
                 const dbUpdate: Record<string, unknown> = {
-                    suggested_weight_lb: result.suggestedWeightLb,
+                    suggested_weight_lb: Math.round(newUniformWeight / 2.5) * 2.5,
+                    per_set_weights_lb: perSetWeightsLb,
                     updated_at: new Date().toISOString(),
                 };
                 if (result.suggestedRPE !== null) {
@@ -671,25 +732,42 @@ export function useCurrentProgram() {
 
     // Advance to the next week immediately by back-dating start_date so computeWeekNumber returns currentWeek+1.
     const advanceToNextWeek = useCallback(async () => {
+        console.log('[advanceToNextWeek] Pressed. program:', program?.id, 'currentWeek:', program?.currentWeek, 'totalWeeks:', program?.totalWeeks);
         if (!program) return;
         const nextWeek = program.currentWeek + 1;
-        if (nextWeek > program.totalWeeks) return;
+        if (nextWeek > program.totalWeeks) {
+            console.log('[advanceToNextWeek] Already at last week, skipping');
+            return;
+        }
 
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        if (!user) {
+            console.log('[advanceToNextWeek] No user');
+            return;
+        }
 
-        // Set start_date so that (today - start_date) puts us at the start of nextWeek
+        // Use local date (not UTC) to match computeWeekNumber which parses as local
         const daysToSubtract = (nextWeek - 1) * 7;
         const newStart = new Date();
         newStart.setDate(newStart.getDate() - daysToSubtract);
-        const newStartISO = newStart.toISOString().split('T')[0]; // YYYY-MM-DD
+        const y = newStart.getFullYear();
+        const m = String(newStart.getMonth() + 1).padStart(2, '0');
+        const d = String(newStart.getDate()).padStart(2, '0');
+        const newStartISO = `${y}-${m}-${d}`;
+        console.log('[advanceToNextWeek] Updating start_date to', newStartISO, 'for week', nextWeek);
 
-        await supabase
+        const { error: updateErr } = await supabase
             .from('programs')
             .update({ start_date: newStartISO })
             .eq('id', program.id)
             .eq('user_id', user.id);
 
+        if (updateErr) {
+            console.error('[advanceToNextWeek] Update failed:', updateErr.message);
+            return;
+        }
+
+        console.log('[advanceToNextWeek] Success, refreshing');
         await refresh();
     }, [program, refresh]);
 

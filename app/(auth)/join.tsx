@@ -35,9 +35,36 @@ export default function JoinScreen() {
         }
     };
 
+    const passwordCriteria = {
+        length: password.length >= 8,
+        uppercase: /[A-Z]/.test(password),
+        number: /[0-9]/.test(password),
+        special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password),
+    };
+
+    const criteriaMetCount = Object.values(passwordCriteria).filter(Boolean).length;
+
+    const passwordStrength: { label: string; color: string } | null =
+        password.length === 0
+            ? null
+            : criteriaMetCount <= 1
+              ? { label: "Weak", color: "#ef4444" }
+              : criteriaMetCount === 2
+                ? { label: "Fair", color: "#f97316" }
+                : criteriaMetCount === 3
+                  ? { label: "Strong", color: "#84cc16" }
+                  : { label: "Excellent", color: "#22c55e" };
+
     const validatePassword = (value: string) => {
-        if (value && value.length < 8) {
-            setPasswordError('Password must be at least 8 characters');
+        if (!value) { setPasswordError(''); return; }
+        const criteria = {
+            length: value.length >= 8,
+            uppercase: /[A-Z]/.test(value),
+            number: /[0-9]/.test(value),
+            special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(value),
+        };
+        if (!criteria.length || !criteria.uppercase || !criteria.number || !criteria.special) {
+            setPasswordError('Password must have 8+ chars, uppercase, number, and special character');
         } else {
             setPasswordError('');
         }
@@ -86,7 +113,7 @@ export default function JoinScreen() {
     };
 
 
-    const disabled = !email || !password || !fullName || !!emailError || !!passwordError;
+    const disabled = !email || !password || !fullName || !!emailError || !!passwordError || criteriaMetCount < 4;
 
     useEffect(() => {
         const showSub = Keyboard.addListener("keyboardWillShow", (e) => {
@@ -177,7 +204,49 @@ export default function JoinScreen() {
                             textContentType="newPassword"
                             autoComplete={"password-new"}
                         />
-                        {!!passwordError && <Text style={styles.errorText}>{passwordError}</Text>}
+
+                        {/* Strength meter */}
+                        {password.length > 0 && (
+                            <View style={styles.strengthContainer}>
+                                <View style={styles.strengthBarRow}>
+                                    {[0, 1, 2, 3].map((i) => (
+                                        <View
+                                            key={i}
+                                            style={[
+                                                styles.strengthSegment,
+                                                i < criteriaMetCount
+                                                    ? { backgroundColor: passwordStrength?.color }
+                                                    : styles.strengthSegmentEmpty,
+                                            ]}
+                                        />
+                                    ))}
+                                </View>
+                                {passwordStrength && (
+                                    <Text style={[styles.strengthLabel, { color: passwordStrength.color }]}>
+                                        {passwordStrength.label}
+                                    </Text>
+                                )}
+                            </View>
+                        )}
+
+                        {/* Criteria checklist */}
+                        {password.length > 0 && (
+                            <View style={styles.criteriaList}>
+                                {[
+                                    { met: passwordCriteria.length, text: "At least 8 characters" },
+                                    { met: passwordCriteria.uppercase, text: "One uppercase letter" },
+                                    { met: passwordCriteria.number, text: "One number" },
+                                    { met: passwordCriteria.special, text: "One special character" },
+                                ].map(({ met, text }) => (
+                                    <Text
+                                        key={text}
+                                        style={[styles.criteriaItem, met ? styles.criteriaMet : styles.criteriaUnmet]}
+                                    >
+                                        {met ? "✓" : "✗"} {text}
+                                    </Text>
+                                ))}
+                            </View>
+                        )}
 
                         {/* Primary Button */}
                         <Pressable
@@ -249,6 +318,19 @@ const styles = StyleSheet.create({
     },
     inputError: { borderColor: ERROR_COLOR },
     errorText: { color: ERROR_COLOR_LIGHT, marginTop: 8 },
+    strengthContainer: { marginTop: 8, gap: 6 },
+    strengthBarRow: { flexDirection: "row", gap: 4 },
+    strengthSegment: {
+        flex: 1,
+        height: 4,
+        borderRadius: 2,
+    },
+    strengthSegmentEmpty: { backgroundColor: "#374151" },
+    strengthLabel: { fontSize: 12, fontWeight: "600" },
+    criteriaList: { marginTop: 6, gap: 2 },
+    criteriaItem: { fontSize: 12 },
+    criteriaMet: { color: "#22c55e" },
+    criteriaUnmet: { color: "#6b7280" },
     primaryButton: {
         marginTop: 20,
         backgroundColor: PRIMARY_COLOR,

@@ -1,4 +1,5 @@
 import { ExerciseHistoryModal } from '@/components/ExerciseHistoryModal';
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   CalendarDays,
@@ -264,20 +265,27 @@ interface SummaryMetricCardProps {
   icon: ReactNode;
   value: string;
   label: string;
+  onPress?: () => void;
 }
 
-const SummaryMetricCard = ({ icon, value, label }: SummaryMetricCardProps) => (
-  <LinearGradient
-    colors={['#181b26', '#12141b']}
-    start={{ x: 0, y: 0 }}
-    end={{ x: 1, y: 1 }}
-    style={styles.summaryCard}
-  >
-    {icon}
-    <Text style={styles.summaryValue}>{value}</Text>
-    <Text style={styles.summaryLabel}>{label}</Text>
-  </LinearGradient>
-);
+const SummaryMetricCard = ({ icon, value, label, onPress }: SummaryMetricCardProps) => {
+  const content = (
+    <LinearGradient
+      colors={['#181b26', '#12141b']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={[styles.summaryCard, onPress && { width: '100%' }]}
+    >
+      {icon}
+      <Text style={styles.summaryValue}>{value}</Text>
+      <Text style={styles.summaryLabel}>{label}</Text>
+    </LinearGradient>
+  );
+  if (onPress) {
+    return <Pressable onPress={onPress} style={{ width: '48.6%' }}>{content}</Pressable>;
+  }
+  return content;
+};
 
 export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
@@ -293,6 +301,14 @@ export default function HistoryScreen() {
   // Exercise history modal state (drill-down from detail sheet)
   const [historyExerciseId, setHistoryExerciseId] = useState<string | null>(null);
   const [historyExerciseName, setHistoryExerciseName] = useState<string | null>(null);
+
+  // PR count from personal_records table
+  const [prCount, setPrCount] = useState(0);
+
+  // PR history modal state
+  const [showPrModal, setShowPrModal] = useState(false);
+  const [prRecords, setPrRecords] = useState<{ exerciseName: string; weightLb: number; reps: number; achievedAt: string }[]>([]);
+  const [prLoading, setPrLoading] = useState(false);
 
   const handleOpenDetail = async (workout: WorkoutEntry) => {
     setDetailWorkout(workout);
@@ -318,6 +334,63 @@ export default function HistoryScreen() {
     setHistoryExerciseName(null);
   };
 
+  const handleOpenPrHistory = async () => {
+    setShowPrModal(true);
+    setPrLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setPrLoading(false); return; }
+
+      // Fetch all PR rows for this user
+      const { data: prRows, error: prErr } = await supabase
+        .from('personal_records')
+        .select('exercise_id, weight_lb, reps, achieved_at')
+        .eq('user_id', user.id)
+        .order('achieved_at', { ascending: false });
+
+      if (prErr) {
+        console.warn('PR fetch error:', prErr.message);
+        setPrLoading(false);
+        return;
+      }
+
+      if (!prRows || prRows.length === 0) {
+        setPrRecords([]);
+        setPrLoading(false);
+        return;
+      }
+
+      // Get unique exercise IDs and fetch names
+      const exIds = [...new Set(prRows.map((r: any) => r.exercise_id))];
+      const { data: exRows } = await supabase
+        .from('exercises')
+        .select('id, name')
+        .in('id', exIds);
+
+      const nameMap = new Map<string, string>();
+      for (const ex of (exRows ?? []) as any[]) {
+        nameMap.set(ex.id, ex.name);
+      }
+
+      // Group by exercise, keep best per exercise
+      const bestMap = new Map<string, { exerciseName: string; weightLb: number; reps: number; achievedAt: string }>();
+      for (const row of prRows as any[]) {
+        const name = nameMap.get(row.exercise_id) ?? 'Unknown';
+        const w = Number(row.weight_lb) || 0;
+        const r = Number(row.reps) || 0;
+        const existing = bestMap.get(row.exercise_id);
+        if (!existing || w > existing.weightLb || (w === existing.weightLb && r > existing.reps)) {
+          bestMap.set(row.exercise_id, { exerciseName: name, weightLb: w, reps: r, achievedAt: row.achieved_at });
+        }
+      }
+      setPrRecords(Array.from(bestMap.values()).sort((a, b) => a.exerciseName.localeCompare(b.exerciseName)));
+    } catch (err) {
+      console.warn('PR history fetch failed:', err);
+    } finally {
+      setPrLoading(false);
+    }
+  };
+
   useFocusEffect(
     useCallback(() => {
       fetchWorkoutHistory();
@@ -339,6 +412,13 @@ export default function HistoryScreen() {
         setWorkouts([]);
         return;
       }
+
+      // Fetch PR count directly from personal_records table
+      const { count: prTotal } = await supabase
+        .from('personal_records')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+      setPrCount(prTotal ?? 0);
 
       const sessionsResult = await fetchRowsFromTable('workout_sessions', user.id);
       const sessionsMissing = isMissingTableError(sessionsResult.error, 'workout_sessions');
@@ -393,7 +473,6 @@ export default function HistoryScreen() {
     const totalWorkouts = workouts.length;
     const totalMinutes = workouts.reduce((total, workout) => total + workout.durationMin, 0);
     const totalVolumeLb = workouts.reduce((total, workout) => total + workout.totalVolumeLb, 0);
-    const personalRecords = workouts.reduce((total, workout) => total + workout.personalRecords, 0);
 
     const avgDuration = totalWorkouts > 0 ? Math.round(totalMinutes / totalWorkouts) : 0;
 
@@ -401,9 +480,9 @@ export default function HistoryScreen() {
       totalWorkouts,
       avgDuration,
       totalVolumeLb,
-      personalRecords,
+      personalRecords: prCount,
     };
-  }, [workouts]);
+  }, [workouts, prCount]);
 
   const monthSections = useMemo<MonthSection[]>(() => {
     const grouped = new Map<string, WorkoutEntry[]>();
@@ -452,7 +531,8 @@ export default function HistoryScreen() {
           <SummaryMetricCard
             icon={<Medal color="#ffc200" size={24} />}
             value={`${summary.personalRecords}`}
-            label="Personal Records"
+            label="PRs"
+            onPress={handleOpenPrHistory}
           />
         </View>
 
@@ -613,6 +693,52 @@ export default function HistoryScreen() {
           </View>
         )}
       </Modal>
+
+      {/* PR History Modal */}
+      <Modal visible={showPrModal} transparent animationType="slide">
+        <Pressable style={styles.sheetBackdrop} onPress={() => setShowPrModal(false)}>
+          <Pressable style={[styles.sheet, { height: '70%' }]} onPress={() => {}}>
+            <View style={styles.sheetHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sheetTitle}>Personal Records</Text>
+                <Text style={styles.sheetSubtitle}>All-time bests per exercise</Text>
+              </View>
+              <Pressable style={styles.sheetCloseBtn} onPress={() => setShowPrModal(false)}>
+                <Ionicons name="close" size={18} color="#6f7485" />
+              </Pressable>
+            </View>
+            <ScrollView contentContainerStyle={styles.sheetContent}>
+              {prLoading ? (
+                <View style={styles.sheetStateWrap}>
+                  <ActivityIndicator size="large" color="#2f7cff" />
+                </View>
+              ) : prRecords.length === 0 ? (
+                <View style={styles.sheetStateWrap}>
+                  <Medal color="#6f7485" size={28} />
+                  <Text style={styles.sheetStateText}>No personal records yet.{'\n'}Complete a workout to start tracking!</Text>
+                </View>
+              ) : (
+                prRecords.map((pr) => (
+                  <View key={pr.exerciseName} style={styles.exerciseRow}>
+                    <View style={styles.exerciseRowHeader}>
+                      <Text style={styles.exerciseName}>{pr.exerciseName}</Text>
+                      <Medal color="#ffc200" size={18} />
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ color: '#f4f6ff', fontSize: 16, fontWeight: '600' }}>
+                        {pr.weightLb} lbs × {pr.reps} reps
+                      </Text>
+                      <Text style={{ color: '#6f7485', fontSize: 13 }}>
+                        {new Date(pr.achievedAt).toLocaleDateString()}
+                      </Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -669,12 +795,11 @@ const styles = StyleSheet.create({
     marginBottom: 11,
   },
   workoutCard: {
-    minHeight: 154,
     borderRadius: 22,
     borderWidth: 1,
     borderColor: '#202433',
     paddingHorizontal: 18,
-    paddingVertical: 18,
+    paddingVertical: 16,
     marginBottom: 14,
   },
   workoutHeaderRow: {

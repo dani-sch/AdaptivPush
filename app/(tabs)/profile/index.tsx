@@ -375,10 +375,16 @@ export default function ProfileScreen() {
         }
       }
 
+      // Fetch PR count from personal_records table
+      const { count: prTotal } = await supabase
+        .from('personal_records')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+
       setProgress({
         workouts: rows.length,
         weekStreak: computeWeekStreak(rows),
-        prs: rows.reduce((total, row) => total + parsePrCount(row), 0),
+        prs: prTotal ?? 0,
       });
       setError(nextError);
     } catch (fetchError) {

@@ -27,6 +27,8 @@ export type WorkoutExercise = {
     sets?: number;
     reps?: string;
     weight?: number;
+    /** Per-set weight overrides (lb). When present, set i uses perSetWeights[i] instead of weight. */
+    perSetWeights?: number[];
     targetRpe?: number | null;
 
     muscleGroup?: MuscleGroup;
@@ -49,6 +51,7 @@ export type CurrentProgram = {
     currentWeek: number;
     totalWeeks: number;
     daysPerWeek: number;
+    swapIntervalWeeks?: number;
     workouts: ProgramWorkout[];
 };
 
@@ -64,6 +67,10 @@ export interface ProgramGenParams {
   durationWeeks: number;         // allowed: 4, 6, 8, 10, 12, 16
   goal: TrainingGoal;
   focusMuscleGroups: MuscleGroup[];
+  /** Desired session length in minutes. null = no cap (90+ option). */
+  targetSessionMinutes?: number | null;
+  /** How often (in weeks) to prompt accessory swaps. Default 4. */
+  swapIntervalWeeks?: number;
 }
 
 export interface GeneratedExerciseSlot {

@@ -26,6 +26,7 @@ export async function saveProgramToDb(
       days_per_week:  generated.daysPerWeek,
       start_date:     todayISO,
       is_active:      true,
+      swap_interval_weeks: params.swapIntervalWeeks ?? 4,
     })
     .select('id')
     .single();

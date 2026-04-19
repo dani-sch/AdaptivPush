@@ -22,6 +22,8 @@ type Props = {
     exerciseId: string;
     context: 'program' | 'workout';
     onClose: () => void;
+    /** When true, skip the backdrop/sheet wrapper — parent handles layout. */
+    embedded?: boolean;
 
     // This is how we actually "do the swap"
     onSwap: (args: {
@@ -31,7 +33,7 @@ type Props = {
     }) => void;
 };
 
-export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwap }: Props) {
+export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwap, embedded }: Props) {
     const [searchQuery, setSearchQuery] = useState('');
     const [applyToProgram, setApplyToProgram] = useState(false);
     const [selectedExercise, setSelectedExercise] = useState<WorkoutExercise | null>(null);
@@ -127,103 +129,113 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
 
     if (!currentExercise) return null;
 
+    const content = (
+        <>
+            {/* Header */}
+            <View style={styles.header}>
+                <View style={{ flex: 1 }}>
+                    <Text style={styles.headerTitle}>Swap Exercise</Text>
+                    <Text style={styles.headerSubtitle}>Replace {currentExercise.name}</Text>
+                </View>
+
+                <Pressable style={styles.iconBtn} onPress={onClose} accessibilityRole="button">
+                    <X color={WHITE} size={18} />
+                </Pressable>
+            </View>
+
+            {/* Search */}
+            <View style={styles.searchWrap}>
+                <View style={styles.searchBar}>
+                    <Search color={PLACEHOLDER_TEXT} size={18} />
+                    <TextInput
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        placeholder="Search exercises..."
+                        placeholderTextColor={PLACEHOLDER_TEXT}
+                        style={styles.searchInput}
+                        autoCorrect={false}
+                        autoCapitalize="none"
+                    />
+                </View>
+            </View>
+
+            {/* List */}
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+                <Text style={styles.sectionLabel}>{(resolvedMuscleGroup ?? 'General').toUpperCase()} EXERCISES</Text>
+                {loadingExercises ? (
+                    <ActivityIndicator color={PRIMARY_COLOR} style={{ marginTop: 20 }} />
+                ) : filteredAlternatives.length === 0 ? (
+                    <View style={styles.emptyWrap}>
+                        <Text style={styles.emptyText}>No exercises found</Text>
+                    </View>
+                ) : (
+                    filteredAlternatives.map(ex => {
+                        const isSelected = selectedExercise?.id === ex.id;
+                        return (
+                            <Pressable
+                                key={ex.id}
+                                onPress={() => setSelectedExercise(prev => prev?.id === ex.id ? null : ex)}
+                                style={({ pressed }) => [styles.exerciseRow, isSelected && styles.exerciseRowSelected, pressed && { opacity: 0.92 }]}
+                            >
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.exerciseName}>{ex.name}</Text>
+                                    <Text style={styles.exerciseMeta}>{ex.equipment}</Text>
+                                    <View style={styles.exerciseStatsRow}>
+                                        <Text style={styles.statText}>{ex.sets} sets</Text>
+                                        <Text style={styles.statText}>{ex.reps} reps</Text>
+                                    </View>
+                                </View>
+                                {isSelected && (
+                                    <View style={styles.checkCircle}>
+                                        <Check color={WHITE} size={14} />
+                                    </View>
+                                )}
+                            </Pressable>
+                        );
+                    })
+                )}
+            </ScrollView>
+
+            {/* Footer */}
+            <View style={styles.footer}>
+                {context === 'workout' && (
+                    <View style={styles.switchRow}>
+                        <Text style={styles.switchText}>Apply to program going forward</Text>
+                        <Switch
+                            value={applyToProgram}
+                            onValueChange={setApplyToProgram}
+                            trackColor={{ false: MUTED_BG, true: PRIMARY_COLOR }}
+                            thumbColor={WHITE}
+                        />
+                    </View>
+                )}
+
+                <Pressable
+                    onPress={handleSwap}
+                    disabled={!selectedExercise}
+                    style={({ pressed }) => [
+                        styles.swapBtn,
+                        !selectedExercise && styles.swapBtnDisabled,
+                        pressed && selectedExercise && { opacity: 0.92 },
+                    ]}
+                >
+                    <Text style={styles.swapBtnText}>Swap Exercise</Text>
+                </Pressable>
+            </View>
+        </>
+    );
+
+    if (embedded) {
+        return <View style={styles.embeddedContainer}>{content}</View>;
+    }
+
     return (
         <View style={styles.backdrop}>
             {/* tap outside */}
             <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
 
             <View style={styles.sheet}>
-                {/* Header */}
-                <View style={styles.header}>
-                    <View style={{ flex: 1 }}>
-                        <Text style={styles.headerTitle}>Swap Exercise</Text>
-                        <Text style={styles.headerSubtitle}>Replace {currentExercise.name}</Text>
-                    </View>
-
-                    <Pressable style={styles.iconBtn} onPress={onClose} accessibilityRole="button">
-                        <X color={WHITE} size={18} />
-                    </Pressable>
-                </View>
-
-                {/* Search */}
-                <View style={styles.searchWrap}>
-                    <View style={styles.searchBar}>
-                        <Search color={PLACEHOLDER_TEXT} size={18} />
-                        <TextInput
-                            value={searchQuery}
-                            onChangeText={setSearchQuery}
-                            placeholder="Search exercises..."
-                            placeholderTextColor={PLACEHOLDER_TEXT}
-                            style={styles.searchInput}
-                            autoCorrect={false}
-                            autoCapitalize="none"
-                        />
-                    </View>
-                </View>
-
-                {/* List */}
-                <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
-                    <Text style={styles.sectionLabel}>{(resolvedMuscleGroup ?? 'General').toUpperCase()} EXERCISES</Text>
-                    {loadingExercises ? (
-                        <ActivityIndicator color={PRIMARY_COLOR} style={{ marginTop: 20 }} />
-                    ) : filteredAlternatives.length === 0 ? (
-                        <View style={styles.emptyWrap}>
-                            <Text style={styles.emptyText}>No exercises found</Text>
-                        </View>
-                    ) : (
-                        filteredAlternatives.map(ex => {
-                            const isSelected = selectedExercise?.id === ex.id;
-                            return (
-                                <Pressable
-                                    key={ex.id}
-                                    onPress={() => setSelectedExercise(ex)}
-                                    style={({ pressed }) => [styles.exerciseRow, isSelected && styles.exerciseRowSelected, pressed && { opacity: 0.92 }]}
-                                >
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={styles.exerciseName}>{ex.name}</Text>
-                                        <Text style={styles.exerciseMeta}>{ex.equipment}</Text>
-                                        <View style={styles.exerciseStatsRow}>
-                                            <Text style={styles.statText}>{ex.sets} sets</Text>
-                                            <Text style={styles.statText}>{ex.reps} reps</Text>
-                                        </View>
-                                    </View>
-                                    {isSelected && (
-                                        <View style={styles.checkCircle}>
-                                            <Check color={WHITE} size={14} />
-                                        </View>
-                                    )}
-                                </Pressable>
-                            );
-                        })
-                    )}
-                </ScrollView>
-
-                {/* Footer */}
-                <View style={styles.footer}>
-                    {context === 'workout' && (
-                        <View style={styles.switchRow}>
-                            <Text style={styles.switchText}>Apply to program going forward</Text>
-                            <Switch
-                                value={applyToProgram}
-                                onValueChange={setApplyToProgram}
-                                trackColor={{ false: MUTED_BG, true: PRIMARY_COLOR }}
-                                thumbColor={WHITE}
-                            />
-                        </View>
-                    )}
-
-                    <Pressable
-                        onPress={handleSwap}
-                        disabled={!selectedExercise}
-                        style={({ pressed }) => [
-                            styles.swapBtn,
-                            !selectedExercise && styles.swapBtnDisabled,
-                            pressed && selectedExercise && { opacity: 0.92 },
-                        ]}
-                    >
-                        <Text style={styles.swapBtnText}>Swap Exercise</Text>
-                    </Pressable>
-                </View>
+                {content}
             </View>
         </View>
     );
@@ -234,6 +246,10 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.82)',
         justifyContent: 'flex-end',
+    },
+    embeddedContainer: {
+        flex: 1,
+        backgroundColor: SURFACE_BG,
     },
     sheet: {
         backgroundColor: SURFACE_BG,

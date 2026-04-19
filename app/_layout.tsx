@@ -40,6 +40,12 @@ export default function RootLayout() {
         <Stack.Screen name="workout-history" options={{ headerShown: false }} />
         <Stack.Screen name="next-workout" options={{ headerShown: false }} />
         <Stack.Screen name="create-program" options={{ headerShown: false }} />
+        <Stack.Screen name="faq" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="recovery-library"
+          options={{ headerShown: false }}
+        />
+
         <Stack.Screen
           name="program-overview"
           options={{ headerShown: false }}

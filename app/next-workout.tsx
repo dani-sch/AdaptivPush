@@ -42,10 +42,13 @@ function buildExercises(workout: ProgramWorkout, readinessScore: number | null):
     const baseWeight = ex.weight != null ? ex.weight : 0;
 
     // Apply readiness modifier to the displayed weight (UI overlay only — not persisted)
-    const adjustedWeight = modifier
-      ? Math.max(0, Math.round((baseWeight * modifier.weightMultiplier) / 2.5) * 2.5)
-      : baseWeight;
-    const weightStr = adjustedWeight > 0 ? String(adjustedWeight) : "";
+    const weightForSet = (setIndex: number): string => {
+      const raw = ex.perSetWeights?.[setIndex] ?? baseWeight;
+      const adjusted = modifier
+        ? Math.max(0, Math.round((raw * modifier.weightMultiplier) / 2.5) * 2.5)
+        : raw;
+      return adjusted > 0 ? String(adjusted) : "";
+    };
 
     // Apply readiness RPE delta
     const baseRpe = ex.targetRpe != null ? ex.targetRpe : null;
@@ -56,7 +59,7 @@ function buildExercises(workout: ProgramWorkout, readinessScore: number | null):
 
     const sets: WorkoutSet[] = Array.from({ length: setCount }, (_, i) => ({
       id: `${ex.id}-${i + 1}`,
-      weight: weightStr,
+      weight: weightForSet(i),
       reps: "",
       rpe: rpeStr,
       logged: false,
@@ -170,6 +173,8 @@ export default function NextWorkoutScreen() {
   const [saving, setSaving] = useState(false);
   const [swapTargetId, setSwapTargetId] = useState<string | null>(null);
   const [readinessScore, setReadinessScore] = useState<number | null>(null);
+  const [prExercises, setPrExercises] = useState<string[]>([]); // exercise names with new PRs
+  const [showPrModal, setShowPrModal] = useState(false);
   const [historyExerciseId, setHistoryExerciseId] = useState<string | null>(
     null,
   );
@@ -178,18 +183,18 @@ export default function NextWorkoutScreen() {
   );
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Fetch latest readiness score once on mount
+  // Fetch today's readiness score once on mount (today-only — no bleed from previous days)
   useEffect(() => {
     (async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
+        const today = new Date().toISOString().split("T")[0];
         const { data } = await supabase
           .from("readiness_logs")
           .select("readiness_score")
           .eq("user_id", user.id)
-          .order("log_date", { ascending: false })
-          .limit(1)
+          .eq("log_date", today)
           .maybeSingle();
         if (data?.readiness_score != null) {
           setReadinessScore(Number(data.readiness_score));
@@ -347,6 +352,64 @@ export default function NextWorkoutScreen() {
         }
       }
 
+      // ── PR Detection ──────────────────────────────────────────────────────
+      // For each exercise, find the best weight×reps set just saved and compare
+      // against the user's all-time best for that exercise.
+      const newPrNames: string[] = [];
+      try {
+        for (const ex of exercises) {
+          if (!ex.exerciseId) continue;
+          const loggedSets = ex.sets.filter((s) => s.logged && parseInt(s.reps) > 0);
+          if (loggedSets.length === 0) continue;
+
+          // Best set from this workout (highest weight, tiebreak by reps)
+          let bestWeight = 0;
+          let bestReps = 0;
+          for (const s of loggedSets) {
+            const w = parseFloat(s.weight) || 0;
+            const r = parseInt(s.reps) || 0;
+            if (w > bestWeight || (w === bestWeight && r > bestReps)) {
+              bestWeight = w;
+              bestReps = r;
+            }
+          }
+          if (bestWeight <= 0) continue;
+
+          // Check previous best from personal_records
+          const { data: prevBest } = await supabase
+            .from("personal_records")
+            .select("weight_lb, reps")
+            .eq("user_id", user.id)
+            .eq("exercise_id", ex.exerciseId)
+            .order("weight_lb", { ascending: false })
+            .order("reps", { ascending: false })
+            .limit(1);
+
+          const prev = prevBest?.[0];
+          const isNewPr =
+            !prev ||
+            bestWeight > (prev.weight_lb ?? 0) ||
+            (bestWeight === (prev.weight_lb ?? 0) && bestReps > (prev.reps ?? 0));
+
+          if (isNewPr) {
+            const { error: prInsertErr } = await supabase.from("personal_records").insert({
+              user_id: user.id,
+              exercise_id: ex.exerciseId,
+              weight_lb: bestWeight,
+              reps: bestReps,
+              achieved_at: new Date().toISOString(),
+            });
+            if (prInsertErr) {
+              console.warn(`[PR] Insert failed for ${ex.name}:`, prInsertErr.message);
+            } else {
+              newPrNames.push(ex.name);
+            }
+          }
+        }
+      } catch (prErr) {
+        console.warn("[handleFinish] PR detection failed:", prErr);
+      }
+
       // Trigger progression for next week now that new data is available
       try {
         await applyProgressionToNextWeek();
@@ -355,7 +418,13 @@ export default function NextWorkoutScreen() {
       }
 
       setSaving(false);
-      router.back();
+
+      if (newPrNames.length > 0) {
+        setPrExercises(newPrNames);
+        setShowPrModal(true);
+      } else {
+        router.back();
+      }
     } catch (err) {
       console.error("[handleFinish] Failed to save workout:", err);
       setSaving(false);
@@ -474,6 +543,36 @@ export default function NextWorkoutScreen() {
         onConfirm={handleFinish}
         onCancel={() => setShowFinishModal(false)}
       />
+
+      {/* PR Celebration Modal */}
+      <Modal visible={showPrModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={{ fontSize: 40, textAlign: "center", marginBottom: 8 }}>🏆</Text>
+            <Text style={styles.modalTitle}>
+              {prExercises.length === 1 ? "New PR!" : `${prExercises.length} New PRs!`}
+            </Text>
+            <View style={{ gap: 4, marginBottom: 20 }}>
+              {prExercises.map((name) => (
+                <Text key={name} style={[styles.modalBody, { textAlign: "center", marginBottom: 0 }]}>
+                  {name}
+                </Text>
+              ))}
+            </View>
+            <Pressable
+              style={({ pressed }) => [{
+                backgroundColor: PRIMARY_COLOR,
+                borderRadius: 14,
+                paddingVertical: 14,
+                alignItems: "center",
+              }, pressed && { opacity: 0.8 }]}
+              onPress={() => { setShowPrModal(false); router.back(); }}
+            >
+              <Text style={styles.modalConfirmText}>Nice!</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
 
       {/* Swap Exercise Modal */}
       <Modal visible={swapTargetId !== null} transparent animationType="slide">

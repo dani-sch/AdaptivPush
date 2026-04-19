@@ -65,9 +65,11 @@ export function WorkoutTemplateModal({ workout, program, onSwapExercise, onClose
                                         <Text style={styles.exerciseName}>{exercise.name}</Text>
                                     </View>
 
-                                    <Text style={styles.exerciseMeta}>
-                                        {(exercise.muscleGroup ?? '—')} • {(exercise.equipment ?? '—')}
-                                    </Text>
+                                    {(exercise.muscleGroup || exercise.equipment) && (
+                                        <Text style={styles.exerciseMeta}>
+                                            {exercise.muscleGroup ?? ''}{exercise.muscleGroup && exercise.equipment ? ' • ' : ''}{exercise.equipment ?? ''}
+                                        </Text>
+                                    )}
                                 </View>
 
                                 <Pressable
@@ -96,12 +98,12 @@ export function WorkoutTemplateModal({ workout, program, onSwapExercise, onClose
                     <Pressable style={StyleSheet.absoluteFill} onPress={closeSwap} />
 
                     <View style={styles.nestedSheet}>
-                        {/* Wrapper guarantees minimum height to display all content */}
                         <View style={{ flex: 1 }}>
                             <SwapExerciseModal
                                 program={program}
                                 exerciseId={swapExerciseId}
                                 context="program"
+                                embedded
                                 onClose={closeSwap}
                                 onSwap={onSwapExercise}
                             />

@@ -202,7 +202,12 @@ export default function HelpSupportScreen() {
           <Text style={styles.hoursCaption}>Typical first response: under 24 hours.</Text>
         </View>
 
-        <Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
+          <Pressable onPress={() => router.push('/faq')} hitSlop={8}>
+            <Text style={{ color: '#2f7cff', fontSize: 13, fontWeight: '600' }}>View all →</Text>
+          </Pressable>
+        </View>
         <View style={styles.sectionCard}>
           <FaqItem
             question="How do I reset my workout plan?"

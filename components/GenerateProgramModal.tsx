@@ -21,6 +21,13 @@ import {
 
 const DAYS = [1, 2, 3, 4, 5, 6, 7] as const;
 const DURATIONS = [4, 6, 8, 10, 12, 16] as const;
+const SESSION_LENGTHS: { label: string; value: number | null }[] = [
+  { label: '30 min', value: 30 },
+  { label: '45 min', value: 45 },
+  { label: '60 min', value: 60 },
+  { label: '75 min', value: 75 },
+  { label: '90+ min', value: null },
+];
 
 const GOAL_LABELS: Record<TrainingGoal, string> = {
   strength: 'Strength',
@@ -67,6 +74,8 @@ export function GenerateProgramModal({
   const [focusMuscles, setFocusMuscles] = useState<MuscleGroup[]>(
     defaultParams?.focusMuscleGroups ?? [],
   );
+  const [targetSessionMinutes, setTargetSessionMinutes] = useState<number | null>(60);
+  const [swapIntervalWeeks, setSwapIntervalWeeks] = useState(defaultParams?.swapIntervalWeeks ?? 4);
   const [loading, setLoading] = useState(false);
 
   if (!visible) return null;
@@ -101,6 +110,8 @@ export function GenerateProgramModal({
         durationWeeks,
         goal,
         focusMuscleGroups: focusMuscles,
+        targetSessionMinutes,
+        swapIntervalWeeks,
       };
 
       const generated = generateProgram(params, weightLb, experience);
@@ -202,6 +213,36 @@ export function GenerateProgramModal({
             })}
           </ScrollView>
 
+          {/* Session length */}
+          <Text style={styles.sectionLabel}>SESSION LENGTH</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.durationRow}
+          >
+            {SESSION_LENGTHS.map(({ label, value }) => {
+              const active = targetSessionMinutes === value;
+              return (
+                <Pressable
+                  key={label}
+                  onPress={() => setTargetSessionMinutes(value)}
+                  accessibilityLabel={label}
+                  accessibilityState={{ selected: active }}
+                  style={[
+                    styles.durationPill,
+                    active
+                      ? { backgroundColor: PRIMARY_COLOR, borderColor: PRIMARY_COLOR }
+                      : { backgroundColor: 'transparent', borderColor: BORDER_COLOR },
+                  ]}
+                >
+                  <Text style={[styles.durationPillText, { color: active ? WHITE : TEXT_COLOR }]}>
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
           {/* Training goal */}
           <Text style={styles.sectionLabel}>TRAINING GOAL</Text>
           <View style={styles.chipWrap}>
@@ -248,6 +289,30 @@ export function GenerateProgramModal({
                 >
                   <Text style={[styles.chipText, { color: active ? WHITE : TEXT_COLOR }]}>
                     {m}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* Accessory swap interval */}
+          <Text style={styles.sectionLabel}>ACCESSORY SWAP INTERVAL</Text>
+          <View style={styles.chipWrap}>
+            {([3, 4, 6] as const).map(w => {
+              const active = swapIntervalWeeks === w;
+              return (
+                <Pressable
+                  key={w}
+                  onPress={() => setSwapIntervalWeeks(w)}
+                  style={[
+                    styles.chip,
+                    active
+                      ? { backgroundColor: PRIMARY_COLOR, borderColor: PRIMARY_COLOR }
+                      : { backgroundColor: 'transparent', borderColor: BORDER_COLOR },
+                  ]}
+                >
+                  <Text style={[styles.chipText, { color: active ? WHITE : TEXT_COLOR }]}>
+                    Every {w} weeks
                   </Text>
                 </Pressable>
               );
