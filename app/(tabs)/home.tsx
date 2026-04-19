@@ -310,13 +310,16 @@ const ReadinessCheckInModal: React.FC<{
         return;
       }
 
-      await supabase.from("readiness_logs").insert({
-        user_id: user.id,
-        log_date: new Date().toISOString().split("T")[0],
-        sleep_score: computeSleepScore(sleepHours) * 2,
-        stress: stressLevel,
-        readiness_score: computeReadinessScore(sleepHours, stressLevel),
-      });
+      await supabase.from("readiness_logs").upsert(
+        {
+          user_id: user.id,
+          log_date: new Date().toISOString().split("T")[0],
+          sleep_score: computeSleepScore(sleepHours) * 2,
+          stress: stressLevel,
+          readiness_score: computeReadinessScore(sleepHours, stressLevel),
+        },
+        { onConflict: "user_id,log_date" }
+      );
 
       onSaved(computeReadinessScore(sleepHours, stressLevel));
     } catch (e) {
@@ -503,15 +506,16 @@ export default function HomeScreen() {
       } = await supabase.auth.getUser();
       if (!user) return;
 
+      const today = new Date().toISOString().split("T")[0];
       const { data } = await supabase
         .from("readiness_logs")
         .select("readiness_score")
         .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(1);
+        .eq("log_date", today)
+        .maybeSingle();
 
-      if (data && data.length > 0 && data[0].readiness_score != null) {
-        setReadinessScore(Number(data[0].readiness_score).toFixed(1));
+      if (data?.readiness_score != null) {
+        setReadinessScore(Number(data.readiness_score).toFixed(1));
       }
     };
 

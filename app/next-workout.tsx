@@ -178,18 +178,18 @@ export default function NextWorkoutScreen() {
   );
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Fetch latest readiness score once on mount
+  // Fetch today's readiness score once on mount (today-only — no bleed from previous days)
   useEffect(() => {
     (async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
+        const today = new Date().toISOString().split("T")[0];
         const { data } = await supabase
           .from("readiness_logs")
           .select("readiness_score")
           .eq("user_id", user.id)
-          .order("log_date", { ascending: false })
-          .limit(1)
+          .eq("log_date", today)
           .maybeSingle();
         if (data?.readiness_score != null) {
           setReadinessScore(Number(data.readiness_score));
