@@ -42,10 +42,13 @@ function buildExercises(workout: ProgramWorkout, readinessScore: number | null):
     const baseWeight = ex.weight != null ? ex.weight : 0;
 
     // Apply readiness modifier to the displayed weight (UI overlay only — not persisted)
-    const adjustedWeight = modifier
-      ? Math.max(0, Math.round((baseWeight * modifier.weightMultiplier) / 2.5) * 2.5)
-      : baseWeight;
-    const weightStr = adjustedWeight > 0 ? String(adjustedWeight) : "";
+    const weightForSet = (setIndex: number): string => {
+      const raw = ex.perSetWeights?.[setIndex] ?? baseWeight;
+      const adjusted = modifier
+        ? Math.max(0, Math.round((raw * modifier.weightMultiplier) / 2.5) * 2.5)
+        : raw;
+      return adjusted > 0 ? String(adjusted) : "";
+    };
 
     // Apply readiness RPE delta
     const baseRpe = ex.targetRpe != null ? ex.targetRpe : null;
@@ -56,7 +59,7 @@ function buildExercises(workout: ProgramWorkout, readinessScore: number | null):
 
     const sets: WorkoutSet[] = Array.from({ length: setCount }, (_, i) => ({
       id: `${ex.id}-${i + 1}`,
-      weight: weightStr,
+      weight: weightForSet(i),
       reps: "",
       rpe: rpeStr,
       logged: false,

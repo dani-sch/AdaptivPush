@@ -27,6 +27,8 @@ export type WorkoutExercise = {
     sets?: number;
     reps?: string;
     weight?: number;
+    /** Per-set weight overrides (lb). When present, set i uses perSetWeights[i] instead of weight. */
+    perSetWeights?: number[];
     targetRpe?: number | null;
 
     muscleGroup?: MuscleGroup;
