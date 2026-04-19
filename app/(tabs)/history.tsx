@@ -302,6 +302,9 @@ export default function HistoryScreen() {
   const [historyExerciseId, setHistoryExerciseId] = useState<string | null>(null);
   const [historyExerciseName, setHistoryExerciseName] = useState<string | null>(null);
 
+  // PR count from personal_records table
+  const [prCount, setPrCount] = useState(0);
+
   // PR history modal state
   const [showPrModal, setShowPrModal] = useState(false);
   const [prRecords, setPrRecords] = useState<{ exerciseName: string; weightLb: number; reps: number; achievedAt: string }[]>([]);
@@ -410,6 +413,13 @@ export default function HistoryScreen() {
         return;
       }
 
+      // Fetch PR count directly from personal_records table
+      const { count: prTotal } = await supabase
+        .from('personal_records')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+      setPrCount(prTotal ?? 0);
+
       const sessionsResult = await fetchRowsFromTable('workout_sessions', user.id);
       const sessionsMissing = isMissingTableError(sessionsResult.error, 'workout_sessions');
       if (sessionsResult.error && !sessionsMissing) {
@@ -463,7 +473,6 @@ export default function HistoryScreen() {
     const totalWorkouts = workouts.length;
     const totalMinutes = workouts.reduce((total, workout) => total + workout.durationMin, 0);
     const totalVolumeLb = workouts.reduce((total, workout) => total + workout.totalVolumeLb, 0);
-    const personalRecords = workouts.reduce((total, workout) => total + workout.personalRecords, 0);
 
     const avgDuration = totalWorkouts > 0 ? Math.round(totalMinutes / totalWorkouts) : 0;
 
@@ -471,9 +480,9 @@ export default function HistoryScreen() {
       totalWorkouts,
       avgDuration,
       totalVolumeLb,
-      personalRecords,
+      personalRecords: prCount,
     };
-  }, [workouts]);
+  }, [workouts, prCount]);
 
   const monthSections = useMemo<MonthSection[]>(() => {
     const grouped = new Map<string, WorkoutEntry[]>();
