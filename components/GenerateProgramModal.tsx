@@ -75,6 +75,7 @@ export function GenerateProgramModal({
     defaultParams?.focusMuscleGroups ?? [],
   );
   const [targetSessionMinutes, setTargetSessionMinutes] = useState<number | null>(60);
+  const [swapIntervalWeeks, setSwapIntervalWeeks] = useState(defaultParams?.swapIntervalWeeks ?? 4);
   const [loading, setLoading] = useState(false);
 
   if (!visible) return null;
@@ -110,6 +111,7 @@ export function GenerateProgramModal({
         goal,
         focusMuscleGroups: focusMuscles,
         targetSessionMinutes,
+        swapIntervalWeeks,
       };
 
       const generated = generateProgram(params, weightLb, experience);
@@ -287,6 +289,30 @@ export function GenerateProgramModal({
                 >
                   <Text style={[styles.chipText, { color: active ? WHITE : TEXT_COLOR }]}>
                     {m}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* Accessory swap interval */}
+          <Text style={styles.sectionLabel}>ACCESSORY SWAP INTERVAL</Text>
+          <View style={styles.chipWrap}>
+            {([3, 4, 6] as const).map(w => {
+              const active = swapIntervalWeeks === w;
+              return (
+                <Pressable
+                  key={w}
+                  onPress={() => setSwapIntervalWeeks(w)}
+                  style={[
+                    styles.chip,
+                    active
+                      ? { backgroundColor: PRIMARY_COLOR, borderColor: PRIMARY_COLOR }
+                      : { backgroundColor: 'transparent', borderColor: BORDER_COLOR },
+                  ]}
+                >
+                  <Text style={[styles.chipText, { color: active ? WHITE : TEXT_COLOR }]}>
+                    Every {w} weeks
                   </Text>
                 </Pressable>
               );

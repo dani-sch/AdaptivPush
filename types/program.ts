@@ -51,6 +51,7 @@ export type CurrentProgram = {
     currentWeek: number;
     totalWeeks: number;
     daysPerWeek: number;
+    swapIntervalWeeks?: number;
     workouts: ProgramWorkout[];
 };
 
@@ -68,6 +69,8 @@ export interface ProgramGenParams {
   focusMuscleGroups: MuscleGroup[];
   /** Desired session length in minutes. null = no cap (90+ option). */
   targetSessionMinutes?: number | null;
+  /** How often (in weeks) to prompt accessory swaps. Default 4. */
+  swapIntervalWeeks?: number;
 }
 
 export interface GeneratedExerciseSlot {

@@ -1,4 +1,5 @@
 import { ExerciseHistoryModal } from '@/components/ExerciseHistoryModal';
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   CalendarDays,
@@ -264,20 +265,27 @@ interface SummaryMetricCardProps {
   icon: ReactNode;
   value: string;
   label: string;
+  onPress?: () => void;
 }
 
-const SummaryMetricCard = ({ icon, value, label }: SummaryMetricCardProps) => (
-  <LinearGradient
-    colors={['#181b26', '#12141b']}
-    start={{ x: 0, y: 0 }}
-    end={{ x: 1, y: 1 }}
-    style={styles.summaryCard}
-  >
-    {icon}
-    <Text style={styles.summaryValue}>{value}</Text>
-    <Text style={styles.summaryLabel}>{label}</Text>
-  </LinearGradient>
-);
+const SummaryMetricCard = ({ icon, value, label, onPress }: SummaryMetricCardProps) => {
+  const content = (
+    <LinearGradient
+      colors={['#181b26', '#12141b']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.summaryCard}
+    >
+      {icon}
+      <Text style={styles.summaryValue}>{value}</Text>
+      <Text style={styles.summaryLabel}>{label}</Text>
+    </LinearGradient>
+  );
+  if (onPress) {
+    return <Pressable onPress={onPress}>{content}</Pressable>;
+  }
+  return content;
+};
 
 export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
@@ -293,6 +301,11 @@ export default function HistoryScreen() {
   // Exercise history modal state (drill-down from detail sheet)
   const [historyExerciseId, setHistoryExerciseId] = useState<string | null>(null);
   const [historyExerciseName, setHistoryExerciseName] = useState<string | null>(null);
+
+  // PR history modal state
+  const [showPrModal, setShowPrModal] = useState(false);
+  const [prRecords, setPrRecords] = useState<{ exerciseName: string; weightLb: number; reps: number; achievedAt: string }[]>([]);
+  const [prLoading, setPrLoading] = useState(false);
 
   const handleOpenDetail = async (workout: WorkoutEntry) => {
     setDetailWorkout(workout);
@@ -316,6 +329,40 @@ export default function HistoryScreen() {
   const handleCloseExerciseHistory = () => {
     setHistoryExerciseId(null);
     setHistoryExerciseName(null);
+  };
+
+  const handleOpenPrHistory = async () => {
+    setShowPrModal(true);
+    setPrLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setPrLoading(false); return; }
+
+      const { data } = await supabase
+        .from('personal_records')
+        .select('weight_lb, reps, achieved_at, exercises ( name )')
+        .eq('user_id', user.id)
+        .order('achieved_at', { ascending: false });
+
+      if (data) {
+        // Group by exercise, keep only the best per exercise (highest weight, tiebreak reps)
+        const bestMap = new Map<string, { exerciseName: string; weightLb: number; reps: number; achievedAt: string }>();
+        for (const row of data as any[]) {
+          const name: string = row.exercises?.name ?? 'Unknown';
+          const w = Number(row.weight_lb) || 0;
+          const r = Number(row.reps) || 0;
+          const existing = bestMap.get(name);
+          if (!existing || w > existing.weightLb || (w === existing.weightLb && r > existing.reps)) {
+            bestMap.set(name, { exerciseName: name, weightLb: w, reps: r, achievedAt: row.achieved_at });
+          }
+        }
+        setPrRecords(Array.from(bestMap.values()).sort((a, b) => a.exerciseName.localeCompare(b.exerciseName)));
+      }
+    } catch (err) {
+      console.warn('PR history fetch failed:', err);
+    } finally {
+      setPrLoading(false);
+    }
   };
 
   useFocusEffect(
@@ -453,6 +500,7 @@ export default function HistoryScreen() {
             icon={<Medal color="#ffc200" size={24} />}
             value={`${summary.personalRecords}`}
             label="Personal Records"
+            onPress={handleOpenPrHistory}
           />
         </View>
 
@@ -612,6 +660,52 @@ export default function HistoryScreen() {
             />
           </View>
         )}
+      </Modal>
+
+      {/* PR History Modal */}
+      <Modal visible={showPrModal} transparent animationType="slide">
+        <Pressable style={styles.sheetBackdrop} onPress={() => setShowPrModal(false)}>
+          <Pressable style={[styles.sheet, { height: '70%' }]} onPress={() => {}}>
+            <View style={styles.sheetHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sheetTitle}>Personal Records</Text>
+                <Text style={styles.sheetSubtitle}>All-time bests per exercise</Text>
+              </View>
+              <Pressable style={styles.sheetCloseBtn} onPress={() => setShowPrModal(false)}>
+                <Ionicons name="close" size={18} color="#6f7485" />
+              </Pressable>
+            </View>
+            <ScrollView contentContainerStyle={styles.sheetContent}>
+              {prLoading ? (
+                <View style={styles.sheetStateWrap}>
+                  <ActivityIndicator size="large" color="#2f7cff" />
+                </View>
+              ) : prRecords.length === 0 ? (
+                <View style={styles.sheetStateWrap}>
+                  <Medal color="#6f7485" size={28} />
+                  <Text style={styles.sheetStateText}>No personal records yet.{'\n'}Complete a workout to start tracking!</Text>
+                </View>
+              ) : (
+                prRecords.map((pr) => (
+                  <View key={pr.exerciseName} style={styles.exerciseRow}>
+                    <View style={styles.exerciseRowHeader}>
+                      <Text style={styles.exerciseName}>{pr.exerciseName}</Text>
+                      <Medal color="#ffc200" size={18} />
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ color: '#f4f6ff', fontSize: 16, fontWeight: '600' }}>
+                        {pr.weightLb} lbs × {pr.reps} reps
+                      </Text>
+                      <Text style={{ color: '#6f7485', fontSize: 13 }}>
+                        {new Date(pr.achievedAt).toLocaleDateString()}
+                      </Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
       </Modal>
     </View>
   );

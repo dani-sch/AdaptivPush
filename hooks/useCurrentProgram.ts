@@ -13,6 +13,7 @@ type DbProgram = {
     goal: string | null;
     duration_weeks: number;
     start_date: string | null; // YYYY-MM-DD
+    swap_interval_weeks?: number | null;
 };
 
 type DbProgramDay = {
@@ -102,7 +103,7 @@ export function useCurrentProgram() {
             // Get active program
             const { data: prog, error: progErr } = await supabase
                 .from('programs')
-                .select('id,name,goal,duration_weeks,start_date')
+                .select('id,name,goal,duration_weeks,start_date,swap_interval_weeks')
                 .eq('user_id', user.id)
                 .eq('is_active', true)
                 .order('created_at', { ascending: false })
@@ -218,6 +219,7 @@ export function useCurrentProgram() {
                 currentWeek,
                 totalWeeks: prog.duration_weeks,
                 daysPerWeek,
+                swapIntervalWeeks: prog.swap_interval_weeks ?? 4,
                 workouts,
             };
 
