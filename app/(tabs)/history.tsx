@@ -274,7 +274,7 @@ const SummaryMetricCard = ({ icon, value, label, onPress }: SummaryMetricCardPro
       colors={['#181b26', '#12141b']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={styles.summaryCard}
+      style={[styles.summaryCard, onPress && { width: '100%' }]}
     >
       {icon}
       <Text style={styles.summaryValue}>{value}</Text>
@@ -282,7 +282,7 @@ const SummaryMetricCard = ({ icon, value, label, onPress }: SummaryMetricCardPro
     </LinearGradient>
   );
   if (onPress) {
-    return <Pressable onPress={onPress}>{content}</Pressable>;
+    return <Pressable onPress={onPress} style={{ width: '48.6%' }}>{content}</Pressable>;
   }
   return content;
 };
