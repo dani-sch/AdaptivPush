@@ -283,14 +283,27 @@ export function useCurrentProgram() {
             for (const pde of pdes) {
                 const exerciseName: string = (pde.exercises as any)?.name ?? '';
 
-                // Fetch most recent logged sets for this exercise (scoped to this user)
-                const { data: recentSets } = await supabase
+                // Fetch most recent logged sets for this exercise (scoped to this user).
+                // First find the most recent session_id, then get all sets from that session.
+                const { data: latestSession } = await supabase
                     .from('workout_exercise_sets')
-                    .select('set_number, weight_lb, reps, rpe, workout_sessions!inner(user_id)')
+                    .select('session_id, workout_sessions!inner(user_id)')
                     .eq('exercise_id', pde.exercise_id)
                     .eq('workout_sessions.user_id', userId)
                     .order('created_at', { ascending: false })
-                    .limit(pde.set_count);
+                    .limit(1);
+
+                const latestSessionId = (latestSession?.[0] as any)?.session_id;
+
+                const recentSets = latestSessionId
+                    ? (await supabase
+                        .from('workout_exercise_sets')
+                        .select('set_number, weight_lb, reps, rpe')
+                        .eq('exercise_id', pde.exercise_id)
+                        .eq('session_id', latestSessionId)
+                        .order('set_number', { ascending: true })
+                    ).data
+                    : null;
 
                 const lastSessionSets: LoggedSet[] = (recentSets ?? [])
                     .filter((s: any) => s.weight_lb !== null && s.reps !== null)

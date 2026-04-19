@@ -209,13 +209,29 @@ function selectExercises(
  * Per-position parameter overrides.
  * Positions 1–2 are compound lifts — use goal params as-is.
  * Position 3+ are accessories — reduce volume/intensity slightly.
+ *
+ * RPE periodization: ramps linearly from baseRPE - 1.5 (week 1) to baseRPE (final loading week).
+ * Deload weeks handled separately in buildSlot.
  */
-function resolveSlotParams(baseParams: GoalParams, position: number): GoalParams {
-  if (position <= 2) return baseParams; // compound: full sets + RPE
+function resolveSlotParams(
+  baseParams: GoalParams,
+  position: number,
+  effectiveWeek: number,
+  totalLoadingWeeks: number,
+): GoalParams {
+  // RPE ramp: week 1 starts at base - 1.5, linearly reaches base by final loading week
+  const rpeRamp = totalLoadingWeeks > 1
+    ? baseParams.rpe - 1.5 + (1.5 * (effectiveWeek - 1)) / (totalLoadingWeeks - 1)
+    : baseParams.rpe;
+  const periodizedRPE = Math.round(Math.min(rpeRamp, baseParams.rpe) * 10) / 10;
+
+  if (position <= 2) {
+    return { ...baseParams, rpe: periodizedRPE };
+  }
   return {
     ...baseParams,
     sets: Math.max(baseParams.sets - 1, 2),
-    rpe: Math.max(baseParams.rpe - 0.5, 5.0),
+    rpe: Math.max(periodizedRPE - 0.5, 5.0),
   };
 }
 
@@ -227,9 +243,10 @@ function buildSlot(
   userWeightLb: number,
   experienceLevel: TrainingExperience,
   effectiveWeek: number,
+  totalLoadingWeeks: number,
   isDeload: boolean,
 ): GeneratedExerciseSlot {
-  const slotParams = resolveSlotParams(goalParams, position);
+  const slotParams = resolveSlotParams(goalParams, position, effectiveWeek, totalLoadingWeeks);
   const expMult = exercise.experienceMultipliers[experienceLevel];
   const baseWeight =
     exercise.bodyweightMultiplier === 0
@@ -245,6 +262,11 @@ function buildSlot(
   const deloadFactor = isDeload ? 0.70 : 1.0;
   const suggested = roundWeight(baseWeight * weeklyFactor * deloadFactor);
 
+  // Deload: reduce RPE by 2.0 from base (already periodized RPE doesn't matter for deload)
+  const finalRPE = isDeload
+    ? Math.max(slotParams.rpe - 2.0, 5.0)
+    : slotParams.rpe;
+
   return {
     localExerciseId: exercise.id,
     exerciseName: exercise.name,
@@ -252,7 +274,7 @@ function buildSlot(
     setCount: slotParams.sets,
     repRangeMin: slotParams.repMin,
     repRangeMax: slotParams.repMax,
-    targetRPE: slotParams.rpe,
+    targetRPE: finalRPE,
     suggestedWeightLb: suggested,
   };
 }
@@ -267,14 +289,15 @@ function exercisesPerDay(daysPerWeek: number, targetMinutes?: number | null, set
 
   if (!targetMinutes || !setCount) return uncapped;
 
-  // Invert estimateDuration: exerciseCount * (sets * 4.5 + 2) = targetMinutes
-  const maxFromTime = Math.max(2, Math.floor(targetMinutes / (setCount * 4.5 + 2)));
+  // ~2.5 min per set (30-45s work + 60-90s rest) + 2 min transition per exercise
+  const minutesPerExercise = setCount * 2.5 + 2;
+  const maxFromTime = Math.max(3, Math.floor(targetMinutes / minutesPerExercise));
   return Math.min(uncapped, maxFromTime);
 }
 
 /** Estimated session duration in minutes. */
 function estimateDuration(exerciseCount: number, setCount: number): number {
-  return exerciseCount * setCount * 4.5 + exerciseCount * 2;
+  return exerciseCount * (setCount * 2.5 + 2);
 }
 
 // ─── Slot-map helper ─────────────────────────────────────────────────────────
@@ -381,6 +404,9 @@ export function generateProgram(
   // ── Phase 2: build all weeks using the pinned template ────────────────────
   const allDays: GeneratedProgramDay[] = [];
 
+  // Total loading weeks (non-deload) — used for RPE periodization ramp
+  const totalLoadingWeeks = durationWeeks - Math.floor(durationWeeks / 4);
+
   // effectiveWeek counts only loading weeks (deloads don't advance progression).
   let effectiveWeek = 0;
 
@@ -397,14 +423,13 @@ export function generateProgram(
         ? {
             ...goalParams,
             sets: Math.max(goalParams.sets - 2, 2),
-            rpe: Math.max(goalParams.rpe - 2.0, 5.0),
             weightMultiplier: goalParams.weightMultiplier, // handled in buildSlot
           }
         : goalParams;
 
       const template = dayTemplates.get(orderInWeek) ?? [];
       const exercises: GeneratedExerciseSlot[] = template.map(({ exercise, position }) =>
-        buildSlot(exercise, position, dayGoalParams, userWeightLb, experienceLevel, effectiveWeek, isDeloadWeek),
+        buildSlot(exercise, position, dayGoalParams, userWeightLb, experienceLevel, effectiveWeek, totalLoadingWeeks, isDeloadWeek),
       );
 
       const workoutName = isDeloadWeek
