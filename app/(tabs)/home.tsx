@@ -104,9 +104,11 @@ const StatsRow: React.FC<{ readiness: string }> = ({ readiness }) => {
 
 // readiness card and modal components
 
-const ReadinessPromptCard: React.FC<{ onPress: () => void }> = ({
+const ReadinessPromptCard: React.FC<{ todayScore: string | null; onPress: () => void }> = ({
+  todayScore,
   onPress,
 }) => {
+  const hasScore = todayScore !== null;
   return (
     <Pressable
       style={({ pressed }) => [
@@ -116,10 +118,10 @@ const ReadinessPromptCard: React.FC<{ onPress: () => void }> = ({
       onPress={onPress}
     >
       <Text style={styles.readinessPromptTitle}>
-        How are you feeling today?
+        {hasScore ? `Today's Readiness: ${todayScore}` : "How are you feeling today?"}
       </Text>
       <Text style={styles.readinessPromptSubtitle}>
-        Quick readiness check-in
+        {hasScore ? "Tap to update your check-in" : "Quick readiness check-in"}
       </Text>
     </Pressable>
   );
@@ -278,25 +280,55 @@ const computeSleepScore = (hours: number): number => {
   return Math.max(0, hours - 3); // under 8h scales down from 3h baseline
 };
 
+/**
+ * 4-factor readiness score (0–10):
+ *   Sleep     35% — hours converted to 0-5 score
+ *   Stress    25% — inverted (low stress = high score)
+ *   Soreness  25% — inverted (low soreness = high score)
+ *   Motivation 15% — direct (high motivation = high score)
+ */
 const computeReadinessScore = (
   sleepHours: number,
   stressLevel: number,
+  soreness: number,
+  motivation: number,
 ): number => {
-  const sleepScore = computeSleepScore(sleepHours);
-  const stressScore = ((10 - stressLevel) / 10) * 5; // inverted: low stress = high score
-  return Math.round((sleepScore + stressScore) * 10) / 10;
+  const sleepNorm = (computeSleepScore(sleepHours) / 5) * 10;
+  const stressNorm = 10 - stressLevel;
+  const sorenessNorm = 10 - soreness;
+  const motivationNorm = motivation;
+  const score = sleepNorm * 0.35 + stressNorm * 0.25 + sorenessNorm * 0.25 + motivationNorm * 0.15;
+  return Math.round(score * 10) / 10;
 };
 
 // readiness check-in modal
 
 const ReadinessCheckInModal: React.FC<{
   visible: boolean;
+  initialSleepHours?: number;
+  initialStressLevel?: number;
+  initialSoreness?: number;
+  initialMotivation?: number;
+  initialCyclePhase?: CyclePhase;
   onClose: () => void;
-  onSaved: (score: number) => void;
-}> = ({ visible, onClose, onSaved }) => {
-  const [sleepHours, setSleepHours] = useState<number>(7);
-  const [stressLevel, setStressLevel] = useState<number>(5);
-  const [cyclePhase, setCyclePhase] = useState<CyclePhase>("N/A");
+  onSaved: (score: number, cyclePhase: CyclePhase) => void;
+}> = ({ visible, initialSleepHours = 7, initialStressLevel = 5, initialSoreness = 3, initialMotivation = 7, initialCyclePhase = "N/A", onClose, onSaved }) => {
+  const [sleepHours, setSleepHours] = useState<number>(initialSleepHours);
+  const [stressLevel, setStressLevel] = useState<number>(initialStressLevel);
+  const [soreness, setSoreness] = useState<number>(initialSoreness);
+  const [motivation, setMotivation] = useState<number>(initialMotivation);
+  const [cyclePhase, setCyclePhase] = useState<CyclePhase>(initialCyclePhase);
+
+  // Sync initial values when modal opens with pre-filled data
+  useEffect(() => {
+    if (visible) {
+      setSleepHours(initialSleepHours);
+      setStressLevel(initialStressLevel);
+      setSoreness(initialSoreness);
+      setMotivation(initialMotivation);
+      setCyclePhase(initialCyclePhase);
+    }
+  }, [visible, initialSleepHours, initialStressLevel, initialSoreness, initialMotivation, initialCyclePhase]);
 
   const handleContinue = async () => {
     try {
@@ -310,18 +342,24 @@ const ReadinessCheckInModal: React.FC<{
         return;
       }
 
+      const score = computeReadinessScore(sleepHours, stressLevel, soreness, motivation);
+
       await supabase.from("readiness_logs").upsert(
         {
           user_id: user.id,
           log_date: new Date().toISOString().split("T")[0],
+          sleep_hours: sleepHours,
           sleep_score: computeSleepScore(sleepHours) * 2,
           stress: stressLevel,
-          readiness_score: computeReadinessScore(sleepHours, stressLevel),
+          soreness,
+          motivation,
+          readiness_score: score,
+          cycle_phase: cyclePhase !== "N/A" ? cyclePhase : null,
         },
         { onConflict: "user_id,log_date" }
       );
 
-      onSaved(computeReadinessScore(sleepHours, stressLevel));
+      onSaved(score, cyclePhase);
     } catch (e) {
       console.log("[Readiness] Error saving check-in:", e);
     }
@@ -372,6 +410,30 @@ const ReadinessCheckInModal: React.FC<{
               sliderMin={0}
               sliderMax={10}
               onSliderChange={setStressLevel}
+            />
+
+            <SliderRow
+              icon={<Ionicons name="body" size={20} color="#f97316" />}
+              label="Muscle Soreness"
+              value={`${soreness}/10`}
+              minLabel="None"
+              maxLabel="Very Sore"
+              sliderValue={soreness}
+              sliderMin={0}
+              sliderMax={10}
+              onSliderChange={setSoreness}
+            />
+
+            <SliderRow
+              icon={<Ionicons name="flash" size={20} color="#eab308" />}
+              label="Motivation"
+              value={`${motivation}/10`}
+              minLabel="Low"
+              maxLabel="High"
+              sliderValue={motivation}
+              sliderMin={0}
+              sliderMax={10}
+              onSliderChange={setMotivation}
             />
 
             <CycleSelector
@@ -475,7 +537,12 @@ const ReadinessAdjustmentModal: React.FC<{
 
 export default function HomeScreen() {
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [readinessScore, setReadinessScore] = useState<string>("--");
+  const [readinessScore, setReadinessScore] = useState<string | null>(null);
+  const [todaySleepHours, setTodaySleepHours] = useState<number>(7);
+  const [todayStressLevel, setTodayStressLevel] = useState<number>(5);
+  const [todaySoreness, setTodaySoreness] = useState<number>(3);
+  const [todayMotivation, setTodayMotivation] = useState<number>(7);
+  const [todayCyclePhase, setTodayCyclePhase] = useState<CyclePhase>("N/A");
   const [pendingAdjustmentScore, setPendingAdjustmentScore] = useState<
     number | null
   >(null);
@@ -509,13 +576,18 @@ export default function HomeScreen() {
       const today = new Date().toISOString().split("T")[0];
       const { data } = await supabase
         .from("readiness_logs")
-        .select("readiness_score")
+        .select("readiness_score, sleep_hours, stress, soreness, motivation, cycle_phase")
         .eq("user_id", user.id)
         .eq("log_date", today)
         .maybeSingle();
 
       if (data?.readiness_score != null) {
         setReadinessScore(Number(data.readiness_score).toFixed(1));
+        if (data.sleep_hours != null) setTodaySleepHours(Number(data.sleep_hours));
+        if (data.stress != null) setTodayStressLevel(Number(data.stress));
+        if (data.soreness != null) setTodaySoreness(Number(data.soreness));
+        if (data.motivation != null) setTodayMotivation(Number(data.motivation));
+        if (data.cycle_phase) setTodayCyclePhase(data.cycle_phase as CyclePhase);
       }
     };
 
@@ -539,8 +611,9 @@ export default function HomeScreen() {
     setIsModalVisible(false);
   };
 
-  const handleReadinessSaved = (score: number) => {
+  const handleReadinessSaved = (score: number, cyclePhase: CyclePhase) => {
     setReadinessScore(score.toFixed(1));
+    setTodayCyclePhase(cyclePhase);
     const modifier = getReadinessModifier(score);
     if (!modifier.isNeutral) {
       setPendingAdjustmentScore(score);
@@ -596,12 +669,17 @@ export default function HomeScreen() {
             onPressStart={handleStartWorkout}
           />
         )}
-        <StatsRow readiness={readinessScore} />
-        <ReadinessPromptCard onPress={handleOpenReadinessModal} />
+        <StatsRow readiness={readinessScore ?? "--"} />
+        <ReadinessPromptCard todayScore={readinessScore} onPress={handleOpenReadinessModal} />
       </ScrollView>
 
       <ReadinessCheckInModal
         visible={isModalVisible}
+        initialSleepHours={todaySleepHours}
+        initialStressLevel={todayStressLevel}
+        initialSoreness={todaySoreness}
+        initialMotivation={todayMotivation}
+        initialCyclePhase={todayCyclePhase}
         onClose={handleCloseReadinessModal}
         onSaved={handleReadinessSaved}
       />
