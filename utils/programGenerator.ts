@@ -205,6 +205,20 @@ function selectExercises(
   return ordered.slice(0, count);
 }
 
+/**
+ * Per-position parameter overrides.
+ * Positions 1–2 are compound lifts — use goal params as-is.
+ * Position 3+ are accessories — reduce volume/intensity slightly.
+ */
+function resolveSlotParams(baseParams: GoalParams, position: number): GoalParams {
+  if (position <= 2) return baseParams; // compound: full sets + RPE
+  return {
+    ...baseParams,
+    sets: Math.max(baseParams.sets - 1, 2),
+    rpe: Math.max(baseParams.rpe - 0.5, 5.0),
+  };
+}
+
 /** Build a GeneratedExerciseSlot from a LocalExercise + goal + weight params. */
 function buildSlot(
   exercise: LocalExercise,
@@ -215,13 +229,14 @@ function buildSlot(
   effectiveWeek: number,
   isDeload: boolean,
 ): GeneratedExerciseSlot {
+  const slotParams = resolveSlotParams(goalParams, position);
   const expMult = exercise.experienceMultipliers[experienceLevel];
   const baseWeight =
     exercise.bodyweightMultiplier === 0
       ? 0
       : userWeightLb *
         exercise.bodyweightMultiplier *
-        goalParams.weightMultiplier *
+        slotParams.weightMultiplier *
         expMult;
 
   // Progressive overload: +5% per effective loading week.
@@ -234,10 +249,10 @@ function buildSlot(
     localExerciseId: exercise.id,
     exerciseName: exercise.name,
     position,
-    setCount: goalParams.sets,
-    repRangeMin: goalParams.repMin,
-    repRangeMax: goalParams.repMax,
-    targetRPE: goalParams.rpe,
+    setCount: slotParams.sets,
+    repRangeMin: slotParams.repMin,
+    repRangeMax: slotParams.repMax,
+    targetRPE: slotParams.rpe,
     suggestedWeightLb: suggested,
   };
 }
@@ -401,7 +416,9 @@ export function generateProgram(
         dayIndex,
         orderInWeek: orderInWeek + 1,
         workoutName,
-        estimatedDurationMin: Math.round(estimateDuration(exercises.length, dayGoalParams.sets)),
+        estimatedDurationMin: Math.round(
+          exercises.reduce((sum, ex) => sum + estimateDuration(1, ex.setCount), 0),
+        ),
         exercises,
       });
     }
