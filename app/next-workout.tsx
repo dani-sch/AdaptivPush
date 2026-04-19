@@ -392,14 +392,18 @@ export default function NextWorkoutScreen() {
             (bestWeight === (prev.weight_lb ?? 0) && bestReps > (prev.reps ?? 0));
 
           if (isNewPr) {
-            await supabase.from("personal_records").insert({
+            const { error: prInsertErr } = await supabase.from("personal_records").insert({
               user_id: user.id,
               exercise_id: ex.exerciseId,
               weight_lb: bestWeight,
               reps: bestReps,
               achieved_at: new Date().toISOString(),
             });
-            newPrNames.push(ex.name);
+            if (prInsertErr) {
+              console.warn(`[PR] Insert failed for ${ex.name}:`, prInsertErr.message);
+            } else {
+              newPrNames.push(ex.name);
+            }
           }
         }
       } catch (prErr) {
@@ -548,15 +552,20 @@ export default function NextWorkoutScreen() {
             <Text style={styles.modalTitle}>
               {prExercises.length === 1 ? "New PR!" : `${prExercises.length} New PRs!`}
             </Text>
-            <View style={{ gap: 4, marginBottom: 16 }}>
+            <View style={{ gap: 4, marginBottom: 20 }}>
               {prExercises.map((name) => (
-                <Text key={name} style={[styles.modalBody, { textAlign: "center" }]}>
+                <Text key={name} style={[styles.modalBody, { textAlign: "center", marginBottom: 0 }]}>
                   {name}
                 </Text>
               ))}
             </View>
             <Pressable
-              style={({ pressed }) => [styles.modalConfirm, pressed && { opacity: 0.8 }]}
+              style={({ pressed }) => [{
+                backgroundColor: PRIMARY_COLOR,
+                borderRadius: 14,
+                paddingVertical: 14,
+                alignItems: "center",
+              }, pressed && { opacity: 0.8 }]}
               onPress={() => { setShowPrModal(false); router.back(); }}
             >
               <Text style={styles.modalConfirmText}>Nice!</Text>

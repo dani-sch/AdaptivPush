@@ -19,6 +19,7 @@ import {
   BACKGROUND_COLOR_DARK,
   BORDER_COLOR,
   BUTTON_DISABLED,
+  MUTED_BG,
   PLACEHOLDER_TEXT,
   PRIMARY_COLOR,
   TEXT_COLOR,
@@ -673,34 +674,36 @@ export default function HomeScreen() {
         <StatsRow readiness={readinessScore ?? "--"} />
         <ReadinessPromptCard todayScore={readinessScore} onPress={handleOpenReadinessModal} />
 
-        {/* Accessory Swap Nudge */}
+        {/* Accessory Swap Nudge — hidden on deload weeks (every 4th) */}
         {program && !swapNudgeDismissed && program.swapIntervalWeeks &&
-          program.currentWeek > 0 && program.currentWeek % (program.swapIntervalWeeks ?? 4) === 0 && (
+          program.currentWeek > 0 &&
+          program.currentWeek % 4 !== 0 &&
+          program.currentWeek % (program.swapIntervalWeeks ?? 4) === 0 && (
           <View style={{
-            borderRadius: 16, borderWidth: 1, borderColor: '#242a3b',
-            backgroundColor: '#121621', padding: 16, marginTop: 14,
+            borderRadius: 20, backgroundColor: BORDER_COLOR,
+            padding: 20, marginTop: 14, marginHorizontal: 16,
           }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
               <Text style={{ fontSize: 20 }}>🔄</Text>
-              <Text style={{ color: '#f4f6ff', fontSize: 15, fontWeight: '600', flex: 1 }}>
+              <Text style={{ color: WHITE, fontSize: 15, fontWeight: '600', flex: 1 }}>
                 Time to swap accessories
               </Text>
             </View>
-            <Text style={{ color: '#8d95ac', fontSize: 13, lineHeight: 19, marginBottom: 12 }}>
+            <Text style={{ color: TEXT_COLOR, fontSize: 13, lineHeight: 19, marginBottom: 14 }}>
               You've been on the same accessory exercises for {program.swapIntervalWeeks} weeks. Swapping helps avoid plateaus and keeps training fresh.
             </Text>
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <Pressable
-                onPress={() => router.push('/program-overview')}
-                style={{ flex: 1, backgroundColor: '#2563EB', borderRadius: 10, paddingVertical: 10, alignItems: 'center' }}
+                onPress={() => { setSwapNudgeDismissed(true); router.push('/(tabs)/plan'); }}
+                style={{ flex: 1, backgroundColor: PRIMARY_COLOR, borderRadius: 12, paddingVertical: 12, alignItems: 'center' }}
               >
-                <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>Swap now</Text>
+                <Text style={{ color: WHITE, fontSize: 14, fontWeight: '600' }}>Go to Plan</Text>
               </Pressable>
               <Pressable
                 onPress={() => setSwapNudgeDismissed(true)}
-                style={{ flex: 1, borderRadius: 10, borderWidth: 1, borderColor: '#242a3b', paddingVertical: 10, alignItems: 'center' }}
+                style={{ flex: 1, borderRadius: 12, backgroundColor: MUTED_BG, paddingVertical: 12, alignItems: 'center' }}
               >
-                <Text style={{ color: '#6f758a', fontSize: 14 }}>Remind later</Text>
+                <Text style={{ color: TEXT_COLOR, fontSize: 14 }}>Dismiss</Text>
               </Pressable>
             </View>
           </View>
@@ -710,15 +713,16 @@ export default function HomeScreen() {
         {todayCyclePhase && todayCyclePhase !== "N/A" &&
           (todayCyclePhase === "Menstruation" || todayCyclePhase === "Luteal") && (
           <View style={{
-            borderRadius: 16, borderWidth: 1,
+            borderRadius: 20,
             borderColor: todayCyclePhase === "Menstruation" ? 'rgba(239,68,68,0.3)' : 'rgba(234,179,8,0.3)',
+            borderWidth: 1,
             backgroundColor: todayCyclePhase === "Menstruation" ? 'rgba(239,68,68,0.08)' : 'rgba(234,179,8,0.08)',
-            padding: 16, marginTop: 14,
+            padding: 20, marginTop: 14, marginHorizontal: 16,
           }}>
-            <Text style={{ color: '#f4f6ff', fontSize: 15, fontWeight: '600', marginBottom: 4 }}>
+            <Text style={{ color: WHITE, fontSize: 15, fontWeight: '600', marginBottom: 4 }}>
               {todayCyclePhase === "Menstruation" ? "🩸 Menstruation Phase" : "🌙 Luteal Phase"}
             </Text>
-            <Text style={{ color: '#8d95ac', fontSize: 13, lineHeight: 19 }}>
+            <Text style={{ color: TEXT_COLOR, fontSize: 13, lineHeight: 19 }}>
               {todayCyclePhase === "Menstruation"
                 ? "Energy may be lower. Consider reducing intensity, prioritising mobility work, and listening to your body. It's okay to take it easy."
                 : "You may feel more fatigued than usual. Focus on maintaining form over pushing intensity. Prioritise sleep and recovery."}
@@ -736,6 +740,7 @@ export default function HomeScreen() {
             borderRadius: 20,
             padding: 20,
             marginTop: 14,
+            marginHorizontal: 16,
             gap: 14,
             opacity: pressed ? 0.8 : 1,
           })}

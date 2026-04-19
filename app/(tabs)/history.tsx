@@ -338,26 +338,49 @@ export default function HistoryScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setPrLoading(false); return; }
 
-      const { data } = await supabase
+      // Fetch all PR rows for this user
+      const { data: prRows, error: prErr } = await supabase
         .from('personal_records')
-        .select('weight_lb, reps, achieved_at, exercises ( name )')
+        .select('exercise_id, weight_lb, reps, achieved_at')
         .eq('user_id', user.id)
         .order('achieved_at', { ascending: false });
 
-      if (data) {
-        // Group by exercise, keep only the best per exercise (highest weight, tiebreak reps)
-        const bestMap = new Map<string, { exerciseName: string; weightLb: number; reps: number; achievedAt: string }>();
-        for (const row of data as any[]) {
-          const name: string = row.exercises?.name ?? 'Unknown';
-          const w = Number(row.weight_lb) || 0;
-          const r = Number(row.reps) || 0;
-          const existing = bestMap.get(name);
-          if (!existing || w > existing.weightLb || (w === existing.weightLb && r > existing.reps)) {
-            bestMap.set(name, { exerciseName: name, weightLb: w, reps: r, achievedAt: row.achieved_at });
-          }
-        }
-        setPrRecords(Array.from(bestMap.values()).sort((a, b) => a.exerciseName.localeCompare(b.exerciseName)));
+      if (prErr) {
+        console.warn('PR fetch error:', prErr.message);
+        setPrLoading(false);
+        return;
       }
+
+      if (!prRows || prRows.length === 0) {
+        setPrRecords([]);
+        setPrLoading(false);
+        return;
+      }
+
+      // Get unique exercise IDs and fetch names
+      const exIds = [...new Set(prRows.map((r: any) => r.exercise_id))];
+      const { data: exRows } = await supabase
+        .from('exercises')
+        .select('id, name')
+        .in('id', exIds);
+
+      const nameMap = new Map<string, string>();
+      for (const ex of (exRows ?? []) as any[]) {
+        nameMap.set(ex.id, ex.name);
+      }
+
+      // Group by exercise, keep best per exercise
+      const bestMap = new Map<string, { exerciseName: string; weightLb: number; reps: number; achievedAt: string }>();
+      for (const row of prRows as any[]) {
+        const name = nameMap.get(row.exercise_id) ?? 'Unknown';
+        const w = Number(row.weight_lb) || 0;
+        const r = Number(row.reps) || 0;
+        const existing = bestMap.get(row.exercise_id);
+        if (!existing || w > existing.weightLb || (w === existing.weightLb && r > existing.reps)) {
+          bestMap.set(row.exercise_id, { exerciseName: name, weightLb: w, reps: r, achievedAt: row.achieved_at });
+        }
+      }
+      setPrRecords(Array.from(bestMap.values()).sort((a, b) => a.exerciseName.localeCompare(b.exerciseName)));
     } catch (err) {
       console.warn('PR history fetch failed:', err);
     } finally {
@@ -499,7 +522,7 @@ export default function HistoryScreen() {
           <SummaryMetricCard
             icon={<Medal color="#ffc200" size={24} />}
             value={`${summary.personalRecords}`}
-            label="Personal Records"
+            label="PRs"
             onPress={handleOpenPrHistory}
           />
         </View>
