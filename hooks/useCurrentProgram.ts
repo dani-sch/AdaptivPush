@@ -30,6 +30,7 @@ type DbProgramDay = {
         rep_range_max: number;
         target_rpe: number | null;
         suggested_weight_lb: number | null;
+        per_set_weights_lb: number[] | null;
         notes: string | null;
         exercises: {
             id: string;
@@ -135,6 +136,7 @@ export function useCurrentProgram() {
             rep_range_max,
             target_rpe,
             suggested_weight_lb,
+            per_set_weights_lb,
             notes,
             exercises (
               id,
@@ -182,6 +184,7 @@ export function useCurrentProgram() {
                                 sets: pde.set_count,
                                 reps: `${pde.rep_range_min}-${pde.rep_range_max}`,
                                 weight: pde.suggested_weight_lb ?? undefined,
+                                perSetWeights: pde.per_set_weights_lb ?? undefined,
                                 targetRpe: pde.target_rpe ?? undefined,
                                 muscleGroup: (ex?.primary_muscle as any) ?? undefined,
                                 equipment: (ex?.equipment as any) ?? undefined,
@@ -263,6 +266,7 @@ export function useCurrentProgram() {
                 set_count,
                 rep_range_min,
                 rep_range_max,
+                target_rpe,
                 suggested_weight_lb,
                 exercises ( name )
               )
@@ -317,8 +321,35 @@ export function useCurrentProgram() {
 
                 const result = computeProgression(ctx);
 
+                // Per-set analysis: check if individual sets hit their target
+                // A set misses if reps < repMin OR rpe > 9.0
+                const setsMissed = lastSessionSets.filter(
+                    (s) => s.reps < pde.rep_range_min || (s.rpe !== null && s.rpe > 9.0)
+                );
+                const someMissed = setsMissed.length > 0 && lastSessionSets.length > 0;
+                const allMissed = setsMissed.length === lastSessionSets.length && lastSessionSets.length > 0;
+
+                let perSetWeightsLb: number[] | null = null;
+
+                if (someMissed && !allMissed) {
+                    // Mixed: build per-set weight array
+                    // Missed sets → hold current weight; hit sets → hold (not increase since session was inconsistent)
+                    const missedSetNumbers = new Set(setsMissed.map((s) => s.setNumber));
+                    perSetWeightsLb = Array.from({ length: pde.set_count }, (_, i) => {
+                        const setNum = i + 1;
+                        const logged = lastSessionSets.find((s) => s.setNumber === setNum);
+                        const currentSetWeight = logged?.weightLb ?? baselineWeight;
+                        const missed = missedSetNumbers.has(setNum);
+                        const adjusted = missed
+                            ? Math.max(0, Math.round((currentSetWeight * 0.95) / 2.5) * 2.5)
+                            : Math.round(currentSetWeight / 2.5) * 2.5;
+                        return adjusted;
+                    });
+                }
+
                 const dbUpdate: Record<string, unknown> = {
                     suggested_weight_lb: result.suggestedWeightLb,
+                    per_set_weights_lb: perSetWeightsLb, // null clears per-set on uniform sessions
                     updated_at: new Date().toISOString(),
                 };
                 if (result.suggestedRPE !== null) {
