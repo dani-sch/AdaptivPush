@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, View, Pressable, Modal } from 'react-native';
 import { Link, router } from 'expo-router';
-import { Plus, ChevronRight, MoreVertical, LayoutList } from 'lucide-react-native';
+import { Plus, ChevronRight, MoreVertical, LayoutList, Archive } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Alert } from 'react-native';
 
@@ -35,11 +35,13 @@ function EmptyState({
                         onCreateProgram,
                         onCreateDevProgram,
                         onGenerateProgram,
+                        onOpenArchived,
                         busy,
                     }: {
     onCreateProgram: () => void;
     onCreateDevProgram: () => void;
     onGenerateProgram: () => void;
+    onOpenArchived: () => void;
     busy: boolean;
 }) {
     return (
@@ -112,6 +114,31 @@ function EmptyState({
             >
                 <Text style={{ color: WHITE, fontWeight: '700' }}>{busy ? 'Working…' : 'Dev: Create Default Program'}</Text>
             </Pressable>
+
+            <Pressable
+                disabled={busy}
+                onPress={onOpenArchived}
+                style={({ pressed }) => [
+                    {
+                        width: '100%',
+                        maxWidth: 420,
+                        backgroundColor: 'transparent',
+                        borderWidth: 1,
+                        borderColor: BORDER_COLOR,
+                        borderRadius: 16,
+                        paddingVertical: 14,
+                        paddingHorizontal: 14,
+                        alignItems: 'center',
+                        opacity: busy ? 0.6 : pressed ? 0.85 : 1,
+                        marginTop: 10,
+                    },
+                ]}
+            >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Archive size={16} color={WHITE} />
+                    <Text style={{ color: WHITE, fontWeight: '700' }}>Archived Programs</Text>
+                </View>
+            </Pressable>
         </View>
     );
 }
@@ -168,6 +195,7 @@ export default function PlanScreen() {
                             setCreating(false);
                         }
                     }}
+                    onOpenArchived={() => router.push('/archived-programs')}
                 />
                 <Modal visible={showGenModal} transparent animationType="slide">
                     <GenerateProgramModal
@@ -226,6 +254,21 @@ export default function PlanScreen() {
                                 </View>
                             </Pressable>
                         </Link>
+
+                        <View style={styles.menuDivider} />
+
+                        <Pressable
+                            style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
+                            onPress={() => {
+                                setShowMenu(false);
+                                router.push('/archived-programs');
+                            }}
+                        >
+                            <View style={styles.menuItemRow}>
+                                <Archive size={16} color={WHITE} />
+                                <Text style={styles.menuText}>Archived Programs</Text>
+                            </View>
+                        </Pressable>
 
                         <View style={styles.menuDivider} />
 
@@ -457,6 +500,11 @@ const styles = StyleSheet.create({
     },
     menuItemPressed: {
         backgroundColor: MUTED_BG,
+    },
+    menuItemRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
     },
     menuText: {
         color: WHITE,
