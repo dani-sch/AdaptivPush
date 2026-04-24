@@ -4,15 +4,18 @@ import {
   ArrowLeft,
   Bell,
   CalendarClock,
+  Check,
   ChevronRight,
   Mail,
   MoonStar,
   Smartphone,
   Sparkles,
 } from 'lucide-react-native';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -23,11 +26,29 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
+  applyNotificationPreferences,
+  getDevicePushToken,
+  getNotificationPermissionStatus,
+  requestNotificationPermission,
+  sendTestNotification,
+} from '@/utils/notifications';
+import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   mergeUserMetadata,
   parseNotificationPreferences,
 } from '@/utils/profilePreferences';
 import { supabase } from '@/utils/supabase';
+
+// 48 half-hour slots: "12:00 AM" … "11:30 PM"
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
+  const h = Math.floor(i / 2);
+  const m = i % 2 === 0 ? '00' : '30';
+  const period = h < 12 ? 'AM' : 'PM';
+  const displayH = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${displayH}:${m} ${period}`;
+});
+
+const ITEM_HEIGHT = 52;
 
 type ToggleRowProps = {
   label: string;
@@ -35,31 +56,33 @@ type ToggleRowProps = {
   icon: ReactNode;
   value: boolean;
   onValueChange: (next: boolean) => void;
+  disabled?: boolean;
 };
 
-const ToggleRow = ({ label, hint, icon, value, onValueChange }: ToggleRowProps) => {
-  return (
-    <View style={styles.toggleRow}>
-      <View style={styles.toggleLeft}>
-        <View style={styles.iconShell}>{icon}</View>
-        <View style={styles.toggleTextWrap}>
-          <Text style={styles.toggleLabel}>{label}</Text>
-          <Text style={styles.toggleHint}>{hint}</Text>
-        </View>
+const ToggleRow = ({ label, hint, icon, value, onValueChange, disabled }: ToggleRowProps) => (
+  <View style={[styles.toggleRow, disabled && styles.rowDisabled]}>
+    <View style={styles.toggleLeft}>
+      <View style={styles.iconShell}>{icon}</View>
+      <View style={styles.toggleTextWrap}>
+        <Text style={styles.toggleLabel}>{label}</Text>
+        <Text style={styles.toggleHint}>{hint}</Text>
       </View>
-      <Switch
-        value={value}
-        onValueChange={onValueChange}
-        trackColor={{ false: '#4f5568', true: '#2f7cff' }}
-        thumbColor="#f4f6ff"
-        ios_backgroundColor="#4f5568"
-      />
     </View>
-  );
-};
+    <Switch
+      value={value}
+      onValueChange={disabled ? undefined : onValueChange}
+      disabled={disabled}
+      trackColor={{ false: '#4f5568', true: '#2f7cff' }}
+      thumbColor="#f4f6ff"
+      ios_backgroundColor="#4f5568"
+    />
+  </View>
+);
 
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
+  const flatListRef = useRef<FlatList>(null);
+
   const [pushEnabled, setPushEnabled] = useState(DEFAULT_NOTIFICATION_PREFERENCES.pushEnabled);
   const [emailEnabled, setEmailEnabled] = useState(DEFAULT_NOTIFICATION_PREFERENCES.emailEnabled);
   const [smsEnabled, setSmsEnabled] = useState(DEFAULT_NOTIFICATION_PREFERENCES.smsEnabled);
@@ -79,30 +102,34 @@ export default function NotificationsScreen() {
     DEFAULT_NOTIFICATION_PREFERENCES.quietHoursStart,
   );
   const [quietHoursEnd, setQuietHoursEnd] = useState(DEFAULT_NOTIFICATION_PREFERENCES.quietHoursEnd);
+
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [saveMessage, setSaveMessage] = useState('');
 
+  // Time picker modal
+  const [timePickerTarget, setTimePickerTarget] = useState<'start' | 'end' | null>(null);
+  const pickerValue = timePickerTarget === 'start' ? quietHoursStart : quietHoursEnd;
+
   useEffect(() => {
-    const loadNotificationSettings = async () => {
+    const load = async () => {
       try {
         setIsLoading(true);
         setErrorMessage('');
-        setSaveMessage('');
 
+        // Use cached session — no network call needed for reading prefs
         const {
-          data: { user },
-          error: authError,
-        } = await supabase.auth.getUser();
+          data: { session },
+        } = await supabase.auth.getSession();
 
-        if (authError || !user) {
-          setErrorMessage('Unable to load notification settings.');
+        if (!session?.user) {
+          // Not authenticated yet; defaults are already set
           return;
         }
 
         const preferences = parseNotificationPreferences(
-          user.user_metadata?.notification_preferences,
+          session.user.user_metadata?.notification_preferences,
         );
 
         setPushEnabled(preferences.pushEnabled);
@@ -114,16 +141,53 @@ export default function NotificationsScreen() {
         setQuietHoursEnabled(preferences.quietHoursEnabled);
         setQuietHoursStart(preferences.quietHoursStart);
         setQuietHoursEnd(preferences.quietHoursEnd);
-      } catch (loadError) {
-        console.error('Failed to load notification settings:', loadError);
-        setErrorMessage('Failed to load notification settings.');
+      } catch {
+        // Silently fall back to defaults
       } finally {
         setIsLoading(false);
       }
     };
 
-    void loadNotificationSettings();
+    void load();
   }, []);
+
+  // Scroll to the selected time when the picker opens
+  useEffect(() => {
+    if (timePickerTarget === null) return;
+    const index = TIME_OPTIONS.indexOf(pickerValue);
+    if (index < 0) return;
+    // Brief delay so the FlatList has rendered
+    const timer = setTimeout(() => {
+      flatListRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0.4 });
+    }, 80);
+    return () => clearTimeout(timer);
+  }, [timePickerTarget, pickerValue]);
+
+  const handlePushToggle = async (next: boolean) => {
+    if (!next) {
+      setPushEnabled(false);
+      return;
+    }
+    const granted = await requestNotificationPermission();
+    if (granted) {
+      setPushEnabled(true);
+      setErrorMessage('');
+    } else {
+      const status = await getNotificationPermissionStatus();
+      setErrorMessage(
+        status === 'denied'
+          ? 'Notifications are blocked. Enable them in your device Settings.'
+          : 'Notification permission was not granted.',
+      );
+      setPushEnabled(false);
+    }
+  };
+
+  const handleTimeSelect = (time: string) => {
+    if (timePickerTarget === 'start') setQuietHoursStart(time);
+    else if (timePickerTarget === 'end') setQuietHoursEnd(time);
+    setTimePickerTarget(null);
+  };
 
   const handleSave = async () => {
     try {
@@ -132,12 +196,11 @@ export default function NotificationsScreen() {
       setSaveMessage('');
 
       const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
 
-      if (authError || !user) {
-        setErrorMessage('Unable to save notification settings.');
+      if (!session?.user) {
+        setErrorMessage('Unable to save — no active session.');
         return;
       }
 
@@ -153,9 +216,16 @@ export default function NotificationsScreen() {
         quietHoursEnd,
       };
 
+      // Persist push token alongside preferences
+      let pushToken: string | null = null;
+      if (pushEnabled) {
+        pushToken = await getDevicePushToken();
+      }
+
       const { error: saveError } = await supabase.auth.updateUser({
-        data: mergeUserMetadata(user.user_metadata, {
+        data: mergeUserMetadata(session.user.user_metadata, {
           notification_preferences: nextPreferences,
+          ...(pushToken ? { push_token: pushToken } : {}),
         }),
       });
 
@@ -164,9 +234,16 @@ export default function NotificationsScreen() {
         return;
       }
 
-      setSaveMessage('Notification preferences saved to backend.');
-    } catch (saveError) {
-      console.error('Failed to save notification settings:', saveError);
+      // Schedule / cancel local notifications
+      await applyNotificationPreferences(nextPreferences);
+
+      if (nextPreferences.pushEnabled) {
+        await sendTestNotification();
+        setSaveMessage('Settings saved — background the app to see a test notification.');
+      } else {
+        setSaveMessage('Notification settings saved.');
+      }
+    } catch {
       setErrorMessage('Failed to save notification settings.');
     } finally {
       setIsSaving(false);
@@ -217,7 +294,7 @@ export default function NotificationsScreen() {
             hint="Real-time updates on your device"
             icon={<Smartphone color="#9ba3b9" size={18} />}
             value={pushEnabled}
-            onValueChange={setPushEnabled}
+            onValueChange={handlePushToggle}
           />
           <ToggleRow
             label="Email Summaries"
@@ -243,6 +320,7 @@ export default function NotificationsScreen() {
             icon={<Bell color="#9ba3b9" size={18} />}
             value={workoutReminder}
             onValueChange={setWorkoutReminder}
+            disabled={!pushEnabled}
           />
           <ToggleRow
             label="Deload Week Reminder"
@@ -250,6 +328,7 @@ export default function NotificationsScreen() {
             icon={<MoonStar color="#9ba3b9" size={18} />}
             value={deloadReminder}
             onValueChange={setDeloadReminder}
+            disabled={!pushEnabled}
           />
           <ToggleRow
             label="PR Celebrations"
@@ -257,6 +336,7 @@ export default function NotificationsScreen() {
             icon={<Sparkles color="#9ba3b9" size={18} />}
             value={prCelebrations}
             onValueChange={setPrCelebrations}
+            disabled={!pushEnabled}
           />
         </View>
 
@@ -270,16 +350,34 @@ export default function NotificationsScreen() {
             onValueChange={setQuietHoursEnabled}
           />
 
-          <Pressable style={({ pressed }) => [styles.timeRow, pressed && styles.pressed]}>
-            <Text style={styles.timeLabel}>Start Time</Text>
+          <Pressable
+            style={({ pressed }) => [
+              styles.timeRow,
+              !quietHoursEnabled && styles.rowDisabled,
+              pressed && quietHoursEnabled && styles.pressed,
+            ]}
+            onPress={() => quietHoursEnabled && setTimePickerTarget('start')}
+          >
+            <Text style={[styles.timeLabel, !quietHoursEnabled && styles.timeLabelDisabled]}>
+              Start Time
+            </Text>
             <View style={styles.timeValueWrap}>
               <Text style={styles.timeValue}>{quietHoursStart}</Text>
               <ChevronRight color="#6f758a" size={18} />
             </View>
           </Pressable>
 
-          <Pressable style={({ pressed }) => [styles.timeRow, pressed && styles.pressed]}>
-            <Text style={styles.timeLabel}>End Time</Text>
+          <Pressable
+            style={({ pressed }) => [
+              styles.timeRow,
+              !quietHoursEnabled && styles.rowDisabled,
+              pressed && quietHoursEnabled && styles.pressed,
+            ]}
+            onPress={() => quietHoursEnabled && setTimePickerTarget('end')}
+          >
+            <Text style={[styles.timeLabel, !quietHoursEnabled && styles.timeLabelDisabled]}>
+              End Time
+            </Text>
             <View style={styles.timeValueWrap}>
               <Text style={styles.timeValue}>{quietHoursEnd}</Text>
               <ChevronRight color="#6f758a" size={18} />
@@ -290,7 +388,7 @@ export default function NotificationsScreen() {
         {isLoading ? (
           <View style={styles.loadingRow}>
             <ActivityIndicator size="small" color="#7aa0ff" />
-            <Text style={styles.loadingText}>Loading from backend...</Text>
+            <Text style={styles.loadingText}>Loading settings...</Text>
           </View>
         ) : null}
         {errorMessage ? <Text style={styles.errorFeedback}>{errorMessage}</Text> : null}
@@ -310,6 +408,69 @@ export default function NotificationsScreen() {
           </Text>
         </Pressable>
       </ScrollView>
+
+      {/* Time picker modal */}
+      <Modal
+        visible={timePickerTarget !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setTimePickerTarget(null)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setTimePickerTarget(null)}>
+          <Pressable style={styles.pickerSheet} onPress={() => {}}>
+            <View style={styles.pickerHandle} />
+            <View style={styles.pickerHeader}>
+              <Text style={styles.pickerTitle}>
+                {timePickerTarget === 'start' ? 'Start Time' : 'End Time'}
+              </Text>
+              <Pressable
+                onPress={() => setTimePickerTarget(null)}
+                style={({ pressed }) => [styles.pickerDoneBtn, pressed && styles.pressed]}
+              >
+                <Text style={styles.pickerDoneText}>Done</Text>
+              </Pressable>
+            </View>
+
+            <FlatList
+              ref={flatListRef}
+              data={TIME_OPTIONS}
+              keyExtractor={(item) => item}
+              getItemLayout={(_, index) => ({
+                length: ITEM_HEIGHT,
+                offset: ITEM_HEIGHT * index,
+                index,
+              })}
+              showsVerticalScrollIndicator={false}
+              onScrollToIndexFailed={({ index }) => {
+                // Retry after layout settles
+                setTimeout(() => {
+                  flatListRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0.4 });
+                }, 100);
+              }}
+              renderItem={({ item }) => {
+                const isSelected = item === pickerValue;
+                return (
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.timeOption,
+                      isSelected && styles.timeOptionSelected,
+                      pressed && styles.pressed,
+                    ]}
+                    onPress={() => handleTimeSelect(item)}
+                  >
+                    <Text
+                      style={[styles.timeOptionText, isSelected && styles.timeOptionTextSelected]}
+                    >
+                      {item}
+                    </Text>
+                    {isSelected && <Check color="#2b68f0" size={18} />}
+                  </Pressable>
+                );
+              }}
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -404,6 +565,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(95, 103, 124, 0.24)',
   },
+  rowDisabled: {
+    opacity: 0.45,
+  },
   toggleLeft: {
     flex: 1,
     flexDirection: 'row',
@@ -443,6 +607,9 @@ const styles = StyleSheet.create({
   timeLabel: {
     color: '#d6dbec',
     fontSize: 15,
+  },
+  timeLabelDisabled: {
+    color: '#555b6e',
   },
   timeValueWrap: {
     flexDirection: 'row',
@@ -495,5 +662,74 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.85,
+  },
+  // Time picker modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'flex-end',
+  },
+  pickerSheet: {
+    backgroundColor: '#0e1119',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderWidth: 1,
+    borderColor: '#242a3b',
+    maxHeight: 440,
+    paddingBottom: 24,
+  },
+  pickerHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#3a4156',
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1e2434',
+  },
+  pickerTitle: {
+    color: '#e6ebfc',
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  pickerDoneBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: '#1b3a8a',
+  },
+  pickerDoneText: {
+    color: '#7aaeff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  timeOption: {
+    height: ITEM_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 22,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(60,70,95,0.3)',
+  },
+  timeOptionSelected: {
+    backgroundColor: 'rgba(43,104,240,0.10)',
+  },
+  timeOptionText: {
+    color: '#9ba5c0',
+    fontSize: 16,
+  },
+  timeOptionTextSelected: {
+    color: '#5b9bff',
+    fontWeight: '600',
   },
 });
