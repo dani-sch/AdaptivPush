@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
-import { supabase} from "@/utils/supabase";
+import { supabase } from "@/utils/supabase";
+import { notifyDeloadWeek } from '@/utils/notifications';
 import type { CurrentProgram, ProgramWorkout, WorkoutExercise } from '@/types/program';
 import { computeProgression } from '@/utils/progressionEngine';
 import type { ProgressionContext, LoggedSet } from '@/types/progression';
@@ -769,6 +770,11 @@ export function useCurrentProgram() {
 
         console.log('[advanceToNextWeek] Success, refreshing');
         await refresh();
+
+        // Every 4th week is a deload — notify the user when transitioning into one
+        if (nextWeek % 4 === 0) {
+            void notifyDeloadWeek();
+        }
     }, [program, refresh]);
 
     return { program, loading, refresh, swapExercise, createBlankProgram, createDevTestProgram, endCurrentProgram, applyProgressionToNextWeek, applyReadinessAdjustmentOnly, advanceToNextWeek };
