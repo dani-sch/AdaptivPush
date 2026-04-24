@@ -4,6 +4,7 @@ import { useCurrentProgram } from "@/hooks/useCurrentProgram";
 import type { CurrentProgram, ProgramWorkout } from "@/types/program";
 import { supabase } from "@/utils/supabase";
 import { getReadinessModifier } from "@/utils/progressionEngine";
+import { notifyPRCelebration } from "@/utils/notifications";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -356,6 +357,7 @@ export default function NextWorkoutScreen() {
       // For each exercise, find the best weight×reps set just saved and compare
       // against the user's all-time best for that exercise.
       const newPrNames: string[] = [];
+      const newPrs: Array<{ name: string; weight: number; reps: number }> = [];
       try {
         for (const ex of exercises) {
           if (!ex.exerciseId) continue;
@@ -403,11 +405,16 @@ export default function NextWorkoutScreen() {
               console.warn(`[PR] Insert failed for ${ex.name}:`, prInsertErr.message);
             } else {
               newPrNames.push(ex.name);
+              newPrs.push({ name: ex.name, weight: bestWeight, reps: bestReps });
             }
           }
         }
       } catch (prErr) {
         console.warn("[handleFinish] PR detection failed:", prErr);
+      }
+
+      if (newPrs.length > 0) {
+        void notifyPRCelebration(newPrs);
       }
 
       // Trigger progression for next week now that new data is available

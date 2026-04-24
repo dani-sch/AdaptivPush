@@ -4,12 +4,23 @@ import {
   ThemeProvider,
 } from "@react-navigation/native";
 import { Stack, router, useRootNavigationState } from "expo-router";
+import * as Notifications from "expo-notifications";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import "react-native-reanimated";
 
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { supabase } from "@/utils/supabase";
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -41,6 +52,7 @@ export default function RootLayout() {
         <Stack.Screen name="next-workout" options={{ headerShown: false }} />
         <Stack.Screen name="create-program" options={{ headerShown: false }} />
         <Stack.Screen name="faq" options={{ headerShown: false }} />
+        <Stack.Screen name="archived-programs" options={{ headerShown: false }} />
         <Stack.Screen
           name="recovery-library"
           options={{ headerShown: false }}
