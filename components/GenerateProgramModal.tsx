@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, Alert, TextInput } from 'react-native';
 import { X } from 'lucide-react-native';
 import { supabase } from '@/utils/supabase';
 import { generateProgram } from '@/utils/programGenerator';
 import { saveProgramToDb } from '@/utils/saveProgramToDb';
-import type { ProgramGenParams, TrainingGoal, MuscleGroup } from '@/types/program';
+import { computeCyclePhase } from '@/utils/cyclePhase';
+import type { ProgramGenParams, TrainingGoal, MuscleGroup, GeneratedProgram } from '@/types/program';
 import type { TrainingExperience } from '@/types/database';
 import {
   PRIMARY_COLOR,
@@ -77,6 +78,8 @@ export function GenerateProgramModal({
   const [targetSessionMinutes, setTargetSessionMinutes] = useState<number | null>(60);
   const [swapIntervalWeeks, setSwapIntervalWeeks] = useState(defaultParams?.swapIntervalWeeks ?? 4);
   const [loading, setLoading] = useState(false);
+  const [pendingProgram, setPendingProgram] = useState<GeneratedProgram | null>(null);
+  const [customName, setCustomName] = useState('');
 
   if (!visible) return null;
 
@@ -98,12 +101,16 @@ export function GenerateProgramModal({
 
       const { data: profile } = await supabase
         .from('user_profile')
-        .select('weight_lb, experience_level')
+        .select('weight_lb, experience_level, cycle_enabled, last_period_start_date, avg_cycle_length_days')
         .eq('user_id', user.id)
         .single();
 
       const weightLb = profile?.weight_lb ?? 150;
-      const experience = (profile?.experience_level ?? 'beginner') as TrainingExperience;
+      const experience = (profile?.experience_level ?? 'intermediate') as TrainingExperience;
+
+      const cyclePhase = profile?.cycle_enabled && profile?.last_period_start_date
+        ? computeCyclePhase(profile.last_period_start_date, profile.avg_cycle_length_days ?? 28)
+        : undefined;
 
       const params: ProgramGenParams = {
         daysPerWeek,
@@ -114,16 +121,49 @@ export function GenerateProgramModal({
         swapIntervalWeeks,
       };
 
-      const generated = generateProgram(params, weightLb, experience);
-      await saveProgramToDb(user.id, params, generated);
-
-      onProgramCreated();
-      onClose();
+      const generated = generateProgram(params, weightLb, experience, cyclePhase);
+      setPendingProgram(generated);
+      setCustomName(generated.name);
     } catch (err: any) {
       Alert.alert('Could not generate program', err?.message ?? 'Please try again.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSave = async () => {
+    if (!pendingProgram) return;
+    setLoading(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not signed in');
+
+      const params: ProgramGenParams = {
+        daysPerWeek,
+        durationWeeks,
+        goal,
+        focusMuscleGroups: focusMuscles,
+        targetSessionMinutes,
+        swapIntervalWeeks,
+      };
+
+      const programName = customName.trim() || pendingProgram.name;
+      await saveProgramToDb(user.id, params, { ...pendingProgram, name: programName });
+
+      onProgramCreated();
+      onClose();
+    } catch (err: any) {
+      Alert.alert('Could not save program', err?.message ?? 'Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBack = () => {
+    setPendingProgram(null);
+    setCustomName('');
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -139,7 +179,9 @@ export function GenerateProgramModal({
           <View style={styles.headerDot} />
           <View style={{ flex: 1 }}>
             <Text style={styles.headerTitle}>Generate Your Program</Text>
-            <Text style={styles.headerSubtitle}>Build a custom plan based on your goals</Text>
+            <Text style={styles.headerSubtitle}>
+              {pendingProgram ? 'Name your program' : 'Build a custom plan based on your goals'}
+            </Text>
           </View>
           <Pressable
             style={styles.iconBtn}
@@ -150,201 +192,253 @@ export function GenerateProgramModal({
           </Pressable>
         </View>
 
-        {/* ── Scrollable Body ── */}
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Days per week */}
-          <Text style={styles.sectionLabel}>DAYS PER WEEK</Text>
-          <View style={styles.dayRow}>
-            {DAYS.map(day => {
-              const active = daysPerWeek === day;
-              return (
-                <Pressable
-                  key={day}
-                  onPress={() => setDaysPerWeek(day)}
-                  accessibilityLabel={`${day} day${day > 1 ? 's' : ''} per week`}
-                  accessibilityState={{ selected: active }}
-                  style={[
-                    styles.dayCircle,
-                    active
-                      ? { backgroundColor: PRIMARY_COLOR }
-                      : { backgroundColor: MUTED_BG, borderWidth: 1, borderColor: BORDER_COLOR },
-                  ]}
-                >
-                  <Text style={[styles.dayCircleText, { color: active ? WHITE : TEXT_COLOR }]}>
-                    {day}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+        {pendingProgram ? (
+          // ── Name step ──────────────────────────────────────────────────────
+          <>
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Text style={styles.sectionLabel}>PROGRAM NAME</Text>
+              <TextInput
+                style={styles.nameInput}
+                value={customName}
+                onChangeText={setCustomName}
+                placeholder={pendingProgram.name}
+                placeholderTextColor={PLACEHOLDER_TEXT}
+                returnKeyType="done"
+                autoFocus
+                autoCapitalize="words"
+              />
+              <Text style={styles.nameHint}>
+                Leave blank to use the default name
+              </Text>
+            </ScrollView>
 
-          {/* Program duration */}
-          <Text style={styles.sectionLabel}>PROGRAM LENGTH</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.durationRow}
-          >
-            {DURATIONS.map(weeks => {
-              const active = durationWeeks === weeks;
-              return (
-                <Pressable
-                  key={weeks}
-                  onPress={() => setDurationWeeks(weeks)}
-                  accessibilityLabel={`${weeks} weeks`}
-                  accessibilityState={{ selected: active }}
-                  style={[
-                    styles.durationPill,
-                    active
-                      ? { backgroundColor: PRIMARY_COLOR, borderColor: PRIMARY_COLOR }
-                      : { backgroundColor: 'transparent', borderColor: BORDER_COLOR },
-                  ]}
-                >
-                  <Text style={[styles.durationPillText, { color: active ? WHITE : TEXT_COLOR }]}>
-                    {weeks} wk
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+            <View style={styles.footer}>
+              <Pressable
+                onPress={handleSave}
+                disabled={loading}
+                accessibilityLabel={loading ? 'Saving program' : 'Save Program'}
+                style={({ pressed }) => [
+                  styles.generateBtn,
+                  loading && { opacity: 0.6 },
+                  pressed && !loading && { opacity: 0.92 },
+                ]}
+              >
+                <Text style={styles.generateBtnText}>
+                  {loading ? 'Saving…' : 'Save Program'}
+                </Text>
+              </Pressable>
 
-          {/* Session length */}
-          <Text style={styles.sectionLabel}>SESSION LENGTH</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.durationRow}
-          >
-            {SESSION_LENGTHS.map(({ label, value }) => {
-              const active = targetSessionMinutes === value;
-              return (
-                <Pressable
-                  key={label}
-                  onPress={() => setTargetSessionMinutes(value)}
-                  accessibilityLabel={label}
-                  accessibilityState={{ selected: active }}
-                  style={[
-                    styles.durationPill,
-                    active
-                      ? { backgroundColor: PRIMARY_COLOR, borderColor: PRIMARY_COLOR }
-                      : { backgroundColor: 'transparent', borderColor: BORDER_COLOR },
-                  ]}
-                >
-                  <Text style={[styles.durationPillText, { color: active ? WHITE : TEXT_COLOR }]}>
-                    {label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+              <Pressable
+                onPress={loading ? undefined : handleBack}
+                accessibilityLabel="Back to settings"
+                style={({ pressed }) => [styles.skipBtn, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={styles.skipBtnText}>Back</Text>
+              </Pressable>
+            </View>
+          </>
+        ) : (
+          // ── Params step ────────────────────────────────────────────────────
+          <>
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* Days per week */}
+              <Text style={styles.sectionLabel}>DAYS PER WEEK</Text>
+              <View style={styles.dayRow}>
+                {DAYS.map(day => {
+                  const active = daysPerWeek === day;
+                  return (
+                    <Pressable
+                      key={day}
+                      onPress={() => setDaysPerWeek(day)}
+                      accessibilityLabel={`${day} day${day > 1 ? 's' : ''} per week`}
+                      accessibilityState={{ selected: active }}
+                      style={[
+                        styles.dayCircle,
+                        active
+                          ? { backgroundColor: PRIMARY_COLOR }
+                          : { backgroundColor: MUTED_BG, borderWidth: 1, borderColor: BORDER_COLOR },
+                      ]}
+                    >
+                      <Text style={[styles.dayCircleText, { color: active ? WHITE : TEXT_COLOR }]}>
+                        {day}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
 
-          {/* Training goal */}
-          <Text style={styles.sectionLabel}>TRAINING GOAL</Text>
-          <View style={styles.chipWrap}>
-            {GOALS.map(g => {
-              const active = goal === g;
-              return (
-                <Pressable
-                  key={g}
-                  onPress={() => setGoal(g)}
-                  accessibilityLabel={GOAL_LABELS[g]}
-                  accessibilityState={{ selected: active }}
-                  style={[
-                    styles.chip,
-                    active
-                      ? { backgroundColor: PRIMARY_COLOR, borderColor: PRIMARY_COLOR }
-                      : { backgroundColor: 'transparent', borderColor: BORDER_COLOR },
-                  ]}
-                >
-                  <Text style={[styles.chipText, { color: active ? WHITE : TEXT_COLOR }]}>
-                    {GOAL_LABELS[g]}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+              {/* Program duration */}
+              <Text style={styles.sectionLabel}>PROGRAM LENGTH</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.durationRow}
+              >
+                {DURATIONS.map(weeks => {
+                  const active = durationWeeks === weeks;
+                  return (
+                    <Pressable
+                      key={weeks}
+                      onPress={() => setDurationWeeks(weeks)}
+                      accessibilityLabel={`${weeks} weeks`}
+                      accessibilityState={{ selected: active }}
+                      style={[
+                        styles.durationPill,
+                        active
+                          ? { backgroundColor: PRIMARY_COLOR, borderColor: PRIMARY_COLOR }
+                          : { backgroundColor: 'transparent', borderColor: BORDER_COLOR },
+                      ]}
+                    >
+                      <Text style={[styles.durationPillText, { color: active ? WHITE : TEXT_COLOR }]}>
+                        {weeks} wk
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
 
-          {/* Focus muscle groups */}
-          <Text style={styles.sectionLabel}>FOCUS MUSCLE GROUPS (OPTIONAL)</Text>
-          <View style={styles.chipWrap}>
-            {MUSCLE_GROUPS.map(m => {
-              const active = focusMuscles.includes(m);
-              return (
-                <Pressable
-                  key={m}
-                  onPress={() => toggleMuscle(m)}
-                  accessibilityLabel={m}
-                  accessibilityState={{ selected: active }}
-                  style={[
-                    styles.chip,
-                    active
-                      ? { backgroundColor: SECONDARY_COLOR, borderColor: SECONDARY_COLOR }
-                      : { backgroundColor: 'transparent', borderColor: BORDER_COLOR },
-                  ]}
-                >
-                  <Text style={[styles.chipText, { color: active ? WHITE : TEXT_COLOR }]}>
-                    {m}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+              {/* Session length */}
+              <Text style={styles.sectionLabel}>SESSION LENGTH</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.durationRow}
+              >
+                {SESSION_LENGTHS.map(({ label, value }) => {
+                  const active = targetSessionMinutes === value;
+                  return (
+                    <Pressable
+                      key={label}
+                      onPress={() => setTargetSessionMinutes(value)}
+                      accessibilityLabel={label}
+                      accessibilityState={{ selected: active }}
+                      style={[
+                        styles.durationPill,
+                        active
+                          ? { backgroundColor: PRIMARY_COLOR, borderColor: PRIMARY_COLOR }
+                          : { backgroundColor: 'transparent', borderColor: BORDER_COLOR },
+                      ]}
+                    >
+                      <Text style={[styles.durationPillText, { color: active ? WHITE : TEXT_COLOR }]}>
+                        {label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
 
-          {/* Accessory swap interval */}
-          <Text style={styles.sectionLabel}>ACCESSORY SWAP INTERVAL</Text>
-          <View style={styles.chipWrap}>
-            {([3, 4, 6] as const).map(w => {
-              const active = swapIntervalWeeks === w;
-              return (
-                <Pressable
-                  key={w}
-                  onPress={() => setSwapIntervalWeeks(w)}
-                  style={[
-                    styles.chip,
-                    active
-                      ? { backgroundColor: PRIMARY_COLOR, borderColor: PRIMARY_COLOR }
-                      : { backgroundColor: 'transparent', borderColor: BORDER_COLOR },
-                  ]}
-                >
-                  <Text style={[styles.chipText, { color: active ? WHITE : TEXT_COLOR }]}>
-                    Every {w} weeks
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </ScrollView>
+              {/* Training goal */}
+              <Text style={styles.sectionLabel}>TRAINING GOAL</Text>
+              <View style={styles.chipWrap}>
+                {GOALS.map(g => {
+                  const active = goal === g;
+                  return (
+                    <Pressable
+                      key={g}
+                      onPress={() => setGoal(g)}
+                      accessibilityLabel={GOAL_LABELS[g]}
+                      accessibilityState={{ selected: active }}
+                      style={[
+                        styles.chip,
+                        active
+                          ? { backgroundColor: PRIMARY_COLOR, borderColor: PRIMARY_COLOR }
+                          : { backgroundColor: 'transparent', borderColor: BORDER_COLOR },
+                      ]}
+                    >
+                      <Text style={[styles.chipText, { color: active ? WHITE : TEXT_COLOR }]}>
+                        {GOAL_LABELS[g]}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
 
-        {/* ── Footer ── */}
-        <View style={styles.footer}>
-          <Pressable
-            onPress={handleGenerate}
-            disabled={loading}
-            accessibilityLabel={loading ? 'Generating program' : 'Generate My Program'}
-            style={({ pressed }) => [
-              styles.generateBtn,
-              loading && { opacity: 0.6 },
-              pressed && !loading && { opacity: 0.92 },
-            ]}
-          >
-            <Text style={styles.generateBtnText}>
-              {loading ? 'Generating…' : 'Generate My Program'}
-            </Text>
-          </Pressable>
+              {/* Focus muscle groups */}
+              <Text style={styles.sectionLabel}>FOCUS MUSCLE GROUPS (OPTIONAL)</Text>
+              <View style={styles.chipWrap}>
+                {MUSCLE_GROUPS.map(m => {
+                  const active = focusMuscles.includes(m);
+                  return (
+                    <Pressable
+                      key={m}
+                      onPress={() => toggleMuscle(m)}
+                      accessibilityLabel={m}
+                      accessibilityState={{ selected: active }}
+                      style={[
+                        styles.chip,
+                        active
+                          ? { backgroundColor: SECONDARY_COLOR, borderColor: SECONDARY_COLOR }
+                          : { backgroundColor: 'transparent', borderColor: BORDER_COLOR },
+                      ]}
+                    >
+                      <Text style={[styles.chipText, { color: active ? WHITE : TEXT_COLOR }]}>
+                        {m}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
 
-          <Pressable
-            onPress={loading ? undefined : onClose}
-            accessibilityLabel="Skip for now"
-            style={({ pressed }) => [styles.skipBtn, pressed && { opacity: 0.7 }]}
-          >
-            <Text style={styles.skipBtnText}>Skip for now</Text>
-          </Pressable>
-        </View>
+              {/* Accessory swap interval */}
+              <Text style={styles.sectionLabel}>ACCESSORY SWAP INTERVAL</Text>
+              <View style={styles.chipWrap}>
+                {([3, 4, 6] as const).map(w => {
+                  const active = swapIntervalWeeks === w;
+                  return (
+                    <Pressable
+                      key={w}
+                      onPress={() => setSwapIntervalWeeks(w)}
+                      style={[
+                        styles.chip,
+                        active
+                          ? { backgroundColor: PRIMARY_COLOR, borderColor: PRIMARY_COLOR }
+                          : { backgroundColor: 'transparent', borderColor: BORDER_COLOR },
+                      ]}
+                    >
+                      <Text style={[styles.chipText, { color: active ? WHITE : TEXT_COLOR }]}>
+                        Every {w} weeks
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </ScrollView>
+
+            <View style={styles.footer}>
+              <Pressable
+                onPress={handleGenerate}
+                disabled={loading}
+                accessibilityLabel={loading ? 'Generating program' : 'Generate My Program'}
+                style={({ pressed }) => [
+                  styles.generateBtn,
+                  loading && { opacity: 0.6 },
+                  pressed && !loading && { opacity: 0.92 },
+                ]}
+              >
+                <Text style={styles.generateBtnText}>
+                  {loading ? 'Generating…' : 'Generate My Program'}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={loading ? undefined : onClose}
+                accessibilityLabel="Skip for now"
+                style={({ pressed }) => [styles.skipBtn, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={styles.skipBtnText}>Skip for now</Text>
+              </Pressable>
+            </View>
+          </>
+        )}
       </View>
     </View>
   );
@@ -474,6 +568,24 @@ const styles = StyleSheet.create({
   chipText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+
+  // Name step
+  nameInput: {
+    backgroundColor: MUTED_BG,
+    borderWidth: 1,
+    borderColor: BORDER_COLOR,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: WHITE,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  nameHint: {
+    color: PLACEHOLDER_TEXT,
+    fontSize: 12,
+    marginTop: 8,
   },
 
   // Footer
