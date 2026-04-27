@@ -14,19 +14,30 @@ import {
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActionSheetIOS,
   ActivityIndicator,
+  Alert,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { mergeUserMetadata, parseReadinessPreferences } from '@/utils/profilePreferences';
 import { supabase } from '@/utils/supabase';
+import type { TrainingExperience } from '@/types/database';
+
+const EXPERIENCE_LABELS: Record<TrainingExperience, string> = {
+  beginner: 'Beginner',
+  intermediate: 'Intermediate',
+  advanced: 'Advanced',
+};
 
 interface UserProfile {
   id: string;
@@ -290,6 +301,11 @@ export default function ProfileScreen() {
   const [isReadinessSaving, setIsReadinessSaving] = useState(false);
   const [readinessStatusMessage, setReadinessStatusMessage] = useState<string | null>(null);
   const [readinessStatusType, setReadinessStatusType] = useState<'success' | 'error'>('success');
+  const [experienceLevel, setExperienceLevel] = useState<TrainingExperience | null>(null);
+  const [cycleEnabled, setCycleEnabled] = useState(false);
+  const [daysSincePeriod, setDaysSincePeriod] = useState<string>('');
+  const [avgCycleLength, setAvgCycleLength] = useState<string>('28');
+  const [cycleSaving, setCycleSaving] = useState(false);
 
   const fetchProfileData = useCallback(async () => {
     try {
@@ -329,7 +345,7 @@ export default function ProfileScreen() {
 
       const { data: userProfileData, error: userProfileError } = await supabase
         .from('user_profile')
-        .select('healthkit_enabled')
+        .select('healthkit_enabled, experience_level, cycle_enabled, last_period_start_date, avg_cycle_length_days')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -347,6 +363,15 @@ export default function ProfileScreen() {
         setIsAppleHealthConnected(healthkitEnabled);
         if (!healthkitEnabled && readinessPreferences.source === 'apple') {
           setReadinessSource('manual');
+        }
+        if (userProfileData?.experience_level) {
+          setExperienceLevel(userProfileData.experience_level as TrainingExperience);
+        }
+        setCycleEnabled(userProfileData?.cycle_enabled ?? false);
+        setAvgCycleLength(String(userProfileData?.avg_cycle_length_days ?? 28));
+        if (userProfileData?.last_period_start_date) {
+          const { daysSincePeriod: dsp } = await import('@/utils/cyclePhase');
+          setDaysSincePeriod(String(dsp(userProfileData.last_period_start_date)));
         }
       }
 
@@ -505,6 +530,69 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleEditExperienceLevel = () => {
+    const options: TrainingExperience[] = ['beginner', 'intermediate', 'advanced'];
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ['Cancel', 'Beginner', 'Intermediate', 'Advanced'],
+          cancelButtonIndex: 0,
+          title: 'Experience Level',
+        },
+        async (buttonIndex) => {
+          if (buttonIndex === 0) return;
+          const selected = options[buttonIndex - 1];
+          await saveExperienceLevel(selected);
+        },
+      );
+    } else {
+      Alert.alert(
+        'Experience Level',
+        'Select your training experience',
+        [
+          ...options.map((opt) => ({
+            text: EXPERIENCE_LABELS[opt],
+            onPress: () => saveExperienceLevel(opt),
+          })),
+          { text: 'Cancel', style: 'cancel' as const },
+        ],
+      );
+    }
+  };
+
+  const saveExperienceLevel = async (level: TrainingExperience) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    setExperienceLevel(level);
+    await supabase
+      .from('user_profile')
+      .update({ experience_level: level, updated_at: new Date().toISOString() })
+      .eq('user_id', user.id);
+  };
+
+  const saveCycleSettings = async () => {
+    try {
+      setCycleSaving(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { dateFromDaysAgo } = await import('@/utils/cyclePhase');
+      const daysNum = parseInt(daysSincePeriod, 10);
+      const periodDate = !isNaN(daysNum) && daysNum >= 0 ? dateFromDaysAgo(daysNum) : null;
+      const cycleLen = parseInt(avgCycleLength, 10);
+
+      await supabase.from('user_profile').update({
+        cycle_enabled: cycleEnabled,
+        last_period_start_date: cycleEnabled ? periodDate : null,
+        avg_cycle_length_days: !isNaN(cycleLen) && cycleLen > 0 ? cycleLen : 28,
+        updated_at: new Date().toISOString(),
+      }).eq('user_id', user.id);
+    } finally {
+      setCycleSaving(false);
+    }
+  };
+
   const handleMenuItemPress = (label: MenuLabel) => {
     if (label === 'Readiness Settings') {
       setReadinessStatusMessage(null);
@@ -578,6 +666,101 @@ export default function ProfileScreen() {
             </View>
           </View>
         </LinearGradient>
+
+        {/* Training section */}
+        <View style={styles.sectionWrap}>
+          <Text style={styles.sectionTitle}>TRAINING</Text>
+          <LinearGradient
+            colors={['#171a24', '#12141b']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.groupCard}
+          >
+            <Pressable
+              onPress={handleEditExperienceLevel}
+              style={({ pressed }) => [styles.menuRow, pressed && styles.menuRowPressed]}
+            >
+              <View style={styles.menuRowLeft}>
+                <ChevronRight color="#747a8f" size={24} style={{ transform: [{ rotate: '0deg' }] }} />
+                <Text style={styles.menuLabel}>Experience Level</Text>
+              </View>
+              <View style={styles.experienceBadge}>
+                <Text style={styles.experienceBadgeText}>
+                  {experienceLevel ? EXPERIENCE_LABELS[experienceLevel] : 'Not set'}
+                </Text>
+                <ChevronRight color="#4d5265" size={20} />
+              </View>
+            </Pressable>
+          </LinearGradient>
+        </View>
+
+        {/* Cycle Tracking section */}
+        <View style={styles.sectionWrap}>
+          <Text style={styles.sectionTitle}>CYCLE TRACKING</Text>
+          <LinearGradient
+            colors={['#171a24', '#12141b']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.groupCard, { overflow: 'visible', borderRadius: 22, padding: 16 }]}
+          >
+            <View style={styles.cycleToggleRow}>
+              <Text style={styles.menuLabel}>Enable Cycle Tracking</Text>
+              <Switch
+                value={cycleEnabled}
+                onValueChange={(val) => { setCycleEnabled(val); }}
+                trackColor={{ false: '#4f5568', true: '#2f7cff' }}
+                thumbColor="#f4f6ff"
+                ios_backgroundColor="#4f5568"
+              />
+            </View>
+
+            {cycleEnabled && (
+              <View style={styles.cycleFields}>
+                <View style={styles.cycleField}>
+                  <Text style={styles.cycleFieldLabel}>Days since period started</Text>
+                  <TextInput
+                    value={daysSincePeriod}
+                    onChangeText={setDaysSincePeriod}
+                    keyboardType="number-pad"
+                    placeholder="e.g. 5"
+                    placeholderTextColor="#4d5265"
+                    style={styles.cycleInput}
+                    maxLength={2}
+                  />
+                </View>
+                <View style={styles.cycleField}>
+                  <Text style={styles.cycleFieldLabel}>Average cycle length (days)</Text>
+                  <TextInput
+                    value={avgCycleLength}
+                    onChangeText={setAvgCycleLength}
+                    keyboardType="number-pad"
+                    placeholder="28"
+                    placeholderTextColor="#4d5265"
+                    style={styles.cycleInput}
+                    maxLength={2}
+                  />
+                </View>
+                <Pressable
+                  onPress={saveCycleSettings}
+                  disabled={cycleSaving}
+                  style={({ pressed }) => [styles.cycleSaveBtn, pressed && { opacity: 0.8 }]}
+                >
+                  <Text style={styles.cycleSaveBtnText}>{cycleSaving ? 'Saving…' : 'Save'}</Text>
+                </Pressable>
+              </View>
+            )}
+
+            {!cycleEnabled && (
+              <Pressable
+                onPress={saveCycleSettings}
+                disabled={cycleSaving}
+                style={({ pressed }) => [styles.cycleSaveBtn, { marginTop: 12 }, pressed && { opacity: 0.8 }]}
+              >
+                <Text style={styles.cycleSaveBtnText}>{cycleSaving ? 'Saving…' : 'Save'}</Text>
+              </Pressable>
+            )}
+          </LinearGradient>
+        </View>
 
         {error ? (
           <View style={styles.errorBanner}>
@@ -954,6 +1137,56 @@ const styles = StyleSheet.create({
     bottom: 0,
     height: 1,
     backgroundColor: 'rgba(93, 100, 121, 0.28)',
+  },
+  cycleToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  cycleFields: {
+    marginTop: 16,
+    gap: 14,
+  },
+  cycleField: {
+    gap: 6,
+  },
+  cycleFieldLabel: {
+    color: '#6f7485',
+    fontSize: 13,
+  },
+  cycleInput: {
+    backgroundColor: 'rgba(76,82,97,0.35)',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    color: '#f4f6ff',
+    fontSize: 15,
+    fontWeight: '500',
+    borderWidth: 1,
+    borderColor: '#2a2f42',
+  },
+  cycleSaveBtn: {
+    backgroundColor: '#2b68f0',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  cycleSaveBtnText: {
+    color: '#f4f6ff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  experienceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  experienceBadgeText: {
+    color: '#6f7485',
+    fontSize: 15,
+    fontWeight: '500',
   },
   logoutCard: {
     borderRadius: 22,
