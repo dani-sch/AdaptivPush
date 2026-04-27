@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Archive } from 'lucide-react-native';
 
@@ -21,6 +21,7 @@ type ArchivedProgram = {
     start_date: string | null;
     created_at: string;
     updated_at: string;
+    last_active_week: number | null;
 };
 
 function formatDate(value: string | null) {
@@ -52,7 +53,7 @@ export default function ArchivedProgramsScreen() {
 
             const { data, error } = await supabase
                 .from('programs')
-                .select('id,name,goal,duration_weeks,start_date,created_at,updated_at')
+                .select('id,name,goal,duration_weeks,start_date,created_at,updated_at,last_active_week')
                 .eq('user_id', user.id)
                 .eq('is_active', false)
                 .order('updated_at', { ascending: false })
@@ -71,6 +72,64 @@ export default function ArchivedProgramsScreen() {
     useEffect(() => {
         loadArchivedPrograms();
     }, [loadArchivedPrograms]);
+
+    const unarchiveProgram = async (programId: string, resumeWeek: number) => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            // Compute start_date so that computeWeekNumber returns resumeWeek
+            const daysToSubtract = (resumeWeek - 1) * 7;
+            const newStart = new Date();
+            newStart.setDate(newStart.getDate() - daysToSubtract);
+            const y = newStart.getFullYear();
+            const m = String(newStart.getMonth() + 1).padStart(2, '0');
+            const d = String(newStart.getDate()).padStart(2, '0');
+            const startDate = `${y}-${m}-${d}`;
+
+            // Deactivate any currently active program
+            await supabase
+                .from('programs')
+                .update({ is_active: false, updated_at: new Date().toISOString() })
+                .eq('user_id', user.id)
+                .eq('is_active', true);
+
+            // Restore this program at the desired week
+            await supabase
+                .from('programs')
+                .update({
+                    is_active: true,
+                    start_date: startDate,
+                    last_active_week: null,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', programId);
+
+            await loadArchivedPrograms();
+            router.back();
+        } catch (e) {
+            console.error('unarchiveProgram error', e);
+        }
+    };
+
+    const handleUnarchive = (prog: ArchivedProgram) => {
+        const hasSnapshot = prog.last_active_week != null && prog.last_active_week > 1;
+        Alert.alert(
+            `Restore "${prog.name}"?`,
+            'This will make it your active program. Any currently running program will be archived.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                ...(hasSnapshot ? [{
+                    text: `Resume — Week ${prog.last_active_week}`,
+                    onPress: () => unarchiveProgram(prog.id, prog.last_active_week!),
+                }] : []),
+                {
+                    text: 'Restart from Week 1',
+                    onPress: () => unarchiveProgram(prog.id, 1),
+                },
+            ],
+        );
+    };
 
     return (
         <SafeAreaView style={styles.safeArea}>
@@ -120,9 +179,22 @@ export default function ArchivedProgramsScreen() {
                                     <Text style={styles.metaValue}>{formatDate(program.start_date)}</Text>
                                 </View>
                                 <View style={styles.metaRow}>
-                                    <Text style={styles.metaLabel}>Ended</Text>
+                                    <Text style={styles.metaLabel}>Ended on</Text>
                                     <Text style={styles.metaValue}>{formatDate(program.updated_at)}</Text>
                                 </View>
+                                {program.last_active_week != null && (
+                                    <View style={styles.metaRow}>
+                                        <Text style={styles.metaLabel}>Left off at</Text>
+                                        <Text style={styles.metaValue}>Week {program.last_active_week}</Text>
+                                    </View>
+                                )}
+
+                                <Pressable
+                                    onPress={() => handleUnarchive(program)}
+                                    style={({ pressed }) => [styles.restoreBtn, pressed && { opacity: 0.8 }]}
+                                >
+                                    <Text style={styles.restoreBtnText}>Restore Program</Text>
+                                </Pressable>
                             </View>
                         ))}
                     </ScrollView>
@@ -213,6 +285,20 @@ const styles = StyleSheet.create({
         color: WHITE,
         fontSize: 13,
         fontWeight: '600',
+    },
+    restoreBtn: {
+        marginTop: 14,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: BORDER_COLOR,
+        backgroundColor: CARD_BG,
+        paddingVertical: 10,
+        alignItems: 'center',
+    },
+    restoreBtnText: {
+        color: WHITE,
+        fontSize: 14,
+        fontWeight: '700',
     },
     emptyState: {
         flex: 1,
