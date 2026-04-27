@@ -4,6 +4,8 @@ import { useCurrentProgram } from "@/hooks/useCurrentProgram";
 import type { CurrentProgram, ProgramWorkout } from "@/types/program";
 import { supabase } from "@/utils/supabase";
 import { getReadinessModifier } from "@/utils/progressionEngine";
+import { computeCyclePhase, getCycleModifier } from "@/utils/cyclePhase";
+import type { CyclePhase } from "@/utils/cyclePhase";
 import { notifyPRCelebration } from "@/utils/notifications";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -34,27 +36,38 @@ import {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Build ExerciseCard Exercise[] from a real ProgramWorkout, with optional readiness overlay */
-function buildExercises(workout: ProgramWorkout, readinessScore: number | null): Exercise[] {
-  const modifier = readinessScore !== null ? getReadinessModifier(readinessScore) : null;
+/** Build ExerciseCard Exercise[] from a real ProgramWorkout, with optional readiness + cycle overlay */
+function buildExercises(
+  workout: ProgramWorkout,
+  readinessScore: number | null,
+  cyclePhase: CyclePhase | null,
+): Exercise[] {
+  const readinessModifier = readinessScore !== null ? getReadinessModifier(readinessScore) : null;
+  const cycleModifier = getCycleModifier(cyclePhase);
+
+  const combinedWeightMult =
+    (readinessModifier?.weightMultiplier ?? 1.0) * (cycleModifier?.weightMultiplier ?? 1.0);
+  const combinedRpeDelta =
+    (readinessModifier?.rpeDelta ?? 0) + (cycleModifier?.rpeDelta ?? 0);
+  const hasModifier = readinessModifier !== null || cycleModifier !== null;
 
   return workout.exercises.map((ex) => {
     const setCount = ex.sets ?? 3;
     const baseWeight = ex.weight != null ? ex.weight : 0;
 
-    // Apply readiness modifier to the displayed weight (UI overlay only — not persisted)
+    // Apply combined modifier to the displayed weight (UI overlay only — not persisted)
     const weightForSet = (setIndex: number): string => {
       const raw = ex.perSetWeights?.[setIndex] ?? baseWeight;
-      const adjusted = modifier
-        ? Math.max(0, Math.round((raw * modifier.weightMultiplier) / 2.5) * 2.5)
+      const adjusted = hasModifier
+        ? Math.max(0, Math.round((raw * combinedWeightMult) / 2.5) * 2.5)
         : raw;
       return adjusted > 0 ? String(adjusted) : "";
     };
 
-    // Apply readiness RPE delta
+    // Apply combined RPE delta
     const baseRpe = ex.targetRpe != null ? ex.targetRpe : null;
-    const adjustedRpe = baseRpe !== null && modifier
-      ? Math.min(10, Math.max(5, baseRpe + modifier.rpeDelta))
+    const adjustedRpe = baseRpe !== null && hasModifier
+      ? Math.min(10, Math.max(5, baseRpe + combinedRpeDelta))
       : baseRpe;
     const rpeStr = adjustedRpe != null ? String(adjustedRpe) : "";
 
@@ -176,6 +189,7 @@ export default function NextWorkoutScreen() {
   const [saving, setSaving] = useState(false);
   const [swapTargetId, setSwapTargetId] = useState<string | null>(null);
   const [readinessScore, setReadinessScore] = useState<number | null>(null);
+  const [cyclePhase, setCyclePhase] = useState<CyclePhase | null>(null);
   const [prExercises, setPrExercises] = useState<string[]>([]); // exercise names with new PRs
   const [showPrModal, setShowPrModal] = useState(false);
   const [historyExerciseId, setHistoryExerciseId] = useState<string | null>(
@@ -186,36 +200,62 @@ export default function NextWorkoutScreen() {
   );
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Fetch today's readiness score once on mount (today-only — no bleed from previous days)
+  // Fetch today's readiness + cycle phase once on mount
   useEffect(() => {
     (async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
         const today = new Date().toISOString().split("T")[0];
+
         const { data } = await supabase
           .from("readiness_logs")
-          .select("readiness_score")
+          .select("readiness_score, cycle_phase")
           .eq("user_id", user.id)
           .eq("log_date", today)
           .maybeSingle();
+
         if (data?.readiness_score != null) {
           setReadinessScore(Number(data.readiness_score));
         }
+
+        // Map readiness log's UI-phase strings to utility CyclePhase
+        const dbPhaseMap: Record<string, CyclePhase> = {
+          Menstruation: 'menstrual',
+          Follicular: 'follicular',
+          Ovulation: 'ovulatory',
+          Luteal: 'luteal',
+        };
+
+        if (data?.cycle_phase && dbPhaseMap[data.cycle_phase]) {
+          setCyclePhase(dbPhaseMap[data.cycle_phase]);
+        } else {
+          // Fall back to auto-compute from profile
+          const { data: profile } = await supabase
+            .from("user_profile")
+            .select("cycle_enabled, last_period_start_date, avg_cycle_length_days")
+            .eq("user_id", user.id)
+            .maybeSingle();
+          if (profile?.cycle_enabled && profile?.last_period_start_date) {
+            setCyclePhase(
+              computeCyclePhase(profile.last_period_start_date, profile.avg_cycle_length_days ?? 28),
+            );
+          }
+        }
       } catch {
-        // Readiness fetch is best-effort; proceed without overlay
+        // Best-effort; proceed without overlay
       }
     })();
   }, []);
 
-  // Populate exercises once the program workout and readiness score are available
+  // Populate exercises once the program workout, readiness score, and cycle phase are available
   useEffect(() => {
     if (programWorkout) {
-      setExercises(buildExercises(programWorkout, readinessScore));
+      setExercises(buildExercises(programWorkout, readinessScore, cyclePhase));
       setWorkoutName(programWorkout.name);
       setProgramDayId(programWorkout.id);
     }
-  }, [programWorkout?.id, readinessScore]);
+  }, [programWorkout?.id, readinessScore, cyclePhase]);
 
   const programForSwap = useMemo<CurrentProgram | null>(() => {
     if (!program || !programWorkout) return null;

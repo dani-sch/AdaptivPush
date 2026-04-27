@@ -28,6 +28,7 @@ import {
 import { useCurrentProgram } from "../../hooks/useCurrentProgram";
 import { getReadinessModifier } from "../../utils/progressionEngine";
 import { supabase } from "../../utils/supabase";
+import { computeCyclePhase } from "../../utils/cyclePhase";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -577,11 +578,57 @@ export default function HomeScreen() {
     }
   }, []);
 
-  // Refresh program data and last workout date every time the home tab comes into focus
+  const fetchHomeData = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const today = new Date().toISOString().split("T")[0];
+    const { data } = await supabase
+      .from("readiness_logs")
+      .select("readiness_score, sleep_hours, stress, soreness, motivation, cycle_phase")
+      .eq("user_id", user.id)
+      .eq("log_date", today)
+      .maybeSingle();
+
+    if (data?.readiness_score != null) {
+      setReadinessScore(Number(data.readiness_score).toFixed(1));
+      if (data.sleep_hours != null) setTodaySleepHours(Number(data.sleep_hours));
+      if (data.stress != null) setTodayStressLevel(Number(data.stress));
+      if (data.soreness != null) setTodaySoreness(Number(data.soreness));
+      if (data.motivation != null) setTodayMotivation(Number(data.motivation));
+      if (data.cycle_phase) setTodayCyclePhase(data.cycle_phase as CyclePhase);
+    }
+
+    // Auto-compute cycle phase from stored profile data if no manual selection today
+    if (!data?.cycle_phase) {
+      const { data: profileData } = await supabase
+        .from('user_profile')
+        .select('cycle_enabled, last_period_start_date, avg_cycle_length_days')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (profileData?.cycle_enabled && profileData?.last_period_start_date) {
+        const phase = computeCyclePhase(
+          profileData.last_period_start_date,
+          profileData.avg_cycle_length_days ?? 28,
+        );
+        const phaseMap: Record<string, CyclePhase> = {
+          menstrual:  'Menstruation',
+          follicular: 'Follicular',
+          ovulatory:  'Ovulation',
+          luteal:     'Luteal',
+        };
+        setTodayCyclePhase(phaseMap[phase] ?? 'N/A');
+      }
+    }
+  }, []);
+
+  // Refresh all home data every time the tab comes into focus
   useFocusEffect(useCallback(() => {
     refresh();
     fetchLastWorkout();
-  }, [refresh, fetchLastWorkout]));
+    fetchHomeData();
+  }, [refresh, fetchLastWorkout, fetchHomeData]));
 
   // workouts[0] is always the next uncompleted workout (hook sorts completed last)
   const nextWorkout = program?.workouts.find((w) => !w.isCompleted);
@@ -595,34 +642,6 @@ export default function HomeScreen() {
         })),
       }
     : undefined;
-
-  useEffect(() => {
-    const fetchHomeData = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const today = new Date().toISOString().split("T")[0];
-      const { data } = await supabase
-        .from("readiness_logs")
-        .select("readiness_score, sleep_hours, stress, soreness, motivation, cycle_phase")
-        .eq("user_id", user.id)
-        .eq("log_date", today)
-        .maybeSingle();
-
-      if (data?.readiness_score != null) {
-        setReadinessScore(Number(data.readiness_score).toFixed(1));
-        if (data.sleep_hours != null) setTodaySleepHours(Number(data.sleep_hours));
-        if (data.stress != null) setTodayStressLevel(Number(data.stress));
-        if (data.soreness != null) setTodaySoreness(Number(data.soreness));
-        if (data.motivation != null) setTodayMotivation(Number(data.motivation));
-        if (data.cycle_phase) setTodayCyclePhase(data.cycle_phase as CyclePhase);
-      }
-    };
-
-    fetchHomeData();
-  }, []);
 
   const handleStartWorkout = () => {
     const workoutId = nextWorkout?.id;

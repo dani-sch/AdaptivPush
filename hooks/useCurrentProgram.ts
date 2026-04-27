@@ -5,6 +5,7 @@ import type { CurrentProgram, ProgramWorkout, WorkoutExercise } from '@/types/pr
 import { computeProgression } from '@/utils/progressionEngine';
 import type { ProgressionContext, LoggedSet } from '@/types/progression';
 import type { TrainingExperience } from '@/types/database';
+import { computeCyclePhase } from '@/utils/cyclePhase';
 
 type SwapArgs = { exerciseId: string; replacement: WorkoutExercise; applyToProgram: boolean };
 
@@ -254,13 +255,19 @@ export function useCurrentProgram() {
         const nextWeek = program.currentWeek + 1;
         if (nextWeek > program.totalWeeks) return;
 
-        // Fetch user experience level from user_profile (field: experience_level)
+        // Fetch user profile fields needed for progression adjustments
         const { data: profile } = await supabase
             .from('user_profile')
-            .select('experience_level')
+            .select('experience_level, cycle_enabled, last_period_start_date, avg_cycle_length_days')
             .eq('user_id', userId)
             .single();
-        const experienceLevel = (profile?.experience_level ?? 'beginner') as TrainingExperience;
+        const experienceLevel = (profile?.experience_level ?? 'intermediate') as TrainingExperience;
+
+        const cyclePhase = profile?.cycle_enabled && profile?.last_period_start_date
+            ? computeCyclePhase(profile.last_period_start_date, profile.avg_cycle_length_days ?? 28)
+            : undefined;
+
+        const isCycleReduced = cyclePhase === 'menstrual' || cyclePhase === 'luteal';
 
         // Get next week's program_days with nested program_day_exercises
         const { data: nextDays } = await supabase
@@ -400,7 +407,11 @@ export function useCurrentProgram() {
                     updated_at: new Date().toISOString(),
                 };
                 if (result.suggestedRPE !== null) {
-                    dbUpdate.target_rpe = result.suggestedRPE;
+                    // Apply cycle phase RPE reduction on top of progression engine suggestion
+                    const adjustedRPE = isCycleReduced
+                        ? Math.max(result.suggestedRPE - 0.5, 5.0)
+                        : result.suggestedRPE;
+                    dbUpdate.target_rpe = adjustedRPE;
                 }
 
                 updates.push(
