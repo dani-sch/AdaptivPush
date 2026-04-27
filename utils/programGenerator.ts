@@ -7,6 +7,7 @@ import {
   type TrainingGoal,
 } from '@/types/program';
 import { type TrainingExperience } from '@/types/database';
+import { type CyclePhase } from '@/utils/cyclePhase';
 import {
   exercisesByMuscleGroup,
   type LocalExercise,
@@ -28,6 +29,19 @@ const GOAL_PARAMS: Record<TrainingGoal, GoalParams> = {
   endurance:       { sets: 3, repMin: 15, repMax: 20, rpe: 6.0, weightMultiplier: 0.50 },
   fat_loss:        { sets: 3, repMin: 12, repMax: 15, rpe: 7.0, weightMultiplier: 0.60 },
   general_fitness: { sets: 3, repMin: 8,  repMax: 12, rpe: 7.0, weightMultiplier: 0.70 },
+};
+
+// ─── Experience level modifiers ───────────────────────────────────────────────
+
+interface ExperienceModifier {
+  setsMultiplier: number; // scales final slot sets (e.g. 0.85 → fewer sets for beginner)
+  rpeOffset:      number; // added to periodized RPE after slot adjustment
+}
+
+const EXPERIENCE_MODIFIERS: Record<TrainingExperience, ExperienceModifier> = {
+  beginner:     { setsMultiplier: 0.85, rpeOffset: -1.0 },
+  intermediate: { setsMultiplier: 1.00, rpeOffset:  0.0 },
+  advanced:     { setsMultiplier: 1.15, rpeOffset: +0.5 },
 };
 
 // ─── Split definitions ────────────────────────────────────────────────────────
@@ -221,6 +235,8 @@ function resolveSlotParams(
   effectiveWeek: number,
   totalLoadingWeeks: number,
   exercise: { equipment: string },
+  experienceLevel: TrainingExperience,
+  cyclePhase?: CyclePhase,
 ): GoalParams {
   // RPE ramp: week 1 starts at base - 1.5, linearly reaches base by final loading week
   const rpeRamp = totalLoadingWeeks > 1
@@ -228,15 +244,23 @@ function resolveSlotParams(
     : baseParams.rpe;
   const periodizedRPE = Math.round(Math.min(rpeRamp, baseParams.rpe) * 10) / 10;
 
+  // Slot-type adjustment (compound vs accessory)
   const isCompound = position <= 2 || COMPOUND_EQUIPMENT.has(exercise.equipment);
-  if (isCompound) {
-    return { ...baseParams, rpe: periodizedRPE };
+  const slotSets = isCompound ? baseParams.sets : Math.max(baseParams.sets - 1, 2);
+  const slotRPE  = isCompound ? periodizedRPE   : Math.max(periodizedRPE - 0.5, 5.0);
+
+  // Experience modifier
+  const mod = EXPERIENCE_MODIFIERS[experienceLevel];
+  let finalSets = Math.max(Math.round(slotSets * mod.setsMultiplier), 2);
+  let finalRPE  = Math.round(Math.min(Math.max(slotRPE + mod.rpeOffset, 5.0), 10.0) * 10) / 10;
+
+  // Cycle phase modifier — menstrual and luteal phases reduce intensity
+  if (cyclePhase === 'menstrual' || cyclePhase === 'luteal') {
+    finalSets = Math.max(isCompound ? finalSets - 1 : finalSets, 2);
+    finalRPE  = Math.round(Math.max(finalRPE - 0.5, 5.0) * 10) / 10;
   }
-  return {
-    ...baseParams,
-    sets: Math.max(baseParams.sets - 1, 2),
-    rpe: Math.max(periodizedRPE - 0.5, 5.0),
-  };
+
+  return { ...baseParams, sets: finalSets, rpe: finalRPE };
 }
 
 /** Build a GeneratedExerciseSlot from a LocalExercise + goal + weight params. */
@@ -249,8 +273,9 @@ function buildSlot(
   effectiveWeek: number,
   totalLoadingWeeks: number,
   isDeload: boolean,
+  cyclePhase?: CyclePhase,
 ): GeneratedExerciseSlot {
-  const slotParams = resolveSlotParams(goalParams, position, effectiveWeek, totalLoadingWeeks, exercise);
+  const slotParams = resolveSlotParams(goalParams, position, effectiveWeek, totalLoadingWeeks, exercise, experienceLevel, cyclePhase);
   const expMult = exercise.experienceMultipliers[experienceLevel];
   const baseWeight =
     exercise.bodyweightMultiplier === 0
@@ -366,6 +391,7 @@ export function generateProgram(
   params: ProgramGenParams,
   userWeightLb: number,
   experienceLevel: TrainingExperience,
+  cyclePhase?: CyclePhase,
 ): GeneratedProgram {
   const { daysPerWeek, durationWeeks, goal, focusMuscleGroups, targetSessionMinutes } = params;
   const goalParams = GOAL_PARAMS[goal];
@@ -433,7 +459,7 @@ export function generateProgram(
 
       const template = dayTemplates.get(orderInWeek) ?? [];
       const exercises: GeneratedExerciseSlot[] = template.map(({ exercise, position }) =>
-        buildSlot(exercise, position, dayGoalParams, userWeightLb, experienceLevel, effectiveWeek, totalLoadingWeeks, isDeloadWeek),
+        buildSlot(exercise, position, dayGoalParams, userWeightLb, experienceLevel, effectiveWeek, totalLoadingWeeks, isDeloadWeek, cyclePhase),
       );
 
       const workoutName = isDeloadWeek
