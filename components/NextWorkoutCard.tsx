@@ -22,18 +22,6 @@ interface NextWorkoutCardProps {
   onPressCalendar?: () => void;
 }
 
-// mock workout
-const MOCK_WORKOUT: WorkoutSummary = {
-  name: "Upper Body A",
-  durationMinutes: 75,
-  exercises: [
-    { name: "Bench Press", prescription: "4×6–8" },
-    { name: "Incline DB Press", prescription: "3×8–10" },
-    { name: "Cable Flyes", prescription: "3×12–15" },
-    { name: "Overhead Press", prescription: "4×6–8" },
-    { name: "Lateral Raises", prescription: "3×12–15" },
-  ],
-};
 
 // Subcomponent: Card Header
 const CardHeader: React.FC<{
@@ -86,10 +74,11 @@ const StartWorkoutButton: React.FC<{ onPress?: () => void }> = ({
 
 // main Component
 export default function NextWorkoutCard({
-  workout = MOCK_WORKOUT,
+  workout,
   onPressStart,
   onPressCalendar,
 }: NextWorkoutCardProps) {
+  if (!workout) return null;
   // display first 3 exercise
   const displayExercises = workout.exercises.slice(0, 3);
 
