@@ -33,6 +33,9 @@ export type WorkoutExercise = {
 
     muscleGroup?: MuscleGroup;
     equipment?: Equipment;
+
+    imageUrl?: string;    // RapidAPI image endpoint URL (key added at request time)
+    description?: string; // first instruction sentence
 };
 
 export type ProgramWorkout = {
