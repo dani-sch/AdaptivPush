@@ -144,7 +144,9 @@ export function useCurrentProgram() {
               id,
               name,
               primary_muscle,
-              equipment
+              equipment,
+              image_url,
+              instructions
             )
           )
         `,
@@ -181,8 +183,10 @@ export function useCurrentProgram() {
                             const ex = pde.exercises;
                             return {
                                 id: pde.id, // program_day_exercises row id (swap targets this)
-                                exerciseId: ex?.id ?? undefined, // exercises table id (for set writes)
+                                exerciseId: ex?.id ?? undefined,
                                 name: ex?.name ?? 'Unknown exercise',
+                                imageUrl: (ex as any)?.image_url ?? undefined,
+                                description: ((ex as any)?.instructions as string[] | null)?.[0] ?? undefined,
                                 sets: pde.set_count,
                                 reps: `${pde.rep_range_min}-${pde.rep_range_max}`,
                                 weight: pde.suggested_weight_lb ?? undefined,
@@ -335,13 +339,24 @@ export function useCurrentProgram() {
                     readinessScore:  null, // Readiness is applied as UI overlay only, not baked into progression
                 };
 
-                // Per-set analysis: a set "hits" if reps >= repMin AND (rpe is null OR rpe <= targetRPE + 0.5)
+                // Double-progression model:
+                //   Increase weight  → ALL sets hit repMax with acceptable RPE
+                //   Hold weight      → sets within range (repMin–repMax) but not all at repMax
+                //   Per-set decrease → any set failed to reach repMin (missed the bottom of range)
                 const targetRPE = pde.target_rpe ?? 8.0;
-                const setsHit = lastSessionSets.filter(
-                    (s) => s.reps >= pde.rep_range_min && (s.rpe === null || s.rpe <= targetRPE + 0.5)
+
+                // Sets that reached the TOP of the rep range with acceptable RPE
+                const setsHitMax = lastSessionSets.filter(
+                    (s) => s.reps >= pde.rep_range_max && (s.rpe === null || s.rpe <= targetRPE + 0.5)
                 );
-                const allHit = setsHit.length === lastSessionSets.length && lastSessionSets.length > 0;
-                const noneHit = setsHit.length === 0 && lastSessionSets.length > 0;
+                // Sets that missed the BOTTOM of the rep range (too few reps regardless of RPE)
+                const setsMissedMin = lastSessionSets.filter(
+                    (s) => s.reps < pde.rep_range_min
+                );
+
+                const allHitMax   = setsHitMax.length === lastSessionSets.length && lastSessionSets.length > 0;
+                const allMissedMin = setsMissedMin.length === lastSessionSets.length && lastSessionSets.length > 0;
+                const someMissedMin = setsMissedMin.length > 0 && lastSessionSets.length > 0;
 
                 // Experience-based increment (matches progressionEngine)
                 const incrementLb: Record<string, number> = { beginner: 5.0, intermediate: 2.5, advanced: 1.25 };
@@ -353,25 +368,26 @@ export function useCurrentProgram() {
                 if (lastSessionSets.length === 0) {
                     // No data — hold
                     newUniformWeight = baselineWeight;
-                } else if (allHit) {
-                    // All sets met targets → progress uniformly
+                } else if (allHitMax) {
+                    // Every set hit repMax with good RPE → increase weight
                     newUniformWeight = Math.max(0, Math.round((baselineWeight + increment) / 2.5) * 2.5);
-                } else if (noneHit) {
-                    // All sets missed → uniform decrease 5%
+                } else if (allMissedMin) {
+                    // Every set missed repMin → uniform decrease 5%
                     newUniformWeight = Math.max(0, Math.round((baselineWeight * 0.95) / 2.5) * 2.5);
-                } else {
-                    // Mixed: hit sets hold, missed sets decrease 5%
-                    const hitSetNumbers = new Set(setsHit.map((s) => s.setNumber));
+                } else if (someMissedMin) {
+                    // Mixed: sets below repMin decrease 5%, sets within or at range hold
+                    const missedSetNumbers = new Set(setsMissedMin.map((s) => s.setNumber));
                     perSetWeightsLb = Array.from({ length: pde.set_count }, (_, i) => {
                         const setNum = i + 1;
                         const logged = lastSessionSets.find((s) => s.setNumber === setNum);
                         const currentSetWeight = logged?.weightLb ?? baselineWeight;
-                        const hit = hitSetNumbers.has(setNum);
-                        return hit
-                            ? Math.round(currentSetWeight / 2.5) * 2.5           // hold
-                            : Math.max(0, Math.round((currentSetWeight * 0.95) / 2.5) * 2.5); // decrease
+                        return missedSetNumbers.has(setNum)
+                            ? Math.max(0, Math.round((currentSetWeight * 0.95) / 2.5) * 2.5) // decrease
+                            : Math.round(currentSetWeight / 2.5) * 2.5;                        // hold
                     });
-                    // Uniform weight stays at baseline (per-set array overrides display)
+                    newUniformWeight = baselineWeight;
+                } else {
+                    // Hit repMin but not all sets hit repMax — hold, build up to repMax
                     newUniformWeight = baselineWeight;
                 }
 
@@ -494,8 +510,10 @@ export function useCurrentProgram() {
 
     const endCurrentProgram = useCallback(async () => {
         const userId = await requireUserId();
+        const programId = program?.id;
+        const lastActiveWeek = program?.currentWeek ?? 1;
 
-        // end the currently active program for this user
+        // Essential: deactivate the program — must succeed or throw
         const { error } = await supabase
             .from('programs')
             .update({ is_active: false, updated_at: new Date().toISOString() })
@@ -504,8 +522,21 @@ export function useCurrentProgram() {
 
         if (error) throw error;
 
+        // Best-effort: snapshot the week for restore (requires migration 003).
+        // Failure here must NOT prevent the program from being ended.
+        if (programId) {
+            try {
+                await supabase
+                    .from('programs')
+                    .update({ last_active_week: lastActiveWeek })
+                    .eq('id', programId);
+            } catch {
+                // Migration 003 not yet applied — non-fatal, restore will default to week 1
+            }
+        }
+
         await refresh();
-    }, [refresh]);
+    }, [program, refresh]);
 
     const createDevTestProgram = useCallback(async () => {
         const userId = await requireUserId();

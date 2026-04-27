@@ -207,8 +207,10 @@ function selectExercises(
 
 /**
  * Per-position parameter overrides.
- * Positions 1–2 are compound lifts — use goal params as-is.
- * Position 3+ are accessories — reduce volume/intensity slightly.
+ * Positions 1–2 are always treated as compound lifts.
+ * Position 3+ defaults to accessory (reduced volume/intensity), UNLESS the
+ * exercise uses compound equipment (Barbell or Dumbbell) — e.g. Barbell Row
+ * landing at position 3 on a Full Body day still deserves full compound params.
  *
  * RPE periodization: ramps linearly from baseRPE - 1.5 (week 1) to baseRPE (final loading week).
  * Deload weeks handled separately in buildSlot.
@@ -218,6 +220,7 @@ function resolveSlotParams(
   position: number,
   effectiveWeek: number,
   totalLoadingWeeks: number,
+  exercise: { equipment: string },
 ): GoalParams {
   // RPE ramp: week 1 starts at base - 1.5, linearly reaches base by final loading week
   const rpeRamp = totalLoadingWeeks > 1
@@ -225,7 +228,8 @@ function resolveSlotParams(
     : baseParams.rpe;
   const periodizedRPE = Math.round(Math.min(rpeRamp, baseParams.rpe) * 10) / 10;
 
-  if (position <= 2) {
+  const isCompound = position <= 2 || COMPOUND_EQUIPMENT.has(exercise.equipment);
+  if (isCompound) {
     return { ...baseParams, rpe: periodizedRPE };
   }
   return {
@@ -246,7 +250,7 @@ function buildSlot(
   totalLoadingWeeks: number,
   isDeload: boolean,
 ): GeneratedExerciseSlot {
-  const slotParams = resolveSlotParams(goalParams, position, effectiveWeek, totalLoadingWeeks);
+  const slotParams = resolveSlotParams(goalParams, position, effectiveWeek, totalLoadingWeeks, exercise);
   const expMult = exercise.experienceMultipliers[experienceLevel];
   const baseWeight =
     exercise.bodyweightMultiplier === 0

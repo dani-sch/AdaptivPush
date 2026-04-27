@@ -93,12 +93,16 @@ const StatCard: React.FC<{
   );
 };
 
-const StatsRow: React.FC<{ readiness: string }> = ({ readiness }) => {
+const StatsRow: React.FC<{
+  readiness: string;
+  lastWorkout: string | null;
+  week: string | null;
+}> = ({ readiness, lastWorkout, week }) => {
   return (
     <View style={styles.statsRow}>
-      <StatCard label="Last Workout" value="Jan 21" />
+      <StatCard label="Last Workout" value={lastWorkout ?? '—'} />
       <StatCard label="Readiness" value={readiness} showUpArrow />
-      <StatCard label="Week" value="4/12" />
+      <StatCard label="Week" value={week ?? '—'} />
     </View>
   );
 };
@@ -549,11 +553,35 @@ export default function HomeScreen() {
   >(null);
   const [swapNudgeDismissed, setSwapNudgeDismissed] = useState(false);
 
+  const [lastWorkoutDate, setLastWorkoutDate] = useState<string | null>(null);
+
   const { program, refresh, applyReadinessAdjustmentOnly, advanceToNextWeek } = useCurrentProgram();
 
-  // Refresh program data every time the home screen comes into focus
-  // so that finishing a workout advances to the next one immediately
-  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
+  const fetchLastWorkout = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase
+      .from('workout_sessions')
+      .select('ended_at')
+      .eq('user_id', user.id)
+      .order('ended_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (data?.ended_at) {
+      const formatted = new Date(data.ended_at).toLocaleDateString(undefined, {
+        month: 'short', day: 'numeric',
+      });
+      setLastWorkoutDate(formatted);
+    } else {
+      setLastWorkoutDate(null);
+    }
+  }, []);
+
+  // Refresh program data and last workout date every time the home tab comes into focus
+  useFocusEffect(useCallback(() => {
+    refresh();
+    fetchLastWorkout();
+  }, [refresh, fetchLastWorkout]));
 
   // workouts[0] is always the next uncompleted workout (hook sorts completed last)
   const nextWorkout = program?.workouts.find((w) => !w.isCompleted);
@@ -641,7 +669,7 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         <HeaderDateBlock />
-        {program && program.workouts.every((w) => w.isCompleted) ? (
+        {program && program.workouts.every((w) => w.isCompleted) && program.workouts.length > 0 ? (
           <>
             <View style={styles.weekCompleteCard}>
               <Ionicons name="checkmark-circle" size={32} color={PRIMARY_COLOR} />
@@ -671,7 +699,11 @@ export default function HomeScreen() {
             onPressStart={handleStartWorkout}
           />
         )}
-        <StatsRow readiness={readinessScore ?? "--"} />
+        <StatsRow
+          readiness={readinessScore ?? '--'}
+          lastWorkout={lastWorkoutDate}
+          week={program ? `${program.currentWeek}/${program.totalWeeks}` : null}
+        />
         <ReadinessPromptCard todayScore={readinessScore} onPress={handleOpenReadinessModal} />
 
         {/* Accessory Swap Nudge — hidden on deload weeks (every 4th) */}

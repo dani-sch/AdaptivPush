@@ -1,6 +1,17 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Switch } from 'react-native';
-import { X, Search, Check } from 'lucide-react-native';
+import {
+    ActivityIndicator,
+    Image,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
+    Switch,
+} from 'react-native';
+// Images are served from Supabase Storage (public) — no auth headers needed.
+import { X, Search, Check, ChevronDown, ChevronUp } from 'lucide-react-native';
 
 import type { CurrentProgram, WorkoutExercise, MuscleGroup, Equipment } from '@/types/program';
 import { getAlternativesFor, exercisesByMuscleGroup } from '@/lib/exerciseDatabase';
@@ -17,6 +28,11 @@ import {
     WHITE,
 } from '@/constants/colors';
 
+interface SwapOption extends WorkoutExercise {
+    imageUrl?: string;
+    description?: string;
+}
+
 type Props = {
     program: CurrentProgram;
     exerciseId: string;
@@ -25,7 +41,6 @@ type Props = {
     /** When true, skip the backdrop/sheet wrapper — parent handles layout. */
     embedded?: boolean;
 
-    // This is how we actually "do the swap"
     onSwap: (args: {
         exerciseId: string;
         replacement: WorkoutExercise;
@@ -36,7 +51,8 @@ type Props = {
 export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwap, embedded }: Props) {
     const [searchQuery, setSearchQuery] = useState('');
     const [applyToProgram, setApplyToProgram] = useState(false);
-    const [selectedExercise, setSelectedExercise] = useState<WorkoutExercise | null>(null);
+    const [selectedExercise, setSelectedExercise] = useState<SwapOption | null>(null);
+    const [expandedId, setExpandedId] = useState<string | null>(null);
 
     const currentExercise = useMemo(() => {
         for (const workout of program.workouts) {
@@ -46,13 +62,12 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
         return null;
     }, [program, exerciseId]);
 
-    const [alternatives, setAlternatives] = useState<WorkoutExercise[]>([]);
+    const [alternatives, setAlternatives] = useState<SwapOption[]>([]);
     const [loadingExercises, setLoadingExercises] = useState(false);
     const [resolvedMuscleGroup, setResolvedMuscleGroup] = useState<MuscleGroup | undefined>(undefined);
 
     useEffect(() => {
         if (!currentExercise) return;
-        // If muscleGroup is missing from DB, look it up by exercise name in the local DB
         let muscleGroup = currentExercise.muscleGroup;
         if (!muscleGroup && currentExercise.name) {
             const name = currentExercise.name.toLowerCase();
@@ -72,7 +87,7 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
         try {
             let query = supabase
                 .from('exercises')
-                .select('id, name, primary_muscle, equipment')
+                .select('id, name, primary_muscle, equipment, image_url, instructions')
                 .order('name');
 
             if (muscleGroup) {
@@ -89,9 +104,10 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
                     equipment:   ex.equipment as Equipment,
                     sets:        3,
                     reps:        '8–12',
+                    imageUrl:    ex.image_url ?? undefined,
+                    description: (ex.instructions as string[] | null)?.[0] ?? undefined,
                 })));
             } else if (muscleGroup) {
-                // Fallback: use local exercise database (only when muscle group is known)
                 const local = getAlternativesFor(muscleGroup, [exerciseId]);
                 setAlternatives(local.map(ex => ({
                     id:          ex.id,
@@ -121,8 +137,15 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
         if (!selectedExercise) return;
         onSwap({
             exerciseId,
-            replacement: selectedExercise,
-            applyToProgram: context === 'workout' ? applyToProgram : true, // program context implies yes
+            replacement: {
+                id:          selectedExercise.id,
+                name:        selectedExercise.name,
+                muscleGroup: selectedExercise.muscleGroup,
+                equipment:   selectedExercise.equipment,
+                sets:        selectedExercise.sets,
+                reps:        selectedExercise.reps,
+            },
+            applyToProgram: context === 'workout' ? applyToProgram : true,
         });
         onClose();
     };
@@ -171,26 +194,66 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
                 ) : (
                     filteredAlternatives.map(ex => {
                         const isSelected = selectedExercise?.id === ex.id;
+                        const isExpanded = expandedId === ex.id;
                         return (
-                            <Pressable
+                            <View
                                 key={ex.id}
-                                onPress={() => setSelectedExercise(prev => prev?.id === ex.id ? null : ex)}
-                                style={({ pressed }) => [styles.exerciseRow, isSelected && styles.exerciseRowSelected, pressed && { opacity: 0.92 }]}
+                                style={[styles.exerciseCard, isSelected && styles.exerciseCardSelected]}
                             >
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.exerciseName}>{ex.name}</Text>
-                                    <Text style={styles.exerciseMeta}>{ex.equipment}</Text>
-                                    <View style={styles.exerciseStatsRow}>
-                                        <Text style={styles.statText}>{ex.sets} sets</Text>
-                                        <Text style={styles.statText}>{ex.reps} reps</Text>
+                                {/* Tappable main row — selects the exercise */}
+                                <Pressable
+                                    onPress={() => setSelectedExercise(prev => prev?.id === ex.id ? null : ex)}
+                                    style={({ pressed }) => [styles.exerciseRow, pressed && { opacity: 0.92 }]}
+                                >
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.exerciseName}>{ex.name}</Text>
+                                        <Text style={styles.exerciseMeta}>{ex.equipment}</Text>
+                                        <View style={styles.exerciseStatsRow}>
+                                            <Text style={styles.statText}>{ex.sets} sets</Text>
+                                            <Text style={styles.statText}>{ex.reps} reps</Text>
+                                        </View>
+                                        {ex.description && !isExpanded && (
+                                            <Text style={styles.exerciseDescription} numberOfLines={2}>
+                                                {ex.description}
+                                            </Text>
+                                        )}
                                     </View>
-                                </View>
-                                {isSelected && (
-                                    <View style={styles.checkCircle}>
-                                        <Check color={WHITE} size={14} />
+                                    <View style={styles.rowActions}>
+                                        {isSelected && (
+                                            <View style={styles.checkCircle}>
+                                                <Check color={WHITE} size={14} />
+                                            </View>
+                                        )}
+                                        {/* Info toggle — separate from selection */}
+                                        <Pressable
+                                            onPress={() => setExpandedId(prev => prev === ex.id ? null : ex.id)}
+                                            hitSlop={8}
+                                            style={styles.chevronBtn}
+                                        >
+                                            {isExpanded
+                                                ? <ChevronUp color={PLACEHOLDER_TEXT} size={16} />
+                                                : <ChevronDown color={PLACEHOLDER_TEXT} size={16} />
+                                            }
+                                        </Pressable>
+                                    </View>
+                                </Pressable>
+
+                                {/* Expanded detail — GIF + full instructions */}
+                                {isExpanded && (
+                                    <View style={styles.detailPanel}>
+                                        {ex.imageUrl ? (
+                                            <Image
+                                                source={{ uri: ex.imageUrl }}
+                                                style={styles.exerciseGif}
+                                                resizeMode="contain"
+                                            />
+                                        ) : null}
+                                        {ex.description && (
+                                            <Text style={styles.descriptionText}>{ex.description}</Text>
+                                        )}
                                     </View>
                                 )}
-                            </Pressable>
+                            </View>
                         );
                     })
                 )}
@@ -231,9 +294,7 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
 
     return (
         <View style={styles.backdrop}>
-            {/* tap outside */}
             <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-
             <View style={styles.sheet}>
                 {content}
             </View>
@@ -328,20 +389,23 @@ const styles = StyleSheet.create({
         marginBottom: 10,
     },
 
-    exerciseRow: {
+    exerciseCard: {
         backgroundColor: CARD_BG,
         borderWidth: 1,
         borderColor: BORDER_COLOR,
         borderRadius: 16,
-        padding: 14,
         marginBottom: 10,
+        overflow: 'hidden',
+    },
+    exerciseCardSelected: {
+        borderColor: PRIMARY_COLOR,
+        borderWidth: 2,
+    },
+    exerciseRow: {
+        padding: 14,
         flexDirection: 'row',
         alignItems: 'flex-start',
         gap: 12,
-    },
-    exerciseRowSelected: {
-        borderColor: PRIMARY_COLOR,
-        borderWidth: 2,
     },
     exerciseName: {
         color: WHITE,
@@ -357,10 +421,21 @@ const styles = StyleSheet.create({
     exerciseStatsRow: {
         flexDirection: 'row',
         gap: 14,
+        marginBottom: 8,
     },
     statText: {
         color: TEXT_COLOR,
         fontSize: 12,
+    },
+    exerciseDescription: {
+        color: PLACEHOLDER_TEXT,
+        fontSize: 11,
+        lineHeight: 16,
+        marginTop: 2,
+    },
+    rowActions: {
+        alignItems: 'center',
+        gap: 8,
     },
     checkCircle: {
         width: 24,
@@ -369,7 +444,27 @@ const styles = StyleSheet.create({
         backgroundColor: PRIMARY_COLOR,
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: 2,
+    },
+    chevronBtn: {
+        padding: 2,
+    },
+
+    detailPanel: {
+        borderTopWidth: 1,
+        borderTopColor: BORDER_COLOR,
+        padding: 14,
+        gap: 12,
+    },
+    exerciseGif: {
+        width: '100%',
+        height: 200,
+        borderRadius: 10,
+        backgroundColor: MUTED_BG,
+    },
+    descriptionText: {
+        color: TEXT_COLOR,
+        fontSize: 13,
+        lineHeight: 19,
     },
 
     emptyWrap: {

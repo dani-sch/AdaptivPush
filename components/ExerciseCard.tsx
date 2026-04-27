@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
+import React, { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ExerciseInfoPanel } from "./ExerciseInfoPanel";
 import {
     BORDER_COLOR,
     BUTTON_DISABLED,
@@ -26,12 +27,14 @@ export interface WorkoutSet {
 
 export interface Exercise {
     id: string;
-    exerciseId?: string; // exercises table UUID — used for DB set writes
+    exerciseId?: string;
     name: string;
     prescription: string;
     sets: WorkoutSet[];
     completed: boolean;
     muscleGroup?: MuscleGroup;
+    imageUrl?: string;
+    description?: string;
 }
 
 // ─── SetRow ───────────────────────────────────────────────────────────────────
@@ -124,6 +127,7 @@ export default function ExerciseCard({
     onPressHistory,
     onPressSwap,
 }: ExerciseCardProps) {
+    const [showInfo, setShowInfo] = useState(false);
     return (
         <View style={[styles.card, exercise.completed && styles.cardCompleted]}>
             {/* Header */}
@@ -158,6 +162,15 @@ export default function ExerciseCard({
                 </View>
 
                 <View style={styles.actions}>
+                    {(exercise.imageUrl || exercise.description) && (
+                        <Pressable
+                            style={({ pressed }) => [styles.actionButton, showInfo && styles.actionButtonActive, pressed && { opacity: 0.7 }]}
+                            onPress={() => setShowInfo(p => !p)}
+                            hitSlop={6}
+                        >
+                            <Ionicons name="information-circle-outline" size={16} color={showInfo ? TEXT_COLOR : TEXT_COLOR} />
+                        </Pressable>
+                    )}
                     <Pressable
                         style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.7 }]}
                         onPress={onPressHistory}
@@ -174,6 +187,10 @@ export default function ExerciseCard({
                     </Pressable>
                 </View>
             </View>
+
+            {showInfo && (
+                <ExerciseInfoPanel imageUrl={exercise.imageUrl} description={exercise.description} />
+            )}
 
             {/* Sets table */}
             <View style={styles.setsTable}>
@@ -279,6 +296,9 @@ const styles = StyleSheet.create({
         paddingVertical: 6,
         borderWidth: 1,
         borderColor: BORDER_COLOR,
+    },
+    actionButtonActive: {
+        borderColor: TEXT_COLOR,
     },
     actionButtonText: {
         color: TEXT_COLOR,

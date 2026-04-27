@@ -82,6 +82,8 @@ function buildExercises(workout: ProgramWorkout, readinessScore: number | null):
       name: ex.name,
       prescription,
       muscleGroup: ex.muscleGroup,
+      imageUrl: ex.imageUrl,
+      description: ex.description,
       sets,
       completed: false,
     };
