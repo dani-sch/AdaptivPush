@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { Platform, ScrollView, StyleSheet, Text, View, Pressable, Modal } from 'react-native';
 import { Link, router } from 'expo-router';
 import { Plus, ChevronRight, MoreVertical, LayoutList, Archive } from 'lucide-react-native';
@@ -151,10 +152,11 @@ export default function PlanScreen() {
     const [showGenModal, setShowGenModal] = useState(false);
 
     const { program, loading, refresh, swapExercise, endCurrentProgram, createBlankProgram, createDevTestProgram } = useCurrentProgram();
+
+    useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
     const [creating, setCreating] = useState(false);
 
-    // TODO: Replace fake completion count with real workout session / completion data.
-    const completedCount = program?.workouts.filter((_, i) => i < 2).length ?? 0;
+    const completedCount = program?.workouts.filter((w) => w.isCompleted).length ?? 0;
     const totalCount = program?.workouts.length ?? 0;
 
     const progressPct = useMemo(() => {
@@ -179,14 +181,7 @@ export default function PlanScreen() {
                 <EmptyState
                     busy={creating}
                     onGenerateProgram={() => setShowGenModal(true)}
-                    onCreateProgram={async () => {
-                        try {
-                            setCreating(true);
-                            await createBlankProgram();
-                        } finally {
-                            setCreating(false);
-                        }
-                    }}
+                    onCreateProgram={() => router.push('/create-program')}
                     onCreateDevProgram={async () => {
                         try {
                             setCreating(true);
