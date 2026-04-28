@@ -1,8 +1,10 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { type Href, router } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   Bell,
+  Camera,
   Check,
   ChevronRight,
   CircleHelp,
@@ -31,6 +33,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { mergeUserMetadata, parseReadinessPreferences } from '@/utils/profilePreferences';
 import { supabase } from '@/utils/supabase';
+import { uploadAvatar } from '@/utils/uploadAvatar';
 import type { TrainingExperience } from '@/types/database';
 import { useTheme, type AppearancePreference } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
@@ -292,6 +295,8 @@ export default function ProfileScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [progress, setProgress] = useState<ProgressSummary>(DEFAULT_PROGRESS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -335,6 +340,14 @@ export default function ProfileScreen() {
         email: user.email || '',
         full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
       });
+
+      // Load avatar from user_profile table
+      const { data: profileRow } = await supabase
+        .from('user_profile')
+        .select('avatar_url')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      setAvatarUrl(profileRow?.avatar_url ?? null);
 
       const readinessPreferences = parseReadinessPreferences(
         user.user_metadata?.readiness_preferences,
@@ -614,6 +627,32 @@ export default function ProfileScreen() {
   const displayName = useMemo(() => profile?.full_name?.trim() || 'User', [profile?.full_name]);
   const avatarLabel = displayName.slice(0, 1).toUpperCase();
 
+  const handleAvatarPress = useCallback(async () => {
+    if (!profile?.id || avatarUploading) return;
+    setAvatarUploading(true);
+    try {
+      const url = await uploadAvatar(profile.id);
+      if (url) {
+        const { error: upsertError } = await supabase
+          .from('user_profile')
+          .update({ avatar_url: url })
+          .eq('user_id', profile.id);
+        if (upsertError) {
+          console.error('Profile upsert failed:', upsertError.message);
+          Alert.alert('Error', 'Photo uploaded but failed to save. Please try again.');
+          return;
+        }
+        setAvatarUrl(url);
+      } else {
+        Alert.alert('Photo', 'No photo was selected or permission was denied.');
+      }
+    } catch {
+      Alert.alert('Error', 'Failed to upload photo. Please try again.');
+    } finally {
+      setAvatarUploading(false);
+    }
+  }, [profile?.id, avatarUploading]);
+
   if (loading && !profile) {
     return (
       <View style={styles.container}>
@@ -636,9 +675,25 @@ export default function ProfileScreen() {
       >
         {/* ── Header ── */}
         <View style={styles.headerRow}>
-          <LinearGradient colors={['#2c81ff', '#8626ff']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatar}>
-            <Text style={styles.avatarText}>{avatarLabel}</Text>
-          </LinearGradient>
+          <Pressable onPress={handleAvatarPress} style={styles.avatarWrap}>
+            {avatarUrl ? (
+              <Image
+                source={{ uri: avatarUrl }}
+                style={styles.avatar}
+                contentFit="cover"
+              />
+            ) : (
+              <LinearGradient colors={['#2c81ff', '#8626ff']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatar}>
+                <Text style={styles.avatarText}>{avatarLabel}</Text>
+              </LinearGradient>
+            )}
+            <View style={styles.avatarCameraBtn}>
+              {avatarUploading
+                ? <ActivityIndicator size={10} color={theme.white} />
+                : <Camera size={12} color={theme.white} />
+              }
+            </View>
+          </Pressable>
 
           <View style={styles.userMeta}>
             <Text numberOfLines={1} style={styles.nameText}>
@@ -1108,7 +1163,24 @@ function createStyles(theme: Theme) {
       borderRadius: 38,
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    avatarWrap: {
+      width: 76,
+      height: 76,
       marginRight: 16,
+    },
+    avatarCameraBtn: {
+      position: 'absolute',
+      bottom: 0,
+      right: 0,
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: theme.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: theme.backgroundDark,
     },
     avatarText: {
       color: theme.white,
