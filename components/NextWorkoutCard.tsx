@@ -1,7 +1,8 @@
 import { SymbolView } from "expo-symbols";
-import React from "react";
+import React, { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { PRIMARY_COLOR, WHITE } from "../constants/colors";
+import { useTheme } from "@/contexts/ThemeContext";
+import type { Theme } from "@/constants/themes";
 
 // TypeScript types
 export interface ExerciseItem {
@@ -28,7 +29,9 @@ const CardHeader: React.FC<{
   title: string;
   duration: number;
   onPressCalendar?: () => void;
-}> = ({ title, duration, onPressCalendar }) => (
+  styles: ReturnType<typeof createStyles>;
+  theme: Theme;
+}> = ({ title, duration, onPressCalendar, styles, theme }) => (
   <View style={styles.header}>
     <View style={styles.headerLeft}>
       <Text style={styles.label}>Next Workout</Text>
@@ -40,13 +43,13 @@ const CardHeader: React.FC<{
       style={styles.calendarButton}
       hitSlop={8}
     >
-      <SymbolView name="calendar" size={24} tintColor={WHITE} />
+      <SymbolView name="calendar" size={24} tintColor={theme.white} />
     </Pressable>
   </View>
 );
 
 // subcomponent: exercise Row
-const ExerciseRow: React.FC<{ exercise: ExerciseItem }> = ({ exercise }) => (
+const ExerciseRow: React.FC<{ exercise: ExerciseItem; styles: ReturnType<typeof createStyles> }> = ({ exercise, styles }) => (
   <View style={styles.exerciseRow}>
     <Text style={styles.exerciseName}>{exercise.name}</Text>
     <Text style={styles.exercisePrescription}>{exercise.prescription}</Text>
@@ -54,15 +57,16 @@ const ExerciseRow: React.FC<{ exercise: ExerciseItem }> = ({ exercise }) => (
 );
 
 // subcomponent: more Exercises Row
-const MoreExercisesRow: React.FC<{ count: number }> = ({ count }) => (
+const MoreExercisesRow: React.FC<{ count: number; styles: ReturnType<typeof createStyles> }> = ({ count, styles }) => (
   <Text style={styles.moreExercises}>
     +{count} more exercise{count !== 1 ? "s" : ""}
   </Text>
 );
 
 // subcomponent: Start Workout Button
-const StartWorkoutButton: React.FC<{ onPress?: () => void }> = ({
+const StartWorkoutButton: React.FC<{ onPress?: () => void; styles: ReturnType<typeof createStyles> }> = ({
   onPress,
+  styles,
 }) => (
   <Pressable
     onPress={onPress}
@@ -78,6 +82,9 @@ export default function NextWorkoutCard({
   onPressStart,
   onPressCalendar,
 }: NextWorkoutCardProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   if (!workout) return null;
   // display first 3 exercise
   const displayExercises = workout.exercises.slice(0, 3);
@@ -98,127 +105,131 @@ export default function NextWorkoutCard({
           title={workout.name}
           duration={workout.durationMinutes}
           onPressCalendar={onPressCalendar}
+          styles={styles}
+          theme={theme}
         />
 
         <View style={styles.exerciseList}>
           {displayExercises.map((exercise, index) => (
-            <ExerciseRow key={index} exercise={exercise} />
+            <ExerciseRow key={index} exercise={exercise} styles={styles} />
           ))}
         </View>
 
-        {remainingCount > 0 && <MoreExercisesRow count={remainingCount} />}
+        {remainingCount > 0 && <MoreExercisesRow count={remainingCount} styles={styles} />}
 
-        <StartWorkoutButton onPress={onPressStart} />
+        <StartWorkoutButton onPress={onPressStart} styles={styles} />
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    borderRadius: 24,
-    backgroundColor: PRIMARY_COLOR,
-    overflow: "hidden",
-    marginHorizontal: 16,
-    marginVertical: 12,
+function createStyles(theme: Theme) {
+  return StyleSheet.create({
+    card: {
+      borderRadius: 24,
+      backgroundColor: theme.primary,
+      overflow: "hidden",
+      marginHorizontal: 16,
+      marginVertical: 12,
 
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  gradientLayer: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: PRIMARY_COLOR,
-    opacity: 0.95,
-  },
-  cardContent: {
-    padding: 24,
-    paddingTop: 20,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 20,
-  },
-  headerLeft: {
-    flex: 1,
-  },
-  label: {
-    color: WHITE,
-    fontSize: 13,
-    fontWeight: "500",
-    opacity: 0.7,
-    marginBottom: 6,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  title: {
-    color: WHITE,
-    fontSize: 26,
-    fontWeight: "700",
-    marginBottom: 4,
-  },
-  duration: {
-    color: WHITE,
-    fontSize: 15,
-    fontWeight: "500",
-    opacity: 0.85,
-  },
-  calendarButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: WHITE,
-    opacity: 0.15,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  exerciseList: {
-    marginBottom: 12,
-  },
-  exerciseRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255, 255, 255, 0.1)",
-  },
-  exerciseName: {
-    color: WHITE,
-    fontSize: 16,
-    fontWeight: "500",
-    flex: 1,
-  },
-  exercisePrescription: {
-    color: WHITE,
-    fontSize: 15,
-    fontWeight: "600",
-    opacity: 0.8,
-    marginLeft: 12,
-  },
-  moreExercises: {
-    color: WHITE,
-    fontSize: 14,
-    fontWeight: "500",
-    opacity: 0.7,
-    marginTop: 8,
-    marginBottom: 20,
-  },
-  startButton: {
-    backgroundColor: WHITE,
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 8,
-  },
-  startButtonText: {
-    color: PRIMARY_COLOR,
-    fontSize: 17,
-    fontWeight: "700",
-  },
-});
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    gradientLayer: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: theme.primary,
+      opacity: 0.95,
+    },
+    cardContent: {
+      padding: 24,
+      paddingTop: 20,
+    },
+    header: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      marginBottom: 20,
+    },
+    headerLeft: {
+      flex: 1,
+    },
+    label: {
+      color: theme.white,
+      fontSize: 13,
+      fontWeight: "500",
+      opacity: 0.7,
+      marginBottom: 6,
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+    },
+    title: {
+      color: theme.white,
+      fontSize: 26,
+      fontWeight: "700",
+      marginBottom: 4,
+    },
+    duration: {
+      color: theme.white,
+      fontSize: 15,
+      fontWeight: "500",
+      opacity: 0.85,
+    },
+    calendarButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
+      backgroundColor: theme.white,
+      opacity: 0.15,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    exerciseList: {
+      marginBottom: 12,
+    },
+    exerciseRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: "rgba(255, 255, 255, 0.1)",
+    },
+    exerciseName: {
+      color: theme.white,
+      fontSize: 16,
+      fontWeight: "500",
+      flex: 1,
+    },
+    exercisePrescription: {
+      color: theme.white,
+      fontSize: 15,
+      fontWeight: "600",
+      opacity: 0.8,
+      marginLeft: 12,
+    },
+    moreExercises: {
+      color: theme.white,
+      fontSize: 14,
+      fontWeight: "500",
+      opacity: 0.7,
+      marginTop: 8,
+      marginBottom: 20,
+    },
+    startButton: {
+      backgroundColor: theme.white,
+      borderRadius: 16,
+      paddingVertical: 16,
+      alignItems: "center",
+      justifyContent: "center",
+      marginTop: 8,
+    },
+    startButtonText: {
+      color: theme.primary,
+      fontSize: 17,
+      fontWeight: "700",
+    },
+  });
+}

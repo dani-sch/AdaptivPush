@@ -17,18 +17,8 @@ import { ChevronLeft, Plus } from 'lucide-react-native';
 import { SymbolView } from 'expo-symbols';
 
 import { supabase } from '@/utils/supabase';
-import {
-    PRIMARY_COLOR,
-    BUTTON_PICKED,
-    BUTTON_DISABLED,
-    BACKGROUND_COLOR,
-    BACKGROUND_COLOR_DARK,
-    TEXT_COLOR,
-    PLACEHOLDER_TEXT,
-    WHITE,
-    BORDER_COLOR,
-    CARD_BG,
-} from '@/constants/colors';
+import { useTheme } from '@/contexts/ThemeContext';
+import type { Theme } from '@/constants/themes';
 
 interface ProgramDay {
     id: string;
@@ -89,6 +79,8 @@ async function requireUserId() {
 
 export default function CreateProgramScreen() {
     const router = useRouter();
+    const { theme } = useTheme();
+    const styles = useMemo(() => createStyles(theme), [theme]);
 
     const [step, setStep] = useState(1);
     const [programName, setProgramName] = useState('');
@@ -279,7 +271,7 @@ export default function CreateProgramScreen() {
                 <View style={styles.container}>
                     <View style={styles.header}>
                         <Pressable onPress={handleBack} style={styles.iconButton}>
-                            <ChevronLeft size={20} color={WHITE} />
+                            <ChevronLeft size={20} color={theme.textPrimary} />
                         </Pressable>
 
                         <Text style={styles.headerTitle}>Create Program</Text>
@@ -312,7 +304,7 @@ export default function CreateProgramScreen() {
                                         value={programName}
                                         onChangeText={setProgramName}
                                         placeholder="e.g., Push Pull Legs"
-                                        placeholderTextColor={PLACEHOLDER_TEXT}
+                                        placeholderTextColor={theme.placeholder}
                                         style={styles.input}
                                         returnKeyType="done"
                                     />
@@ -324,7 +316,7 @@ export default function CreateProgramScreen() {
                                         value={programGoal}
                                         onChangeText={setProgramGoal}
                                         placeholder="e.g., Strength & Hypertrophy"
-                                        placeholderTextColor={PLACEHOLDER_TEXT}
+                                        placeholderTextColor={theme.placeholder}
                                         style={styles.input}
                                         returnKeyType="done"
                                     />
@@ -369,7 +361,7 @@ export default function CreateProgramScreen() {
                                         onChangeText={setProgramLength}
                                         keyboardType="number-pad"
                                         placeholder="12"
-                                        placeholderTextColor={PLACEHOLDER_TEXT}
+                                        placeholderTextColor={theme.placeholder}
                                         style={styles.input}
                                     />
                                 </View>
@@ -404,7 +396,7 @@ export default function CreateProgramScreen() {
                                                 value={day.name}
                                                 onChangeText={(value) => handleUpdateDayName(idx, value)}
                                                 placeholder={`Day ${idx + 1}`}
-                                                placeholderTextColor={PLACEHOLDER_TEXT}
+                                                placeholderTextColor={theme.placeholder}
                                                 style={styles.input}
                                                 returnKeyType="done"
                                             />
@@ -441,7 +433,7 @@ export default function CreateProgramScreen() {
                                                 onPress={() => handleAddExercise(idx)}
                                                 style={styles.secondaryButton}
                                             >
-                                                <Plus size={16} color={WHITE} />
+                                                <Plus size={16} color={theme.white} />
                                                 <Text style={styles.secondaryButtonText}>Add Exercises</Text>
                                             </Pressable>
 
@@ -504,7 +496,7 @@ export default function CreateProgramScreen() {
                             <SymbolView
                                 name="keyboard.chevron.compact.down"
                                 size={18}
-                                tintColor={WHITE}
+                                tintColor={theme.textPrimary}
                             />
                         </Pressable>
                     )}
@@ -514,232 +506,234 @@ export default function CreateProgramScreen() {
     );
 }
 
-const styles = StyleSheet.create({
-    safeArea: {
-        flex: 1,
-        backgroundColor: BACKGROUND_COLOR_DARK,
-    },
-    flex: {
-        flex: 1,
-    },
-    container: {
-        flex: 1,
-        backgroundColor: BACKGROUND_COLOR_DARK,
-    },
-    header: {
-        height: 64,
-        paddingHorizontal: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: BORDER_COLOR,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    iconButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 999,
-        backgroundColor: BACKGROUND_COLOR,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    headerTitle: {
-        color: WHITE,
-        fontSize: 18,
-        fontWeight: '600',
-    },
-    headerSpacer: {
-        width: 40,
-    },
-    progressWrapper: {
-        flexDirection: 'row',
-        gap: 8,
-        paddingHorizontal: 16,
-        paddingTop: 16,
-        paddingBottom: 24,
-    },
-    progressBar: {
-        flex: 1,
-        height: 4,
-        borderRadius: 999,
-    },
-    progressBarActive: {
-        backgroundColor: PRIMARY_COLOR,
-    },
-    progressBarInactive: {
-        backgroundColor: BORDER_COLOR,
-    },
-    scrollContent: {
-        paddingHorizontal: 16,
-        paddingBottom: 32,
-    },
-    section: {
-        gap: 24,
-    },
-    titleBlock: {
-        gap: 6,
-    },
-    sectionTitle: {
-        color: WHITE,
-        fontSize: 20,
-        fontWeight: '600',
-    },
-    sectionSubtitle: {
-        color: TEXT_COLOR,
-        fontSize: 14,
-    },
-    fieldGroup: {
-        gap: 8,
-    },
-    label: {
-        color: TEXT_COLOR,
-        fontSize: 14,
-    },
-    smallLabel: {
-        color: PLACEHOLDER_TEXT,
-        fontSize: 12,
-    },
-    input: {
-        backgroundColor: BACKGROUND_COLOR,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-        borderRadius: 14,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        color: WHITE,
-        fontSize: 16,
-    },
-    daysGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
-    },
-    dayNumberButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 10,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    dayNumberButtonSelected: {
-        backgroundColor: BUTTON_PICKED,
-    },
-    dayNumberButtonUnselected: {
-        backgroundColor: BACKGROUND_COLOR,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-    },
-    dayNumberText: {
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    dayNumberTextSelected: {
-        color: WHITE,
-    },
-    dayNumberTextUnselected: {
-        color: TEXT_COLOR,
-    },
-    cardList: {
-        gap: 16,
-    },
-    workoutCard: {
-        backgroundColor: CARD_BG,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-        borderRadius: 18,
-        padding: 16,
-        gap: 14,
-    },
-    workoutCardHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    workoutCardTitle: {
-        color: WHITE,
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    workoutCardMeta: {
-        color: PLACEHOLDER_TEXT,
-        fontSize: 14,
-    },
-    secondaryButton: {
-        backgroundColor: BORDER_COLOR,
-        borderWidth: 1,
-        borderColor: BUTTON_DISABLED,
-        borderRadius: 14,
-        paddingVertical: 14,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-    },
-    secondaryButtonText: {
-        color: WHITE,
-        fontSize: 14,
-        fontWeight: '500',
-    },
-    exerciseList: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
-    },
-    exerciseChip: {
-        backgroundColor: BACKGROUND_COLOR_DARK,
-        borderWidth: 1,
-        borderColor: BUTTON_DISABLED,
-        borderRadius: 999,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-    },
-    exerciseChipText: {
-        color: WHITE,
-        fontSize: 13,
-    },
-    footerButtons: {
-        gap: 8,
-    },
-    primaryButton: {
-        backgroundColor: PRIMARY_COLOR,
-        borderRadius: 14,
-        paddingVertical: 15,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    primaryButtonDisabled: {
-        opacity: 0.6,
-    },
-    primaryButtonText: {
-        color: WHITE,
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    cancelButton: {
-        backgroundColor: BORDER_COLOR,
-        borderRadius: 14,
-        paddingVertical: 15,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    cancelButtonText: {
-        color: WHITE,
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    hideKeyboardButton: {
-        position: "absolute",
-        right: 16,
-        alignItems: "center",
-        justifyContent: "center",
-        width: 44,
-        height: 44,
-        borderRadius: 999,
-        backgroundColor: BACKGROUND_COLOR,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-        shadowOpacity: 0.25,
-        shadowRadius: 6,
-        shadowOffset: { width: 0, height: 2 },
-    },
-});
+function createStyles(theme: Theme) {
+    return StyleSheet.create({
+        safeArea: {
+            flex: 1,
+            backgroundColor: theme.backgroundDark,
+        },
+        flex: {
+            flex: 1,
+        },
+        container: {
+            flex: 1,
+            backgroundColor: theme.backgroundDark,
+        },
+        header: {
+            height: 64,
+            paddingHorizontal: 16,
+            borderBottomWidth: 1,
+            borderBottomColor: theme.border,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+        },
+        iconButton: {
+            width: 40,
+            height: 40,
+            borderRadius: 999,
+            backgroundColor: theme.background,
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
+        headerTitle: {
+            color: theme.textPrimary,
+            fontSize: 18,
+            fontWeight: '600',
+        },
+        headerSpacer: {
+            width: 40,
+        },
+        progressWrapper: {
+            flexDirection: 'row',
+            gap: 8,
+            paddingHorizontal: 16,
+            paddingTop: 16,
+            paddingBottom: 24,
+        },
+        progressBar: {
+            flex: 1,
+            height: 4,
+            borderRadius: 999,
+        },
+        progressBarActive: {
+            backgroundColor: theme.primary,
+        },
+        progressBarInactive: {
+            backgroundColor: theme.border,
+        },
+        scrollContent: {
+            paddingHorizontal: 16,
+            paddingBottom: 32,
+        },
+        section: {
+            gap: 24,
+        },
+        titleBlock: {
+            gap: 6,
+        },
+        sectionTitle: {
+            color: theme.textPrimary,
+            fontSize: 20,
+            fontWeight: '600',
+        },
+        sectionSubtitle: {
+            color: theme.text,
+            fontSize: 14,
+        },
+        fieldGroup: {
+            gap: 8,
+        },
+        label: {
+            color: theme.text,
+            fontSize: 14,
+        },
+        smallLabel: {
+            color: theme.placeholder,
+            fontSize: 12,
+        },
+        input: {
+            backgroundColor: theme.background,
+            borderWidth: 1,
+            borderColor: theme.border,
+            borderRadius: 14,
+            paddingHorizontal: 16,
+            paddingVertical: 14,
+            color: theme.textPrimary,
+            fontSize: 16,
+        },
+        daysGrid: {
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            gap: 8,
+        },
+        dayNumberButton: {
+            width: 44,
+            height: 44,
+            borderRadius: 10,
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
+        dayNumberButtonSelected: {
+            backgroundColor: theme.buttonPicked,
+        },
+        dayNumberButtonUnselected: {
+            backgroundColor: theme.background,
+            borderWidth: 1,
+            borderColor: theme.border,
+        },
+        dayNumberText: {
+            fontSize: 14,
+            fontWeight: '600',
+        },
+        dayNumberTextSelected: {
+            color: theme.white,
+        },
+        dayNumberTextUnselected: {
+            color: theme.text,
+        },
+        cardList: {
+            gap: 16,
+        },
+        workoutCard: {
+            backgroundColor: theme.cardBg,
+            borderWidth: 1,
+            borderColor: theme.border,
+            borderRadius: 18,
+            padding: 16,
+            gap: 14,
+        },
+        workoutCardHeader: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+        },
+        workoutCardTitle: {
+            color: theme.textPrimary,
+            fontSize: 16,
+            fontWeight: '600',
+        },
+        workoutCardMeta: {
+            color: theme.placeholder,
+            fontSize: 14,
+        },
+        secondaryButton: {
+            backgroundColor: theme.border,
+            borderWidth: 1,
+            borderColor: theme.buttonDisabled,
+            borderRadius: 14,
+            paddingVertical: 14,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+        },
+        secondaryButtonText: {
+            color: theme.white,
+            fontSize: 14,
+            fontWeight: '500',
+        },
+        exerciseList: {
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            gap: 8,
+        },
+        exerciseChip: {
+            backgroundColor: theme.backgroundDark,
+            borderWidth: 1,
+            borderColor: theme.buttonDisabled,
+            borderRadius: 999,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+        },
+        exerciseChipText: {
+            color: theme.textPrimary,
+            fontSize: 13,
+        },
+        footerButtons: {
+            gap: 8,
+        },
+        primaryButton: {
+            backgroundColor: theme.primary,
+            borderRadius: 14,
+            paddingVertical: 15,
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
+        primaryButtonDisabled: {
+            opacity: 0.6,
+        },
+        primaryButtonText: {
+            color: theme.white,
+            fontSize: 16,
+            fontWeight: '600',
+        },
+        cancelButton: {
+            backgroundColor: theme.border,
+            borderRadius: 14,
+            paddingVertical: 15,
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
+        cancelButtonText: {
+            color: theme.white,
+            fontSize: 16,
+            fontWeight: '600',
+        },
+        hideKeyboardButton: {
+            position: "absolute",
+            right: 16,
+            alignItems: "center",
+            justifyContent: "center",
+            width: 44,
+            height: 44,
+            borderRadius: 999,
+            backgroundColor: theme.background,
+            borderWidth: 1,
+            borderColor: theme.border,
+            shadowOpacity: 0.25,
+            shadowRadius: 6,
+            shadowOffset: { width: 0, height: 2 },
+        },
+    });
+}

@@ -10,7 +10,7 @@ import {
   ShieldCheck,
   Trash2,
 } from 'lucide-react-native';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -28,6 +28,8 @@ import {
   parsePrivacyPreferences,
 } from '@/utils/profilePreferences';
 import { supabase } from '@/utils/supabase';
+import { useTheme } from '@/contexts/ThemeContext';
+import type { Theme } from '@/constants/themes';
 
 type PrivacyToggleRowProps = {
   label: string;
@@ -44,6 +46,9 @@ const PrivacyToggleRow = ({
   value,
   onValueChange,
 }: PrivacyToggleRowProps) => {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   return (
     <View style={styles.row}>
       <View style={styles.rowLeft}>
@@ -56,8 +61,8 @@ const PrivacyToggleRow = ({
       <Switch
         value={value}
         onValueChange={onValueChange}
-        trackColor={{ false: '#4f5568', true: '#2f7cff' }}
-        thumbColor="#f4f6ff"
+        trackColor={{ false: '#4f5568', true: theme.primary }}
+        thumbColor={theme.textPrimary}
         ios_backgroundColor="#4f5568"
       />
     </View>
@@ -85,6 +90,9 @@ const DataActionCard = ({
   loading = false,
   onPress,
 }: DataActionCardProps) => {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   return (
     <View style={styles.dataActionCard}>
       <View style={styles.dataActionHeader}>
@@ -120,6 +128,9 @@ const DataActionCard = ({
 
 export default function PrivacyDataScreen() {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   const [analyticsEnabled, setAnalyticsEnabled] = useState(
     DEFAULT_PRIVACY_PREFERENCES.analyticsEnabled,
   );
@@ -378,243 +389,245 @@ export default function PrivacyDataScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#03040b',
-  },
-  scrollContent: {
-    paddingHorizontal: 18,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 18,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#2a2f41',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#131722',
-  },
-  headerTitle: {
-    color: '#f3f6ff',
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  headerSpacer: {
-    width: 44,
-    height: 44,
-  },
-  headlineCard: {
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#242a3b',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 18,
-  },
-  headlineIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    backgroundColor: '#25304a',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  headlineTextWrap: {
-    flex: 1,
-  },
-  headlineTitle: {
-    color: '#eff3ff',
-    fontSize: 17,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  headlineSubtitle: {
-    color: '#8f97ad',
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  sectionTitle: {
-    color: '#8b91a4',
-    fontSize: 14,
-    letterSpacing: 1,
-    marginBottom: 10,
-    textTransform: 'uppercase',
-  },
-  sectionCard: {
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#242a3b',
-    backgroundColor: '#121621',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 16,
-  },
-  row: {
-    minHeight: 76,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(95, 103, 124, 0.24)',
-  },
-  rowLeft: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingRight: 10,
-  },
-  iconShell: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#1a2133',
-    marginRight: 10,
-  },
-  iconShellDanger: {
-    backgroundColor: '#341a20',
-  },
-  rowTextWrap: {
-    flex: 1,
-  },
-  rowLabel: {
-    color: '#e7ebf8',
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  rowHint: {
-    color: '#8d95ac',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  dataActionCard: {
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#242a3b',
-    backgroundColor: '#121621',
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    marginBottom: 12,
-  },
-  dataActionHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  dataActionHeaderText: {
-    flex: 1,
-  },
-  dataActionTitle: {
-    color: '#e8ecf9',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  dataActionTitleDanger: {
-    color: '#ffb2b8',
-  },
-  dataActionDescription: {
-    color: '#8d95ac',
-    fontSize: 13,
-    lineHeight: 19,
-    marginTop: 3,
-  },
-  dataActionButton: {
-    minHeight: 48,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  dataActionButtonDisabled: {
-    opacity: 0.65,
-  },
-  dataActionButtonPrimary: {
-    borderColor: '#325ec2',
-    backgroundColor: '#1d376f',
-  },
-  dataActionButtonDanger: {
-    borderColor: '#6f2832',
-    backgroundColor: '#3c1a21',
-  },
-  dataActionButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  dataActionButtonTextPrimary: {
-    color: '#c4ddff',
-  },
-  dataActionButtonTextDanger: {
-    color: '#ff9ea7',
-  },
-  learnMoreRow: {
-    minHeight: 56,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#2b3245',
-    backgroundColor: '#121722',
-    paddingHorizontal: 14,
-    marginBottom: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  learnMoreText: {
-    color: '#c7cedf',
-    fontSize: 15,
-  },
-  loadingRow: {
-    minHeight: 28,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  loadingText: {
-    color: '#98a1b8',
-    fontSize: 13,
-  },
-  errorFeedback: {
-    color: '#ff8088',
-    fontSize: 13,
-    marginBottom: 10,
-    marginLeft: 2,
-  },
-  saveFeedback: {
-    color: '#7ae4a7',
-    fontSize: 13,
-    marginBottom: 10,
-    marginLeft: 2,
-  },
-  saveButton: {
-    minHeight: 62,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#336de8',
-    backgroundColor: '#2b68f0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  saveButtonDisabled: {
-    opacity: 0.65,
-  },
-  saveButtonText: {
-    color: '#eef2ff',
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  pressed: {
-    opacity: 0.85,
-  },
-});
+function createStyles(theme: Theme) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: '#03040b',
+    },
+    scrollContent: {
+      paddingHorizontal: 18,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 18,
+    },
+    backButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: '#2a2f41',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#131722',
+    },
+    headerTitle: {
+      color: '#f3f6ff',
+      fontSize: 20,
+      fontWeight: '600',
+    },
+    headerSpacer: {
+      width: 44,
+      height: 44,
+    },
+    headlineCard: {
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: '#242a3b',
+      paddingHorizontal: 16,
+      paddingVertical: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 18,
+    },
+    headlineIconWrap: {
+      width: 48,
+      height: 48,
+      borderRadius: 16,
+      backgroundColor: '#25304a',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+    },
+    headlineTextWrap: {
+      flex: 1,
+    },
+    headlineTitle: {
+      color: '#eff3ff',
+      fontSize: 17,
+      fontWeight: '600',
+      marginBottom: 2,
+    },
+    headlineSubtitle: {
+      color: '#8f97ad',
+      fontSize: 13,
+      lineHeight: 19,
+    },
+    sectionTitle: {
+      color: '#8b91a4',
+      fontSize: 14,
+      letterSpacing: 1,
+      marginBottom: 10,
+      textTransform: 'uppercase',
+    },
+    sectionCard: {
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: '#242a3b',
+      backgroundColor: '#121621',
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      marginBottom: 16,
+    },
+    row: {
+      minHeight: 76,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(95, 103, 124, 0.24)',
+    },
+    rowLeft: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingRight: 10,
+    },
+    iconShell: {
+      width: 36,
+      height: 36,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#1a2133',
+      marginRight: 10,
+    },
+    iconShellDanger: {
+      backgroundColor: '#341a20',
+    },
+    rowTextWrap: {
+      flex: 1,
+    },
+    rowLabel: {
+      color: '#e7ebf8',
+      fontSize: 15,
+      fontWeight: '500',
+    },
+    rowHint: {
+      color: '#8d95ac',
+      fontSize: 12,
+      marginTop: 2,
+    },
+    dataActionCard: {
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: '#242a3b',
+      backgroundColor: '#121621',
+      paddingHorizontal: 14,
+      paddingVertical: 14,
+      marginBottom: 12,
+    },
+    dataActionHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      marginBottom: 12,
+    },
+    dataActionHeaderText: {
+      flex: 1,
+    },
+    dataActionTitle: {
+      color: '#e8ecf9',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    dataActionTitleDanger: {
+      color: '#ffb2b8',
+    },
+    dataActionDescription: {
+      color: '#8d95ac',
+      fontSize: 13,
+      lineHeight: 19,
+      marginTop: 3,
+    },
+    dataActionButton: {
+      minHeight: 48,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+    },
+    dataActionButtonDisabled: {
+      opacity: 0.65,
+    },
+    dataActionButtonPrimary: {
+      borderColor: '#325ec2',
+      backgroundColor: '#1d376f',
+    },
+    dataActionButtonDanger: {
+      borderColor: '#6f2832',
+      backgroundColor: '#3c1a21',
+    },
+    dataActionButtonText: {
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    dataActionButtonTextPrimary: {
+      color: '#c4ddff',
+    },
+    dataActionButtonTextDanger: {
+      color: '#ff9ea7',
+    },
+    learnMoreRow: {
+      minHeight: 56,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: '#2b3245',
+      backgroundColor: '#121722',
+      paddingHorizontal: 14,
+      marginBottom: 14,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    learnMoreText: {
+      color: '#c7cedf',
+      fontSize: 15,
+    },
+    loadingRow: {
+      minHeight: 28,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 8,
+    },
+    loadingText: {
+      color: '#98a1b8',
+      fontSize: 13,
+    },
+    errorFeedback: {
+      color: '#ff8088',
+      fontSize: 13,
+      marginBottom: 10,
+      marginLeft: 2,
+    },
+    saveFeedback: {
+      color: '#7ae4a7',
+      fontSize: 13,
+      marginBottom: 10,
+      marginLeft: 2,
+    },
+    saveButton: {
+      minHeight: 62,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: '#336de8',
+      backgroundColor: '#2b68f0',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    saveButtonDisabled: {
+      opacity: 0.65,
+    },
+    saveButtonText: {
+      color: '#eef2ff',
+      fontSize: 17,
+      fontWeight: '600',
+    },
+    pressed: {
+      opacity: 0.85,
+    },
+  });
+}

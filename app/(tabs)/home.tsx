@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
 import { router, useFocusEffect } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Dimensions,
   Modal,
@@ -15,16 +15,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import NextWorkoutCard, {
   WorkoutSummary,
 } from "../../components/NextWorkoutCard";
-import {
-  BACKGROUND_COLOR_DARK,
-  BORDER_COLOR,
-  BUTTON_DISABLED,
-  MUTED_BG,
-  PLACEHOLDER_TEXT,
-  PRIMARY_COLOR,
-  TEXT_COLOR,
-  WHITE,
-} from "../../constants/colors";
+import { useTheme } from "@/contexts/ThemeContext";
+import type { Theme } from "@/constants/themes";
 import { useCurrentProgram } from "../../hooks/useCurrentProgram";
 import { getReadinessModifier } from "../../utils/progressionEngine";
 import { supabase } from "../../utils/supabase";
@@ -45,7 +37,7 @@ type CyclePhase =
 
 // header component
 
-const HeaderDateBlock: React.FC = () => {
+const HeaderDateBlock: React.FC<{ styles: ReturnType<typeof createStyles> }> = ({ styles }) => {
   const now = new Date();
   const dayOfWeek = now.toLocaleDateString(undefined, { weekday: "long" });
   const date = now.toLocaleDateString(undefined, {
@@ -82,7 +74,8 @@ const StatCard: React.FC<{
   label: string;
   value: string;
   showUpArrow?: boolean;
-}> = ({ label, value, showUpArrow }) => {
+  styles: ReturnType<typeof createStyles>;
+}> = ({ label, value, showUpArrow, styles }) => {
   return (
     <View style={styles.statCard}>
       <Text style={styles.statLabel}>{label}</Text>
@@ -98,21 +91,27 @@ const StatsRow: React.FC<{
   readiness: string;
   lastWorkout: string | null;
   week: string | null;
-}> = ({ readiness, lastWorkout, week }) => {
+  styles: ReturnType<typeof createStyles>;
+}> = ({ readiness, lastWorkout, week, styles }) => {
   return (
     <View style={styles.statsRow}>
-      <StatCard label="Last Workout" value={lastWorkout ?? '—'} />
-      <StatCard label="Readiness" value={readiness} showUpArrow />
-      <StatCard label="Week" value={week ?? '—'} />
+      <StatCard label="Last Workout" value={lastWorkout ?? '—'} styles={styles} />
+      <StatCard label="Readiness" value={readiness} showUpArrow styles={styles} />
+      <StatCard label="Week" value={week ?? '—'} styles={styles} />
     </View>
   );
 };
 
 // readiness card and modal components
 
-const ReadinessPromptCard: React.FC<{ todayScore: string | null; onPress: () => void }> = ({
+const ReadinessPromptCard: React.FC<{
+  todayScore: string | null;
+  onPress: () => void;
+  styles: ReturnType<typeof createStyles>;
+}> = ({
   todayScore,
   onPress,
+  styles,
 }) => {
   const hasScore = todayScore !== null;
   return (
@@ -133,12 +132,16 @@ const ReadinessPromptCard: React.FC<{ todayScore: string | null; onPress: () => 
   );
 };
 
-const ModalHeader: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+const ModalHeader: React.FC<{
+  onClose: () => void;
+  styles: ReturnType<typeof createStyles>;
+  theme: Theme;
+}> = ({ onClose, styles, theme }) => {
   return (
     <View style={styles.modalHeader}>
       <Text style={styles.modalTitle}>Readiness Check-in</Text>
       <Pressable onPress={onClose} style={styles.closeButton} hitSlop={8}>
-        <Ionicons name="close" size={24} color={TEXT_COLOR} />
+        <Ionicons name="close" size={24} color={theme.text} />
       </Pressable>
     </View>
   );
@@ -154,6 +157,8 @@ const SliderRow: React.FC<{
   sliderMin: number;
   sliderMax: number;
   onSliderChange: (value: number) => void;
+  styles: ReturnType<typeof createStyles>;
+  theme: Theme;
 }> = ({
   icon,
   label,
@@ -164,6 +169,8 @@ const SliderRow: React.FC<{
   sliderMin,
   sliderMax,
   onSliderChange,
+  styles,
+  theme,
 }) => {
   return (
     <View style={styles.sliderRowContainer}>
@@ -183,7 +190,7 @@ const SliderRow: React.FC<{
           step={1}
           onValueChange={onSliderChange}
           minimumTrackTintColor={PINK_ACCENT}
-          maximumTrackTintColor={PLACEHOLDER_TEXT}
+          maximumTrackTintColor={theme.placeholder}
           thumbTintColor={PINK_ACCENT}
         />
         <View style={styles.sliderLabels}>
@@ -198,7 +205,8 @@ const SliderRow: React.FC<{
 const CycleSelector: React.FC<{
   selectedPhase: CyclePhase;
   onSelectPhase: (phase: CyclePhase) => void;
-}> = ({ selectedPhase, onSelectPhase }) => {
+  styles: ReturnType<typeof createStyles>;
+}> = ({ selectedPhase, onSelectPhase, styles }) => {
   const phases: Exclude<CyclePhase, "N/A">[] = [
     "Follicular",
     "Ovulation",
@@ -251,7 +259,8 @@ const CycleSelector: React.FC<{
 const ModalFooterButtons: React.FC<{
   onContinue: () => void;
   onSkip: () => void;
-}> = ({ onContinue, onSkip }) => {
+  styles: ReturnType<typeof createStyles>;
+}> = ({ onContinue, onSkip, styles }) => {
   return (
     <View style={styles.modalFooter}>
       <Pressable
@@ -318,7 +327,9 @@ const ReadinessCheckInModal: React.FC<{
   initialCyclePhase?: CyclePhase;
   onClose: () => void;
   onSaved: (score: number, cyclePhase: CyclePhase) => void;
-}> = ({ visible, initialSleepHours = 7, initialStressLevel = 5, initialSoreness = 3, initialMotivation = 7, initialCyclePhase = "N/A", onClose, onSaved }) => {
+  styles: ReturnType<typeof createStyles>;
+  theme: Theme;
+}> = ({ visible, initialSleepHours = 7, initialStressLevel = 5, initialSoreness = 3, initialMotivation = 7, initialCyclePhase = "N/A", onClose, onSaved, styles, theme }) => {
   const [sleepHours, setSleepHours] = useState<number>(initialSleepHours);
   const [stressLevel, setStressLevel] = useState<number>(initialStressLevel);
   const [soreness, setSoreness] = useState<number>(initialSoreness);
@@ -390,7 +401,7 @@ const ReadinessCheckInModal: React.FC<{
             contentContainerStyle={styles.modalContent}
             showsVerticalScrollIndicator={false}
           >
-            <ModalHeader onClose={onClose} />
+            <ModalHeader onClose={onClose} styles={styles} theme={theme} />
 
             <View style={styles.modalDivider} />
 
@@ -404,6 +415,8 @@ const ReadinessCheckInModal: React.FC<{
               sliderMin={3}
               sliderMax={12}
               onSliderChange={setSleepHours}
+              styles={styles}
+              theme={theme}
             />
 
             <SliderRow
@@ -416,6 +429,8 @@ const ReadinessCheckInModal: React.FC<{
               sliderMin={0}
               sliderMax={10}
               onSliderChange={setStressLevel}
+              styles={styles}
+              theme={theme}
             />
 
             <SliderRow
@@ -428,6 +443,8 @@ const ReadinessCheckInModal: React.FC<{
               sliderMin={0}
               sliderMax={10}
               onSliderChange={setSoreness}
+              styles={styles}
+              theme={theme}
             />
 
             <SliderRow
@@ -440,16 +457,20 @@ const ReadinessCheckInModal: React.FC<{
               sliderMin={0}
               sliderMax={10}
               onSliderChange={setMotivation}
+              styles={styles}
+              theme={theme}
             />
 
             <CycleSelector
               selectedPhase={cyclePhase}
               onSelectPhase={setCyclePhase}
+              styles={styles}
             />
 
             <ModalFooterButtons
               onContinue={handleContinue}
               onSkip={handleSkip}
+              styles={styles}
             />
           </ScrollView>
         </View>
@@ -465,7 +486,9 @@ const ReadinessAdjustmentModal: React.FC<{
   score: number;
   onApply: () => void;
   onDismiss: () => void;
-}> = ({ visible, score, onApply, onDismiss }) => {
+  styles: ReturnType<typeof createStyles>;
+  theme: Theme;
+}> = ({ visible, score, onApply, onDismiss, styles, theme }) => {
   const modifier = getReadinessModifier(score);
   const isIncrease = modifier.weightMultiplier > 1.0;
   const isDecrease = modifier.weightMultiplier < 1.0;
@@ -542,6 +565,9 @@ const ReadinessAdjustmentModal: React.FC<{
 // main screen
 
 export default function HomeScreen() {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [readinessScore, setReadinessScore] = useState<string | null>(null);
   const [todaySleepHours, setTodaySleepHours] = useState<number>(7);
@@ -687,11 +713,11 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <HeaderDateBlock />
+        <HeaderDateBlock styles={styles} />
         {program && program.workouts.every((w) => w.isCompleted) && program.workouts.length > 0 ? (
           <>
             <View style={styles.weekCompleteCard}>
-              <Ionicons name="checkmark-circle" size={32} color={PRIMARY_COLOR} />
+              <Ionicons name="checkmark-circle" size={32} color={theme.primary} />
               <Text style={styles.weekCompleteTitle}>Week Complete!</Text>
               <Text style={styles.weekCompleteSubtitle}>
                 All workouts this week are done. Rest up — next week&apos;s plan is ready.
@@ -722,8 +748,9 @@ export default function HomeScreen() {
           readiness={readinessScore ?? '--'}
           lastWorkout={lastWorkoutDate}
           week={program ? `${program.currentWeek}/${program.totalWeeks}` : null}
+          styles={styles}
         />
-        <ReadinessPromptCard todayScore={readinessScore} onPress={handleOpenReadinessModal} />
+        <ReadinessPromptCard todayScore={readinessScore} onPress={handleOpenReadinessModal} styles={styles} />
 
         {/* Accessory Swap Nudge — hidden on deload weeks (every 4th) */}
         {program && !swapNudgeDismissed && program.swapIntervalWeeks &&
@@ -731,30 +758,30 @@ export default function HomeScreen() {
           program.currentWeek % 4 !== 0 &&
           program.currentWeek % (program.swapIntervalWeeks ?? 4) === 0 && (
           <View style={{
-            borderRadius: 20, backgroundColor: BORDER_COLOR,
+            borderRadius: 20, backgroundColor: theme.border,
             padding: 20, marginTop: 14, marginHorizontal: 16,
           }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
               <Text style={{ fontSize: 20 }}>🔄</Text>
-              <Text style={{ color: WHITE, fontSize: 15, fontWeight: '600', flex: 1 }}>
+              <Text style={{ color: theme.textPrimary, fontSize: 15, fontWeight: '600', flex: 1 }}>
                 Time to swap accessories
               </Text>
             </View>
-            <Text style={{ color: TEXT_COLOR, fontSize: 13, lineHeight: 19, marginBottom: 14 }}>
+            <Text style={{ color: theme.text, fontSize: 13, lineHeight: 19, marginBottom: 14 }}>
               You've been on the same accessory exercises for {program.swapIntervalWeeks} weeks. Swapping helps avoid plateaus and keeps training fresh.
             </Text>
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <Pressable
                 onPress={() => { setSwapNudgeDismissed(true); router.push('/(tabs)/plan'); }}
-                style={{ flex: 1, backgroundColor: PRIMARY_COLOR, borderRadius: 12, paddingVertical: 12, alignItems: 'center' }}
+                style={{ flex: 1, backgroundColor: theme.primary, borderRadius: 12, paddingVertical: 12, alignItems: 'center' }}
               >
-                <Text style={{ color: WHITE, fontSize: 14, fontWeight: '600' }}>Go to Plan</Text>
+                <Text style={{ color: theme.white, fontSize: 14, fontWeight: '600' }}>Go to Plan</Text>
               </Pressable>
               <Pressable
                 onPress={() => setSwapNudgeDismissed(true)}
-                style={{ flex: 1, borderRadius: 12, backgroundColor: MUTED_BG, paddingVertical: 12, alignItems: 'center' }}
+                style={{ flex: 1, borderRadius: 12, backgroundColor: theme.mutedBg, paddingVertical: 12, alignItems: 'center' }}
               >
-                <Text style={{ color: TEXT_COLOR, fontSize: 14 }}>Dismiss</Text>
+                <Text style={{ color: theme.text, fontSize: 14 }}>Dismiss</Text>
               </Pressable>
             </View>
           </View>
@@ -770,10 +797,10 @@ export default function HomeScreen() {
             backgroundColor: todayCyclePhase === "Menstruation" ? 'rgba(239,68,68,0.08)' : 'rgba(234,179,8,0.08)',
             padding: 20, marginTop: 14, marginHorizontal: 16,
           }}>
-            <Text style={{ color: WHITE, fontSize: 15, fontWeight: '600', marginBottom: 4 }}>
+            <Text style={{ color: theme.textPrimary, fontSize: 15, fontWeight: '600', marginBottom: 4 }}>
               {todayCyclePhase === "Menstruation" ? "🩸 Menstruation Phase" : "🌙 Luteal Phase"}
             </Text>
-            <Text style={{ color: TEXT_COLOR, fontSize: 13, lineHeight: 19 }}>
+            <Text style={{ color: theme.text, fontSize: 13, lineHeight: 19 }}>
               {todayCyclePhase === "Menstruation"
                 ? "Energy may be lower. Consider reducing intensity, prioritising mobility work, and listening to your body. It's okay to take it easy."
                 : "You may feel more fatigued than usual. Focus on maintaining form over pushing intensity. Prioritise sleep and recovery."}
@@ -787,7 +814,7 @@ export default function HomeScreen() {
           style={({ pressed }) => ({
             flexDirection: 'row',
             alignItems: 'center',
-            backgroundColor: BORDER_COLOR,
+            backgroundColor: theme.border,
             borderRadius: 20,
             padding: 20,
             marginTop: 14,
@@ -798,10 +825,10 @@ export default function HomeScreen() {
         >
           <Text style={{ fontSize: 24 }}>🧘</Text>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: WHITE, fontSize: 16, fontWeight: '600' }}>Recovery & Mobility</Text>
-            <Text style={{ color: TEXT_COLOR, fontSize: 13, marginTop: 3 }}>Stretches, foam rolling & active recovery</Text>
+            <Text style={{ color: theme.textPrimary, fontSize: 16, fontWeight: '600' }}>Recovery & Mobility</Text>
+            <Text style={{ color: theme.text, fontSize: 13, marginTop: 3 }}>Stretches, foam rolling & active recovery</Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={TEXT_COLOR} />
+          <Ionicons name="chevron-forward" size={18} color={theme.text} />
         </Pressable>
       </ScrollView>
 
@@ -814,6 +841,8 @@ export default function HomeScreen() {
         initialCyclePhase={todayCyclePhase}
         onClose={handleCloseReadinessModal}
         onSaved={handleReadinessSaved}
+        styles={styles}
+        theme={theme}
       />
 
       {pendingAdjustmentScore !== null && (
@@ -822,6 +851,8 @@ export default function HomeScreen() {
           score={pendingAdjustmentScore}
           onApply={handleApplyAdjustment}
           onDismiss={handleDismissAdjustment}
+          styles={styles}
+          theme={theme}
         />
       )}
     </SafeAreaView>
@@ -830,391 +861,393 @@ export default function HomeScreen() {
 
 // stylesheet
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: BACKGROUND_COLOR_DARK,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 32,
-  },
-  weekCompleteCard: {
-    margin: 16,
-    padding: 24,
-    borderRadius: 16,
-    backgroundColor: BACKGROUND_COLOR_DARK,
-    borderWidth: 1,
-    borderColor: PRIMARY_COLOR + "44",
-    alignItems: "center",
-    gap: 8,
-  },
-  weekCompleteTitle: {
-    color: PRIMARY_COLOR,
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  weekCompleteSubtitle: {
-    color: PLACEHOLDER_TEXT,
-    fontSize: 14,
-    textAlign: "center",
-    lineHeight: 20,
-  },
-  startNextWeekBtn: {
-    marginHorizontal: 20,
-    marginTop: 12,
-    marginBottom: 4,
-    backgroundColor: PRIMARY_COLOR,
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  startNextWeekBtnText: {
-    color: WHITE,
-    fontSize: 16,
-    fontWeight: "700",
-  },
+function createStyles(theme: Theme) {
+  return StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: theme.backgroundDark,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingBottom: 32,
+    },
+    weekCompleteCard: {
+      margin: 16,
+      padding: 24,
+      borderRadius: 16,
+      backgroundColor: theme.backgroundDark,
+      borderWidth: 1,
+      borderColor: theme.primary + "44",
+      alignItems: "center",
+      gap: 8,
+    },
+    weekCompleteTitle: {
+      color: theme.primary,
+      fontSize: 20,
+      fontWeight: "700",
+    },
+    weekCompleteSubtitle: {
+      color: theme.placeholder,
+      fontSize: 14,
+      textAlign: "center",
+      lineHeight: 20,
+    },
+    startNextWeekBtn: {
+      marginHorizontal: 20,
+      marginTop: 12,
+      marginBottom: 4,
+      backgroundColor: theme.primary,
+      borderRadius: 14,
+      paddingVertical: 14,
+      alignItems: "center",
+    },
+    startNextWeekBtnText: {
+      color: theme.white,
+      fontSize: 16,
+      fontWeight: "700",
+    },
 
-  headerDateBlock: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 16,
-  },
-  dayOfWeek: {
-    color: WHITE,
-    fontSize: 32,
-    fontWeight: "700",
-    marginBottom: 2,
-  },
-  date: {
-    color: TEXT_COLOR,
-    fontSize: 16,
-    fontWeight: "500",
-  },
+    headerDateBlock: {
+      paddingHorizontal: 20,
+      paddingTop: 8,
+      paddingBottom: 16,
+    },
+    dayOfWeek: {
+      color: theme.textPrimary,
+      fontSize: 32,
+      fontWeight: "700",
+      marginBottom: 2,
+    },
+    date: {
+      color: theme.text,
+      fontSize: 16,
+      fontWeight: "500",
+    },
 
-  statsRow: {
-    flexDirection: "row",
-    paddingHorizontal: 16,
-    gap: 12,
-    marginTop: 8,
-    marginBottom: 16,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: BORDER_COLOR,
-    borderRadius: 16,
-    padding: 16,
-    paddingVertical: 18,
-  },
-  statLabel: {
-    color: TEXT_COLOR,
-    fontSize: 12,
-    fontWeight: "500",
-    marginBottom: 8,
-  },
-  statValueContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  statValue: {
-    color: WHITE,
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  upArrow: {
-    color: "#16a34a",
-    fontSize: 16,
-    fontWeight: "700",
-  },
+    statsRow: {
+      flexDirection: "row",
+      paddingHorizontal: 16,
+      gap: 12,
+      marginTop: 8,
+      marginBottom: 16,
+    },
+    statCard: {
+      flex: 1,
+      backgroundColor: theme.border,
+      borderRadius: 16,
+      padding: 16,
+      paddingVertical: 18,
+    },
+    statLabel: {
+      color: theme.text,
+      fontSize: 12,
+      fontWeight: "500",
+      marginBottom: 8,
+    },
+    statValueContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+    },
+    statValue: {
+      color: theme.textPrimary,
+      fontSize: 20,
+      fontWeight: "700",
+    },
+    upArrow: {
+      color: "#16a34a",
+      fontSize: 16,
+      fontWeight: "700",
+    },
 
-  readinessPromptCard: {
-    backgroundColor: BORDER_COLOR,
-    borderRadius: 20,
-    padding: 24,
-    marginHorizontal: 16,
-    marginTop: 8,
-  },
-  readinessPromptTitle: {
-    color: WHITE,
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 6,
-  },
-  readinessPromptSubtitle: {
-    color: TEXT_COLOR,
-    fontSize: 14,
-    fontWeight: "500",
-  },
+    readinessPromptCard: {
+      backgroundColor: theme.border,
+      borderRadius: 20,
+      padding: 24,
+      marginHorizontal: 16,
+      marginTop: 8,
+    },
+    readinessPromptTitle: {
+      color: theme.textPrimary,
+      fontSize: 18,
+      fontWeight: "700",
+      marginBottom: 6,
+    },
+    readinessPromptSubtitle: {
+      color: theme.text,
+      fontSize: 14,
+      fontWeight: "500",
+    },
 
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.85)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 16,
-  },
-  modalContainer: {
-    backgroundColor: BACKGROUND_COLOR_DARK,
-    borderRadius: 24,
-    width: "100%",
-    maxWidth: 500,
-    maxHeight: SCREEN_HEIGHT * 0.75,
-  },
-  modalContent: {
-    padding: 24,
-    paddingBottom: 32,
-  },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0, 0, 0, 0.85)",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 16,
+    },
+    modalContainer: {
+      backgroundColor: theme.backgroundDark,
+      borderRadius: 24,
+      width: "100%",
+      maxWidth: 500,
+      maxHeight: SCREEN_HEIGHT * 0.75,
+    },
+    modalContent: {
+      padding: 24,
+      paddingBottom: 32,
+    },
 
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  modalTitle: {
-    color: WHITE,
-    fontSize: 22,
-    fontWeight: "700",
-  },
-  closeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: BUTTON_DISABLED,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalDivider: {
-    height: 1,
-    backgroundColor: BORDER_COLOR,
-    marginBottom: 24,
-  },
+    modalHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 16,
+    },
+    modalTitle: {
+      color: theme.textPrimary,
+      fontSize: 22,
+      fontWeight: "700",
+    },
+    closeButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: theme.buttonDisabled,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    modalDivider: {
+      height: 1,
+      backgroundColor: theme.border,
+      marginBottom: 24,
+    },
 
-  sliderRowContainer: {
-    marginBottom: 28,
-  },
-  sliderRowHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  sliderRowLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  sliderRowLabel: {
-    color: WHITE,
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  sliderRowValue: {
-    color: WHITE,
-    fontSize: 18,
-    fontWeight: "700",
-  },
-  sliderWrapper: {
-    marginTop: 4,
-  },
-  slider: {
-    width: "100%",
-    height: 40,
-  },
-  sliderLabels: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 4,
-  },
-  sliderLabelText: {
-    color: TEXT_COLOR,
-    fontSize: 13,
-    fontWeight: "500",
-  },
+    sliderRowContainer: {
+      marginBottom: 28,
+    },
+    sliderRowHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 8,
+    },
+    sliderRowLeft: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
+    sliderRowLabel: {
+      color: theme.textPrimary,
+      fontSize: 16,
+      fontWeight: "600",
+    },
+    sliderRowValue: {
+      color: theme.textPrimary,
+      fontSize: 18,
+      fontWeight: "700",
+    },
+    sliderWrapper: {
+      marginTop: 4,
+    },
+    slider: {
+      width: "100%",
+      height: 40,
+    },
+    sliderLabels: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginTop: 4,
+    },
+    sliderLabelText: {
+      color: theme.text,
+      fontSize: 13,
+      fontWeight: "500",
+    },
 
-  cycleSelectorContainer: {
-    marginBottom: 24,
-  },
-  cycleSelectorHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 16,
-  },
-  cycleSelectorLabel: {
-    color: WHITE,
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  cycleButtonsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    marginBottom: 12,
-    gap: 12,
-  },
-  cyclePhaseButton: {
-    width: "48%",
-    backgroundColor: BUTTON_DISABLED,
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "transparent",
-  },
-  cyclePhaseButtonSelected: {
-    backgroundColor: "rgba(236, 72, 153, 0.2)",
-    borderColor: PINK_ACCENT,
-  },
-  cyclePhaseButtonText: {
-    color: TEXT_COLOR,
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  cyclePhaseButtonTextSelected: {
-    color: WHITE,
-  },
-  naButton: {
-    width: "100%",
-    backgroundColor: PINK_ACCENT,
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "transparent",
-  },
-  naButtonSelected: {
-    borderColor: "#f9a8d4",
-    shadowColor: PINK_ACCENT,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  naButtonText: {
-    color: WHITE,
-    fontSize: 17,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-  },
+    cycleSelectorContainer: {
+      marginBottom: 24,
+    },
+    cycleSelectorHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 16,
+    },
+    cycleSelectorLabel: {
+      color: theme.textPrimary,
+      fontSize: 16,
+      fontWeight: "600",
+    },
+    cycleButtonsGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "space-between",
+      marginBottom: 12,
+      gap: 12,
+    },
+    cyclePhaseButton: {
+      width: "48%",
+      backgroundColor: theme.buttonDisabled,
+      borderRadius: 12,
+      paddingVertical: 16,
+      paddingHorizontal: 16,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: "transparent",
+    },
+    cyclePhaseButtonSelected: {
+      backgroundColor: "rgba(236, 72, 153, 0.2)",
+      borderColor: PINK_ACCENT,
+    },
+    cyclePhaseButtonText: {
+      color: theme.text,
+      fontSize: 14,
+      fontWeight: "600",
+    },
+    cyclePhaseButtonTextSelected: {
+      color: theme.textPrimary,
+    },
+    naButton: {
+      width: "100%",
+      backgroundColor: PINK_ACCENT,
+      borderRadius: 16,
+      paddingVertical: 16,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 2,
+      borderColor: "transparent",
+    },
+    naButtonSelected: {
+      borderColor: "#f9a8d4",
+      shadowColor: PINK_ACCENT,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.4,
+      shadowRadius: 8,
+      elevation: 8,
+    },
+    naButtonText: {
+      color: theme.white,
+      fontSize: 17,
+      fontWeight: "700",
+      letterSpacing: 0.5,
+    },
 
-  modalFooter: {
-    marginTop: 8,
-    gap: 16,
-  },
-  continueButton: {
-    backgroundColor: PRIMARY_COLOR,
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  continueButtonText: {
-    color: WHITE,
-    fontSize: 17,
-    fontWeight: "700",
-  },
-  skipButton: {
-    backgroundColor: "transparent",
-    paddingVertical: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  skipButtonText: {
-    color: TEXT_COLOR,
-    fontSize: 16,
-    fontWeight: "600",
-  },
+    modalFooter: {
+      marginTop: 8,
+      gap: 16,
+    },
+    continueButton: {
+      backgroundColor: theme.primary,
+      borderRadius: 16,
+      paddingVertical: 16,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    continueButtonText: {
+      color: theme.white,
+      fontSize: 17,
+      fontWeight: "700",
+    },
+    skipButton: {
+      backgroundColor: "transparent",
+      paddingVertical: 8,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    skipButtonText: {
+      color: theme.text,
+      fontSize: 16,
+      fontWeight: "600",
+    },
 
-  // readiness adjustment popup
-  adjOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.88)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-  },
-  adjContainer: {
-    backgroundColor: BACKGROUND_COLOR_DARK,
-    borderRadius: 24,
-    width: "100%",
-    maxWidth: 380,
-    padding: 28,
-    alignItems: "center",
-  },
-  adjScoreBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    borderWidth: 1.5,
-    borderRadius: 100,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    marginBottom: 20,
-  },
-  adjScoreText: {
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  adjTitle: {
-    color: WHITE,
-    fontSize: 20,
-    fontWeight: "700",
-    marginBottom: 12,
-    textAlign: "center",
-  },
-  adjDescription: {
-    color: TEXT_COLOR,
-    fontSize: 14,
-    fontWeight: "500",
-    textAlign: "center",
-    lineHeight: 20,
-    marginBottom: 20,
-  },
-  adjPill: {
-    borderWidth: 1.5,
-    borderRadius: 100,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-    marginBottom: 20,
-  },
-  adjPillLabel: {
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  adjSubtext: {
-    color: PLACEHOLDER_TEXT,
-    fontSize: 13,
-    fontWeight: "500",
-    textAlign: "center",
-    marginBottom: 24,
-  },
-  adjApplyButton: {
-    width: "100%",
-    borderRadius: 14,
-    paddingVertical: 15,
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  adjApplyButtonText: {
-    color: WHITE,
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  adjKeepButton: {
-    width: "100%",
-    paddingVertical: 10,
-    alignItems: "center",
-  },
-  adjKeepButtonText: {
-    color: TEXT_COLOR,
-    fontSize: 15,
-    fontWeight: "600",
-  },
-});
+    // readiness adjustment popup
+    adjOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0, 0, 0, 0.88)",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 24,
+    },
+    adjContainer: {
+      backgroundColor: theme.backgroundDark,
+      borderRadius: 24,
+      width: "100%",
+      maxWidth: 380,
+      padding: 28,
+      alignItems: "center",
+    },
+    adjScoreBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      borderWidth: 1.5,
+      borderRadius: 100,
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+      marginBottom: 20,
+    },
+    adjScoreText: {
+      fontSize: 14,
+      fontWeight: "700",
+    },
+    adjTitle: {
+      color: theme.textPrimary,
+      fontSize: 20,
+      fontWeight: "700",
+      marginBottom: 12,
+      textAlign: "center",
+    },
+    adjDescription: {
+      color: theme.text,
+      fontSize: 14,
+      fontWeight: "500",
+      textAlign: "center",
+      lineHeight: 20,
+      marginBottom: 20,
+    },
+    adjPill: {
+      borderWidth: 1.5,
+      borderRadius: 100,
+      paddingHorizontal: 18,
+      paddingVertical: 8,
+      marginBottom: 20,
+    },
+    adjPillLabel: {
+      fontSize: 15,
+      fontWeight: "700",
+    },
+    adjSubtext: {
+      color: theme.placeholder,
+      fontSize: 13,
+      fontWeight: "500",
+      textAlign: "center",
+      marginBottom: 24,
+    },
+    adjApplyButton: {
+      width: "100%",
+      borderRadius: 14,
+      paddingVertical: 15,
+      alignItems: "center",
+      marginBottom: 12,
+    },
+    adjApplyButtonText: {
+      color: theme.white,
+      fontSize: 16,
+      fontWeight: "700",
+    },
+    adjKeepButton: {
+      width: "100%",
+      paddingVertical: 10,
+      alignItems: "center",
+    },
+    adjKeepButtonText: {
+      color: theme.text,
+      fontSize: 15,
+      fontWeight: "600",
+    },
+  });
+}

@@ -32,6 +32,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { mergeUserMetadata, parseReadinessPreferences } from '@/utils/profilePreferences';
 import { supabase } from '@/utils/supabase';
 import type { TrainingExperience } from '@/types/database';
+import { useTheme, type AppearancePreference } from '@/contexts/ThemeContext';
+import type { Theme } from '@/constants/themes';
+import { PALETTES, type PaletteKey } from '@/constants/palettes';
 
 const EXPERIENCE_LABELS: Record<TrainingExperience, string> = {
   beginner: 'Beginner',
@@ -209,18 +212,18 @@ const computeWeekStreak = (rows: WorkoutHistoryRow[]): number => {
   return streak;
 };
 
-const renderMenuIcon = (icon: MenuIcon) => {
+const renderMenuIcon = (icon: MenuIcon, iconColor: string) => {
   switch (icon) {
     case 'user':
-      return <UserRound color="#747a8f" size={24} />;
+      return <UserRound color={iconColor} size={24} />;
     case 'bell':
-      return <Bell color="#747a8f" size={24} />;
+      return <Bell color={iconColor} size={24} />;
     case 'heart':
-      return <Heart color="#747a8f" size={24} />;
+      return <Heart color={iconColor} size={24} />;
     case 'shield':
-      return <Shield color="#747a8f" size={24} />;
+      return <Shield color={iconColor} size={24} />;
     case 'help':
-      return <CircleHelp color="#747a8f" size={24} />;
+      return <CircleHelp color={iconColor} size={24} />;
     default:
       return null;
   }
@@ -285,6 +288,9 @@ const isMissingUserProfileSchemaError = (error: {
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  const { theme, preference, setPreference, palette, setPalette } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [progress, setProgress] = useState<ProgressSummary>(DEFAULT_PROGRESS);
   const [loading, setLoading] = useState(true);
@@ -400,7 +406,6 @@ export default function ProfileScreen() {
         }
       }
 
-      // Fetch PR count from personal_records table
       const { count: prTotal } = await supabase
         .from('personal_records')
         .select('*', { count: 'exact', head: true })
@@ -613,7 +618,7 @@ export default function ProfileScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.loadingWrap}>
-          <ActivityIndicator size="large" color="#2f7cff" />
+          <ActivityIndicator size="large" color={theme.primary} />
           <Text style={styles.loadingText}>Loading profile...</Text>
         </View>
       </View>
@@ -629,6 +634,7 @@ export default function ProfileScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
+        {/* ── Header ── */}
         <View style={styles.headerRow}>
           <LinearGradient colors={['#2c81ff', '#8626ff']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatar}>
             <Text style={styles.avatarText}>{avatarLabel}</Text>
@@ -644,8 +650,9 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* ── Progress card ── */}
         <LinearGradient
-          colors={['#181b26', '#12141b']}
+          colors={[theme.cardBg, theme.backgroundDark]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.progressCard}
@@ -667,11 +674,11 @@ export default function ProfileScreen() {
           </View>
         </LinearGradient>
 
-        {/* Training section */}
+        {/* ── Training section ── */}
         <View style={styles.sectionWrap}>
           <Text style={styles.sectionTitle}>TRAINING</Text>
           <LinearGradient
-            colors={['#171a24', '#12141b']}
+            colors={[theme.cardBg, theme.backgroundDark]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.groupCard}
@@ -681,24 +688,24 @@ export default function ProfileScreen() {
               style={({ pressed }) => [styles.menuRow, pressed && styles.menuRowPressed]}
             >
               <View style={styles.menuRowLeft}>
-                <ChevronRight color="#747a8f" size={24} style={{ transform: [{ rotate: '0deg' }] }} />
+                <ChevronRight color={theme.placeholder} size={24} style={{ transform: [{ rotate: '0deg' }] }} />
                 <Text style={styles.menuLabel}>Experience Level</Text>
               </View>
               <View style={styles.experienceBadge}>
                 <Text style={styles.experienceBadgeText}>
                   {experienceLevel ? EXPERIENCE_LABELS[experienceLevel] : 'Not set'}
                 </Text>
-                <ChevronRight color="#4d5265" size={20} />
+                <ChevronRight color={theme.placeholder} size={20} />
               </View>
             </Pressable>
           </LinearGradient>
         </View>
 
-        {/* Cycle Tracking section */}
+        {/* ── Cycle Tracking section ── */}
         <View style={styles.sectionWrap}>
           <Text style={styles.sectionTitle}>CYCLE TRACKING</Text>
           <LinearGradient
-            colors={['#171a24', '#12141b']}
+            colors={[theme.cardBg, theme.backgroundDark]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={[styles.groupCard, { overflow: 'visible', borderRadius: 22, padding: 16 }]}
@@ -708,9 +715,9 @@ export default function ProfileScreen() {
               <Switch
                 value={cycleEnabled}
                 onValueChange={(val) => { setCycleEnabled(val); }}
-                trackColor={{ false: '#4f5568', true: '#2f7cff' }}
-                thumbColor="#f4f6ff"
-                ios_backgroundColor="#4f5568"
+                trackColor={{ false: theme.buttonDisabled, true: theme.primary }}
+                thumbColor={theme.white}
+                ios_backgroundColor={theme.buttonDisabled}
               />
             </View>
 
@@ -723,7 +730,7 @@ export default function ProfileScreen() {
                     onChangeText={setDaysSincePeriod}
                     keyboardType="number-pad"
                     placeholder="e.g. 5"
-                    placeholderTextColor="#4d5265"
+                    placeholderTextColor={theme.placeholder}
                     style={styles.cycleInput}
                     maxLength={2}
                   />
@@ -735,7 +742,7 @@ export default function ProfileScreen() {
                     onChangeText={setAvgCycleLength}
                     keyboardType="number-pad"
                     placeholder="28"
-                    placeholderTextColor="#4d5265"
+                    placeholderTextColor={theme.placeholder}
                     style={styles.cycleInput}
                     maxLength={2}
                   />
@@ -762,17 +769,87 @@ export default function ProfileScreen() {
           </LinearGradient>
         </View>
 
+        {/* ── Appearance section ── */}
+        <View style={styles.sectionWrap}>
+          <Text style={styles.sectionTitle}>APPEARANCE</Text>
+          <LinearGradient
+            colors={[theme.cardBg, theme.backgroundDark]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.groupCard, { padding: 16 }]}
+          >
+            {/* Light / Dark / System picker */}
+            <View style={styles.appearanceRow}>
+              {(['system', 'light', 'dark'] as AppearancePreference[]).map(pref => {
+                const active = preference === pref;
+                return (
+                  <Pressable
+                    key={pref}
+                    onPress={() => setPreference(pref)}
+                    accessibilityLabel={pref}
+                    accessibilityState={{ selected: active }}
+                    style={[
+                      styles.appearanceBtn,
+                      active
+                        ? { backgroundColor: theme.primary, borderColor: theme.primary }
+                        : { backgroundColor: 'transparent', borderColor: theme.border },
+                    ]}
+                  >
+                    <Text style={[styles.appearanceBtnText, { color: active ? theme.white : theme.text }]}>
+                      {pref.charAt(0).toUpperCase() + pref.slice(1)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* Colour palette swatches */}
+            <View style={styles.paletteDivider} />
+            <Text style={styles.paletteLabel}>Colour</Text>
+            <View style={styles.paletteRow}>
+              {(Object.entries(PALETTES) as [PaletteKey, typeof PALETTES[PaletteKey]][]).map(([key, p]) => {
+                const active = palette === key;
+                return (
+                  <Pressable
+                    key={key}
+                    onPress={() => setPalette(key)}
+                    accessibilityLabel={p.label}
+                    accessibilityState={{ selected: active }}
+                    style={styles.swatchWrap}
+                  >
+                    <View
+                      style={[
+                        styles.swatch,
+                        { backgroundColor: p.swatch },
+                        active && styles.swatchActive,
+                      ]}
+                    >
+                      {active && (
+                        <Check size={14} color="#fff" strokeWidth={3} />
+                      )}
+                    </View>
+                    <Text style={[styles.swatchText, active && { color: theme.textPrimary }]}>
+                      {p.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </LinearGradient>
+        </View>
+
         {error ? (
           <View style={styles.errorBanner}>
             <Text style={styles.errorText}>{error}</Text>
           </View>
         ) : null}
 
+        {/* ── Menu sections ── */}
         {MENU_SECTIONS.map((section) => (
           <View key={section.title} style={styles.sectionWrap}>
             <Text style={styles.sectionTitle}>{section.title}</Text>
             <LinearGradient
-              colors={['#171a24', '#12141b']}
+              colors={[theme.cardBg, theme.backgroundDark]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.groupCard}
@@ -787,10 +864,10 @@ export default function ProfileScreen() {
                     style={({ pressed }) => [styles.menuRow, pressed && styles.menuRowPressed]}
                   >
                     <View style={styles.menuRowLeft}>
-                      {renderMenuIcon(item.icon)}
+                      {renderMenuIcon(item.icon, theme.placeholder)}
                       <Text style={styles.menuLabel}>{item.label}</Text>
                     </View>
-                    <ChevronRight color="#4d5265" size={24} />
+                    <ChevronRight color={theme.placeholder} size={24} />
                     {!isLast ? <View style={styles.rowDivider} /> : null}
                   </Pressable>
                 );
@@ -799,8 +876,9 @@ export default function ProfileScreen() {
           </View>
         ))}
 
+        {/* ── Logout ── */}
         <LinearGradient
-          colors={['#171a24', '#12141b']}
+          colors={[theme.cardBg, theme.backgroundDark]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.logoutCard}
@@ -815,6 +893,7 @@ export default function ProfileScreen() {
         </LinearGradient>
       </ScrollView>
 
+      {/* ── Readiness modal ── */}
       <Modal
         visible={isReadinessModalVisible}
         transparent
@@ -823,7 +902,7 @@ export default function ProfileScreen() {
       >
         <View style={styles.readinessOverlay}>
           <LinearGradient
-            colors={['#1a1d2a', '#11131b']}
+            colors={[theme.surfaceBg, theme.backgroundDark]}
             start={{ x: 0.08, y: 0.04 }}
             end={{ x: 1, y: 1 }}
             style={[
@@ -840,7 +919,7 @@ export default function ProfileScreen() {
                 onPress={() => setIsReadinessModalVisible(false)}
                 style={({ pressed }) => [styles.readinessCloseButton, pressed && styles.readinessCloseButtonPressed]}
               >
-                <X color="#d0d4e4" size={24} />
+                <X color={theme.textPrimary} size={24} />
               </Pressable>
             </View>
 
@@ -933,9 +1012,9 @@ export default function ProfileScreen() {
                 <Switch
                   value={isReadinessPromptsEnabled}
                   onValueChange={setIsReadinessPromptsEnabled}
-                  trackColor={{ false: '#4f5568', true: '#2f7cff' }}
-                  thumbColor="#f4f6ff"
-                  ios_backgroundColor="#4f5568"
+                  trackColor={{ false: theme.buttonDisabled, true: theme.primary }}
+                  thumbColor={theme.white}
+                  ios_backgroundColor={theme.buttonDisabled}
                 />
               </View>
 
@@ -951,7 +1030,7 @@ export default function ProfileScreen() {
                   >
                     <Text style={styles.questionLabel}>{question.label}</Text>
                     <View style={[styles.checkbox, isChecked && styles.checkboxChecked]}>
-                      {isChecked ? <Check color="#ffffff" size={16} strokeWidth={3} /> : null}
+                      {isChecked ? <Check color={theme.white} size={16} strokeWidth={3} /> : null}
                     </View>
                   </Pressable>
                 );
@@ -999,507 +1078,563 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#03040b',
-  },
-  scrollContent: {
-    paddingHorizontal: 18,
-  },
-  loadingWrap: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    color: '#83889a',
-    fontSize: 15,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  avatar: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  avatarText: {
-    color: '#e9edff',
-    fontSize: 21,
-    fontWeight: '500',
-    lineHeight: 22,
-  },
-  userMeta: {
-    flex: 1,
-  },
-  nameText: {
-    color: '#f4f6ff',
-    fontSize: 21,
-    fontWeight: '500',
-  },
-  emailText: {
-    color: '#6f7485',
-    fontSize: 14,
-    marginTop: 4,
-  },
-  progressCard: {
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#202433',
-    paddingHorizontal: 18,
-    paddingVertical: 24,
-    marginBottom: 22,
-  },
-  progressTitle: {
-    color: '#8f95a8',
-    fontSize: 16,
-    marginBottom: 18,
-  },
-  progressRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  progressItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  progressValue: {
-    color: '#f4f6ff',
-    fontSize: 44,
-    lineHeight: 48,
-    fontWeight: '500',
-  },
-  progressLabel: {
-    color: '#6f7485',
-    fontSize: 14,
-    marginTop: 4,
-  },
-  errorBanner: {
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 59, 69, 0.35)',
-    backgroundColor: 'rgba(255, 59, 69, 0.08)',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 16,
-  },
-  errorText: {
-    color: '#ff747c',
-    fontSize: 13,
-  },
-  sectionWrap: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    color: '#696f82',
-    fontSize: 15,
-    letterSpacing: 1.2,
-    marginBottom: 11,
-  },
-  groupCard: {
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#202433',
-    overflow: 'hidden',
-  },
-  menuRow: {
-    minHeight: 84,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    position: 'relative',
-  },
-  menuRowPressed: {
-    opacity: 0.84,
-  },
-  menuRowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-  },
-  menuLabel: {
-    color: '#e8ebf5',
-    fontSize: 17,
-    fontWeight: '500',
-  },
-  rowDivider: {
-    position: 'absolute',
-    left: 20,
-    right: 20,
-    bottom: 0,
-    height: 1,
-    backgroundColor: 'rgba(93, 100, 121, 0.28)',
-  },
-  cycleToggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-  },
-  cycleFields: {
-    marginTop: 16,
-    gap: 14,
-  },
-  cycleField: {
-    gap: 6,
-  },
-  cycleFieldLabel: {
-    color: '#6f7485',
-    fontSize: 13,
-  },
-  cycleInput: {
-    backgroundColor: 'rgba(76,82,97,0.35)',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    color: '#f4f6ff',
-    fontSize: 15,
-    fontWeight: '500',
-    borderWidth: 1,
-    borderColor: '#2a2f42',
-  },
-  cycleSaveBtn: {
-    backgroundColor: '#2b68f0',
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  cycleSaveBtnText: {
-    color: '#f4f6ff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  experienceBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  experienceBadgeText: {
-    color: '#6f7485',
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  logoutCard: {
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#202433',
-    minHeight: 96,
-    justifyContent: 'center',
-  },
-  logoutInner: {
-    minHeight: 96,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 10,
-  },
-  logoutPressed: {
-    opacity: 0.84,
-  },
-  logoutText: {
-    color: '#ff3c46',
-    fontSize: 17,
-    fontWeight: '500',
-  },
-  readinessOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    paddingHorizontal: 18,
-  },
-  readinessModal: {
-    width: '100%',
-    maxWidth: 520,
-    height: '86%',
-    alignSelf: 'center',
-    borderRadius: 30,
-    borderWidth: 1,
-    borderColor: '#252a3a',
-    overflow: 'hidden',
-  },
-  readinessHeader: {
-    minHeight: 84,
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  readinessHeaderTitle: {
-    color: '#f4f6ff',
-    fontSize: 20,
-    fontWeight: '500',
-  },
-  readinessCloseButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(95, 102, 120, 0.3)',
-  },
-  readinessCloseButtonPressed: {
-    opacity: 0.82,
-  },
-  readinessHeaderDivider: {
-    height: 1,
-    backgroundColor: 'rgba(106, 111, 130, 0.25)',
-  },
-  readinessBodyScroll: {
-    flex: 1,
-  },
-  readinessBodyContent: {
-    paddingHorizontal: 24,
-    paddingTop: 18,
-    paddingBottom: 18,
-  },
-  readinessSectionLabel: {
-    color: '#f0f3ff',
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 12,
-    marginTop: 2,
-  },
-  appleHealthCard: {
-    borderRadius: 22,
-    borderWidth: 2,
-    paddingHorizontal: 18,
-    paddingVertical: 17,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 18,
-  },
-  appleHealthCardDisconnected: {
-    borderColor: '#3e4457',
-    backgroundColor: 'rgba(72, 76, 89, 0.32)',
-  },
-  appleHealthCardConnected: {
-    borderColor: '#00bc57',
-    backgroundColor: 'rgba(6, 134, 73, 0.2)',
-  },
-  appleHealthIconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-  },
-  appleHealthIconWrapDisconnected: {
-    backgroundColor: 'rgba(146, 151, 169, 0.22)',
-  },
-  appleHealthIconWrapConnected: {
-    backgroundColor: '#16ba5f',
-  },
-  appleHealthTextWrap: {
-    flex: 1,
-  },
-  appleHealthTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    columnGap: 9,
-    marginBottom: 6,
-  },
-  appleHealthTitle: {
-    color: '#f4f6ff',
-    fontSize: 17,
-    fontWeight: '500',
-  },
-  appleHealthConnectedText: {
-    color: '#08cf61',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  appleHealthSubtitle: {
-    color: '#a2a8ba',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  permissionsCard: {
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#1445a4',
-    backgroundColor: 'rgba(31, 60, 119, 0.26)',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginBottom: 20,
-  },
-  permissionsTitle: {
-    color: '#7dc4ff',
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 5,
-  },
-  permissionsItem: {
-    color: '#c4d6ff',
-    fontSize: 15,
-    lineHeight: 23,
-  },
-  readinessSourceRow: {
-    borderRadius: 20,
-    minHeight: 94,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: 'rgba(76, 82, 97, 0.35)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  radioOuter: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    borderWidth: 3,
-    borderColor: '#ffffff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-    backgroundColor: '#f6f8ff',
-  },
-  radioOuterSelected: {
-    borderColor: '#2f7cff',
-    backgroundColor: '#2f7cff',
-  },
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#ffffff',
-  },
-  readinessSourceTextWrap: {
-    flex: 1,
-  },
-  readinessSourceTitle: {
-    color: '#f4f6ff',
-    fontSize: 17,
-    fontWeight: '500',
-  },
-  readinessSourceSubtitle: {
-    color: '#7f8599',
-    fontSize: 14,
-    marginTop: 2,
-  },
-  promptsToggleRow: {
-    borderRadius: 20,
-    minHeight: 104,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: 'rgba(76, 82, 97, 0.35)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  promptsToggleTextWrap: {
-    flex: 1,
-    paddingRight: 12,
-  },
-  promptsToggleTitle: {
-    color: '#f4f6ff',
-    fontSize: 17,
-    fontWeight: '500',
-  },
-  promptsToggleSubtitle: {
-    color: '#7f8599',
-    fontSize: 14,
-    marginTop: 3,
-  },
-  questionRow: {
-    borderRadius: 20,
-    minHeight: 88,
-    paddingHorizontal: 16,
-    backgroundColor: 'rgba(76, 82, 97, 0.35)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  questionLabel: {
-    color: '#f4f6ff',
-    fontSize: 17,
-    fontWeight: '500',
-  },
-  checkbox: {
-    width: 34,
-    height: 34,
-    borderRadius: 7,
-    borderWidth: 2,
-    borderColor: '#5c6478',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(26, 29, 38, 0.6)',
-  },
-  checkboxChecked: {
-    borderColor: '#2f7cff',
-    backgroundColor: '#2f7cff',
-  },
-  privacyCard: {
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#464d61',
-    backgroundColor: 'rgba(82, 87, 102, 0.26)',
-    paddingHorizontal: 15,
-    paddingVertical: 14,
-    marginTop: 10,
-  },
-  privacyText: {
-    color: '#9ba1b4',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  privacyLabel: {
-    color: '#c6ccdc',
-    fontWeight: '500',
-  },
-  readinessFooter: {
-    paddingHorizontal: 24,
-    paddingTop: 14,
-    paddingBottom: 16,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(90, 96, 114, 0.25)',
-    backgroundColor: 'rgba(19, 21, 30, 0.96)',
-  },
-  readinessStatusText: {
-    fontSize: 13,
-    marginBottom: 10,
-    marginLeft: 2,
-  },
-  readinessStatusSuccess: {
-    color: '#7ae4a7',
-  },
-  readinessStatusError: {
-    color: '#ff8088',
-  },
-  readinessSaveButton: {
-    minHeight: 78,
-    borderRadius: 20,
-    backgroundColor: '#2b68f0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  readinessSaveButtonDisabled: {
-    opacity: 0.65,
-  },
-  readinessSaveButtonPressed: {
-    opacity: 0.85,
-  },
-  readinessSaveButtonText: {
-    color: '#f4f6ff',
-    fontSize: 18,
-    fontWeight: '500',
-  },
-  readinessPressablePressed: {
-    opacity: 0.9,
-  },
-});
+function createStyles(theme: Theme) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.backgroundDark,
+    },
+    scrollContent: {
+      paddingHorizontal: 18,
+    },
+    loadingWrap: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    loadingText: {
+      marginTop: 12,
+      color: theme.text,
+      fontSize: 15,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 24,
+    },
+    avatar: {
+      width: 76,
+      height: 76,
+      borderRadius: 38,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 16,
+    },
+    avatarText: {
+      color: theme.white,
+      fontSize: 21,
+      fontWeight: '500',
+      lineHeight: 22,
+    },
+    userMeta: {
+      flex: 1,
+    },
+    nameText: {
+      color: theme.textPrimary,
+      fontSize: 21,
+      fontWeight: '500',
+    },
+    emailText: {
+      color: theme.placeholder,
+      fontSize: 14,
+      marginTop: 4,
+    },
+    progressCard: {
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: theme.border,
+      paddingHorizontal: 18,
+      paddingVertical: 24,
+      marginBottom: 22,
+    },
+    progressTitle: {
+      color: theme.text,
+      fontSize: 16,
+      marginBottom: 18,
+    },
+    progressRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    progressItem: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    progressValue: {
+      color: theme.textPrimary,
+      fontSize: 44,
+      lineHeight: 48,
+      fontWeight: '500',
+    },
+    progressLabel: {
+      color: theme.placeholder,
+      fontSize: 14,
+      marginTop: 4,
+    },
+    errorBanner: {
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: 'rgba(255, 59, 69, 0.35)',
+      backgroundColor: 'rgba(255, 59, 69, 0.08)',
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      marginBottom: 16,
+    },
+    errorText: {
+      color: '#ff747c',
+      fontSize: 13,
+    },
+    sectionWrap: {
+      marginBottom: 20,
+    },
+    sectionTitle: {
+      color: theme.text,
+      fontSize: 15,
+      letterSpacing: 1.2,
+      marginBottom: 11,
+    },
+    groupCard: {
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: theme.border,
+      overflow: 'hidden',
+    },
+    menuRow: {
+      minHeight: 84,
+      paddingHorizontal: 20,
+      alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      position: 'relative',
+    },
+    menuRowPressed: {
+      opacity: 0.84,
+    },
+    menuRowLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
+    },
+    menuLabel: {
+      color: theme.textPrimary,
+      fontSize: 17,
+      fontWeight: '500',
+    },
+    rowDivider: {
+      position: 'absolute',
+      left: 20,
+      right: 20,
+      bottom: 0,
+      height: 1,
+      backgroundColor: theme.border,
+    },
+    cycleToggleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 4,
+    },
+    cycleFields: {
+      marginTop: 16,
+      gap: 14,
+    },
+    cycleField: {
+      gap: 6,
+    },
+    cycleFieldLabel: {
+      color: theme.text,
+      fontSize: 13,
+    },
+    cycleInput: {
+      backgroundColor: theme.mutedBg,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      color: theme.textPrimary,
+      fontSize: 15,
+      fontWeight: '500',
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    cycleSaveBtn: {
+      backgroundColor: theme.primary,
+      borderRadius: 12,
+      paddingVertical: 12,
+      alignItems: 'center',
+      marginTop: 4,
+    },
+    cycleSaveBtnText: {
+      color: theme.white,
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    experienceBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    experienceBadgeText: {
+      color: theme.placeholder,
+      fontSize: 15,
+      fontWeight: '500',
+    },
+    // ── Appearance ────────────────────────────────────────────────────────────
+    appearanceRow: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    appearanceBtn: {
+      flex: 1,
+      borderRadius: 12,
+      paddingVertical: 12,
+      alignItems: 'center',
+      borderWidth: 1,
+    },
+    appearanceBtnText: {
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    paletteDivider: {
+      height: 1,
+      backgroundColor: theme.border,
+      marginVertical: 14,
+    },
+    paletteLabel: {
+      color: theme.text,
+      fontSize: 13,
+      fontWeight: '600',
+      letterSpacing: 0.5,
+      marginBottom: 12,
+    },
+    paletteRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+    },
+    swatchWrap: {
+      alignItems: 'center',
+      gap: 6,
+    },
+    swatch: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    swatchActive: {
+      borderWidth: 3,
+      borderColor: theme.white,
+    },
+    swatchText: {
+      color: theme.placeholder,
+      fontSize: 12,
+      fontWeight: '500',
+    },
+    // ── Logout ────────────────────────────────────────────────────────────────
+    logoutCard: {
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: theme.border,
+      minHeight: 96,
+      justifyContent: 'center',
+    },
+    logoutInner: {
+      minHeight: 96,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+      gap: 10,
+    },
+    logoutPressed: {
+      opacity: 0.84,
+    },
+    logoutText: {
+      color: '#ff3c46',
+      fontSize: 17,
+      fontWeight: '500',
+    },
+    // ── Readiness modal ───────────────────────────────────────────────────────
+    readinessOverlay: {
+      flex: 1,
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+      paddingHorizontal: 18,
+    },
+    readinessModal: {
+      width: '100%',
+      maxWidth: 520,
+      height: '86%',
+      alignSelf: 'center',
+      borderRadius: 30,
+      borderWidth: 1,
+      borderColor: theme.border,
+      overflow: 'hidden',
+    },
+    readinessHeader: {
+      minHeight: 84,
+      paddingHorizontal: 24,
+      paddingTop: 16,
+      paddingBottom: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    readinessHeaderTitle: {
+      color: theme.textPrimary,
+      fontSize: 20,
+      fontWeight: '500',
+    },
+    readinessCloseButton: {
+      width: 46,
+      height: 46,
+      borderRadius: 23,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(95, 102, 120, 0.3)',
+    },
+    readinessCloseButtonPressed: {
+      opacity: 0.82,
+    },
+    readinessHeaderDivider: {
+      height: 1,
+      backgroundColor: theme.border,
+    },
+    readinessBodyScroll: {
+      flex: 1,
+    },
+    readinessBodyContent: {
+      paddingHorizontal: 24,
+      paddingTop: 18,
+      paddingBottom: 18,
+    },
+    readinessSectionLabel: {
+      color: theme.textPrimary,
+      fontSize: 16,
+      fontWeight: '500',
+      marginBottom: 12,
+      marginTop: 2,
+    },
+    appleHealthCard: {
+      borderRadius: 22,
+      borderWidth: 2,
+      paddingHorizontal: 18,
+      paddingVertical: 17,
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 18,
+    },
+    appleHealthCardDisconnected: {
+      borderColor: theme.border,
+      backgroundColor: theme.mutedBg,
+    },
+    appleHealthCardConnected: {
+      borderColor: '#00bc57',
+      backgroundColor: 'rgba(6, 134, 73, 0.2)',
+    },
+    appleHealthIconWrap: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 14,
+    },
+    appleHealthIconWrapDisconnected: {
+      backgroundColor: 'rgba(146, 151, 169, 0.22)',
+    },
+    appleHealthIconWrapConnected: {
+      backgroundColor: '#16ba5f',
+    },
+    appleHealthTextWrap: {
+      flex: 1,
+    },
+    appleHealthTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      columnGap: 9,
+      marginBottom: 6,
+    },
+    appleHealthTitle: {
+      color: theme.textPrimary,
+      fontSize: 17,
+      fontWeight: '500',
+    },
+    appleHealthConnectedText: {
+      color: '#08cf61',
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    appleHealthSubtitle: {
+      color: theme.text,
+      fontSize: 14,
+      lineHeight: 20,
+    },
+    permissionsCard: {
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: '#1445a4',
+      backgroundColor: 'rgba(31, 60, 119, 0.26)',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      marginBottom: 20,
+    },
+    permissionsTitle: {
+      color: '#7dc4ff',
+      fontSize: 16,
+      fontWeight: '500',
+      marginBottom: 5,
+    },
+    permissionsItem: {
+      color: '#c4d6ff',
+      fontSize: 15,
+      lineHeight: 23,
+    },
+    readinessSourceRow: {
+      borderRadius: 20,
+      minHeight: 94,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      backgroundColor: theme.mutedBg,
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 10,
+    },
+    radioOuter: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      borderWidth: 3,
+      borderColor: theme.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 14,
+      backgroundColor: theme.surfaceBg,
+    },
+    radioOuterSelected: {
+      borderColor: theme.primary,
+      backgroundColor: theme.primary,
+    },
+    radioInner: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: theme.white,
+    },
+    readinessSourceTextWrap: {
+      flex: 1,
+    },
+    readinessSourceTitle: {
+      color: theme.textPrimary,
+      fontSize: 17,
+      fontWeight: '500',
+    },
+    readinessSourceSubtitle: {
+      color: theme.text,
+      fontSize: 14,
+      marginTop: 2,
+    },
+    promptsToggleRow: {
+      borderRadius: 20,
+      minHeight: 104,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: theme.mutedBg,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 20,
+    },
+    promptsToggleTextWrap: {
+      flex: 1,
+      paddingRight: 12,
+    },
+    promptsToggleTitle: {
+      color: theme.textPrimary,
+      fontSize: 17,
+      fontWeight: '500',
+    },
+    promptsToggleSubtitle: {
+      color: theme.text,
+      fontSize: 14,
+      marginTop: 3,
+    },
+    questionRow: {
+      borderRadius: 20,
+      minHeight: 88,
+      paddingHorizontal: 16,
+      backgroundColor: theme.mutedBg,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 10,
+    },
+    questionLabel: {
+      color: theme.textPrimary,
+      fontSize: 17,
+      fontWeight: '500',
+    },
+    checkbox: {
+      width: 34,
+      height: 34,
+      borderRadius: 7,
+      borderWidth: 2,
+      borderColor: theme.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.mutedBg,
+    },
+    checkboxChecked: {
+      borderColor: theme.primary,
+      backgroundColor: theme.primary,
+    },
+    privacyCard: {
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.mutedBg,
+      paddingHorizontal: 15,
+      paddingVertical: 14,
+      marginTop: 10,
+    },
+    privacyText: {
+      color: theme.text,
+      fontSize: 14,
+      lineHeight: 20,
+    },
+    privacyLabel: {
+      color: theme.textPrimary,
+      fontWeight: '500',
+    },
+    readinessFooter: {
+      paddingHorizontal: 24,
+      paddingTop: 14,
+      paddingBottom: 16,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+      backgroundColor: theme.surfaceBg,
+    },
+    readinessStatusText: {
+      fontSize: 13,
+      marginBottom: 10,
+      marginLeft: 2,
+    },
+    readinessStatusSuccess: {
+      color: theme.success,
+    },
+    readinessStatusError: {
+      color: theme.errorLight,
+    },
+    readinessSaveButton: {
+      minHeight: 78,
+      borderRadius: 20,
+      backgroundColor: theme.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    readinessSaveButtonDisabled: {
+      opacity: 0.65,
+    },
+    readinessSaveButtonPressed: {
+      opacity: 0.85,
+    },
+    readinessSaveButtonText: {
+      color: theme.white,
+      fontSize: 18,
+      fontWeight: '500',
+    },
+    readinessPressablePressed: {
+      opacity: 0.9,
+    },
+  });
+}

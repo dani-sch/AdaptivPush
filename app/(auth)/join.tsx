@@ -1,21 +1,18 @@
-import React, {useEffect, useState } from 'react';
-import {Platform, Keyboard, View, Text, TextInput, Pressable, StyleSheet} from "react-native";
+import React, { useEffect, useMemo, useState } from 'react';
+import { Platform, Keyboard, View, Text, TextInput, Pressable, StyleSheet } from "react-native";
 import { Link, router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import {KeyboardAvoidingView, ScrollView} from "react-native";
-import {useSafeAreaInsets} from "react-native-safe-area-context";
-import {supabase} from "@/utils/supabase";
-import {
-    BACKGROUND_COLOR,
-    BACKGROUND_COLOR_DARK, BORDER_COLOR, ERROR_COLOR, ERROR_COLOR_LIGHT,
-    PLACEHOLDER_TEXT,
-    PRIMARY_COLOR,
-    PRIMARY_COLOR_LIGHT,
-    TEXT_COLOR, WHITE
-} from "@/constants/colors";
+import { KeyboardAvoidingView, ScrollView } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { supabase } from "@/utils/supabase";
+import { useTheme } from "@/contexts/ThemeContext";
+import type { Theme } from "@/constants/themes";
 import BackButton from '@/components/ui/BackButton';
 
 export default function JoinScreen() {
+    const { theme } = useTheme();
+    const styles = useMemo(() => createStyles(theme), [theme]);
+
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [fullName, setFullName] = useState('');
@@ -160,7 +157,7 @@ export default function JoinScreen() {
                             value={fullName}
                             onChangeText={setFullName}
                             placeholder={"Enter your full name"}
-                            placeholderTextColor={PLACEHOLDER_TEXT}
+                            placeholderTextColor={theme.placeholder}
                             style={styles.input}
                             autoCapitalize={"words"}
                         />
@@ -175,7 +172,7 @@ export default function JoinScreen() {
                             }}
                             onBlur={()=> validateEmail(email)}
                             placeholder={"you@example.com"}
-                            placeholderTextColor={PLACEHOLDER_TEXT}
+                            placeholderTextColor={theme.placeholder}
                             style={[styles.input, emailError ? styles.inputError : null]}
                             autoCapitalize={"none"}
                             autoCorrect={false}
@@ -196,7 +193,7 @@ export default function JoinScreen() {
                             }}
                             onBlur={()=> validatePassword(password)}
                             placeholder={"At least 8 characters"}
-                            placeholderTextColor={PLACEHOLDER_TEXT}
+                            placeholderTextColor={theme.placeholder}
                             style={[styles.input, passwordError ? styles.inputError : null]}
                             secureTextEntry={true}
                             autoCapitalize={"none"}
@@ -291,79 +288,82 @@ export default function JoinScreen() {
         </View>
     );
 }
-const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: BACKGROUND_COLOR_DARK },
-    header: { paddingHorizontal: 16, paddingBottom: 8 },
-    backButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 999,
-        backgroundColor: BACKGROUND_COLOR,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    backText: { color: WHITE, fontSize: 18 },
-    content: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 24 },
-    title: { color: WHITE, fontSize: 30, marginBottom: 8, fontWeight: "600" },
-    subtitle: { color: TEXT_COLOR, marginBottom: 24 },
-    label: { color: TEXT_COLOR, marginBottom: 8, marginTop: 12 },
-    input: {
-        backgroundColor: BACKGROUND_COLOR,
-        borderColor: BORDER_COLOR,
-        borderWidth: 1,
-        borderRadius: 16,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        color: WHITE,
-    },
-    inputError: { borderColor: ERROR_COLOR },
-    errorText: { color: ERROR_COLOR_LIGHT, marginTop: 8 },
-    strengthContainer: { marginTop: 8, gap: 6 },
-    strengthBarRow: { flexDirection: "row", gap: 4 },
-    strengthSegment: {
-        flex: 1,
-        height: 4,
-        borderRadius: 2,
-    },
-    strengthSegmentEmpty: { backgroundColor: "#374151" },
-    strengthLabel: { fontSize: 12, fontWeight: "600" },
-    criteriaList: { marginTop: 6, gap: 2 },
-    criteriaItem: { fontSize: 12 },
-    criteriaMet: { color: "#22c55e" },
-    criteriaUnmet: { color: "#6b7280" },
-    primaryButton: {
-        marginTop: 20,
-        backgroundColor: PRIMARY_COLOR,
-        paddingVertical: 14,
-        borderRadius: 16,
-        alignItems: "center",
-    },
-    primaryButtonDisabled: { opacity: 0.5 },
-    primaryButtonText: { color: "white", fontWeight: "600" },
-    signInText: { color: TEXT_COLOR, textAlign: "center", marginTop: 16 },
-    signInLink: { color: PRIMARY_COLOR_LIGHT },
-    hideKeyboardButton: {
-        position: "absolute",
-        right: 16,
-        alignItems: "center",
-        justifyContent: "center",
-        width: 44,
-        height: 44,
-        borderRadius: 999,
-        backgroundColor: BACKGROUND_COLOR,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-        shadowOpacity: 0.25,
-        shadowRadius: 6,
-        shadowOffset: { width: 0, height: 2 },
-    },
-    hideKeyboardText: {
-        color: "white",
-        fontWeight: "600",
-        fontSize: 14,
-    },
-    scrollContent: {
-        flexGrow: 1,
-        paddingBottom: 24, // keeps bottom content from feeling cramped
-    },
-});
+
+function createStyles(theme: Theme) {
+    return StyleSheet.create({
+        container: { flex: 1, backgroundColor: theme.backgroundDark },
+        header: { paddingHorizontal: 16, paddingBottom: 8 },
+        backButton: {
+            width: 40,
+            height: 40,
+            borderRadius: 999,
+            backgroundColor: theme.background,
+            alignItems: "center",
+            justifyContent: "center",
+        },
+        backText: { color: theme.textPrimary, fontSize: 18 },
+        content: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 24 },
+        title: { color: theme.textPrimary, fontSize: 30, marginBottom: 8, fontWeight: "600" },
+        subtitle: { color: theme.text, marginBottom: 24 },
+        label: { color: theme.text, marginBottom: 8, marginTop: 12 },
+        input: {
+            backgroundColor: theme.background,
+            borderColor: theme.border,
+            borderWidth: 1,
+            borderRadius: 16,
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            color: theme.textPrimary,
+        },
+        inputError: { borderColor: theme.error },
+        errorText: { color: theme.errorLight, marginTop: 8 },
+        strengthContainer: { marginTop: 8, gap: 6 },
+        strengthBarRow: { flexDirection: "row", gap: 4 },
+        strengthSegment: {
+            flex: 1,
+            height: 4,
+            borderRadius: 2,
+        },
+        strengthSegmentEmpty: { backgroundColor: "#374151" },
+        strengthLabel: { fontSize: 12, fontWeight: "600" },
+        criteriaList: { marginTop: 6, gap: 2 },
+        criteriaItem: { fontSize: 12 },
+        criteriaMet: { color: "#22c55e" },
+        criteriaUnmet: { color: "#6b7280" },
+        primaryButton: {
+            marginTop: 20,
+            backgroundColor: theme.primary,
+            paddingVertical: 14,
+            borderRadius: 16,
+            alignItems: "center",
+        },
+        primaryButtonDisabled: { opacity: 0.5 },
+        primaryButtonText: { color: theme.white, fontWeight: "600" },
+        signInText: { color: theme.text, textAlign: "center", marginTop: 16 },
+        signInLink: { color: theme.primaryLight },
+        hideKeyboardButton: {
+            position: "absolute",
+            right: 16,
+            alignItems: "center",
+            justifyContent: "center",
+            width: 44,
+            height: 44,
+            borderRadius: 999,
+            backgroundColor: theme.background,
+            borderWidth: 1,
+            borderColor: theme.border,
+            shadowOpacity: 0.25,
+            shadowRadius: 6,
+            shadowOffset: { width: 0, height: 2 },
+        },
+        hideKeyboardText: {
+            color: theme.textPrimary,
+            fontWeight: "600",
+            fontSize: 14,
+        },
+        scrollContent: {
+            flexGrow: 1,
+            paddingBottom: 24, // keeps bottom content from feeling cramped
+        },
+    });
+}

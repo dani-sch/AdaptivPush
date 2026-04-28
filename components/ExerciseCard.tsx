@@ -1,18 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { ExerciseInfoPanel } from "./ExerciseInfoPanel";
-import {
-    BORDER_COLOR,
-    BUTTON_DISABLED,
-    CARD_BG,
-    MUTED_BG,
-    PLACEHOLDER_TEXT,
-    PRIMARY_COLOR,
-    SUCCESS,
-    TEXT_COLOR,
-    WHITE,
-} from "../constants/colors";
+import { useTheme } from "@/contexts/ThemeContext";
+import type { Theme } from "@/constants/themes";
 import type { MuscleGroup } from "@/types/program";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -46,6 +37,8 @@ interface SetRowProps {
     onChangeReps: (val: string) => void;
     onChangeRpe: (val: string) => void;
     onToggleLogged: () => void;
+    styles: ReturnType<typeof createStyles>;
+    theme: Theme;
 }
 
 const SetRow: React.FC<SetRowProps> = ({
@@ -55,6 +48,8 @@ const SetRow: React.FC<SetRowProps> = ({
     onChangeReps,
     onChangeRpe,
     onToggleLogged,
+    styles,
+    theme,
 }) => (
     <View style={[styles.setRow, set.logged && styles.setRowLogged]}>
         <Text style={styles.setNumber}>{index + 1}</Text>
@@ -66,7 +61,7 @@ const SetRow: React.FC<SetRowProps> = ({
             keyboardType="decimal-pad"
             selectTextOnFocus
             editable={!set.logged}
-            placeholderTextColor={PLACEHOLDER_TEXT}
+            placeholderTextColor={theme.placeholder}
             placeholder="—"
         />
 
@@ -77,7 +72,7 @@ const SetRow: React.FC<SetRowProps> = ({
             keyboardType="number-pad"
             selectTextOnFocus
             editable={!set.logged}
-            placeholderTextColor={PLACEHOLDER_TEXT}
+            placeholderTextColor={theme.placeholder}
             placeholder="—"
         />
 
@@ -88,7 +83,7 @@ const SetRow: React.FC<SetRowProps> = ({
             keyboardType="decimal-pad"
             selectTextOnFocus
             editable={!set.logged}
-            placeholderTextColor={PLACEHOLDER_TEXT}
+            placeholderTextColor={theme.placeholder}
             placeholder="—"
         />
 
@@ -104,7 +99,7 @@ const SetRow: React.FC<SetRowProps> = ({
             <Ionicons
                 name="checkmark"
                 size={16}
-                color={set.logged ? WHITE : PLACEHOLDER_TEXT}
+                color={set.logged ? theme.white : theme.placeholder}
             />
         </Pressable>
     </View>
@@ -127,6 +122,8 @@ export default function ExerciseCard({
     onPressHistory,
     onPressSwap,
 }: ExerciseCardProps) {
+    const { theme } = useTheme();
+    const styles = useMemo(() => createStyles(theme), [theme]);
     const [showInfo, setShowInfo] = useState(false);
     return (
         <View style={[styles.card, exercise.completed && styles.cardCompleted]}>
@@ -143,7 +140,7 @@ export default function ExerciseCard({
                         hitSlop={8}
                     >
                         {exercise.completed && (
-                            <Ionicons name="checkmark" size={16} color={WHITE} />
+                            <Ionicons name="checkmark" size={16} color={theme.white} />
                         )}
                     </Pressable>
                     <View style={styles.exerciseNameWrapper}>
@@ -168,21 +165,21 @@ export default function ExerciseCard({
                             onPress={() => setShowInfo(p => !p)}
                             hitSlop={6}
                         >
-                            <Ionicons name="information-circle-outline" size={16} color={showInfo ? TEXT_COLOR : TEXT_COLOR} />
+                            <Ionicons name="information-circle-outline" size={16} color={showInfo ? theme.text : theme.text} />
                         </Pressable>
                     )}
                     <Pressable
                         style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.7 }]}
                         onPress={onPressHistory}
                     >
-                        <Ionicons name="time-outline" size={16} color={TEXT_COLOR} />
+                        <Ionicons name="time-outline" size={16} color={theme.text} />
                         <Text style={styles.actionButtonText}>History</Text>
                     </Pressable>
                     <Pressable
                         style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.7 }]}
                         onPress={onPressSwap}
                     >
-                        <Ionicons name="swap-horizontal" size={16} color={TEXT_COLOR} />
+                        <Ionicons name="swap-horizontal" size={16} color={theme.text} />
                         <Text style={styles.actionButtonText}>Swap</Text>
                     </Pressable>
                 </View>
@@ -211,6 +208,8 @@ export default function ExerciseCard({
                         onChangeReps={(val) => onUpdateSet(set.id, "reps", val)}
                         onChangeRpe={(val) => onUpdateSet(set.id, "rpe", val)}
                         onToggleLogged={() => onUpdateSet(set.id, "logged", !set.logged)}
+                        styles={styles}
+                        theme={theme}
                     />
                 ))}
             </View>
@@ -220,160 +219,162 @@ export default function ExerciseCard({
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-    card: {
-        backgroundColor: CARD_BG,
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-        padding: 16,
-        marginBottom: 12,
-    },
-    cardCompleted: {
-        borderColor: SUCCESS,
-        borderWidth: 1.5,
-        opacity: 0.75,
-    },
+function createStyles(theme: Theme) {
+    return StyleSheet.create({
+        card: {
+            backgroundColor: theme.cardBg,
+            borderRadius: 20,
+            borderWidth: 1,
+            borderColor: theme.border,
+            padding: 16,
+            marginBottom: 12,
+        },
+        cardCompleted: {
+            borderColor: theme.success,
+            borderWidth: 1.5,
+            opacity: 0.75,
+        },
 
-    header: {
-        flexDirection: "row",
-        alignItems: "flex-start",
-        justifyContent: "space-between",
-        marginBottom: 16,
-    },
-    headerLeft: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 12,
-        flex: 1,
-    },
-    completionCircle: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        borderWidth: 2,
-        borderColor: BORDER_COLOR,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "transparent",
-    },
-    completionCircleDone: {
-        backgroundColor: SUCCESS,
-        borderColor: SUCCESS,
-    },
-    exerciseNameWrapper: {
-        flex: 1,
-        flexShrink: 1,
-    },
-    exerciseName: {
-        color: WHITE,
-        fontSize: 16,
-        fontWeight: "700",
-        marginBottom: 2,
-    },
-    exerciseNameCompleted: {
-        textDecorationLine: "line-through",
-        color: TEXT_COLOR,
-    },
-    prescription: {
-        color: TEXT_COLOR,
-        fontSize: 13,
-        fontWeight: "500",
-    },
+        header: {
+            flexDirection: "row",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            marginBottom: 16,
+        },
+        headerLeft: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+            flex: 1,
+        },
+        completionCircle: {
+            width: 28,
+            height: 28,
+            borderRadius: 14,
+            borderWidth: 2,
+            borderColor: theme.border,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "transparent",
+        },
+        completionCircleDone: {
+            backgroundColor: theme.success,
+            borderColor: theme.success,
+        },
+        exerciseNameWrapper: {
+            flex: 1,
+            flexShrink: 1,
+        },
+        exerciseName: {
+            color: theme.textPrimary,
+            fontSize: 16,
+            fontWeight: "700",
+            marginBottom: 2,
+        },
+        exerciseNameCompleted: {
+            textDecorationLine: "line-through",
+            color: theme.text,
+        },
+        prescription: {
+            color: theme.text,
+            fontSize: 13,
+            fontWeight: "500",
+        },
 
-    actions: {
-        flexDirection: "row",
-        gap: 8,
-        marginLeft: 8,
-    },
-    actionButton: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 4,
-        backgroundColor: MUTED_BG,
-        borderRadius: 10,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-    },
-    actionButtonActive: {
-        borderColor: TEXT_COLOR,
-    },
-    actionButtonText: {
-        color: TEXT_COLOR,
-        fontSize: 12,
-        fontWeight: "600",
-    },
+        actions: {
+            flexDirection: "row",
+            gap: 8,
+            marginLeft: 8,
+        },
+        actionButton: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 4,
+            backgroundColor: theme.mutedBg,
+            borderRadius: 10,
+            paddingHorizontal: 10,
+            paddingVertical: 6,
+            borderWidth: 1,
+            borderColor: theme.border,
+        },
+        actionButtonActive: {
+            borderColor: theme.text,
+        },
+        actionButtonText: {
+            color: theme.text,
+            fontSize: 12,
+            fontWeight: "600",
+        },
 
-    setsTable: {
-        gap: 4,
-    },
-    setRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
-        paddingVertical: 4,
-    },
-    setRowLogged: {
-        opacity: 0.6,
-    },
-    setNumber: {
-        color: PLACEHOLDER_TEXT,
-        fontSize: 14,
-        fontWeight: "600",
-        width: 24,
-        textAlign: "center",
-    },
-    setHeaderSet: {
-        color: PLACEHOLDER_TEXT,
-        fontSize: 11,
-        fontWeight: "700",
-        letterSpacing: 0.8,
-        width: 24,
-        textAlign: "center",
-    },
-    setHeaderLabel: {
-        color: PLACEHOLDER_TEXT,
-        fontSize: 11,
-        fontWeight: "700",
-        letterSpacing: 0.8,
-        flex: 1,
-        textAlign: "center",
-    },
-    setInput: {
-        flex: 1,
-        backgroundColor: MUTED_BG,
-        borderRadius: 10,
-        paddingVertical: 8,
-        paddingHorizontal: 4,
-        color: WHITE,
-        fontSize: 15,
-        fontWeight: "600",
-        textAlign: "center",
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-    },
-    setInputLogged: {
-        backgroundColor: "transparent",
-        borderColor: "transparent",
-        color: TEXT_COLOR,
-    },
-    logButton: {
-        width: 32,
-        height: 32,
-        borderRadius: 10,
-        backgroundColor: BUTTON_DISABLED,
-        alignItems: "center",
-        justifyContent: "center",
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-    },
-    logButtonDone: {
-        backgroundColor: PRIMARY_COLOR,
-        borderColor: PRIMARY_COLOR,
-    },
-    logButtonPlaceholder: {
-        width: 32,
-    },
-});
+        setsTable: {
+            gap: 4,
+        },
+        setRow: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            paddingVertical: 4,
+        },
+        setRowLogged: {
+            opacity: 0.6,
+        },
+        setNumber: {
+            color: theme.placeholder,
+            fontSize: 14,
+            fontWeight: "600",
+            width: 24,
+            textAlign: "center",
+        },
+        setHeaderSet: {
+            color: theme.placeholder,
+            fontSize: 11,
+            fontWeight: "700",
+            letterSpacing: 0.8,
+            width: 24,
+            textAlign: "center",
+        },
+        setHeaderLabel: {
+            color: theme.placeholder,
+            fontSize: 11,
+            fontWeight: "700",
+            letterSpacing: 0.8,
+            flex: 1,
+            textAlign: "center",
+        },
+        setInput: {
+            flex: 1,
+            backgroundColor: theme.mutedBg,
+            borderRadius: 10,
+            paddingVertical: 8,
+            paddingHorizontal: 4,
+            color: theme.textPrimary,
+            fontSize: 15,
+            fontWeight: "600",
+            textAlign: "center",
+            borderWidth: 1,
+            borderColor: theme.border,
+        },
+        setInputLogged: {
+            backgroundColor: "transparent",
+            borderColor: "transparent",
+            color: theme.text,
+        },
+        logButton: {
+            width: 32,
+            height: 32,
+            borderRadius: 10,
+            backgroundColor: theme.buttonDisabled,
+            alignItems: "center",
+            justifyContent: "center",
+            borderWidth: 1,
+            borderColor: theme.border,
+        },
+        logButtonDone: {
+            backgroundColor: theme.primary,
+            borderColor: theme.primary,
+        },
+        logButtonPlaceholder: {
+            width: 32,
+        },
+    });
+}

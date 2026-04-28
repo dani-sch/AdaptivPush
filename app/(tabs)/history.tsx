@@ -23,6 +23,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 
 import { supabase } from '@/utils/supabase';
+import { useTheme } from '@/contexts/ThemeContext';
+import type { Theme } from '@/constants/themes';
 
 interface WorkoutHistoryRow {
   id?: string;
@@ -269,9 +271,12 @@ interface SummaryMetricCardProps {
 }
 
 const SummaryMetricCard = ({ icon, value, label, onPress }: SummaryMetricCardProps) => {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   const content = (
     <LinearGradient
-      colors={['#181b26', '#12141b']}
+      colors={[theme.background, theme.background]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={[styles.summaryCard, onPress && { width: '100%' }]}
@@ -289,6 +294,9 @@ const SummaryMetricCard = ({ icon, value, label, onPress }: SummaryMetricCardPro
 
 export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   const [workouts, setWorkouts] = useState<WorkoutEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -514,17 +522,17 @@ export default function HistoryScreen() {
 
         <View style={styles.summaryGrid}>
           <SummaryMetricCard
-            icon={<CalendarDays color="#2f7cff" size={24} />}
+            icon={<CalendarDays color={theme.primary} size={24} />}
             value={`${summary.totalWorkouts}`}
             label="Total Workouts"
           />
           <SummaryMetricCard
-            icon={<Clock3 color="#a14bff" size={24} />}
+            icon={<Clock3 color={theme.secondary} size={24} />}
             value={`${summary.avgDuration}`}
             label="Avg Duration (min)"
           />
           <SummaryMetricCard
-            icon={<TrendingUp color="#10d97a" size={24} />}
+            icon={<TrendingUp color={theme.success} size={24} />}
             value={formatCompactVolume(summary.totalVolumeLb)}
             label="Total Volume (lbs)"
           />
@@ -538,7 +546,7 @@ export default function HistoryScreen() {
 
         {loading ? (
           <View style={styles.stateCard}>
-            <ActivityIndicator size="large" color="#2f7cff" />
+            <ActivityIndicator size="large" color={theme.primary} />
             <Text style={styles.stateText}>Loading workout history...</Text>
           </View>
         ) : error ? (
@@ -562,7 +570,7 @@ export default function HistoryScreen() {
                   style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
                 >
                   <LinearGradient
-                    colors={['#181b26', '#12141b']}
+                    colors={[theme.background, theme.background]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.workoutCard}
@@ -572,17 +580,17 @@ export default function HistoryScreen() {
                         <Text style={styles.workoutTitle}>{workout.title}</Text>
                         <Text style={styles.workoutDate}>{formatWorkoutDate(workout.completedAt)}</Text>
                       </View>
-                      <ChevronRight color="#4d5265" size={26} style={styles.workoutChevron} />
+                      <ChevronRight color={theme.placeholder} size={26} style={styles.workoutChevron} />
                     </View>
 
                     <View style={styles.workoutMetaRow}>
                       <View style={styles.workoutMetaItem}>
-                        <Clock3 color="#8d93a7" size={18} />
+                        <Clock3 color={theme.text} size={18} />
                         <Text style={styles.workoutMetaText}>{workout.durationMin} min</Text>
                       </View>
 
                       <View style={styles.workoutMetaItem}>
-                        <TrendingUp color="#8d93a7" size={18} />
+                        <TrendingUp color={theme.text} size={18} />
                         <Text style={styles.workoutMetaText}>{formatExactVolume(workout.totalVolumeLb)} lbs</Text>
                       </View>
 
@@ -629,7 +637,7 @@ export default function HistoryScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Close workout detail"
               >
-                <X color="#f4f6ff" size={18} />
+                <X color={theme.textPrimary} size={18} />
               </Pressable>
             </View>
 
@@ -640,7 +648,7 @@ export default function HistoryScreen() {
             >
               {detailLoading ? (
                 <View style={styles.sheetStateWrap}>
-                  <ActivityIndicator size="small" color="#2f7cff" />
+                  <ActivityIndicator size="small" color={theme.primary} />
                   <Text style={styles.sheetStateText}>Loading exercises…</Text>
                 </View>
               ) : sessionExercises.length === 0 ? (
@@ -661,7 +669,7 @@ export default function HistoryScreen() {
                         accessibilityRole="button"
                         accessibilityLabel={`View history for ${ex.name}`}
                       >
-                        <TrendingUp size={14} color="#2f7cff" />
+                        <TrendingUp size={14} color={theme.primary} />
                         <Text style={styles.historyBtnText}>History</Text>
                       </Pressable>
                     </View>
@@ -704,17 +712,17 @@ export default function HistoryScreen() {
                 <Text style={styles.sheetSubtitle}>All-time bests per exercise</Text>
               </View>
               <Pressable style={styles.sheetCloseBtn} onPress={() => setShowPrModal(false)}>
-                <Ionicons name="close" size={18} color="#6f7485" />
+                <Ionicons name="close" size={18} color={theme.placeholder} />
               </Pressable>
             </View>
             <ScrollView contentContainerStyle={styles.sheetContent}>
               {prLoading ? (
                 <View style={styles.sheetStateWrap}>
-                  <ActivityIndicator size="large" color="#2f7cff" />
+                  <ActivityIndicator size="large" color={theme.primary} />
                 </View>
               ) : prRecords.length === 0 ? (
                 <View style={styles.sheetStateWrap}>
-                  <Medal color="#6f7485" size={28} />
+                  <Medal color={theme.placeholder} size={28} />
                   <Text style={styles.sheetStateText}>No personal records yet.{'\n'}Complete a workout to start tracking!</Text>
                 </View>
               ) : (
@@ -725,10 +733,10 @@ export default function HistoryScreen() {
                       <Medal color="#ffc200" size={18} />
                     </View>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text style={{ color: '#f4f6ff', fontSize: 16, fontWeight: '600' }}>
+                      <Text style={{ color: theme.textPrimary, fontSize: 16, fontWeight: '600' }}>
                         {pr.weightLb} lbs × {pr.reps} reps
                       </Text>
-                      <Text style={{ color: '#6f7485', fontSize: 13 }}>
+                      <Text style={{ color: theme.placeholder, fontSize: 13 }}>
                         {new Date(pr.achievedAt).toLocaleDateString()}
                       </Text>
                     </View>
@@ -743,248 +751,250 @@ export default function HistoryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#03040b',
-  },
-  scrollContent: {
-    paddingHorizontal: 18,
-  },
-  screenTitle: {
-    color: '#f4f6ff',
-    fontSize: 24,
-    fontWeight: '500',
-    marginBottom: 18,
-  },
-  summaryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    rowGap: 12,
-    marginBottom: 28,
-  },
-  summaryCard: {
-    width: '48.6%',
-    minHeight: 176,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#202433',
-    paddingHorizontal: 17,
-    paddingVertical: 16,
-  },
-  summaryValue: {
-    color: '#f5f6ff',
-    fontSize: 34,
-    lineHeight: 38,
-    fontWeight: '500',
-    marginTop: 12,
-    marginBottom: 6,
-  },
-  summaryLabel: {
-    color: '#6f7485',
-    fontSize: 14,
-  },
-  sectionWrap: {
-    marginBottom: 8,
-  },
-  sectionTitle: {
-    color: '#696f82',
-    fontSize: 15,
-    letterSpacing: 1.2,
-    marginBottom: 11,
-  },
-  workoutCard: {
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#202433',
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    marginBottom: 14,
-  },
-  workoutHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  workoutHeaderTextWrap: {
-    flex: 1,
-    paddingRight: 10,
-  },
-  workoutTitle: {
-    color: '#f4f6ff',
-    fontSize: 18,
-    fontWeight: '500',
-    marginBottom: 5,
-  },
-  workoutDate: {
-    color: '#6f7485',
-    fontSize: 14,
-  },
-  workoutMetaRow: {
-    marginTop: 16,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    columnGap: 16,
-    rowGap: 8,
-  },
-  workoutMetaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  workoutMetaText: {
-    color: '#a8adbc',
-    fontSize: 14,
-  },
-  workoutMetaPrText: {
-    color: '#ffc200',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  workoutChevron: {
-    marginTop: 2,
-  },
-  stateCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#202433',
-    backgroundColor: '#12141b',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-    minHeight: 120,
-  },
-  stateTitle: {
-    color: '#f4f6ff',
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 6,
-  },
-  stateText: {
-    color: '#8d93a7',
-    fontSize: 14,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  errorCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 59, 69, 0.35)',
-    backgroundColor: 'rgba(255, 59, 69, 0.08)',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  errorText: {
-    color: '#ff747c',
-    fontSize: 13,
-  },
+function createStyles(theme: Theme) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.backgroundDark,
+    },
+    scrollContent: {
+      paddingHorizontal: 18,
+    },
+    screenTitle: {
+      color: theme.textPrimary,
+      fontSize: 24,
+      fontWeight: '500',
+      marginBottom: 18,
+    },
+    summaryGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'space-between',
+      rowGap: 12,
+      marginBottom: 28,
+    },
+    summaryCard: {
+      width: '48.6%',
+      minHeight: 176,
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: theme.border,
+      paddingHorizontal: 17,
+      paddingVertical: 16,
+    },
+    summaryValue: {
+      color: theme.textPrimary,
+      fontSize: 34,
+      lineHeight: 38,
+      fontWeight: '500',
+      marginTop: 12,
+      marginBottom: 6,
+    },
+    summaryLabel: {
+      color: theme.placeholder,
+      fontSize: 14,
+    },
+    sectionWrap: {
+      marginBottom: 8,
+    },
+    sectionTitle: {
+      color: theme.text,
+      fontSize: 15,
+      letterSpacing: 1.2,
+      marginBottom: 11,
+    },
+    workoutCard: {
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: theme.border,
+      paddingHorizontal: 18,
+      paddingVertical: 16,
+      marginBottom: 14,
+    },
+    workoutHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    workoutHeaderTextWrap: {
+      flex: 1,
+      paddingRight: 10,
+    },
+    workoutTitle: {
+      color: theme.textPrimary,
+      fontSize: 18,
+      fontWeight: '500',
+      marginBottom: 5,
+    },
+    workoutDate: {
+      color: theme.placeholder,
+      fontSize: 14,
+    },
+    workoutMetaRow: {
+      marginTop: 16,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      columnGap: 16,
+      rowGap: 8,
+    },
+    workoutMetaItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    workoutMetaText: {
+      color: theme.placeholder,
+      fontSize: 14,
+    },
+    workoutMetaPrText: {
+      color: '#ffc200',
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    workoutChevron: {
+      marginTop: 2,
+    },
+    stateCard: {
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.background,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 20,
+      minHeight: 120,
+    },
+    stateTitle: {
+      color: theme.textPrimary,
+      fontSize: 18,
+      fontWeight: '600',
+      marginBottom: 6,
+    },
+    stateText: {
+      color: theme.text,
+      fontSize: 14,
+      marginTop: 8,
+      textAlign: 'center',
+    },
+    errorCard: {
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: 'rgba(255, 59, 69, 0.35)',
+      backgroundColor: 'rgba(255, 59, 69, 0.08)',
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    errorText: {
+      color: '#ff747c',
+      fontSize: 13,
+    },
 
-  // Session detail bottom sheet
-  sheetBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.82)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: '#12141b',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderWidth: 1,
-    borderColor: '#202433',
-    overflow: 'hidden',
-    maxHeight: '88%',
-    height: '75%',
-  },
-  sheetHeader: {
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#202433',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  sheetTitle: {
-    color: '#f4f6ff',
-    fontSize: 18,
-    fontWeight: '800',
-    marginBottom: 2,
-  },
-  sheetSubtitle: {
-    color: '#6f7485',
-    fontSize: 13,
-  },
-  sheetCloseBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#1e2130',
-    borderWidth: 1,
-    borderColor: '#202433',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sheetContent: {
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    paddingBottom: 32,
-    gap: 12,
-  },
-  sheetStateWrap: {
-    alignItems: 'center',
-    paddingVertical: 32,
-    gap: 10,
-  },
-  sheetStateText: {
-    color: '#6f7485',
-    fontSize: 14,
-    textAlign: 'center',
-  },
+    // Session detail bottom sheet
+    sheetBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.82)',
+      justifyContent: 'flex-end',
+    },
+    sheet: {
+      backgroundColor: theme.background,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      borderWidth: 1,
+      borderColor: theme.border,
+      overflow: 'hidden',
+      maxHeight: '88%',
+      height: '75%',
+    },
+    sheetHeader: {
+      paddingHorizontal: 18,
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    sheetTitle: {
+      color: theme.textPrimary,
+      fontSize: 18,
+      fontWeight: '800',
+      marginBottom: 2,
+    },
+    sheetSubtitle: {
+      color: theme.placeholder,
+      fontSize: 13,
+    },
+    sheetCloseBtn: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      backgroundColor: theme.mutedBg,
+      borderWidth: 1,
+      borderColor: theme.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    sheetContent: {
+      paddingHorizontal: 18,
+      paddingVertical: 16,
+      paddingBottom: 32,
+      gap: 12,
+    },
+    sheetStateWrap: {
+      alignItems: 'center',
+      paddingVertical: 32,
+      gap: 10,
+    },
+    sheetStateText: {
+      color: theme.placeholder,
+      fontSize: 14,
+      textAlign: 'center',
+    },
 
-  // Exercise rows in detail sheet
-  exerciseRow: {
-    backgroundColor: '#181b26',
-    borderWidth: 1,
-    borderColor: '#202433',
-    borderRadius: 16,
-    padding: 14,
-  },
-  exerciseRowHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  exerciseName: {
-    color: '#f4f6ff',
-    fontSize: 15,
-    fontWeight: '700',
-    flex: 1,
-    paddingRight: 8,
-  },
-  historyBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(47,124,255,0.12)',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(47,124,255,0.25)',
-  },
-  historyBtnText: {
-    color: '#2f7cff',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  setRow: {
-    color: '#a8adbc',
-    fontSize: 13,
-    marginBottom: 4,
-    fontVariant: ['tabular-nums'],
-  },
-});
+    // Exercise rows in detail sheet
+    exerciseRow: {
+      backgroundColor: theme.background,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 16,
+      padding: 14,
+    },
+    exerciseRowHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 10,
+    },
+    exerciseName: {
+      color: theme.textPrimary,
+      fontSize: 15,
+      fontWeight: '700',
+      flex: 1,
+      paddingRight: 8,
+    },
+    historyBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      backgroundColor: 'rgba(47,124,255,0.12)',
+      borderRadius: 10,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderWidth: 1,
+      borderColor: 'rgba(47,124,255,0.25)',
+    },
+    historyBtnText: {
+      color: theme.primary,
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    setRow: {
+      color: theme.placeholder,
+      fontSize: 13,
+      marginBottom: 4,
+      fontVariant: ['tabular-nums'],
+    },
+  });
+}

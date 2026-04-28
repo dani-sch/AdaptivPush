@@ -1,14 +1,15 @@
 import React from 'react';
-import { TouchableOpacity, View} from 'react-native';
+import { TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import {PRIMARY_COLOR} from '@/constants/colors';
-import {useRouter} from 'expo-router';
+import { useTheme } from '@/contexts/ThemeContext';
+import { useRouter } from 'expo-router';
 
 export default function BackButton() {
     const router = useRouter();
+    const { theme } = useTheme();
     return (
         <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back-sharp" size={30} color={PRIMARY_COLOR} />
+            <Ionicons name="arrow-back-sharp" size={30} color={theme.primary} />
         </TouchableOpacity>
     )
 }

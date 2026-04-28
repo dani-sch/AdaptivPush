@@ -1,20 +1,12 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { X, ArrowLeftRight, Info } from 'lucide-react-native';
 
 import { SwapExerciseModal } from '@/components/SwapExerciseModal';
 import { ExerciseInfoPanel } from '@/components/ExerciseInfoPanel';
 import type { CurrentProgram, ProgramWorkout, WorkoutExercise } from '@/types/program';
-
-import {
-    BORDER_COLOR,
-    CARD_BG,
-    MUTED_BG,
-    PLACEHOLDER_TEXT,
-    SURFACE_BG,
-    TEXT_COLOR,
-    WHITE,
-} from '@/constants/colors';
+import { useTheme } from '@/contexts/ThemeContext';
+import type { Theme } from '@/constants/themes';
 
 type Props = {
     workout: ProgramWorkout;
@@ -23,10 +15,12 @@ type Props = {
     onClose: () => void;
 };
 
-function ExerciseRow({ exercise, idx, onSwap }: {
+function ExerciseRow({ exercise, idx, onSwap, styles, theme }: {
     exercise: WorkoutExercise;
     idx: number;
     onSwap: () => void;
+    styles: ReturnType<typeof createStyles>;
+    theme: Theme;
 }) {
     const [showInfo, setShowInfo] = useState(false);
     const hasInfo = !!(exercise.imageUrl || exercise.description);
@@ -55,7 +49,7 @@ function ExerciseRow({ exercise, idx, onSwap }: {
                             accessibilityRole="button"
                             accessibilityLabel="Exercise info"
                         >
-                            <Info color={WHITE} size={15} />
+                            <Info color={theme.white} size={15} />
                         </Pressable>
                     )}
                     <Pressable
@@ -64,7 +58,7 @@ function ExerciseRow({ exercise, idx, onSwap }: {
                         accessibilityRole="button"
                         accessibilityLabel={`Swap ${exercise.name}`}
                     >
-                        <ArrowLeftRight color={WHITE} size={15} />
+                        <ArrowLeftRight color={theme.white} size={15} />
                     </Pressable>
                 </View>
             </View>
@@ -83,6 +77,9 @@ function ExerciseRow({ exercise, idx, onSwap }: {
 }
 
 export function WorkoutTemplateModal({ workout, program, onSwapExercise, onClose }: Props) {
+    const { theme } = useTheme();
+    const styles = useMemo(() => createStyles(theme), [theme]);
+
     const [swapExerciseId, setSwapExerciseId] = useState<string | null>(null);
 
     return (
@@ -102,7 +99,7 @@ export function WorkoutTemplateModal({ workout, program, onSwapExercise, onClose
                         style={({ pressed }) => [styles.closeButton, pressed && { opacity: 0.85 }]}
                         accessibilityRole="button"
                     >
-                        <X color={WHITE} size={18} />
+                        <X color={theme.white} size={18} />
                     </Pressable>
                 </View>
 
@@ -113,6 +110,8 @@ export function WorkoutTemplateModal({ workout, program, onSwapExercise, onClose
                             exercise={exercise}
                             idx={idx}
                             onSwap={() => setSwapExerciseId(exercise.id)}
+                            styles={styles}
+                            theme={theme}
                         />
                     ))}
                 </ScrollView>
@@ -139,133 +138,135 @@ export function WorkoutTemplateModal({ workout, program, onSwapExercise, onClose
     );
 }
 
-const styles = StyleSheet.create({
-    backdrop: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.82)',
-        justifyContent: 'flex-end',
-    },
-    sheet: {
-        backgroundColor: SURFACE_BG,
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-        overflow: 'hidden',
-        height: '75%',
-        maxHeight: '90%',
-    },
-    header: {
-        paddingHorizontal: 18,
-        paddingVertical: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: BORDER_COLOR,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-    },
-    headerTitle: {
-        color: WHITE,
-        fontSize: 18,
-        fontWeight: '700',
-        marginBottom: 2,
-    },
-    headerSubtitle: {
-        color: TEXT_COLOR,
-        fontSize: 13,
-    },
-    closeButton: {
-        width: 34,
-        height: 34,
-        borderRadius: 17,
-        backgroundColor: MUTED_BG,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    scrollContent: {
-        paddingHorizontal: 18,
-        paddingVertical: 16,
-        paddingBottom: 26,
-    },
-    exerciseCard: {
-        backgroundColor: CARD_BG,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-        padding: 14,
-        marginBottom: 12,
-    },
-    exerciseTopRow: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        justifyContent: 'space-between',
-        gap: 12,
-        marginBottom: 10,
-    },
-    exerciseTitleRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-        marginBottom: 4,
-    },
-    exerciseIndex: {
-        color: PLACEHOLDER_TEXT,
-        fontSize: 12,
-        fontWeight: '700',
-        width: 16,
-        textAlign: 'center',
-    },
-    exerciseName: {
-        color: WHITE,
-        fontSize: 14,
-        fontWeight: '700',
-        flexShrink: 1,
-    },
-    exerciseMeta: {
-        color: TEXT_COLOR,
-        fontSize: 12,
-    },
-    cardActions: {
-        flexDirection: 'row',
-        gap: 8,
-    },
-    iconBtn: {
-        width: 32,
-        height: 32,
-        borderRadius: 10,
-        backgroundColor: MUTED_BG,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    iconBtnActive: {
-        borderColor: TEXT_COLOR,
-    },
-    exerciseStatsRow: {
-        flexDirection: 'row',
-        gap: 14,
-    },
-    statText: {
-        color: TEXT_COLOR,
-        fontSize: 13,
-    },
-    swapOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.82)',
-        justifyContent: 'flex-end',
-    },
-    nestedSheet: {
-        backgroundColor: SURFACE_BG,
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-        overflow: 'hidden',
-        height: '72%',
-        maxHeight: '85%',
-        minHeight: 280,
-    },
-});
+function createStyles(theme: Theme) {
+    return StyleSheet.create({
+        backdrop: {
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.82)',
+            justifyContent: 'flex-end',
+        },
+        sheet: {
+            backgroundColor: theme.surfaceBg,
+            borderTopLeftRadius: 24,
+            borderTopRightRadius: 24,
+            borderWidth: 1,
+            borderColor: theme.border,
+            overflow: 'hidden',
+            height: '75%',
+            maxHeight: '90%',
+        },
+        header: {
+            paddingHorizontal: 18,
+            paddingVertical: 14,
+            borderBottomWidth: 1,
+            borderBottomColor: theme.border,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12,
+        },
+        headerTitle: {
+            color: theme.textPrimary,
+            fontSize: 18,
+            fontWeight: '700',
+            marginBottom: 2,
+        },
+        headerSubtitle: {
+            color: theme.text,
+            fontSize: 13,
+        },
+        closeButton: {
+            width: 34,
+            height: 34,
+            borderRadius: 17,
+            backgroundColor: theme.mutedBg,
+            borderWidth: 1,
+            borderColor: theme.border,
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
+        scrollContent: {
+            paddingHorizontal: 18,
+            paddingVertical: 16,
+            paddingBottom: 26,
+        },
+        exerciseCard: {
+            backgroundColor: theme.cardBg,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: theme.border,
+            padding: 14,
+            marginBottom: 12,
+        },
+        exerciseTopRow: {
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: 12,
+            marginBottom: 10,
+        },
+        exerciseTitleRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+            marginBottom: 4,
+        },
+        exerciseIndex: {
+            color: theme.placeholder,
+            fontSize: 12,
+            fontWeight: '700',
+            width: 16,
+            textAlign: 'center',
+        },
+        exerciseName: {
+            color: theme.textPrimary,
+            fontSize: 14,
+            fontWeight: '700',
+            flexShrink: 1,
+        },
+        exerciseMeta: {
+            color: theme.text,
+            fontSize: 12,
+        },
+        cardActions: {
+            flexDirection: 'row',
+            gap: 8,
+        },
+        iconBtn: {
+            width: 32,
+            height: 32,
+            borderRadius: 10,
+            backgroundColor: theme.mutedBg,
+            borderWidth: 1,
+            borderColor: theme.border,
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
+        iconBtnActive: {
+            borderColor: theme.text,
+        },
+        exerciseStatsRow: {
+            flexDirection: 'row',
+            gap: 14,
+        },
+        statText: {
+            color: theme.text,
+            fontSize: 13,
+        },
+        swapOverlay: {
+            ...StyleSheet.absoluteFillObject,
+            backgroundColor: 'rgba(0,0,0,0.82)',
+            justifyContent: 'flex-end',
+        },
+        nestedSheet: {
+            backgroundColor: theme.surfaceBg,
+            borderTopLeftRadius: 24,
+            borderTopRightRadius: 24,
+            borderWidth: 1,
+            borderColor: theme.border,
+            overflow: 'hidden',
+            height: '72%',
+            maxHeight: '85%',
+            minHeight: 280,
+        },
+    });
+}

@@ -6,7 +6,7 @@
  * 'exercise-images' Supabase Storage bucket, and writes the public URL back.
  *
  * Run after seedExercises.ts has populated exercise data and the
- * 005_exercises_add_exercisedb_id.sql migration has been applied.
+ * 005_exercises_add_exercisedb_id.sql np has been applied.
  *
  * Usage:
  *   npx ts-node -P scripts/tsconfig.json scripts/seedImages.ts
@@ -68,7 +68,9 @@ async function fetchAndUpload(exercisedbId: string): Promise<string | null> {
       return null;
     }
 
-    const { data } = supabase.storage.from("exercise-images").getPublicUrl(path);
+    const { data } = supabase.storage
+      .from("exercise-images")
+      .getPublicUrl(path);
     return data.publicUrl;
   } catch (e: any) {
     if (e.message?.includes("429")) throw e; // propagate quota errors
@@ -96,7 +98,9 @@ async function seedImages() {
     (ex) => !ex.image_url || !ex.image_url.startsWith(supabaseBase),
   );
 
-  console.log(`[Images] ${pending.length} exercises need images (${(exercises ?? []).length} total).`);
+  console.log(
+    `[Images] ${pending.length} exercises need images (${(exercises ?? []).length} total).`,
+  );
   if (pending.length === 0) {
     console.log("[Done] All images already uploaded.");
     return;
@@ -118,8 +122,10 @@ async function seedImages() {
     );
 
     for (const r of results) {
-      if (r) { updates.push(r); uploaded++; }
-      else failed++;
+      if (r) {
+        updates.push(r);
+        uploaded++;
+      } else failed++;
     }
 
     const done = Math.min(i + BATCH_SIZE, pending.length);
@@ -138,8 +144,12 @@ async function seedImages() {
     for (let i = 0; i < updates.length; i += CHUNK) {
       const { error: writeErr } = await supabase
         .from("exercises")
-        .upsert(updates.slice(i, i + CHUNK), { onConflict: "name", ignoreDuplicates: false });
-      if (writeErr) console.error("[Error] URL write failed:", writeErr.message);
+        .upsert(updates.slice(i, i + CHUNK), {
+          onConflict: "name",
+          ignoreDuplicates: false,
+        });
+      if (writeErr)
+        console.error("[Error] URL write failed:", writeErr.message);
     }
   }
 
@@ -151,7 +161,9 @@ async function seedImages() {
 
 seedImages().catch((err) => {
   if (err.message?.includes("429")) {
-    console.error("\n[Fatal] Monthly API quota exceeded. Wait for it to reset, then re-run.");
+    console.error(
+      "\n[Fatal] Monthly API quota exceeded. Wait for it to reset, then re-run.",
+    );
   } else {
     console.error("[Fatal]", err);
   }

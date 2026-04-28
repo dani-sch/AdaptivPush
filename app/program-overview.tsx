@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -11,15 +11,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import {
-  BORDER_COLOR,
-  CARD_BG,
-  MUTED_BG,
-  PLACEHOLDER_TEXT,
-  PRIMARY_COLOR,
-  TEXT_COLOR,
-  WHITE,
-} from '@/constants/colors';
+import { useTheme } from '@/contexts/ThemeContext';
+import type { Theme } from '@/constants/themes';
 import { useCurrentProgram } from '@/hooks/useCurrentProgram';
 import { supabase } from '@/utils/supabase';
 
@@ -108,7 +101,7 @@ async function fetchProgramOverview(programId: string): Promise<OverviewWeek[]> 
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function ExerciseRow({ ex }: { ex: OverviewExercise }) {
+function ExerciseRow({ ex, styles }: { ex: OverviewExercise; styles: ReturnType<typeof createStyles> }) {
   const prescription =
     ex.repMin === ex.repMax
       ? `${ex.sets}×${ex.repMin}`
@@ -138,10 +131,14 @@ function DayCard({
   day,
   expanded,
   onToggle,
+  styles,
+  theme,
 }: {
   day: OverviewDay;
   expanded: boolean;
   onToggle: () => void;
+  styles: ReturnType<typeof createStyles>;
+  theme: Theme;
 }) {
   return (
     <View style={styles.dayCard}>
@@ -158,14 +155,14 @@ function DayCard({
         <Ionicons
           name={expanded ? 'chevron-up' : 'chevron-down'}
           size={18}
-          color={PLACEHOLDER_TEXT}
+          color={theme.placeholder}
         />
       </Pressable>
 
       {expanded && (
         <View style={styles.exerciseList}>
           {day.exercises.map((ex) => (
-            <ExerciseRow key={ex.pdeId} ex={ex} />
+            <ExerciseRow key={ex.pdeId} ex={ex} styles={styles} />
           ))}
         </View>
       )}
@@ -178,6 +175,8 @@ function DayCard({
 export default function ProgramOverviewScreen() {
   const insets = useSafeAreaInsets();
   const { program } = useCurrentProgram();
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [weeks, setWeeks] = useState<OverviewWeek[]>([]);
   const [loading, setLoading] = useState(true);
@@ -222,7 +221,7 @@ export default function ProgramOverviewScreen() {
           accessibilityRole="button"
           accessibilityLabel="Go back"
         >
-          <Ionicons name="arrow-back" size={22} color={WHITE} />
+          <Ionicons name="arrow-back" size={22} color={theme.textPrimary} />
         </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>{program?.name ?? 'Program'}</Text>
@@ -236,7 +235,7 @@ export default function ProgramOverviewScreen() {
 
       {loading ? (
         <View style={styles.stateWrap}>
-          <ActivityIndicator size="large" color={PRIMARY_COLOR} />
+          <ActivityIndicator size="large" color={theme.primary} />
           <Text style={styles.stateText}>Loading program…</Text>
         </View>
       ) : weeks.length === 0 ? (
@@ -292,7 +291,7 @@ export default function ProgramOverviewScreen() {
                   <Ionicons
                     name={isExpanded ? 'chevron-up' : 'chevron-down'}
                     size={20}
-                    color={isCurrent ? WHITE : PLACEHOLDER_TEXT}
+                    color={isCurrent ? theme.white : theme.placeholder}
                   />
                 </Pressable>
 
@@ -305,6 +304,8 @@ export default function ProgramOverviewScreen() {
                         day={day}
                         expanded={expandedDays.has(day.id)}
                         onToggle={() => toggleDay(day.id)}
+                        styles={styles}
+                        theme={theme}
                       />
                     ))}
                   </View>
@@ -320,198 +321,200 @@ export default function ProgramOverviewScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#03040b',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER_COLOR,
-  },
-  backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: MUTED_BG,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    color: WHITE,
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  headerMeta: {
-    color: PLACEHOLDER_TEXT,
-    fontSize: 13,
-    marginTop: 2,
-  },
+function createStyles(theme: Theme) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: '#03040b',
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+    },
+    backBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: theme.mutedBg,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    headerTitle: {
+      color: theme.textPrimary,
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    headerMeta: {
+      color: theme.placeholder,
+      fontSize: 13,
+      marginTop: 2,
+    },
 
-  stateWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  stateText: {
-    color: TEXT_COLOR,
-    fontSize: 14,
-  },
+    stateWrap: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 12,
+    },
+    stateText: {
+      color: theme.text,
+      fontSize: 14,
+    },
 
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 40,
-    gap: 10,
-  },
+    scrollContent: {
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      paddingBottom: 40,
+      gap: 10,
+    },
 
-  // Week accordion
-  weekSection: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: BORDER_COLOR,
-    overflow: 'hidden',
-  },
-  weekHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: CARD_BG,
-  },
-  weekHeaderCurrent: {
-    backgroundColor: '#1a2744',
-    borderBottomWidth: 1,
-    borderBottomColor: PRIMARY_COLOR + '44',
-  },
-  weekHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-  },
-  weekTitle: {
-    color: WHITE,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  weekTitleMuted: {
-    color: PLACEHOLDER_TEXT,
-  },
-  weekDayCount: {
-    color: PLACEHOLDER_TEXT,
-    fontSize: 13,
-  },
-  currentBadge: {
-    backgroundColor: PRIMARY_COLOR,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  currentBadgeText: {
-    color: WHITE,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  deloadBadge: {
-    backgroundColor: '#2a1f00',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderWidth: 1,
-    borderColor: '#c87900',
-  },
-  deloadBadgeText: {
-    color: '#c87900',
-    fontSize: 11,
-    fontWeight: '700',
-  },
+    // Week accordion
+    weekSection: {
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: theme.border,
+      overflow: 'hidden',
+    },
+    weekHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      backgroundColor: theme.cardBg,
+    },
+    weekHeaderCurrent: {
+      backgroundColor: '#1a2744',
+      borderBottomWidth: 1,
+      borderBottomColor: theme.primary + '44',
+    },
+    weekHeaderLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      flex: 1,
+    },
+    weekTitle: {
+      color: theme.textPrimary,
+      fontSize: 15,
+      fontWeight: '700',
+    },
+    weekTitleMuted: {
+      color: theme.placeholder,
+    },
+    weekDayCount: {
+      color: theme.placeholder,
+      fontSize: 13,
+    },
+    currentBadge: {
+      backgroundColor: theme.primary,
+      borderRadius: 8,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+    },
+    currentBadgeText: {
+      color: theme.white,
+      fontSize: 11,
+      fontWeight: '700',
+    },
+    deloadBadge: {
+      backgroundColor: '#2a1f00',
+      borderRadius: 8,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderWidth: 1,
+      borderColor: '#c87900',
+    },
+    deloadBadgeText: {
+      color: '#c87900',
+      fontSize: 11,
+      fontWeight: '700',
+    },
 
-  // Day cards
-  daysContainer: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: '#0a0b10',
-    gap: 8,
-  },
-  dayCard: {
-    backgroundColor: CARD_BG,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: BORDER_COLOR,
-    overflow: 'hidden',
-  },
-  dayHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  dayHeaderLeft: {
-    flex: 1,
-  },
-  dayName: {
-    color: WHITE,
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  dayMeta: {
-    color: PLACEHOLDER_TEXT,
-    fontSize: 12,
-  },
+    // Day cards
+    daysContainer: {
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      backgroundColor: '#0a0b10',
+      gap: 8,
+    },
+    dayCard: {
+      backgroundColor: theme.cardBg,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      overflow: 'hidden',
+    },
+    dayHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    dayHeaderLeft: {
+      flex: 1,
+    },
+    dayName: {
+      color: theme.textPrimary,
+      fontSize: 14,
+      fontWeight: '600',
+      marginBottom: 2,
+    },
+    dayMeta: {
+      color: theme.placeholder,
+      fontSize: 12,
+    },
 
-  // Exercise rows
-  exerciseList: {
-    borderTopWidth: 1,
-    borderTopColor: BORDER_COLOR,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    gap: 2,
-  },
-  exerciseRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 7,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER_COLOR + '66',
-  },
-  exerciseLeft: {
-    flex: 1,
-    paddingRight: 8,
-  },
-  exerciseName: {
-    color: WHITE,
-    fontSize: 13,
-    fontWeight: '500',
-    marginBottom: 2,
-  },
-  exercisePrescription: {
-    color: TEXT_COLOR,
-    fontSize: 12,
-    fontVariant: ['tabular-nums'],
-  },
-  weightBadge: {
-    backgroundColor: MUTED_BG,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderWidth: 1,
-    borderColor: BORDER_COLOR,
-  },
-  weightText: {
-    color: WHITE,
-    fontSize: 12,
-    fontWeight: '600',
-    fontVariant: ['tabular-nums'],
-  },
-});
+    // Exercise rows
+    exerciseList: {
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      gap: 2,
+    },
+    exerciseRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 7,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border + '66',
+    },
+    exerciseLeft: {
+      flex: 1,
+      paddingRight: 8,
+    },
+    exerciseName: {
+      color: theme.textPrimary,
+      fontSize: 13,
+      fontWeight: '500',
+      marginBottom: 2,
+    },
+    exercisePrescription: {
+      color: theme.text,
+      fontSize: 12,
+      fontVariant: ['tabular-nums'],
+    },
+    weightBadge: {
+      backgroundColor: theme.mutedBg,
+      borderRadius: 8,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    weightText: {
+      color: theme.textPrimary,
+      fontSize: 12,
+      fontWeight: '600',
+      fontVariant: ['tabular-nums'],
+    },
+  });
+}

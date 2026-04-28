@@ -3,18 +3,20 @@
 import React from 'react';
 import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { PRIMARY_COLOR } from '../constants/colors';
+import { useTheme } from '@/contexts/ThemeContext';
 
 type GVAreaProps = {
     safeAreaColor?: string,
     children?: React.ReactNode
 };
 
-export default function GVArea({children, safeAreaColor=PRIMARY_COLOR}: GVAreaProps) {
+export default function GVArea({ children, safeAreaColor }: GVAreaProps) {
+    const { theme } = useTheme();
+    const bgColor = safeAreaColor ?? theme.primary;
     return (
         <SafeAreaView style={{
-            flex: 1, 
-            backgroundColor: safeAreaColor
+            flex: 1,
+            backgroundColor: bgColor
         }}
         edges={['top', 'left', 'right']}
         >

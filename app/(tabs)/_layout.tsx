@@ -3,26 +3,29 @@ import { Tabs } from 'expo-router';
 import React from 'react';
 
 import { HapticTab } from '@/components/haptic-tab';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function TabLayout() {
+  const { theme } = useTheme();
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarShowLabel: false,
-        tabBarActiveTintColor: '#2f7cff',
-        tabBarInactiveTintColor: '#6f7485',
+        tabBarActiveTintColor: theme.primary,
+        tabBarInactiveTintColor: theme.placeholder,
         tabBarStyle: {
-          backgroundColor: '#12141b',
-          borderTopColor: '#202433',
+          backgroundColor: theme.cardBg,
+          borderTopColor: theme.border,
           borderTopWidth: 1,
           height: 84,
           paddingTop: 10,
           paddingBottom: 18,
         },
         sceneStyle: {
-          backgroundColor: '#03040b',
+          backgroundColor: theme.background,
         },
       }}
     >

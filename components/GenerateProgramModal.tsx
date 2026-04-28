@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, Alert, TextInput } from 'react-native';
 import { X } from 'lucide-react-native';
 import { supabase } from '@/utils/supabase';
@@ -7,16 +7,8 @@ import { saveProgramToDb } from '@/utils/saveProgramToDb';
 import { computeCyclePhase } from '@/utils/cyclePhase';
 import type { ProgramGenParams, TrainingGoal, MuscleGroup, GeneratedProgram } from '@/types/program';
 import type { TrainingExperience } from '@/types/database';
-import {
-  PRIMARY_COLOR,
-  SECONDARY_COLOR,
-  SURFACE_BG,
-  MUTED_BG,
-  BORDER_COLOR,
-  TEXT_COLOR,
-  PLACEHOLDER_TEXT,
-  WHITE,
-} from '@/constants/colors';
+import { useTheme } from '@/contexts/ThemeContext';
+import type { Theme } from '@/constants/themes';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -69,6 +61,9 @@ export function GenerateProgramModal({
   onProgramCreated,
   defaultParams,
 }: GenerateProgramModalProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   const [daysPerWeek, setDaysPerWeek] = useState(defaultParams?.daysPerWeek ?? 3);
   const [durationWeeks, setDurationWeeks] = useState(defaultParams?.durationWeeks ?? 8);
   const [goal, setGoal] = useState<TrainingGoal>(defaultParams?.goal ?? 'general_fitness');
@@ -188,7 +183,7 @@ export function GenerateProgramModal({
             onPress={loading ? undefined : onClose}
             accessibilityLabel="Close modal"
           >
-            <X color={WHITE} size={18} />
+            <X color={theme.white} size={18} />
           </Pressable>
         </View>
 
@@ -206,7 +201,7 @@ export function GenerateProgramModal({
                 value={customName}
                 onChangeText={setCustomName}
                 placeholder={pendingProgram.name}
-                placeholderTextColor={PLACEHOLDER_TEXT}
+                placeholderTextColor={theme.placeholder}
                 returnKeyType="done"
                 autoFocus
                 autoCapitalize="words"
@@ -264,11 +259,11 @@ export function GenerateProgramModal({
                       style={[
                         styles.dayCircle,
                         active
-                          ? { backgroundColor: PRIMARY_COLOR }
-                          : { backgroundColor: MUTED_BG, borderWidth: 1, borderColor: BORDER_COLOR },
+                          ? { backgroundColor: theme.primary }
+                          : { backgroundColor: theme.mutedBg, borderWidth: 1, borderColor: theme.border },
                       ]}
                     >
-                      <Text style={[styles.dayCircleText, { color: active ? WHITE : TEXT_COLOR }]}>
+                      <Text style={[styles.dayCircleText, { color: active ? theme.white : theme.text }]}>
                         {day}
                       </Text>
                     </Pressable>
@@ -294,11 +289,11 @@ export function GenerateProgramModal({
                       style={[
                         styles.durationPill,
                         active
-                          ? { backgroundColor: PRIMARY_COLOR, borderColor: PRIMARY_COLOR }
-                          : { backgroundColor: 'transparent', borderColor: BORDER_COLOR },
+                          ? { backgroundColor: theme.primary, borderColor: theme.primary }
+                          : { backgroundColor: 'transparent', borderColor: theme.border },
                       ]}
                     >
-                      <Text style={[styles.durationPillText, { color: active ? WHITE : TEXT_COLOR }]}>
+                      <Text style={[styles.durationPillText, { color: active ? theme.white : theme.text }]}>
                         {weeks} wk
                       </Text>
                     </Pressable>
@@ -324,11 +319,11 @@ export function GenerateProgramModal({
                       style={[
                         styles.durationPill,
                         active
-                          ? { backgroundColor: PRIMARY_COLOR, borderColor: PRIMARY_COLOR }
-                          : { backgroundColor: 'transparent', borderColor: BORDER_COLOR },
+                          ? { backgroundColor: theme.primary, borderColor: theme.primary }
+                          : { backgroundColor: 'transparent', borderColor: theme.border },
                       ]}
                     >
-                      <Text style={[styles.durationPillText, { color: active ? WHITE : TEXT_COLOR }]}>
+                      <Text style={[styles.durationPillText, { color: active ? theme.white : theme.text }]}>
                         {label}
                       </Text>
                     </Pressable>
@@ -350,11 +345,11 @@ export function GenerateProgramModal({
                       style={[
                         styles.chip,
                         active
-                          ? { backgroundColor: PRIMARY_COLOR, borderColor: PRIMARY_COLOR }
-                          : { backgroundColor: 'transparent', borderColor: BORDER_COLOR },
+                          ? { backgroundColor: theme.primary, borderColor: theme.primary }
+                          : { backgroundColor: 'transparent', borderColor: theme.border },
                       ]}
                     >
-                      <Text style={[styles.chipText, { color: active ? WHITE : TEXT_COLOR }]}>
+                      <Text style={[styles.chipText, { color: active ? theme.white : theme.text }]}>
                         {GOAL_LABELS[g]}
                       </Text>
                     </Pressable>
@@ -376,11 +371,11 @@ export function GenerateProgramModal({
                       style={[
                         styles.chip,
                         active
-                          ? { backgroundColor: SECONDARY_COLOR, borderColor: SECONDARY_COLOR }
-                          : { backgroundColor: 'transparent', borderColor: BORDER_COLOR },
+                          ? { backgroundColor: theme.secondary, borderColor: theme.secondary }
+                          : { backgroundColor: 'transparent', borderColor: theme.border },
                       ]}
                     >
-                      <Text style={[styles.chipText, { color: active ? WHITE : TEXT_COLOR }]}>
+                      <Text style={[styles.chipText, { color: active ? theme.white : theme.text }]}>
                         {m}
                       </Text>
                     </Pressable>
@@ -400,11 +395,11 @@ export function GenerateProgramModal({
                       style={[
                         styles.chip,
                         active
-                          ? { backgroundColor: PRIMARY_COLOR, borderColor: PRIMARY_COLOR }
-                          : { backgroundColor: 'transparent', borderColor: BORDER_COLOR },
+                          ? { backgroundColor: theme.primary, borderColor: theme.primary }
+                          : { backgroundColor: 'transparent', borderColor: theme.border },
                       ]}
                     >
-                      <Text style={[styles.chipText, { color: active ? WHITE : TEXT_COLOR }]}>
+                      <Text style={[styles.chipText, { color: active ? theme.white : theme.text }]}>
                         Every {w} weeks
                       </Text>
                     </Pressable>
@@ -446,178 +441,180 @@ export function GenerateProgramModal({
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  // Backdrop
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.82)',
-    justifyContent: 'flex-end',
-  },
+function createStyles(theme: Theme) {
+  return StyleSheet.create({
+    // Backdrop
+    backdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.82)',
+      justifyContent: 'flex-end',
+    },
 
-  // Sheet
-  sheet: {
-    backgroundColor: SURFACE_BG,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderWidth: 1,
-    borderColor: BORDER_COLOR,
-    overflow: 'hidden',
-    height: '88%',
-  },
+    // Sheet
+    sheet: {
+      backgroundColor: theme.surfaceBg,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      borderWidth: 1,
+      borderColor: theme.border,
+      overflow: 'hidden',
+      height: '88%',
+    },
 
-  // Header
-  header: {
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER_COLOR,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  headerDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: PRIMARY_COLOR,
-    marginRight: 2,
-  },
-  headerTitle: {
-    color: WHITE,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  headerSubtitle: {
-    color: TEXT_COLOR,
-    fontSize: 13,
-    marginTop: 2,
-  },
-  iconBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: MUTED_BG,
-    borderWidth: 1,
-    borderColor: BORDER_COLOR,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    // Header
+    header: {
+      paddingHorizontal: 18,
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    headerDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: theme.primary,
+      marginRight: 2,
+    },
+    headerTitle: {
+      color: theme.textPrimary,
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    headerSubtitle: {
+      color: theme.text,
+      fontSize: 13,
+      marginTop: 2,
+    },
+    iconBtn: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      backgroundColor: theme.mutedBg,
+      borderWidth: 1,
+      borderColor: theme.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
-  // Scroll body
-  scrollContent: {
-    paddingHorizontal: 18,
-    paddingBottom: 24,
-  },
+    // Scroll body
+    scrollContent: {
+      paddingHorizontal: 18,
+      paddingBottom: 24,
+    },
 
-  // Section label
-  sectionLabel: {
-    color: PLACEHOLDER_TEXT,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
-    marginBottom: 10,
-    marginTop: 20,
-  },
+    // Section label
+    sectionLabel: {
+      color: theme.placeholder,
+      fontSize: 11,
+      fontWeight: '700',
+      letterSpacing: 1,
+      marginBottom: 10,
+      marginTop: 20,
+    },
 
-  // Day circles
-  dayRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  dayCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dayCircleText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
+    // Day circles
+    dayRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    dayCircle: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    dayCircleText: {
+      fontSize: 14,
+      fontWeight: '700',
+    },
 
-  // Duration pills
-  durationRow: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingVertical: 2,
-  },
-  durationPill: {
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderWidth: 1,
-  },
-  durationPillText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
+    // Duration pills
+    durationRow: {
+      flexDirection: 'row',
+      gap: 8,
+      paddingVertical: 2,
+    },
+    durationPill: {
+      borderRadius: 20,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderWidth: 1,
+    },
+    durationPillText: {
+      fontSize: 14,
+      fontWeight: '600',
+    },
 
-  // Goal / muscle chips
-  chipWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  chip: {
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    margin: 4,
-    borderWidth: 1,
-  },
-  chipText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
+    // Goal / muscle chips
+    chipWrap: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+    },
+    chip: {
+      borderRadius: 20,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      margin: 4,
+      borderWidth: 1,
+    },
+    chipText: {
+      fontSize: 14,
+      fontWeight: '600',
+    },
 
-  // Name step
-  nameInput: {
-    backgroundColor: MUTED_BG,
-    borderWidth: 1,
-    borderColor: BORDER_COLOR,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: WHITE,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  nameHint: {
-    color: PLACEHOLDER_TEXT,
-    fontSize: 12,
-    marginTop: 8,
-  },
+    // Name step
+    nameInput: {
+      backgroundColor: theme.mutedBg,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      color: theme.textPrimary,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    nameHint: {
+      color: theme.placeholder,
+      fontSize: 12,
+      marginTop: 8,
+    },
 
-  // Footer
-  footer: {
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderTopWidth: 1,
-    borderTopColor: BORDER_COLOR,
-    gap: 10,
-  },
-  generateBtn: {
-    backgroundColor: PRIMARY_COLOR,
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  generateBtnText: {
-    color: WHITE,
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  skipBtn: {
-    backgroundColor: MUTED_BG,
-    borderWidth: 1,
-    borderColor: BORDER_COLOR,
-    borderRadius: 14,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  skipBtnText: {
-    color: TEXT_COLOR,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-});
+    // Footer
+    footer: {
+      paddingHorizontal: 18,
+      paddingVertical: 14,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+      gap: 10,
+    },
+    generateBtn: {
+      backgroundColor: theme.primary,
+      borderRadius: 14,
+      paddingVertical: 14,
+      alignItems: 'center',
+    },
+    generateBtnText: {
+      color: theme.white,
+      fontSize: 15,
+      fontWeight: '800',
+    },
+    skipBtn: {
+      backgroundColor: theme.mutedBg,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 14,
+      paddingVertical: 12,
+      alignItems: 'center',
+    },
+    skipBtnText: {
+      color: theme.text,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+  });
+}

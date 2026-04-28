@@ -1,21 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { X } from 'lucide-react-native';
 
 import type { ExerciseHistoryEntry } from '@/types/program';
 import { fetchExerciseHistory } from '@/utils/fetchExerciseHistory';
-
-import {
-  BORDER_COLOR,
-  CARD_BG,
-  ERROR_COLOR_LIGHT,
-  MUTED_BG,
-  PLACEHOLDER_TEXT,
-  SUCCESS,
-  SURFACE_BG,
-  TEXT_COLOR,
-  WHITE,
-} from '@/constants/colors';
+import { useTheme } from '@/contexts/ThemeContext';
+import type { Theme } from '@/constants/themes';
 
 interface ExerciseHistoryModalProps {
   exerciseId: string;
@@ -36,6 +26,9 @@ export function ExerciseHistoryModal({
   exerciseName,
   onClose,
 }: ExerciseHistoryModalProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   const [entries, setEntries] = useState<ExerciseHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -48,7 +41,6 @@ export function ExerciseHistoryModal({
 
   return (
     <View style={styles.backdrop}>
-      {/* Tap-outside-to-close backdrop */}
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
 
       <View style={styles.sheet}>
@@ -65,7 +57,7 @@ export function ExerciseHistoryModal({
             accessibilityRole="button"
             accessibilityLabel="Close exercise history"
           >
-            <X color={WHITE} size={18} />
+            <X color={theme.white} size={18} />
           </Pressable>
         </View>
 
@@ -107,14 +99,12 @@ export function ExerciseHistoryModal({
 
               return (
                 <View key={entry.sessionId} style={styles.sessionCard}>
-                  {/* Date · Workout name */}
                   <Text style={styles.sessionHeader}>
                     {formatSessionDate(entry.completedAt)}
                     {'  ·  '}
                     {entry.workoutName}
                   </Text>
 
-                  {/* Set rows */}
                   {entry.sets.map((s) => (
                     <Text key={s.setNumber} style={styles.setRow}>
                       {`Set ${s.setNumber}`}
@@ -125,7 +115,6 @@ export function ExerciseHistoryModal({
                     </Text>
                   ))}
 
-                  {/* Volume + trend */}
                   <View style={styles.volumeRow}>
                     <Text style={styles.volumeText}>
                       Total: {entry.totalVolumeLb.toLocaleString()} lb
@@ -135,7 +124,7 @@ export function ExerciseHistoryModal({
                       <Text
                         style={[
                           styles.trendText,
-                          { color: trendLb >= 0 ? SUCCESS : ERROR_COLOR_LIGHT },
+                          { color: trendLb >= 0 ? theme.success : theme.errorLight },
                         ]}
                       >
                         {trendLb >= 0 ? '▲' : '▼'} {Math.abs(trendLb).toLocaleString()} lb
@@ -151,130 +140,124 @@ export function ExerciseHistoryModal({
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.82)',
-    justifyContent: 'flex-end',
-  },
-
-  sheet: {
-    backgroundColor: SURFACE_BG,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderWidth: 1,
-    borderColor: BORDER_COLOR,
-    overflow: 'hidden',
-    maxHeight: '90%',
-    height: '75%',
-  },
-
-  header: {
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER_COLOR,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  headerTitle: {
-    color: WHITE,
-    fontSize: 18,
-    fontWeight: '800',
-    marginBottom: 2,
-  },
-  headerSubtitle: {
-    color: TEXT_COLOR,
-    fontSize: 13,
-  },
-  iconBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: MUTED_BG,
-    borderWidth: 1,
-    borderColor: BORDER_COLOR,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  listContent: {
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    paddingBottom: 32,
-  },
-
-  sessionCard: {
-    backgroundColor: CARD_BG,
-    borderWidth: 1,
-    borderColor: BORDER_COLOR,
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 12,
-  },
-  sessionHeader: {
-    color: WHITE,
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 10,
-  },
-  setRow: {
-    color: TEXT_COLOR,
-    fontSize: 13,
-    marginBottom: 4,
-    fontVariant: ['tabular-nums'],
-  },
-  volumeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 8,
-  },
-  volumeText: {
-    color: WHITE,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  trendText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-
-  skeletonLine: {
-    backgroundColor: MUTED_BG,
-    borderRadius: 4,
-  },
-
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 48,
-    paddingHorizontal: 24,
-  },
-  emptyIcon: {
-    fontSize: 40,
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  emptyTitle: {
-    color: WHITE,
-    fontSize: 17,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  emptySubtitle: {
-    color: TEXT_COLOR,
-    fontSize: 13,
-    textAlign: 'center',
-  },
-
-  // unused — referenced only for label alignment with spec
-  _sectionLabel: {
-    color: PLACEHOLDER_TEXT,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
-    marginBottom: 10,
-  },
-});
+function createStyles(theme: Theme) {
+  return StyleSheet.create({
+    backdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.82)',
+      justifyContent: 'flex-end',
+    },
+    sheet: {
+      backgroundColor: theme.surfaceBg,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      borderWidth: 1,
+      borderColor: theme.border,
+      overflow: 'hidden',
+      maxHeight: '90%',
+      height: '75%',
+    },
+    header: {
+      paddingHorizontal: 18,
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    headerTitle: {
+      color: theme.textPrimary,
+      fontSize: 18,
+      fontWeight: '800',
+      marginBottom: 2,
+    },
+    headerSubtitle: {
+      color: theme.text,
+      fontSize: 13,
+    },
+    iconBtn: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      backgroundColor: theme.mutedBg,
+      borderWidth: 1,
+      borderColor: theme.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    listContent: {
+      paddingHorizontal: 18,
+      paddingVertical: 16,
+      paddingBottom: 32,
+    },
+    sessionCard: {
+      backgroundColor: theme.cardBg,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 16,
+      padding: 14,
+      marginBottom: 12,
+    },
+    sessionHeader: {
+      color: theme.textPrimary,
+      fontSize: 13,
+      fontWeight: '700',
+      marginBottom: 10,
+    },
+    setRow: {
+      color: theme.text,
+      fontSize: 13,
+      marginBottom: 4,
+      fontVariant: ['tabular-nums'],
+    },
+    volumeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      marginTop: 8,
+    },
+    volumeText: {
+      color: theme.textPrimary,
+      fontSize: 13,
+      fontWeight: '700',
+    },
+    trendText: {
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    skeletonLine: {
+      backgroundColor: theme.mutedBg,
+      borderRadius: 4,
+    },
+    emptyState: {
+      alignItems: 'center',
+      paddingVertical: 48,
+      paddingHorizontal: 24,
+    },
+    emptyIcon: {
+      fontSize: 40,
+      textAlign: 'center',
+      marginBottom: 12,
+    },
+    emptyTitle: {
+      color: theme.textPrimary,
+      fontSize: 17,
+      fontWeight: '700',
+      textAlign: 'center',
+      marginBottom: 8,
+    },
+    emptySubtitle: {
+      color: theme.text,
+      fontSize: 13,
+      textAlign: 'center',
+    },
+    _sectionLabel: {
+      color: theme.placeholder,
+      fontSize: 11,
+      fontWeight: '700',
+      letterSpacing: 1,
+      marginBottom: 10,
+    },
+  });
+}

@@ -7,22 +7,15 @@ import {SafeAreaView, Text, View, TextInput,
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ChevronLeft, CheckCircle } from 'lucide-react-native';
-import {
-    PRIMARY_COLOR,
-    PRIMARY_COLOR_LIGHT,
-    BACKGROUND_COLOR_DARK,
-    WHITE,
-    TEXT_COLOR,
-    PLACEHOLDER_TEXT,
-    BORDER_COLOR,
-    ERROR_COLOR,
-    ERROR_COLOR_LIGHT,
-    BUTTON_DISABLED, BACKGROUND_COLOR, SUCCESS,
-} from '@/constants/colors';
-import {router, Link } from 'expo-router';
+import { router, Link } from 'expo-router';
 import BackButton from "@/components/ui/BackButton";
+import { useTheme } from "@/contexts/ThemeContext";
+import type { Theme } from "@/constants/themes";
 
 export default function ForgotPasswordScreen() {
+    const { theme } = useTheme();
+    const styles = useMemo(() => createStyles(theme), [theme]);
+
     const [email, setEmail] = useState('');
     const [error, setError] = useState('');
     const [submitted, setSubmitted] = useState(false);
@@ -76,7 +69,7 @@ export default function ForgotPasswordScreen() {
                                 }}
                                 onBlur={() => validateEmail(email)}
                                 placeholder={'you@example.com'}
-                                placeholderTextColor={PLACEHOLDER_TEXT}
+                                placeholderTextColor={theme.placeholder}
                                 style={[styles.input, error ? styles.inputError : styles.inputNormal]}
                                 autoCapitalize={'none'}
                                 autoCorrect={false}
@@ -114,10 +107,11 @@ export default function ForgotPasswordScreen() {
 }
 
 
-    const styles = StyleSheet.create({
+function createStyles(theme: Theme) {
+    return StyleSheet.create({
         safe: {
             flex: 1,
-            backgroundColor: BACKGROUND_COLOR_DARK,
+            backgroundColor: theme.backgroundDark,
         },
 
         header: {
@@ -129,7 +123,7 @@ export default function ForgotPasswordScreen() {
             width: 40,
             height: 40,
             borderRadius: 999,
-            backgroundColor: BACKGROUND_COLOR,
+            backgroundColor: theme.background,
             alignItems: 'center',
             justifyContent: 'center',
         },
@@ -141,13 +135,13 @@ export default function ForgotPasswordScreen() {
         },
         title: {
             fontSize: 30,
-            color: WHITE,
+            color: theme.textPrimary,
             marginBottom: 8,
             fontWeight: '600',
         },
         subtitle: {
             fontSize: 14,
-            color: TEXT_COLOR,
+            color: theme.text,
             marginBottom: 28,
             lineHeight: 20,
         },
@@ -157,44 +151,44 @@ export default function ForgotPasswordScreen() {
         },
         label: {
             fontSize: 13,
-            color: TEXT_COLOR,
+            color: theme.text,
             marginBottom: 8,
         },
         input: {
             width: '100%',
-            backgroundColor: BACKGROUND_COLOR,
+            backgroundColor: theme.background,
             borderWidth: 1,
             borderRadius: 14,
             paddingHorizontal: 16,
             paddingVertical: 14,
-            color: WHITE,
+            color: theme.textPrimary,
             fontSize: 16,
         },
         inputNormal: {
-            borderColor: BORDER_COLOR,
+            borderColor: theme.border,
         },
         inputError: {
-            borderColor: ERROR_COLOR,
+            borderColor: theme.error,
         },
         errorText: {
             marginTop: 8,
-            color: ERROR_COLOR_LIGHT,
+            color: theme.errorLight,
             fontSize: 13,
         },
 
         primaryButton: {
             width: '100%',
-            backgroundColor: PRIMARY_COLOR,
+            backgroundColor: theme.primary,
             paddingVertical: 14,
             borderRadius: 14,
             alignItems: 'center',
             justifyContent: 'center',
         },
         primaryDisabled: {
-            backgroundColor: BUTTON_DISABLED,
+            backgroundColor: theme.buttonDisabled,
         },
         primaryButtonText: {
-            color: WHITE,
+            color: theme.white,
             fontSize: 16,
             fontWeight: '600',
         },
@@ -204,7 +198,7 @@ export default function ForgotPasswordScreen() {
             alignItems: 'center',
         },
         linkText: {
-            color: PRIMARY_COLOR_LIGHT,
+            color: theme.primaryLight,
             fontSize: 14,
         },
 
@@ -219,28 +213,29 @@ export default function ForgotPasswordScreen() {
             width: 64,
             height: 64,
             borderRadius: 999,
-            backgroundColor: SUCCESS,
+            backgroundColor: theme.success,
             alignItems: 'center',
             justifyContent: 'center',
             marginBottom: 20,
         },
         successTitle: {
             fontSize: 22,
-            color: WHITE,
+            color: theme.textPrimary,
             marginBottom: 10,
             fontWeight: '600',
             textAlign: 'center',
         },
         successBody: {
             fontSize: 14,
-            color: TEXT_COLOR,
+            color: theme.text,
             textAlign: 'center',
             lineHeight: 20,
             marginBottom: 22,
             maxWidth: 320,
         },
         successEmail: {
-            color: WHITE,
+            color: theme.textPrimary,
             fontWeight: '600',
         },
     });
+}
