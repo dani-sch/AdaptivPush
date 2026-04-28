@@ -78,9 +78,9 @@ const ToggleRow = ({ label, hint, icon, value, onValueChange, disabled }: Toggle
         value={value}
         onValueChange={disabled ? undefined : onValueChange}
         disabled={disabled}
-        trackColor={{ false: '#4f5568', true: theme.primary }}
+        trackColor={{ false: theme.buttonDisabled, true: theme.primary }}
         thumbColor={theme.textPrimary}
-        ios_backgroundColor="#4f5568"
+        ios_backgroundColor={theme.buttonDisabled}
       />
     </View>
   );
@@ -274,20 +274,20 @@ export default function NotificationsScreen() {
             onPress={() => router.back()}
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
           >
-            <ArrowLeft color="#e6e9f4" size={22} />
+            <ArrowLeft color={theme.textPrimary} size={22} />
           </Pressable>
           <Text style={styles.headerTitle}>Notifications</Text>
           <View style={styles.headerSpacer} />
         </View>
 
         <LinearGradient
-          colors={['#181c29', '#12141b']}
+          colors={[theme.cardBg, theme.backgroundDark]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.headlineCard}
         >
           <View style={styles.headlineIconWrap}>
-            <Bell color="#e6ebfc" size={22} />
+            <Bell color={theme.textPrimary} size={22} />
           </View>
           <View style={styles.headlineTextWrap}>
             <Text style={styles.headlineTitle}>Stay in Sync</Text>
@@ -302,21 +302,21 @@ export default function NotificationsScreen() {
           <ToggleRow
             label="Push Notifications"
             hint="Real-time updates on your device"
-            icon={<Smartphone color="#9ba3b9" size={18} />}
+            icon={<Smartphone color={theme.placeholder} size={18} />}
             value={pushEnabled}
             onValueChange={handlePushToggle}
           />
           <ToggleRow
             label="Email Summaries"
             hint="Weekly highlights and milestone recaps"
-            icon={<Mail color="#9ba3b9" size={18} />}
+            icon={<Mail color={theme.placeholder} size={18} />}
             value={emailEnabled}
             onValueChange={setEmailEnabled}
           />
           <ToggleRow
             label="SMS Reminders"
             hint="Text reminders for training sessions"
-            icon={<CalendarClock color="#9ba3b9" size={18} />}
+            icon={<CalendarClock color={theme.placeholder} size={18} />}
             value={smsEnabled}
             onValueChange={setSmsEnabled}
           />
@@ -327,7 +327,7 @@ export default function NotificationsScreen() {
           <ToggleRow
             label="Workout Reminder"
             hint="Heads-up before your planned session"
-            icon={<Bell color="#9ba3b9" size={18} />}
+            icon={<Bell color={theme.placeholder} size={18} />}
             value={workoutReminder}
             onValueChange={setWorkoutReminder}
             disabled={!pushEnabled}
@@ -335,7 +335,7 @@ export default function NotificationsScreen() {
           <ToggleRow
             label="Deload Week Reminder"
             hint="Reminder when recovery week begins"
-            icon={<MoonStar color="#9ba3b9" size={18} />}
+            icon={<MoonStar color={theme.placeholder} size={18} />}
             value={deloadReminder}
             onValueChange={setDeloadReminder}
             disabled={!pushEnabled}
@@ -343,7 +343,7 @@ export default function NotificationsScreen() {
           <ToggleRow
             label="PR Celebrations"
             hint="Celebrate new best lifts and streaks"
-            icon={<Sparkles color="#9ba3b9" size={18} />}
+            icon={<Sparkles color={theme.placeholder} size={18} />}
             value={prCelebrations}
             onValueChange={setPrCelebrations}
             disabled={!pushEnabled}
@@ -355,7 +355,7 @@ export default function NotificationsScreen() {
           <ToggleRow
             label="Enable Quiet Hours"
             hint="Pause non-critical notifications overnight"
-            icon={<MoonStar color="#9ba3b9" size={18} />}
+            icon={<MoonStar color={theme.placeholder} size={18} />}
             value={quietHoursEnabled}
             onValueChange={setQuietHoursEnabled}
           />
@@ -373,7 +373,7 @@ export default function NotificationsScreen() {
             </Text>
             <View style={styles.timeValueWrap}>
               <Text style={styles.timeValue}>{quietHoursStart}</Text>
-              <ChevronRight color="#6f758a" size={18} />
+               <ChevronRight color={theme.placeholder} size={18} />
             </View>
           </Pressable>
 
@@ -390,14 +390,14 @@ export default function NotificationsScreen() {
             </Text>
             <View style={styles.timeValueWrap}>
               <Text style={styles.timeValue}>{quietHoursEnd}</Text>
-              <ChevronRight color="#6f758a" size={18} />
+               <ChevronRight color={theme.placeholder} size={18} />
             </View>
           </Pressable>
         </View>
 
         {isLoading ? (
           <View style={styles.loadingRow}>
-            <ActivityIndicator size="small" color="#7aa0ff" />
+            <ActivityIndicator size="small" color={theme.primary} />
             <Text style={styles.loadingText}>Loading settings...</Text>
           </View>
         ) : null}
@@ -473,7 +473,7 @@ export default function NotificationsScreen() {
                     >
                       {item}
                     </Text>
-                    {isSelected && <Check color="#2b68f0" size={18} />}
+                    {isSelected && <Check color={theme.primary} size={18} />}
                   </Pressable>
                 );
               }}
@@ -489,7 +489,7 @@ function createStyles(theme: Theme) {
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: '#03040b',
+      backgroundColor: theme.backgroundDark,
     },
     scrollContent: {
       paddingHorizontal: 18,
@@ -505,13 +505,13 @@ function createStyles(theme: Theme) {
       height: 44,
       borderRadius: 22,
       borderWidth: 1,
-      borderColor: '#2a2f41',
+      borderColor: theme.border,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: '#131722',
+      backgroundColor: theme.cardBg,
     },
     headerTitle: {
-      color: '#f3f6ff',
+      color: theme.textPrimary,
       fontSize: 20,
       fontWeight: '600',
     },
@@ -522,7 +522,7 @@ function createStyles(theme: Theme) {
     headlineCard: {
       borderRadius: 22,
       borderWidth: 1,
-      borderColor: '#242a3b',
+      borderColor: theme.border,
       paddingHorizontal: 16,
       paddingVertical: 16,
       flexDirection: 'row',
@@ -533,7 +533,7 @@ function createStyles(theme: Theme) {
       width: 48,
       height: 48,
       borderRadius: 16,
-      backgroundColor: '#25304a',
+      backgroundColor: theme.mutedBg,
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: 12,
@@ -542,18 +542,18 @@ function createStyles(theme: Theme) {
       flex: 1,
     },
     headlineTitle: {
-      color: '#eff3ff',
+      color: theme.textPrimary,
       fontSize: 17,
       fontWeight: '600',
       marginBottom: 2,
     },
     headlineSubtitle: {
-      color: '#8f97ad',
+      color: theme.text,
       fontSize: 13,
       lineHeight: 19,
     },
     sectionTitle: {
-      color: '#8b91a4',
+      color: theme.text,
       fontSize: 14,
       letterSpacing: 1,
       marginBottom: 10,
@@ -562,8 +562,8 @@ function createStyles(theme: Theme) {
     sectionCard: {
       borderRadius: 22,
       borderWidth: 1,
-      borderColor: '#242a3b',
-      backgroundColor: '#121621',
+      borderColor: theme.border,
+      backgroundColor: theme.cardBg,
       paddingHorizontal: 14,
       paddingVertical: 10,
       marginBottom: 16,
@@ -574,7 +574,7 @@ function createStyles(theme: Theme) {
       alignItems: 'center',
       justifyContent: 'space-between',
       borderBottomWidth: 1,
-      borderBottomColor: 'rgba(95, 103, 124, 0.24)',
+      borderBottomColor: theme.border,
     },
     rowDisabled: {
       opacity: 0.45,
@@ -591,19 +591,19 @@ function createStyles(theme: Theme) {
       borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: '#1a2133',
+      backgroundColor: theme.mutedBg,
       marginRight: 10,
     },
     toggleTextWrap: {
       flex: 1,
     },
     toggleLabel: {
-      color: '#e7ebf8',
+      color: theme.textPrimary,
       fontSize: 15,
       fontWeight: '500',
     },
     toggleHint: {
-      color: '#8d95ac',
+      color: theme.text,
       fontSize: 12,
       marginTop: 2,
     },
@@ -613,14 +613,14 @@ function createStyles(theme: Theme) {
       alignItems: 'center',
       justifyContent: 'space-between',
       borderBottomWidth: 1,
-      borderBottomColor: 'rgba(95, 103, 124, 0.24)',
+      borderBottomColor: theme.border,
     },
     timeLabel: {
-      color: '#d6dbec',
+      color: theme.textPrimary,
       fontSize: 15,
     },
     timeLabelDisabled: {
-      color: '#555b6e',
+      color: theme.placeholder,
     },
     timeValueWrap: {
       flexDirection: 'row',
@@ -628,7 +628,7 @@ function createStyles(theme: Theme) {
       gap: 4,
     },
     timeValue: {
-      color: '#8d95ac',
+      color: theme.text,
       fontSize: 14,
     },
     loadingRow: {
@@ -639,17 +639,17 @@ function createStyles(theme: Theme) {
       marginBottom: 8,
     },
     loadingText: {
-      color: '#98a1b8',
+      color: theme.text,
       fontSize: 13,
     },
     errorFeedback: {
-      color: '#ff8088',
+      color: theme.errorLight,
       fontSize: 13,
       marginBottom: 10,
       marginLeft: 2,
     },
     saveFeedback: {
-      color: '#7ae4a7',
+      color: theme.success,
       fontSize: 13,
       marginBottom: 10,
       marginLeft: 2,
@@ -658,8 +658,8 @@ function createStyles(theme: Theme) {
       minHeight: 62,
       borderRadius: 20,
       borderWidth: 1,
-      borderColor: '#336de8',
-      backgroundColor: '#2b68f0',
+      borderColor: theme.primary,
+      backgroundColor: theme.primary,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -667,7 +667,7 @@ function createStyles(theme: Theme) {
       opacity: 0.65,
     },
     saveButtonText: {
-      color: '#eef2ff',
+      color: theme.white,
       fontSize: 17,
       fontWeight: '600',
     },
@@ -681,11 +681,11 @@ function createStyles(theme: Theme) {
       justifyContent: 'flex-end',
     },
     pickerSheet: {
-      backgroundColor: '#0e1119',
+      backgroundColor: theme.surfaceBg,
       borderTopLeftRadius: 28,
       borderTopRightRadius: 28,
       borderWidth: 1,
-      borderColor: '#242a3b',
+      borderColor: theme.border,
       maxHeight: 440,
       paddingBottom: 24,
     },
@@ -693,7 +693,7 @@ function createStyles(theme: Theme) {
       width: 36,
       height: 4,
       borderRadius: 2,
-      backgroundColor: '#3a4156',
+      backgroundColor: theme.buttonDisabled,
       alignSelf: 'center',
       marginTop: 12,
       marginBottom: 4,
@@ -705,10 +705,10 @@ function createStyles(theme: Theme) {
       paddingHorizontal: 20,
       paddingVertical: 14,
       borderBottomWidth: 1,
-      borderBottomColor: '#1e2434',
+      borderBottomColor: theme.border,
     },
     pickerTitle: {
-      color: '#e6ebfc',
+      color: theme.textPrimary,
       fontSize: 17,
       fontWeight: '600',
     },
@@ -716,10 +716,10 @@ function createStyles(theme: Theme) {
       paddingHorizontal: 14,
       paddingVertical: 6,
       borderRadius: 10,
-      backgroundColor: '#1b3a8a',
+      backgroundColor: theme.mutedBg,
     },
     pickerDoneText: {
-      color: '#7aaeff',
+      color: theme.primary,
       fontSize: 15,
       fontWeight: '600',
     },
@@ -730,17 +730,17 @@ function createStyles(theme: Theme) {
       justifyContent: 'space-between',
       paddingHorizontal: 22,
       borderBottomWidth: 1,
-      borderBottomColor: 'rgba(60,70,95,0.3)',
+      borderBottomColor: theme.border,
     },
     timeOptionSelected: {
-      backgroundColor: 'rgba(43,104,240,0.10)',
+      backgroundColor: theme.mutedBg,
     },
     timeOptionText: {
-      color: '#9ba5c0',
+      color: theme.text,
       fontSize: 16,
     },
     timeOptionTextSelected: {
-      color: '#5b9bff',
+      color: theme.primary,
       fontWeight: '600',
     },
   });

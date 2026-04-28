@@ -1,8 +1,10 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { type Href, router } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   Bell,
+  Camera,
   Check,
   ChevronRight,
   CircleHelp,
@@ -31,10 +33,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { mergeUserMetadata, parseReadinessPreferences } from '@/utils/profilePreferences';
 import { supabase } from '@/utils/supabase';
+import { uploadAvatar } from '@/utils/uploadAvatar';
 import type { TrainingExperience } from '@/types/database';
 import { useTheme, type AppearancePreference } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
 import { PALETTES, type PaletteKey } from '@/constants/palettes';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const EXPERIENCE_LABELS: Record<TrainingExperience, string> = {
   beginner: 'Beginner',
@@ -292,6 +296,8 @@ export default function ProfileScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [progress, setProgress] = useState<ProgressSummary>(DEFAULT_PROGRESS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -312,6 +318,14 @@ export default function ProfileScreen() {
   const [daysSincePeriod, setDaysSincePeriod] = useState<string>('');
   const [avgCycleLength, setAvgCycleLength] = useState<string>('28');
   const [cycleSaving, setCycleSaving] = useState(false);
+  const [hapticsEnabled, setHapticsEnabled] = useState(true);
+
+  // Load haptics preference on mount
+  useEffect(() => {
+    AsyncStorage.getItem('haptics_enabled').then((val) => {
+      if (val === 'false') setHapticsEnabled(false);
+    }).catch(() => {});
+  }, []);
 
   const fetchProfileData = useCallback(async () => {
     try {
@@ -335,6 +349,14 @@ export default function ProfileScreen() {
         email: user.email || '',
         full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
       });
+
+      // Load avatar from user_profile table
+      const { data: profileRow } = await supabase
+        .from('user_profile')
+        .select('avatar_url')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      setAvatarUrl(profileRow?.avatar_url ?? null);
 
       const readinessPreferences = parseReadinessPreferences(
         user.user_metadata?.readiness_preferences,
@@ -614,6 +636,32 @@ export default function ProfileScreen() {
   const displayName = useMemo(() => profile?.full_name?.trim() || 'User', [profile?.full_name]);
   const avatarLabel = displayName.slice(0, 1).toUpperCase();
 
+  const handleAvatarPress = useCallback(async () => {
+    if (!profile?.id || avatarUploading) return;
+    setAvatarUploading(true);
+    try {
+      const url = await uploadAvatar(profile.id);
+      if (url) {
+        const { error: upsertError } = await supabase
+          .from('user_profile')
+          .update({ avatar_url: url })
+          .eq('user_id', profile.id);
+        if (upsertError) {
+          console.error('Profile upsert failed:', upsertError.message);
+          Alert.alert('Error', 'Photo uploaded but failed to save. Please try again.');
+          return;
+        }
+        setAvatarUrl(url);
+      } else {
+        Alert.alert('Photo', 'No photo was selected or permission was denied.');
+      }
+    } catch {
+      Alert.alert('Error', 'Failed to upload photo. Please try again.');
+    } finally {
+      setAvatarUploading(false);
+    }
+  }, [profile?.id, avatarUploading]);
+
   if (loading && !profile) {
     return (
       <View style={styles.container}>
@@ -636,9 +684,25 @@ export default function ProfileScreen() {
       >
         {/* ── Header ── */}
         <View style={styles.headerRow}>
-          <LinearGradient colors={['#2c81ff', '#8626ff']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatar}>
-            <Text style={styles.avatarText}>{avatarLabel}</Text>
-          </LinearGradient>
+          <Pressable onPress={handleAvatarPress} style={styles.avatarWrap}>
+            {avatarUrl ? (
+              <Image
+                source={{ uri: avatarUrl }}
+                style={styles.avatar}
+                contentFit="cover"
+              />
+            ) : (
+              <LinearGradient colors={[theme.primary, theme.secondary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatar}>
+                <Text style={styles.avatarText}>{avatarLabel}</Text>
+              </LinearGradient>
+            )}
+            <View style={styles.avatarCameraBtn}>
+              {avatarUploading
+                ? <ActivityIndicator size={10} color={theme.white} />
+                : <Camera size={12} color={theme.white} />
+              }
+            </View>
+          </Pressable>
 
           <View style={styles.userMeta}>
             <Text numberOfLines={1} style={styles.nameText}>
@@ -825,7 +889,7 @@ export default function ProfileScreen() {
                       ]}
                     >
                       {active && (
-                        <Check size={14} color="#fff" strokeWidth={3} />
+                          <Check size={14} color={theme.white} strokeWidth={3} />
                       )}
                     </View>
                     <Text style={[styles.swatchText, active && { color: theme.textPrimary }]}>
@@ -834,6 +898,22 @@ export default function ProfileScreen() {
                   </Pressable>
                 );
               })}
+            </View>
+
+            {/* Haptic feedback toggle */}
+            <View style={styles.paletteDivider} />
+            <View style={styles.cycleToggleRow}>
+              <Text style={styles.menuLabel}>Haptic Feedback</Text>
+              <Switch
+                value={hapticsEnabled}
+                onValueChange={(val) => {
+                  setHapticsEnabled(val);
+                  void AsyncStorage.setItem('haptics_enabled', val ? 'true' : 'false');
+                }}
+                trackColor={{ false: theme.buttonDisabled, true: theme.primary }}
+                thumbColor={theme.white}
+                ios_backgroundColor={theme.buttonDisabled}
+              />
             </View>
           </LinearGradient>
         </View>
@@ -887,7 +967,7 @@ export default function ProfileScreen() {
             onPress={handleLogout}
             style={({ pressed }) => [styles.logoutInner, pressed && styles.logoutPressed]}
           >
-            <LogOut color="#ff3c46" size={24} />
+            <LogOut color={theme.errorLight} size={24} />
             <Text style={styles.logoutText}>Log Out</Text>
           </Pressable>
         </LinearGradient>
@@ -946,7 +1026,7 @@ export default function ProfileScreen() {
                   ]}
                 >
                   <Heart
-                    color={isAppleHealthConnected ? '#f5fff9' : '#f0f2f9'}
+                    color={theme.white}
                     size={26}
                     strokeWidth={2.2}
                   />
@@ -1108,7 +1188,24 @@ function createStyles(theme: Theme) {
       borderRadius: 38,
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    avatarWrap: {
+      width: 76,
+      height: 76,
       marginRight: 16,
+    },
+    avatarCameraBtn: {
+      position: 'absolute',
+      bottom: 0,
+      right: 0,
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: theme.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: theme.backgroundDark,
     },
     avatarText: {
       color: theme.white,
@@ -1164,14 +1261,14 @@ function createStyles(theme: Theme) {
     errorBanner: {
       borderRadius: 12,
       borderWidth: 1,
-      borderColor: 'rgba(255, 59, 69, 0.35)',
-      backgroundColor: 'rgba(255, 59, 69, 0.08)',
+      borderColor: theme.error,
+      backgroundColor: theme.cardBg,
       paddingHorizontal: 12,
       paddingVertical: 10,
       marginBottom: 16,
     },
     errorText: {
-      color: '#ff747c',
+      color: theme.errorLight,
       fontSize: 13,
     },
     sectionWrap: {
@@ -1339,7 +1436,7 @@ function createStyles(theme: Theme) {
       opacity: 0.84,
     },
     logoutText: {
-      color: '#ff3c46',
+      color: theme.errorLight,
       fontSize: 17,
       fontWeight: '500',
     },
@@ -1380,7 +1477,7 @@ function createStyles(theme: Theme) {
       borderRadius: 23,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: 'rgba(95, 102, 120, 0.3)',
+      backgroundColor: theme.mutedBg,
     },
     readinessCloseButtonPressed: {
       opacity: 0.82,
@@ -1418,8 +1515,8 @@ function createStyles(theme: Theme) {
       backgroundColor: theme.mutedBg,
     },
     appleHealthCardConnected: {
-      borderColor: '#00bc57',
-      backgroundColor: 'rgba(6, 134, 73, 0.2)',
+      borderColor: theme.success,
+      backgroundColor: theme.cardBg,
     },
     appleHealthIconWrap: {
       width: 56,
@@ -1430,10 +1527,10 @@ function createStyles(theme: Theme) {
       marginRight: 14,
     },
     appleHealthIconWrapDisconnected: {
-      backgroundColor: 'rgba(146, 151, 169, 0.22)',
+      backgroundColor: theme.mutedBg,
     },
     appleHealthIconWrapConnected: {
-      backgroundColor: '#16ba5f',
+      backgroundColor: theme.success,
     },
     appleHealthTextWrap: {
       flex: 1,
@@ -1451,7 +1548,7 @@ function createStyles(theme: Theme) {
       fontWeight: '500',
     },
     appleHealthConnectedText: {
-      color: '#08cf61',
+      color: theme.success,
       fontSize: 13,
       fontWeight: '600',
     },
@@ -1463,20 +1560,20 @@ function createStyles(theme: Theme) {
     permissionsCard: {
       borderRadius: 20,
       borderWidth: 1,
-      borderColor: '#1445a4',
-      backgroundColor: 'rgba(31, 60, 119, 0.26)',
+      borderColor: theme.primary,
+      backgroundColor: theme.cardBg,
       paddingHorizontal: 16,
       paddingVertical: 14,
       marginBottom: 20,
     },
     permissionsTitle: {
-      color: '#7dc4ff',
+      color: theme.primaryLight,
       fontSize: 16,
       fontWeight: '500',
       marginBottom: 5,
     },
     permissionsItem: {
-      color: '#c4d6ff',
+      color: theme.text,
       fontSize: 15,
       lineHeight: 23,
     },

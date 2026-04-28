@@ -1,5 +1,5 @@
 import React, { useMemo, useState} from 'react';
-import {SafeAreaView, Text, View, TextInput,
+import {Text, View, TextInput,
     TouchableOpacity,
     StyleSheet,
     KeyboardAvoidingView,
@@ -8,6 +8,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ChevronLeft, CheckCircle } from 'lucide-react-native';
 import { router, Link } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import BackButton from "@/components/ui/BackButton";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { Theme } from "@/constants/themes";

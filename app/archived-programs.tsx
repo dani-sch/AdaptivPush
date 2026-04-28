@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Archive } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { supabase } from '@/utils/supabase';
 import { useTheme } from '@/contexts/ThemeContext';

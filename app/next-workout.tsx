@@ -1,3 +1,4 @@
+import { haptic, Haptics } from "@/utils/haptic";
 import { ExerciseHistoryModal } from "@/components/ExerciseHistoryModal";
 import { SwapExerciseModal } from "@/components/SwapExerciseModal";
 import { useCurrentProgram } from "@/hooks/useCurrentProgram";
@@ -465,6 +466,8 @@ export default function NextWorkoutScreen() {
 
       setSaving(false);
 
+      void haptic(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success));
+
       if (newPrNames.length > 0) {
         setPrExercises(newPrNames);
         setShowPrModal(true);
@@ -630,7 +633,8 @@ export default function NextWorkoutScreen() {
             context="workout"
             onClose={() => setSwapTargetId(null)}
             onSwap={({ exerciseId, replacement }) => {
-              setExercises((prev) =>
+                void haptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
+                setExercises((prev) =>
                 prev.map((ex) =>
                   ex.id === exerciseId
                     ? {
