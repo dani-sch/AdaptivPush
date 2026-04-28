@@ -16,17 +16,8 @@ import { X, Search, Check, ChevronDown, ChevronUp } from 'lucide-react-native';
 import type { CurrentProgram, WorkoutExercise, MuscleGroup, Equipment } from '@/types/program';
 import { getAlternativesFor, exercisesByMuscleGroup } from '@/lib/exerciseDatabase';
 import { supabase } from '@/utils/supabase';
-
-import {
-    BORDER_COLOR,
-    CARD_BG,
-    MUTED_BG,
-    PLACEHOLDER_TEXT,
-    PRIMARY_COLOR,
-    SURFACE_BG,
-    TEXT_COLOR,
-    WHITE,
-} from '@/constants/colors';
+import { useTheme } from '@/contexts/ThemeContext';
+import type { Theme } from '@/constants/themes';
 
 interface SwapOption extends WorkoutExercise {
     imageUrl?: string;
@@ -49,6 +40,9 @@ type Props = {
 };
 
 export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwap, embedded }: Props) {
+    const { theme } = useTheme();
+    const styles = useMemo(() => createStyles(theme), [theme]);
+
     const [searchQuery, setSearchQuery] = useState('');
     const [applyToProgram, setApplyToProgram] = useState(false);
     const [selectedExercise, setSelectedExercise] = useState<SwapOption | null>(null);
@@ -162,19 +156,19 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
                 </View>
 
                 <Pressable style={styles.iconBtn} onPress={onClose} accessibilityRole="button">
-                    <X color={WHITE} size={18} />
+                    <X color={theme.white} size={18} />
                 </Pressable>
             </View>
 
             {/* Search */}
             <View style={styles.searchWrap}>
                 <View style={styles.searchBar}>
-                    <Search color={PLACEHOLDER_TEXT} size={18} />
+                    <Search color={theme.placeholder} size={18} />
                     <TextInput
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                         placeholder="Search exercises..."
-                        placeholderTextColor={PLACEHOLDER_TEXT}
+                        placeholderTextColor={theme.placeholder}
                         style={styles.searchInput}
                         autoCorrect={false}
                         autoCapitalize="none"
@@ -186,7 +180,7 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
             <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
                 <Text style={styles.sectionLabel}>{(resolvedMuscleGroup ?? 'General').toUpperCase()} EXERCISES</Text>
                 {loadingExercises ? (
-                    <ActivityIndicator color={PRIMARY_COLOR} style={{ marginTop: 20 }} />
+                    <ActivityIndicator color={theme.primary} style={{ marginTop: 20 }} />
                 ) : filteredAlternatives.length === 0 ? (
                     <View style={styles.emptyWrap}>
                         <Text style={styles.emptyText}>No exercises found</Text>
@@ -221,7 +215,7 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
                                     <View style={styles.rowActions}>
                                         {isSelected && (
                                             <View style={styles.checkCircle}>
-                                                <Check color={WHITE} size={14} />
+                                                <Check color={theme.white} size={14} />
                                             </View>
                                         )}
                                         {/* Info toggle — separate from selection */}
@@ -231,8 +225,8 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
                                             style={styles.chevronBtn}
                                         >
                                             {isExpanded
-                                                ? <ChevronUp color={PLACEHOLDER_TEXT} size={16} />
-                                                : <ChevronDown color={PLACEHOLDER_TEXT} size={16} />
+                                                ? <ChevronUp color={theme.placeholder} size={16} />
+                                                : <ChevronDown color={theme.placeholder} size={16} />
                                             }
                                         </Pressable>
                                     </View>
@@ -267,8 +261,8 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
                         <Switch
                             value={applyToProgram}
                             onValueChange={setApplyToProgram}
-                            trackColor={{ false: MUTED_BG, true: PRIMARY_COLOR }}
-                            thumbColor={WHITE}
+                            trackColor={{ false: theme.mutedBg, true: theme.primary }}
+                            thumbColor={theme.white}
                         />
                     </View>
                 )}
@@ -302,212 +296,214 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
     );
 }
 
-const styles = StyleSheet.create({
-    backdrop: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.82)',
-        justifyContent: 'flex-end',
-    },
-    embeddedContainer: {
-        flex: 1,
-        backgroundColor: SURFACE_BG,
-    },
-    sheet: {
-        backgroundColor: SURFACE_BG,
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-        overflow: 'hidden',
-        maxHeight: '90%',
-        height: '75%',
-    },
+function createStyles(theme: Theme) {
+    return StyleSheet.create({
+        backdrop: {
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.82)',
+            justifyContent: 'flex-end',
+        },
+        embeddedContainer: {
+            flex: 1,
+            backgroundColor: theme.surfaceBg,
+        },
+        sheet: {
+            backgroundColor: theme.surfaceBg,
+            borderTopLeftRadius: 24,
+            borderTopRightRadius: 24,
+            borderWidth: 1,
+            borderColor: theme.border,
+            overflow: 'hidden',
+            maxHeight: '90%',
+            height: '75%',
+        },
 
-    header: {
-        paddingHorizontal: 18,
-        paddingVertical: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: BORDER_COLOR,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-    },
-    headerTitle: {
-        color: WHITE,
-        fontSize: 18,
-        fontWeight: '800',
-        marginBottom: 2,
-    },
-    headerSubtitle: {
-        color: TEXT_COLOR,
-        fontSize: 13,
-    },
-    iconBtn: {
-        width: 34,
-        height: 34,
-        borderRadius: 17,
-        backgroundColor: MUTED_BG,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
+        header: {
+            paddingHorizontal: 18,
+            paddingVertical: 14,
+            borderBottomWidth: 1,
+            borderBottomColor: theme.border,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12,
+        },
+        headerTitle: {
+            color: theme.textPrimary,
+            fontSize: 18,
+            fontWeight: '800',
+            marginBottom: 2,
+        },
+        headerSubtitle: {
+            color: theme.text,
+            fontSize: 13,
+        },
+        iconBtn: {
+            width: 34,
+            height: 34,
+            borderRadius: 17,
+            backgroundColor: theme.mutedBg,
+            borderWidth: 1,
+            borderColor: theme.border,
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
 
-    searchWrap: {
-        paddingHorizontal: 18,
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: BORDER_COLOR,
-    },
-    searchBar: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-        backgroundColor: CARD_BG,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-        borderRadius: 14,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-    },
-    searchInput: {
-        flex: 1,
-        color: WHITE,
-        fontSize: 14,
-    },
+        searchWrap: {
+            paddingHorizontal: 18,
+            paddingVertical: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: theme.border,
+        },
+        searchBar: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+            backgroundColor: theme.cardBg,
+            borderWidth: 1,
+            borderColor: theme.border,
+            borderRadius: 14,
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+        },
+        searchInput: {
+            flex: 1,
+            color: theme.textPrimary,
+            fontSize: 14,
+        },
 
-    listContent: {
-        paddingHorizontal: 18,
-        paddingVertical: 14,
-        paddingBottom: 24,
-    },
-    sectionLabel: {
-        color: PLACEHOLDER_TEXT,
-        fontSize: 11,
-        fontWeight: '700',
-        letterSpacing: 1,
-        marginBottom: 10,
-    },
+        listContent: {
+            paddingHorizontal: 18,
+            paddingVertical: 14,
+            paddingBottom: 24,
+        },
+        sectionLabel: {
+            color: theme.placeholder,
+            fontSize: 11,
+            fontWeight: '700',
+            letterSpacing: 1,
+            marginBottom: 10,
+        },
 
-    exerciseCard: {
-        backgroundColor: CARD_BG,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-        borderRadius: 16,
-        marginBottom: 10,
-        overflow: 'hidden',
-    },
-    exerciseCardSelected: {
-        borderColor: PRIMARY_COLOR,
-        borderWidth: 2,
-    },
-    exerciseRow: {
-        padding: 14,
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        gap: 12,
-    },
-    exerciseName: {
-        color: WHITE,
-        fontSize: 14,
-        fontWeight: '700',
-        marginBottom: 4,
-    },
-    exerciseMeta: {
-        color: TEXT_COLOR,
-        fontSize: 12,
-        marginBottom: 10,
-    },
-    exerciseStatsRow: {
-        flexDirection: 'row',
-        gap: 14,
-        marginBottom: 8,
-    },
-    statText: {
-        color: TEXT_COLOR,
-        fontSize: 12,
-    },
-    exerciseDescription: {
-        color: PLACEHOLDER_TEXT,
-        fontSize: 11,
-        lineHeight: 16,
-        marginTop: 2,
-    },
-    rowActions: {
-        alignItems: 'center',
-        gap: 8,
-    },
-    checkCircle: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        backgroundColor: PRIMARY_COLOR,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    chevronBtn: {
-        padding: 2,
-    },
+        exerciseCard: {
+            backgroundColor: theme.cardBg,
+            borderWidth: 1,
+            borderColor: theme.border,
+            borderRadius: 16,
+            marginBottom: 10,
+            overflow: 'hidden',
+        },
+        exerciseCardSelected: {
+            borderColor: theme.primary,
+            borderWidth: 2,
+        },
+        exerciseRow: {
+            padding: 14,
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            gap: 12,
+        },
+        exerciseName: {
+            color: theme.textPrimary,
+            fontSize: 14,
+            fontWeight: '700',
+            marginBottom: 4,
+        },
+        exerciseMeta: {
+            color: theme.text,
+            fontSize: 12,
+            marginBottom: 10,
+        },
+        exerciseStatsRow: {
+            flexDirection: 'row',
+            gap: 14,
+            marginBottom: 8,
+        },
+        statText: {
+            color: theme.text,
+            fontSize: 12,
+        },
+        exerciseDescription: {
+            color: theme.placeholder,
+            fontSize: 11,
+            lineHeight: 16,
+            marginTop: 2,
+        },
+        rowActions: {
+            alignItems: 'center',
+            gap: 8,
+        },
+        checkCircle: {
+            width: 24,
+            height: 24,
+            borderRadius: 12,
+            backgroundColor: theme.primary,
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
+        chevronBtn: {
+            padding: 2,
+        },
 
-    detailPanel: {
-        borderTopWidth: 1,
-        borderTopColor: BORDER_COLOR,
-        padding: 14,
-        gap: 12,
-    },
-    exerciseGif: {
-        width: '100%',
-        height: 200,
-        borderRadius: 10,
-        backgroundColor: MUTED_BG,
-    },
-    descriptionText: {
-        color: TEXT_COLOR,
-        fontSize: 13,
-        lineHeight: 19,
-    },
+        detailPanel: {
+            borderTopWidth: 1,
+            borderTopColor: theme.border,
+            padding: 14,
+            gap: 12,
+        },
+        exerciseGif: {
+            width: '100%',
+            height: 200,
+            borderRadius: 10,
+            backgroundColor: theme.mutedBg,
+        },
+        descriptionText: {
+            color: theme.text,
+            fontSize: 13,
+            lineHeight: 19,
+        },
 
-    emptyWrap: {
-        paddingVertical: 30,
-        alignItems: 'center',
-    },
-    emptyText: {
-        color: TEXT_COLOR,
-        fontSize: 13,
-    },
+        emptyWrap: {
+            paddingVertical: 30,
+            alignItems: 'center',
+        },
+        emptyText: {
+            color: theme.text,
+            fontSize: 13,
+        },
 
-    footer: {
-        paddingHorizontal: 18,
-        paddingVertical: 14,
-        borderTopWidth: 1,
-        borderTopColor: BORDER_COLOR,
-        backgroundColor: SURFACE_BG,
-        gap: 12,
-    },
-    switchRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    switchText: {
-        color: WHITE,
-        fontSize: 13,
-        fontWeight: '600',
-    },
+        footer: {
+            paddingHorizontal: 18,
+            paddingVertical: 14,
+            borderTopWidth: 1,
+            borderTopColor: theme.border,
+            backgroundColor: theme.surfaceBg,
+            gap: 12,
+        },
+        switchRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+        },
+        switchText: {
+            color: theme.textPrimary,
+            fontSize: 13,
+            fontWeight: '600',
+        },
 
-    swapBtn: {
-        backgroundColor: PRIMARY_COLOR,
-        borderRadius: 14,
-        paddingVertical: 14,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    swapBtnDisabled: {
-        opacity: 0.5,
-    },
-    swapBtnText: {
-        color: WHITE,
-        fontSize: 15,
-        fontWeight: '800',
-    },
-});
+        swapBtn: {
+            backgroundColor: theme.primary,
+            borderRadius: 14,
+            paddingVertical: 14,
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
+        swapBtnDisabled: {
+            opacity: 0.5,
+        },
+        swapBtnText: {
+            color: theme.white,
+            fontSize: 15,
+            fontWeight: '800',
+        },
+    });
+}

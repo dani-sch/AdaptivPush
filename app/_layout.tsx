@@ -11,6 +11,7 @@ import "react-native-reanimated";
 
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { supabase } from "@/utils/supabase";
+import { AppThemeProvider, useTheme } from "@/contexts/ThemeContext";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -22,9 +23,10 @@ Notifications.setNotificationHandler({
   }),
 });
 
-export default function RootLayout() {
+function RootLayoutInner() {
   const colorScheme = useColorScheme();
   const navigationState = useRootNavigationState();
+  const { isDark } = useTheme();
 
   useEffect(() => {
     if (!navigationState?.key) return;
@@ -57,13 +59,20 @@ export default function RootLayout() {
           name="recovery-library"
           options={{ headerShown: false }}
         />
-
         <Stack.Screen
           name="program-overview"
           options={{ headerShown: false }}
         />
       </Stack>
-      <StatusBar style="auto" />
+      <StatusBar style={isDark ? "light" : "dark"} />
     </ThemeProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <AppThemeProvider>
+      <RootLayoutInner />
+    </AppThemeProvider>
   );
 }

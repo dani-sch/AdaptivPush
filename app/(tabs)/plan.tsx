@@ -9,24 +9,13 @@ import { Alert } from 'react-native';
 import { useCurrentProgram } from '@/hooks/useCurrentProgram';
 import { WorkoutTemplateModal } from '@/components/WorkoutTemplateModal';
 import { GenerateProgramModal } from '@/components/GenerateProgramModal';
+import { useTheme } from '@/contexts/ThemeContext';
+import type { Theme } from '@/constants/themes';
 
-import {
-    BACKGROUND_COLOR_DARK,
-    BORDER_COLOR,
-    CARD_BG,
-    MUTED_BG,
-    PLACEHOLDER_TEXT,
-    PRIMARY_COLOR,
-    SURFACE_BG,
-    TEXT_COLOR,
-    WHITE,
-    ERROR_COLOR_LIGHT,
-} from '@/constants/colors';
-
-function LoadingState() {
+function LoadingState({ styles }: { styles: ReturnType<typeof createStyles> }) {
     return (
         <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-            <Text style={{ color: TEXT_COLOR }}>Loading program...</Text>
+            <Text style={{ color: styles.label.color }}>Loading program...</Text>
         </View>
     );
 }
@@ -38,16 +27,20 @@ function EmptyState({
                         onGenerateProgram,
                         onOpenArchived,
                         busy,
+                        styles,
+                        theme,
                     }: {
     onCreateProgram: () => void;
     onCreateDevProgram: () => void;
     onGenerateProgram: () => void;
     onOpenArchived: () => void;
     busy: boolean;
+    styles: ReturnType<typeof createStyles>;
+    theme: Theme;
 }) {
     return (
         <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 16 }]}>
-            <Text style={{ color: TEXT_COLOR, textAlign: 'center', marginBottom: 14 }}>
+            <Text style={{ color: theme.text, textAlign: 'center', marginBottom: 14 }}>
                 No current program yet. Create one to get started.
             </Text>
 
@@ -58,9 +51,9 @@ function EmptyState({
                     {
                         width: '100%',
                         maxWidth: 420,
-                        backgroundColor: PRIMARY_COLOR,
+                        backgroundColor: theme.primary,
                         borderWidth: 1,
-                        borderColor: BORDER_COLOR,
+                        borderColor: theme.border,
                         borderRadius: 16,
                         paddingVertical: 14,
                         paddingHorizontal: 14,
@@ -70,7 +63,7 @@ function EmptyState({
                     },
                 ]}
             >
-                <Text style={{ color: WHITE, fontWeight: '700' }}>Generate Personal Program</Text>
+                <Text style={{ color: theme.white, fontWeight: '700' }}>Generate Personal Program</Text>
             </Pressable>
 
             <Pressable
@@ -80,9 +73,9 @@ function EmptyState({
                     {
                         width: '100%',
                         maxWidth: 420,
-                        backgroundColor: CARD_BG,
+                        backgroundColor: theme.cardBg,
                         borderWidth: 1,
-                        borderColor: BORDER_COLOR,
+                        borderColor: theme.border,
                         borderRadius: 16,
                         paddingVertical: 14,
                         paddingHorizontal: 14,
@@ -92,7 +85,7 @@ function EmptyState({
                     },
                 ]}
             >
-                <Text style={{ color: WHITE, fontWeight: '700' }}>{busy ? 'Working…' : 'Create Program'}</Text>
+                <Text style={{ color: theme.white, fontWeight: '700' }}>{busy ? 'Working…' : 'Create Program'}</Text>
             </Pressable>
 
             <Pressable
@@ -102,9 +95,9 @@ function EmptyState({
                     {
                         width: '100%',
                         maxWidth: 420,
-                        backgroundColor: MUTED_BG,
+                        backgroundColor: theme.mutedBg,
                         borderWidth: 1,
-                        borderColor: BORDER_COLOR,
+                        borderColor: theme.border,
                         borderRadius: 16,
                         paddingVertical: 14,
                         paddingHorizontal: 14,
@@ -113,7 +106,7 @@ function EmptyState({
                     },
                 ]}
             >
-                <Text style={{ color: WHITE, fontWeight: '700' }}>{busy ? 'Working…' : 'Dev: Create Default Program'}</Text>
+                <Text style={{ color: theme.white, fontWeight: '700' }}>{busy ? 'Working…' : 'Dev: Create Default Program'}</Text>
             </Pressable>
 
             <Pressable
@@ -125,7 +118,7 @@ function EmptyState({
                         maxWidth: 420,
                         backgroundColor: 'transparent',
                         borderWidth: 1,
-                        borderColor: BORDER_COLOR,
+                        borderColor: theme.border,
                         borderRadius: 16,
                         paddingVertical: 14,
                         paddingHorizontal: 14,
@@ -136,8 +129,8 @@ function EmptyState({
                 ]}
             >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Archive size={16} color={WHITE} />
-                    <Text style={{ color: WHITE, fontWeight: '700' }}>Archived Programs</Text>
+                    <Archive size={16} color={theme.white} />
+                    <Text style={{ color: theme.white, fontWeight: '700' }}>Archived Programs</Text>
                 </View>
             </Pressable>
         </View>
@@ -146,6 +139,8 @@ function EmptyState({
 
 export default function PlanScreen() {
     const insets = useSafeAreaInsets();
+    const { theme } = useTheme();
+    const styles = useMemo(() => createStyles(theme), [theme]);
 
     const [selectedWorkout, setSelectedWorkout] = useState<string | null>(null);
     const [showMenu, setShowMenu] = useState(false);
@@ -174,7 +169,7 @@ export default function PlanScreen() {
         return insets.top + 18;
     }, [insets.top]);
 
-    if (loading) return <LoadingState />;
+    if (loading) return <LoadingState styles={styles} />;
     if (!program)
         return (
             <>
@@ -191,6 +186,8 @@ export default function PlanScreen() {
                         }
                     }}
                     onOpenArchived={() => router.push('/archived-programs')}
+                    styles={styles}
+                    theme={theme}
                 />
                 <Modal visible={showGenModal} transparent animationType="slide">
                     <GenerateProgramModal
@@ -223,7 +220,7 @@ export default function PlanScreen() {
                         accessibilityRole="button"
                         accessibilityLabel="Open program menu"
                     >
-                        <MoreVertical color={WHITE} size={20} />
+                        <MoreVertical color={theme.textPrimary} size={20} />
                     </Pressable>
                 </View>
 
@@ -260,7 +257,7 @@ export default function PlanScreen() {
                             }}
                         >
                             <View style={styles.menuItemRow}>
-                                <Archive size={16} color={WHITE} />
+                                <Archive size={16} color={theme.textPrimary} />
                                 <Text style={styles.menuText}>Archived Programs</Text>
                             </View>
                         </Pressable>
@@ -292,7 +289,7 @@ export default function PlanScreen() {
                             }}
                             style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
                         >
-                            <Text style={[styles.menuText, { color: ERROR_COLOR_LIGHT }]}>End Current Program</Text>
+                            <Text style={[styles.menuText, { color: theme.errorLight }]}>End Current Program</Text>
                         </Pressable>
                     </View>
                 )}
@@ -313,7 +310,7 @@ export default function PlanScreen() {
 
                 {/* Week View */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>This Week’s Workouts</Text>
+                    <Text style={styles.sectionTitle}>This Week's Workouts</Text>
 
                     {/* Weekly Progress */}
                     <View style={styles.section}>
@@ -361,7 +358,7 @@ export default function PlanScreen() {
                                         accessibilityRole="button"
                                         accessibilityLabel={`Open workout ${workout.name}`}
                                     >
-                                        <ChevronRight color={WHITE} size={20} />
+                                        <ChevronRight color={theme.textPrimary} size={20} />
                                     </Pressable>
                                 </View>
 
@@ -377,9 +374,9 @@ export default function PlanScreen() {
                     onPress={() => router.push('/program-overview')}
                     accessibilityRole="button"
                 >
-                    <LayoutList color={PRIMARY_COLOR} size={18} />
+                    <LayoutList color={theme.primary} size={18} />
                     <Text style={styles.viewFullProgramText}>View Full Program</Text>
-                    <ChevronRight color={PLACEHOLDER_TEXT} size={18} style={{ marginLeft: 'auto' }} />
+                    <ChevronRight color={theme.placeholder} size={18} style={{ marginLeft: 'auto' }} />
                 </Pressable>
 
                 {/* Create Program */}
@@ -388,10 +385,10 @@ export default function PlanScreen() {
                         <Pressable style={({ pressed }) => [styles.ctaCard, pressed && { opacity: 0.9 }]}>
                             <View style={styles.ctaLeft}>
                                 <View style={styles.ctaIcon}>
-                                    <Plus color={WHITE} size={20} />
+                                    <Plus color={theme.white} size={20} />
                                 </View>
                                 <Text style={styles.ctaText}>Create Custom Program</Text>
-                                <ChevronRight color={PLACEHOLDER_TEXT} size={20} />
+                                <ChevronRight color={theme.placeholder} size={20} />
                             </View>
                         </Pressable>
                     </Link>
@@ -425,255 +422,257 @@ export default function PlanScreen() {
     );
 }
 
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: BACKGROUND_COLOR_DARK,
-    },
-    content: {
-        paddingHorizontal: 16,
-        paddingTop: 18,
-        paddingBottom: 28,
-    },
+function createStyles(theme: Theme) {
+    return StyleSheet.create({
+        container: {
+            flex: 1,
+            backgroundColor: theme.backgroundDark,
+        },
+        content: {
+            paddingHorizontal: 16,
+            paddingTop: 18,
+            paddingBottom: 28,
+        },
 
-    headerRow: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        justifyContent: 'space-between',
-        gap: 12,
-        marginBottom: 18,
-    },
-    title: {
-        color: WHITE,
-        fontSize: 24,
-        fontWeight: '600',
-        marginBottom: 4,
-    },
-    subtitle: {
-        color: TEXT_COLOR,
-        fontSize: 13,
-    },
-    summaryCard: {
-        backgroundColor: CARD_BG,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-        borderRadius: 18,
-        padding: 14,
-        gap: 12,
-    },
-    summaryTitle: {
-        color: WHITE,
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    summaryMeta: {
-        color: TEXT_COLOR,
-        fontSize: 13,
-    },
-    iconButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: CARD_BG,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
+        headerRow: {
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: 12,
+            marginBottom: 18,
+        },
+        title: {
+            color: theme.textPrimary,
+            fontSize: 24,
+            fontWeight: '600',
+            marginBottom: 4,
+        },
+        subtitle: {
+            color: theme.text,
+            fontSize: 13,
+        },
+        summaryCard: {
+            backgroundColor: theme.cardBg,
+            borderWidth: 1,
+            borderColor: theme.border,
+            borderRadius: 18,
+            padding: 14,
+            gap: 12,
+        },
+        summaryTitle: {
+            color: theme.textPrimary,
+            fontSize: 16,
+            fontWeight: '600',
+        },
+        summaryMeta: {
+            color: theme.text,
+            fontSize: 13,
+        },
+        iconButton: {
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            backgroundColor: theme.cardBg,
+            borderWidth: 1,
+            borderColor: theme.border,
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
 
-    menuCard: {
-        backgroundColor: SURFACE_BG,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-        borderRadius: 18,
-        overflow: 'hidden',
-        marginBottom: 18,
-    },
-    menuItem: {
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-    },
-    menuItemPressed: {
-        backgroundColor: MUTED_BG,
-    },
-    menuItemRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
-    menuText: {
-        color: WHITE,
-        fontSize: 14,
-    },
-    menuDivider: {
-        height: 1,
-        backgroundColor: BORDER_COLOR,
-    },
+        menuCard: {
+            backgroundColor: theme.surfaceBg,
+            borderWidth: 1,
+            borderColor: theme.border,
+            borderRadius: 18,
+            overflow: 'hidden',
+            marginBottom: 18,
+        },
+        menuItem: {
+            paddingHorizontal: 14,
+            paddingVertical: 12,
+        },
+        menuItemPressed: {
+            backgroundColor: theme.mutedBg,
+        },
+        menuItemRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+        },
+        menuText: {
+            color: theme.textPrimary,
+            fontSize: 14,
+        },
+        menuDivider: {
+            height: 1,
+            backgroundColor: theme.border,
+        },
 
-    section: {
-        marginBottom: 18,
-    },
-    sectionTitle: {
-        color: WHITE,
-        fontSize: 18,
-        fontWeight: '600',
-        marginBottom: 12,
-    },
-    rowBetween: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    label: {
-        color: TEXT_COLOR,
-        fontSize: 13,
-    },
+        section: {
+            marginBottom: 18,
+        },
+        sectionTitle: {
+            color: theme.textPrimary,
+            fontSize: 18,
+            fontWeight: '600',
+            marginBottom: 12,
+        },
+        rowBetween: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 8,
+        },
+        label: {
+            color: theme.text,
+            fontSize: 13,
+        },
 
-    progressTrack: {
-        height: 8,
-        backgroundColor: MUTED_BG,
-        borderRadius: 999,
-        overflow: 'hidden',
-    },
-    progressFill: {
-        height: '100%',
-        backgroundColor: PRIMARY_COLOR,
-        borderRadius: 999,
-    },
+        progressTrack: {
+            height: 8,
+            backgroundColor: theme.mutedBg,
+            borderRadius: 999,
+            overflow: 'hidden',
+        },
+        progressFill: {
+            height: '100%',
+            backgroundColor: theme.primary,
+            borderRadius: 999,
+        },
 
-    weekRow: {
-        flexDirection: 'row',
-    },
-    weekCell: {
-        width: `${100 / 7}%`,
-        alignItems: 'center',
-    },
-    weekHeaderText: {
-        color: PLACEHOLDER_TEXT,
-        fontSize: 12,
-    },
-    dayBox: {
-        width: '86%',
-        aspectRatio: 1,
-        borderRadius: 10,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    dayBoxActive: {
-        backgroundColor: PRIMARY_COLOR,
-    },
-    dayBoxInactive: {
-        backgroundColor: MUTED_BG,
-    },
-    dayBoxText: {
-        fontSize: 12,
-        fontWeight: '600',
-    },
+        weekRow: {
+            flexDirection: 'row',
+        },
+        weekCell: {
+            width: `${100 / 7}%`,
+            alignItems: 'center',
+        },
+        weekHeaderText: {
+            color: theme.placeholder,
+            fontSize: 12,
+        },
+        dayBox: {
+            width: '86%',
+            aspectRatio: 1,
+            borderRadius: 10,
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
+        dayBoxActive: {
+            backgroundColor: theme.primary,
+        },
+        dayBoxInactive: {
+            backgroundColor: theme.mutedBg,
+        },
+        dayBoxText: {
+            fontSize: 12,
+            fontWeight: '600',
+        },
 
-    workoutCard: {
-        backgroundColor: CARD_BG,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-        borderRadius: 18,
-        padding: 14,
-    },
-    workoutTopRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: 12,
-        marginBottom: 10,
-    },
-    workoutLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        flex: 1,
-    },
-    workoutIndexBox: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
-        backgroundColor: PRIMARY_COLOR,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    workoutIndexText: {
-        color: WHITE,
-        fontWeight: '700',
-        fontSize: 14,
-    },
-    workoutName: {
-        color: WHITE,
-        fontSize: 16,
-        fontWeight: '600',
-        marginBottom: 2,
-    },
-    workoutMeta: {
-        color: TEXT_COLOR,
-        fontSize: 13,
-    },
-    chevronButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: MUTED_BG,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    exerciseCount: {
-        color: TEXT_COLOR,
-        fontSize: 13,
-    },
+        workoutCard: {
+            backgroundColor: theme.cardBg,
+            borderWidth: 1,
+            borderColor: theme.border,
+            borderRadius: 18,
+            padding: 14,
+        },
+        workoutTopRow: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 12,
+            marginBottom: 10,
+        },
+        workoutLeft: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12,
+            flex: 1,
+        },
+        workoutIndexBox: {
+            width: 40,
+            height: 40,
+            borderRadius: 12,
+            backgroundColor: theme.primary,
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
+        workoutIndexText: {
+            color: theme.white,
+            fontWeight: '700',
+            fontSize: 14,
+        },
+        workoutName: {
+            color: theme.textPrimary,
+            fontSize: 16,
+            fontWeight: '600',
+            marginBottom: 2,
+        },
+        workoutMeta: {
+            color: theme.text,
+            fontSize: 13,
+        },
+        chevronButton: {
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            backgroundColor: theme.mutedBg,
+            borderWidth: 1,
+            borderColor: theme.border,
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
+        exerciseCount: {
+            color: theme.text,
+            fontSize: 13,
+        },
 
-    ctaCard: {
-        marginTop: 8,
-        backgroundColor: CARD_BG,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-        borderRadius: 18,
-        padding: 14,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    ctaLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-    },
-    ctaIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
-        backgroundColor: PRIMARY_COLOR,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    ctaText: {
-        color: WHITE,
-        fontSize: 15,
-        fontWeight: '600',
-    },
-    viewFullProgramBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-        backgroundColor: CARD_BG,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-        borderRadius: 14,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        marginTop: 16,
-        marginBottom: 4,
-    },
-    viewFullProgramText: {
-        color: WHITE,
-        fontSize: 15,
-        fontWeight: '600',
-    },
-});
+        ctaCard: {
+            marginTop: 8,
+            backgroundColor: theme.cardBg,
+            borderWidth: 1,
+            borderColor: theme.border,
+            borderRadius: 18,
+            padding: 14,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+        },
+        ctaLeft: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12,
+        },
+        ctaIcon: {
+            width: 40,
+            height: 40,
+            borderRadius: 12,
+            backgroundColor: theme.primary,
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
+        ctaText: {
+            color: theme.textPrimary,
+            fontSize: 15,
+            fontWeight: '600',
+        },
+        viewFullProgramBtn: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+            backgroundColor: theme.cardBg,
+            borderWidth: 1,
+            borderColor: theme.border,
+            borderRadius: 14,
+            paddingHorizontal: 16,
+            paddingVertical: 14,
+            marginTop: 16,
+            marginBottom: 4,
+        },
+        viewFullProgramText: {
+            color: theme.textPrimary,
+            fontSize: 15,
+            fontWeight: '600',
+        },
+    });
+}

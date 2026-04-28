@@ -1,27 +1,22 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { Dumbbell } from "lucide-react-native";
-import React from "react";
+import React, { useMemo } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import {
-  BACKGROUND_COLOR_DARK, BORDER_COLOR, BUTTON_DISABLED,
-  BUTTON_PICKED,
-  PLACEHOLDER_TEXT,
-  SECONDARY_COLOR_LIGHT,
-  TEXT_COLOR,
-  WHITE
-} from "../constants/colors";
+import { useTheme } from "@/contexts/ThemeContext";
+import type { Theme } from "@/constants/themes";
 
 export default function Index() {
     const router = useRouter();
-
+    const { theme } = useTheme();
+    const styles = useMemo(() => createStyles(theme), [theme]);
 
     return (
         <View style={styles.container}>
             <View style={styles.content}>
                 {/* Logo */}
                 <LinearGradient
-                    colors={[BUTTON_PICKED, SECONDARY_COLOR_LIGHT]}
+                    colors={[theme.buttonPicked, theme.secondaryLight]}
                     style={styles.logo}
                 >
                     <Dumbbell color="white" size={60} />
@@ -73,109 +68,111 @@ export default function Index() {
     );
 }
 
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: BACKGROUND_COLOR_DARK,
-        justifyContent: 'space-between',
-    },
-    devSkipButton: {
-      position: 'absolute',
-      top: 50,
-      right: 16,
-      backgroundColor: BUTTON_DISABLED,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: PLACEHOLDER_TEXT,
-      zIndex: 999,
-    },
-    devSkipText: {
-      color: TEXT_COLOR,
-      fontSize: 12,
-      fontWeight: '500',
-    },
-    content: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: 24,
-    },
-    logoContainer: {
-        marginBottom: 48,
-        paddingVertical: 100
-    },
-    logo: {
-        width: 120,
-        height: 120,
-        borderRadius: 30,  // Add rounded corners 
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 32,
-    },
-    logoIcon: {
-        fontSize: 60,
-    },
-    title: {
-        fontSize: 32,
-        fontWeight: '600',
-        color: WHITE,
-        marginBottom: 16,
-        textAlign: 'center',
-    },
-    subtitle: {
-        fontSize: 16,
-        color: TEXT_COLOR,
-        textAlign: 'center',
-        lineHeight: 24,
-        marginBottom: 64,
-        paddingHorizontal: 20,
-    },
-    buttonContainer: {
-        width: '100%',
-        gap: 16,
-    },
-    signInButton: {
-        backgroundColor: BUTTON_PICKED,
-        paddingVertical: 18,
-        borderRadius: 16,
-        alignItems: 'center',
-    },
-    signInButtonText: {
-        color: WHITE,
-        fontSize: 18,
-        fontWeight: '600',
-    },
-    joinButton: {
-        backgroundColor: BORDER_COLOR,
-        paddingVertical: 18,
-        borderRadius: 16,
-        alignItems: 'center',
-    },
-    joinButtonText: {
-        color: WHITE,
-        fontSize: 18,
-        fontWeight: '600',
-    },
-    footer: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingBottom: 48,
-        gap: 12,
-    },
-    footerLink: {
-        color: PLACEHOLDER_TEXT,
-        fontSize: 14,
-    },
-    footerDot: {
-        color: PLACEHOLDER_TEXT,
-        fontSize: 14,
-    },
-    buttonText: {
-        color: WHITE,
-        fontSize: 16,
-        fontWeight: '600',
-    },
-});
+function createStyles(theme: Theme) {
+    return StyleSheet.create({
+        container: {
+            flex: 1,
+            backgroundColor: theme.backgroundDark,
+            justifyContent: 'space-between',
+        },
+        devSkipButton: {
+          position: 'absolute',
+          top: 50,
+          right: 16,
+          backgroundColor: theme.buttonDisabled,
+          paddingHorizontal: 12,
+          paddingVertical: 6,
+          borderRadius: 8,
+          borderWidth: 1,
+          borderColor: theme.placeholder,
+          zIndex: 999,
+        },
+        devSkipText: {
+          color: theme.text,
+          fontSize: 12,
+          fontWeight: '500',
+        },
+        content: {
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            paddingHorizontal: 24,
+        },
+        logoContainer: {
+            marginBottom: 48,
+            paddingVertical: 100
+        },
+        logo: {
+            width: 120,
+            height: 120,
+            borderRadius: 30,  // Add rounded corners
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginBottom: 32,
+        },
+        logoIcon: {
+            fontSize: 60,
+        },
+        title: {
+            fontSize: 32,
+            fontWeight: '600',
+            color: theme.textPrimary,
+            marginBottom: 16,
+            textAlign: 'center',
+        },
+        subtitle: {
+            fontSize: 16,
+            color: theme.text,
+            textAlign: 'center',
+            lineHeight: 24,
+            marginBottom: 64,
+            paddingHorizontal: 20,
+        },
+        buttonContainer: {
+            width: '100%',
+            gap: 16,
+        },
+        signInButton: {
+            backgroundColor: theme.buttonPicked,
+            paddingVertical: 18,
+            borderRadius: 16,
+            alignItems: 'center',
+        },
+        signInButtonText: {
+            color: theme.white,
+            fontSize: 18,
+            fontWeight: '600',
+        },
+        joinButton: {
+            backgroundColor: theme.border,
+            paddingVertical: 18,
+            borderRadius: 16,
+            alignItems: 'center',
+        },
+        joinButtonText: {
+            color: theme.textPrimary,
+            fontSize: 18,
+            fontWeight: '600',
+        },
+        footer: {
+            flexDirection: 'row',
+            justifyContent: 'center',
+            alignItems: 'center',
+            paddingBottom: 48,
+            gap: 12,
+        },
+        footerLink: {
+            color: theme.placeholder,
+            fontSize: 14,
+        },
+        footerDot: {
+            color: theme.placeholder,
+            fontSize: 14,
+        },
+        buttonText: {
+            color: theme.textPrimary,
+            fontSize: 16,
+            fontWeight: '600',
+        },
+    });
+}

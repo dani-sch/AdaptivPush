@@ -1,9 +1,12 @@
 import { router } from 'expo-router';
 import { ArrowLeft, ChevronDown, Clock3 } from 'lucide-react-native';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { useTheme } from '@/contexts/ThemeContext';
+import type { Theme } from '@/constants/themes';
 
 /* ─── Recovery Data ────────────────────────────────────────────────── */
 
@@ -33,7 +36,7 @@ const ROUTINES: RecoveryRoutine[] = [
       { name: 'Standing Hamstring Stretch', duration: '30s each side' },
       { name: 'Pigeon Pose', duration: '45s each side' },
       { name: 'Seated Spinal Twist', duration: '30s each side' },
-      { name: 'Child\'s Pose', duration: '60s' },
+      { name: "Child's Pose", duration: '60s' },
     ],
   },
   {
@@ -101,6 +104,8 @@ const ROUTINES: RecoveryRoutine[] = [
 /* ─── Components ───────────────────────────────────────────────────── */
 
 const RoutineCard = ({ routine }: { routine: RecoveryRoutine }) => {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [open, setOpen] = useState(false);
 
   return (
@@ -110,12 +115,12 @@ const RoutineCard = ({ routine }: { routine: RecoveryRoutine }) => {
         <View style={{ flex: 1 }}>
           <Text style={styles.cardTitle}>{routine.title}</Text>
           <View style={styles.durationRow}>
-            <Clock3 color="#6f758a" size={13} />
+            <Clock3 color={theme.placeholder} size={13} />
             <Text style={styles.durationText}>{routine.duration}</Text>
           </View>
         </View>
         <Animated.View style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }}>
-          <ChevronDown color="#6f758a" size={20} />
+          <ChevronDown color={theme.placeholder} size={20} />
         </Animated.View>
       </Pressable>
 
@@ -144,6 +149,8 @@ const RoutineCard = ({ routine }: { routine: RecoveryRoutine }) => {
 
 export default function RecoveryLibraryScreen() {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   return (
     <View style={styles.container}>
@@ -156,7 +163,7 @@ export default function RecoveryLibraryScreen() {
       >
         <View style={styles.headerRow}>
           <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
-            <ArrowLeft color="#f4f6ff" size={22} />
+            <ArrowLeft color={theme.textPrimary} size={22} />
           </Pressable>
           <View>
             <Text style={styles.screenTitle}>Recovery & Mobility</Text>
@@ -174,74 +181,76 @@ export default function RecoveryLibraryScreen() {
 
 /* ─── Styles ───────────────────────────────────────────────────────── */
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#03040b' },
-  scrollContent: { paddingHorizontal: 18 },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    marginBottom: 24,
-  },
-  backBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#181b26',
-    borderWidth: 1,
-    borderColor: '#242a3b',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  screenTitle: { color: '#f4f6ff', fontSize: 22, fontWeight: '700' },
-  screenSubtitle: { color: '#6f758a', fontSize: 13, marginTop: 2 },
-  card: {
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#242a3b',
-    backgroundColor: '#121621',
-    marginBottom: 14,
-    overflow: 'hidden',
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    gap: 12,
-  },
-  emoji: { fontSize: 28 },
-  cardTitle: { color: '#f4f6ff', fontSize: 16, fontWeight: '600' },
-  durationRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 },
-  durationText: { color: '#6f758a', fontSize: 13 },
-  cardDescription: {
-    color: '#8d95ac',
-    fontSize: 13,
-    lineHeight: 19,
-    paddingHorizontal: 16,
-    marginBottom: 12,
-  },
-  exerciseList: {
-    borderTopWidth: 1,
-    borderTopColor: '#242a3b',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 10,
-  },
-  exerciseRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-  },
-  exerciseIndex: {
-    color: '#6f758a',
-    fontSize: 13,
-    fontWeight: '600',
-    width: 18,
-    textAlign: 'center',
-    marginTop: 1,
-  },
-  exerciseName: { color: '#e7ebf8', fontSize: 14, fontWeight: '500' },
-  exerciseNotes: { color: '#6f758a', fontSize: 12, marginTop: 1 },
-  exerciseDuration: { color: '#96c0ff', fontSize: 13, fontWeight: '500' },
-});
+function createStyles(theme: Theme) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.background },
+    scrollContent: { paddingHorizontal: 18 },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
+      marginBottom: 24,
+    },
+    backBtn: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      backgroundColor: theme.cardBg,
+      borderWidth: 1,
+      borderColor: theme.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    screenTitle: { color: theme.textPrimary, fontSize: 22, fontWeight: '700' },
+    screenSubtitle: { color: theme.text, fontSize: 13, marginTop: 2 },
+    card: {
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.cardBg,
+      marginBottom: 14,
+      overflow: 'hidden',
+    },
+    cardHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 16,
+      gap: 12,
+    },
+    emoji: { fontSize: 28 },
+    cardTitle: { color: theme.textPrimary, fontSize: 16, fontWeight: '600' },
+    durationRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 },
+    durationText: { color: theme.text, fontSize: 13 },
+    cardDescription: {
+      color: theme.text,
+      fontSize: 13,
+      lineHeight: 19,
+      paddingHorizontal: 16,
+      marginBottom: 12,
+    },
+    exerciseList: {
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      gap: 10,
+    },
+    exerciseRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 10,
+    },
+    exerciseIndex: {
+      color: theme.placeholder,
+      fontSize: 13,
+      fontWeight: '600',
+      width: 18,
+      textAlign: 'center',
+      marginTop: 1,
+    },
+    exerciseName: { color: theme.textPrimary, fontSize: 14, fontWeight: '500' },
+    exerciseNotes: { color: theme.text, fontSize: 12, marginTop: 1 },
+    exerciseDuration: { color: theme.primaryLight, fontSize: 13, fontWeight: '500' },
+  });
+}

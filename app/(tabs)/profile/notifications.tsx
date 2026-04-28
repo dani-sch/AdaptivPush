@@ -11,7 +11,7 @@ import {
   Smartphone,
   Sparkles,
 } from 'lucide-react-native';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -38,6 +38,8 @@ import {
   parseNotificationPreferences,
 } from '@/utils/profilePreferences';
 import { supabase } from '@/utils/supabase';
+import { useTheme } from '@/contexts/ThemeContext';
+import type { Theme } from '@/constants/themes';
 
 // 48 half-hour slots: "12:00 AM" … "11:30 PM"
 const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
@@ -59,28 +61,36 @@ type ToggleRowProps = {
   disabled?: boolean;
 };
 
-const ToggleRow = ({ label, hint, icon, value, onValueChange, disabled }: ToggleRowProps) => (
-  <View style={[styles.toggleRow, disabled && styles.rowDisabled]}>
-    <View style={styles.toggleLeft}>
-      <View style={styles.iconShell}>{icon}</View>
-      <View style={styles.toggleTextWrap}>
-        <Text style={styles.toggleLabel}>{label}</Text>
-        <Text style={styles.toggleHint}>{hint}</Text>
+const ToggleRow = ({ label, hint, icon, value, onValueChange, disabled }: ToggleRowProps) => {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
+  return (
+    <View style={[styles.toggleRow, disabled && styles.rowDisabled]}>
+      <View style={styles.toggleLeft}>
+        <View style={styles.iconShell}>{icon}</View>
+        <View style={styles.toggleTextWrap}>
+          <Text style={styles.toggleLabel}>{label}</Text>
+          <Text style={styles.toggleHint}>{hint}</Text>
+        </View>
       </View>
+      <Switch
+        value={value}
+        onValueChange={disabled ? undefined : onValueChange}
+        disabled={disabled}
+        trackColor={{ false: '#4f5568', true: theme.primary }}
+        thumbColor={theme.textPrimary}
+        ios_backgroundColor="#4f5568"
+      />
     </View>
-    <Switch
-      value={value}
-      onValueChange={disabled ? undefined : onValueChange}
-      disabled={disabled}
-      trackColor={{ false: '#4f5568', true: '#2f7cff' }}
-      thumbColor="#f4f6ff"
-      ios_backgroundColor="#4f5568"
-    />
-  </View>
-);
+  );
+};
 
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   const flatListRef = useRef<FlatList>(null);
 
   const [pushEnabled, setPushEnabled] = useState(DEFAULT_NOTIFICATION_PREFERENCES.pushEnabled);
@@ -475,261 +485,263 @@ export default function NotificationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#03040b',
-  },
-  scrollContent: {
-    paddingHorizontal: 18,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 18,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#2a2f41',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#131722',
-  },
-  headerTitle: {
-    color: '#f3f6ff',
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  headerSpacer: {
-    width: 44,
-    height: 44,
-  },
-  headlineCard: {
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#242a3b',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 18,
-  },
-  headlineIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    backgroundColor: '#25304a',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  headlineTextWrap: {
-    flex: 1,
-  },
-  headlineTitle: {
-    color: '#eff3ff',
-    fontSize: 17,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  headlineSubtitle: {
-    color: '#8f97ad',
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  sectionTitle: {
-    color: '#8b91a4',
-    fontSize: 14,
-    letterSpacing: 1,
-    marginBottom: 10,
-    textTransform: 'uppercase',
-  },
-  sectionCard: {
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#242a3b',
-    backgroundColor: '#121621',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 16,
-  },
-  toggleRow: {
-    minHeight: 76,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(95, 103, 124, 0.24)',
-  },
-  rowDisabled: {
-    opacity: 0.45,
-  },
-  toggleLeft: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingRight: 10,
-  },
-  iconShell: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#1a2133',
-    marginRight: 10,
-  },
-  toggleTextWrap: {
-    flex: 1,
-  },
-  toggleLabel: {
-    color: '#e7ebf8',
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  toggleHint: {
-    color: '#8d95ac',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  timeRow: {
-    minHeight: 58,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(95, 103, 124, 0.24)',
-  },
-  timeLabel: {
-    color: '#d6dbec',
-    fontSize: 15,
-  },
-  timeLabelDisabled: {
-    color: '#555b6e',
-  },
-  timeValueWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  timeValue: {
-    color: '#8d95ac',
-    fontSize: 14,
-  },
-  loadingRow: {
-    minHeight: 28,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  loadingText: {
-    color: '#98a1b8',
-    fontSize: 13,
-  },
-  errorFeedback: {
-    color: '#ff8088',
-    fontSize: 13,
-    marginBottom: 10,
-    marginLeft: 2,
-  },
-  saveFeedback: {
-    color: '#7ae4a7',
-    fontSize: 13,
-    marginBottom: 10,
-    marginLeft: 2,
-  },
-  saveButton: {
-    minHeight: 62,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#336de8',
-    backgroundColor: '#2b68f0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  saveButtonDisabled: {
-    opacity: 0.65,
-  },
-  saveButtonText: {
-    color: '#eef2ff',
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  pressed: {
-    opacity: 0.85,
-  },
-  // Time picker modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    justifyContent: 'flex-end',
-  },
-  pickerSheet: {
-    backgroundColor: '#0e1119',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    borderWidth: 1,
-    borderColor: '#242a3b',
-    maxHeight: 440,
-    paddingBottom: 24,
-  },
-  pickerHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#3a4156',
-    alignSelf: 'center',
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  pickerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1e2434',
-  },
-  pickerTitle: {
-    color: '#e6ebfc',
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  pickerDoneBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 10,
-    backgroundColor: '#1b3a8a',
-  },
-  pickerDoneText: {
-    color: '#7aaeff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  timeOption: {
-    height: ITEM_HEIGHT,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 22,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(60,70,95,0.3)',
-  },
-  timeOptionSelected: {
-    backgroundColor: 'rgba(43,104,240,0.10)',
-  },
-  timeOptionText: {
-    color: '#9ba5c0',
-    fontSize: 16,
-  },
-  timeOptionTextSelected: {
-    color: '#5b9bff',
-    fontWeight: '600',
-  },
-});
+function createStyles(theme: Theme) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: '#03040b',
+    },
+    scrollContent: {
+      paddingHorizontal: 18,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 18,
+    },
+    backButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: '#2a2f41',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#131722',
+    },
+    headerTitle: {
+      color: '#f3f6ff',
+      fontSize: 20,
+      fontWeight: '600',
+    },
+    headerSpacer: {
+      width: 44,
+      height: 44,
+    },
+    headlineCard: {
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: '#242a3b',
+      paddingHorizontal: 16,
+      paddingVertical: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 18,
+    },
+    headlineIconWrap: {
+      width: 48,
+      height: 48,
+      borderRadius: 16,
+      backgroundColor: '#25304a',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+    },
+    headlineTextWrap: {
+      flex: 1,
+    },
+    headlineTitle: {
+      color: '#eff3ff',
+      fontSize: 17,
+      fontWeight: '600',
+      marginBottom: 2,
+    },
+    headlineSubtitle: {
+      color: '#8f97ad',
+      fontSize: 13,
+      lineHeight: 19,
+    },
+    sectionTitle: {
+      color: '#8b91a4',
+      fontSize: 14,
+      letterSpacing: 1,
+      marginBottom: 10,
+      textTransform: 'uppercase',
+    },
+    sectionCard: {
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: '#242a3b',
+      backgroundColor: '#121621',
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      marginBottom: 16,
+    },
+    toggleRow: {
+      minHeight: 76,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(95, 103, 124, 0.24)',
+    },
+    rowDisabled: {
+      opacity: 0.45,
+    },
+    toggleLeft: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingRight: 10,
+    },
+    iconShell: {
+      width: 36,
+      height: 36,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#1a2133',
+      marginRight: 10,
+    },
+    toggleTextWrap: {
+      flex: 1,
+    },
+    toggleLabel: {
+      color: '#e7ebf8',
+      fontSize: 15,
+      fontWeight: '500',
+    },
+    toggleHint: {
+      color: '#8d95ac',
+      fontSize: 12,
+      marginTop: 2,
+    },
+    timeRow: {
+      minHeight: 58,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(95, 103, 124, 0.24)',
+    },
+    timeLabel: {
+      color: '#d6dbec',
+      fontSize: 15,
+    },
+    timeLabelDisabled: {
+      color: '#555b6e',
+    },
+    timeValueWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    timeValue: {
+      color: '#8d95ac',
+      fontSize: 14,
+    },
+    loadingRow: {
+      minHeight: 28,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 8,
+    },
+    loadingText: {
+      color: '#98a1b8',
+      fontSize: 13,
+    },
+    errorFeedback: {
+      color: '#ff8088',
+      fontSize: 13,
+      marginBottom: 10,
+      marginLeft: 2,
+    },
+    saveFeedback: {
+      color: '#7ae4a7',
+      fontSize: 13,
+      marginBottom: 10,
+      marginLeft: 2,
+    },
+    saveButton: {
+      minHeight: 62,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: '#336de8',
+      backgroundColor: '#2b68f0',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    saveButtonDisabled: {
+      opacity: 0.65,
+    },
+    saveButtonText: {
+      color: '#eef2ff',
+      fontSize: 17,
+      fontWeight: '600',
+    },
+    pressed: {
+      opacity: 0.85,
+    },
+    // Time picker modal
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.65)',
+      justifyContent: 'flex-end',
+    },
+    pickerSheet: {
+      backgroundColor: '#0e1119',
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      borderWidth: 1,
+      borderColor: '#242a3b',
+      maxHeight: 440,
+      paddingBottom: 24,
+    },
+    pickerHandle: {
+      width: 36,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: '#3a4156',
+      alignSelf: 'center',
+      marginTop: 12,
+      marginBottom: 4,
+    },
+    pickerHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: '#1e2434',
+    },
+    pickerTitle: {
+      color: '#e6ebfc',
+      fontSize: 17,
+      fontWeight: '600',
+    },
+    pickerDoneBtn: {
+      paddingHorizontal: 14,
+      paddingVertical: 6,
+      borderRadius: 10,
+      backgroundColor: '#1b3a8a',
+    },
+    pickerDoneText: {
+      color: '#7aaeff',
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    timeOption: {
+      height: ITEM_HEIGHT,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 22,
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(60,70,95,0.3)',
+    },
+    timeOptionSelected: {
+      backgroundColor: 'rgba(43,104,240,0.10)',
+    },
+    timeOptionText: {
+      color: '#9ba5c0',
+      fontSize: 16,
+    },
+    timeOptionTextSelected: {
+      color: '#5b9bff',
+      fontWeight: '600',
+    },
+  });
+}

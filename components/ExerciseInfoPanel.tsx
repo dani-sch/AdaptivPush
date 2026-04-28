@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
-import { BORDER_COLOR, MUTED_BG, TEXT_COLOR } from '@/constants/colors';
+import { useTheme } from '@/contexts/ThemeContext';
+import type { Theme } from '@/constants/themes';
 
 interface Props {
     imageUrl?: string;
@@ -8,6 +9,9 @@ interface Props {
 }
 
 export function ExerciseInfoPanel({ imageUrl, description }: Props) {
+    const { theme } = useTheme();
+    const styles = useMemo(() => createStyles(theme), [theme]);
+
     if (!imageUrl && !description) return null;
 
     return (
@@ -26,28 +30,30 @@ export function ExerciseInfoPanel({ imageUrl, description }: Props) {
     );
 }
 
-const styles = StyleSheet.create({
-    panel: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        gap: 12,
-        paddingTop: 10,
-        paddingBottom: 4,
-        marginTop: 8,
-        borderTopWidth: 1,
-        borderTopColor: BORDER_COLOR,
-    },
-    image: {
-        width: 90,
-        height: 90,
-        borderRadius: 8,
-        backgroundColor: MUTED_BG,
-        flexShrink: 0,
-    },
-    description: {
-        flex: 1,
-        color: TEXT_COLOR,
-        fontSize: 12,
-        lineHeight: 18,
-    },
-});
+function createStyles(theme: Theme) {
+    return StyleSheet.create({
+        panel: {
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            gap: 12,
+            paddingTop: 10,
+            paddingBottom: 4,
+            marginTop: 8,
+            borderTopWidth: 1,
+            borderTopColor: theme.border,
+        },
+        image: {
+            width: 90,
+            height: 90,
+            borderRadius: 8,
+            backgroundColor: theme.mutedBg,
+            flexShrink: 0,
+        },
+        description: {
+            flex: 1,
+            color: theme.text,
+            fontSize: 12,
+            lineHeight: 18,
+        },
+    });
+}

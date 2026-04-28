@@ -9,12 +9,14 @@ import {
   LifeBuoy,
   MessageCircle,
 } from 'lucide-react-native';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { mergeUserMetadata } from '@/utils/profilePreferences';
 import { supabase } from '@/utils/supabase';
+import { useTheme } from '@/contexts/ThemeContext';
+import type { Theme } from '@/constants/themes';
 
 type SupportActionProps = {
   icon: ReactNode;
@@ -31,6 +33,9 @@ const SupportAction = ({
   disabled = false,
   onPress,
 }: SupportActionProps) => {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   return (
     <Pressable
       disabled={disabled}
@@ -55,6 +60,9 @@ type FaqItemProps = {
 };
 
 const FaqItem = ({ question, answer }: FaqItemProps) => {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   return (
     <View style={styles.faqItem}>
       <Text style={styles.faqQuestion}>{question}</Text>
@@ -65,6 +73,9 @@ const FaqItem = ({ question, answer }: FaqItemProps) => {
 
 export default function HelpSupportScreen() {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   const [activeRequest, setActiveRequest] = useState<'contact' | 'bug' | 'feature' | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -152,7 +163,7 @@ export default function HelpSupportScreen() {
             <LifeBuoy color="#dce4ff" size={23} />
           </View>
           <View style={styles.heroTextWrap}>
-            <Text style={styles.heroTitle}>We’ve Got You</Text>
+            <Text style={styles.heroTitle}>We've Got You</Text>
             <Text style={styles.heroSubtitle}>
               Reach support, report issues, or browse common answers in one place.
             </Text>
@@ -205,7 +216,7 @@ export default function HelpSupportScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
           <Pressable onPress={() => router.push('/faq')} hitSlop={8}>
-            <Text style={{ color: '#2f7cff', fontSize: 13, fontWeight: '600' }}>View all →</Text>
+            <Text style={{ color: theme.primary, fontSize: 13, fontWeight: '600' }}>View all →</Text>
           </Pressable>
         </View>
         <View style={styles.sectionCard}>
@@ -227,191 +238,193 @@ export default function HelpSupportScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#03040b',
-  },
-  scrollContent: {
-    paddingHorizontal: 18,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 18,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#2a2f41',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#131722',
-  },
-  headerTitle: {
-    color: '#f3f6ff',
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  headerSpacer: {
-    width: 44,
-    height: 44,
-  },
-  heroCard: {
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#242a3b',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 18,
-  },
-  heroIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    backgroundColor: '#25304a',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  heroTextWrap: {
-    flex: 1,
-  },
-  heroTitle: {
-    color: '#eff3ff',
-    fontSize: 17,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  heroSubtitle: {
-    color: '#8f97ad',
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  sectionTitle: {
-    color: '#8b91a4',
-    fontSize: 14,
-    letterSpacing: 1,
-    marginBottom: 10,
-    textTransform: 'uppercase',
-  },
-  sectionCard: {
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#242a3b',
-    backgroundColor: '#121621',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 16,
-  },
-  actionRow: {
-    minHeight: 74,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(95, 103, 124, 0.24)',
-  },
-  actionRowDisabled: {
-    opacity: 0.65,
-  },
-  actionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    paddingRight: 10,
-  },
-  iconShell: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#1a2133',
-    marginRight: 10,
-  },
-  actionTextWrap: {
-    flex: 1,
-  },
-  actionTitle: {
-    color: '#e7ebf8',
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  actionDescription: {
-    color: '#8d95ac',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  loadingRow: {
-    minHeight: 28,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  loadingText: {
-    color: '#98a1b8',
-    fontSize: 13,
-  },
-  errorFeedback: {
-    color: '#ff8088',
-    fontSize: 13,
-    marginBottom: 8,
-    marginLeft: 2,
-  },
-  successFeedback: {
-    color: '#7ae4a7',
-    fontSize: 13,
-    marginBottom: 12,
-    marginLeft: 2,
-  },
-  hoursCard: {
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#264e88',
-    backgroundColor: '#11213f',
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    marginBottom: 16,
-  },
-  hoursRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 6,
-  },
-  hoursText: {
-    color: '#d7e6ff',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  hoursCaption: {
-    color: '#9cb8e4',
-    fontSize: 12,
-  },
-  faqItem: {
-    paddingVertical: 11,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(95, 103, 124, 0.24)',
-  },
-  faqQuestion: {
-    color: '#e7ebf8',
-    fontSize: 15,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  faqAnswer: {
-    color: '#8d95ac',
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  pressed: {
-    opacity: 0.85,
-  },
-});
+function createStyles(theme: Theme) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: '#03040b',
+    },
+    scrollContent: {
+      paddingHorizontal: 18,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 18,
+    },
+    backButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: '#2a2f41',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#131722',
+    },
+    headerTitle: {
+      color: '#f3f6ff',
+      fontSize: 20,
+      fontWeight: '600',
+    },
+    headerSpacer: {
+      width: 44,
+      height: 44,
+    },
+    heroCard: {
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: '#242a3b',
+      paddingHorizontal: 16,
+      paddingVertical: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 18,
+    },
+    heroIconWrap: {
+      width: 48,
+      height: 48,
+      borderRadius: 16,
+      backgroundColor: '#25304a',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+    },
+    heroTextWrap: {
+      flex: 1,
+    },
+    heroTitle: {
+      color: '#eff3ff',
+      fontSize: 17,
+      fontWeight: '600',
+      marginBottom: 2,
+    },
+    heroSubtitle: {
+      color: '#8f97ad',
+      fontSize: 13,
+      lineHeight: 19,
+    },
+    sectionTitle: {
+      color: '#8b91a4',
+      fontSize: 14,
+      letterSpacing: 1,
+      marginBottom: 10,
+      textTransform: 'uppercase',
+    },
+    sectionCard: {
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: '#242a3b',
+      backgroundColor: '#121621',
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      marginBottom: 16,
+    },
+    actionRow: {
+      minHeight: 74,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(95, 103, 124, 0.24)',
+    },
+    actionRowDisabled: {
+      opacity: 0.65,
+    },
+    actionLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+      paddingRight: 10,
+    },
+    iconShell: {
+      width: 36,
+      height: 36,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#1a2133',
+      marginRight: 10,
+    },
+    actionTextWrap: {
+      flex: 1,
+    },
+    actionTitle: {
+      color: '#e7ebf8',
+      fontSize: 15,
+      fontWeight: '500',
+    },
+    actionDescription: {
+      color: '#8d95ac',
+      fontSize: 12,
+      marginTop: 2,
+    },
+    loadingRow: {
+      minHeight: 28,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 8,
+    },
+    loadingText: {
+      color: '#98a1b8',
+      fontSize: 13,
+    },
+    errorFeedback: {
+      color: '#ff8088',
+      fontSize: 13,
+      marginBottom: 8,
+      marginLeft: 2,
+    },
+    successFeedback: {
+      color: '#7ae4a7',
+      fontSize: 13,
+      marginBottom: 12,
+      marginLeft: 2,
+    },
+    hoursCard: {
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: '#264e88',
+      backgroundColor: '#11213f',
+      paddingHorizontal: 14,
+      paddingVertical: 14,
+      marginBottom: 16,
+    },
+    hoursRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 6,
+    },
+    hoursText: {
+      color: '#d7e6ff',
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    hoursCaption: {
+      color: '#9cb8e4',
+      fontSize: 12,
+    },
+    faqItem: {
+      paddingVertical: 11,
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(95, 103, 124, 0.24)',
+    },
+    faqQuestion: {
+      color: '#e7ebf8',
+      fontSize: 15,
+      fontWeight: '500',
+      marginBottom: 4,
+    },
+    faqAnswer: {
+      color: '#8d95ac',
+      fontSize: 13,
+      lineHeight: 19,
+    },
+    pressed: {
+      opacity: 0.85,
+    },
+  });
+}

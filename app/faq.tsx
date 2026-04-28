@@ -1,9 +1,12 @@
 import { router } from 'expo-router';
 import { ArrowLeft, ChevronDown } from 'lucide-react-native';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { useTheme } from '@/contexts/ThemeContext';
+import type { Theme } from '@/constants/themes';
 
 /* ─── FAQ Data ─────────────────────────────────────────────────────── */
 
@@ -99,6 +102,8 @@ const FAQ_DATA: FaqCategory[] = [
 
 const AccordionItem = ({ q, a }: { q: string; a: string }) => {
   const [open, setOpen] = useState(false);
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   return (
     <Pressable onPress={() => setOpen((p) => !p)} style={styles.faqItem}>
@@ -121,6 +126,8 @@ const AccordionItem = ({ q, a }: { q: string; a: string }) => {
 
 export default function FaqScreen() {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   return (
     <View style={styles.container}>
@@ -134,7 +141,7 @@ export default function FaqScreen() {
         {/* Header */}
         <View style={styles.headerRow}>
           <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
-            <ArrowLeft color="#f4f6ff" size={22} />
+            <ArrowLeft color={theme.textPrimary} size={22} />
           </Pressable>
           <Text style={styles.screenTitle}>FAQs</Text>
         </View>
@@ -159,77 +166,79 @@ export default function FaqScreen() {
 
 /* ─── Styles ───────────────────────────────────────────────────────── */
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#03040b',
-  },
-  scrollContent: {
-    paddingHorizontal: 18,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    marginBottom: 24,
-  },
-  backBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#181b26',
-    borderWidth: 1,
-    borderColor: '#242a3b',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  screenTitle: {
-    color: '#f4f6ff',
-    fontSize: 22,
-    fontWeight: '700',
-  },
-  categoryWrap: {
-    marginBottom: 20,
-  },
-  categoryTitle: {
-    color: '#696f82',
-    fontSize: 13,
-    letterSpacing: 1.2,
-    fontWeight: '600',
-    marginBottom: 10,
-  },
-  sectionCard: {
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#242a3b',
-    backgroundColor: '#121621',
-    overflow: 'hidden',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#242a3b',
-    marginHorizontal: 14,
-  },
-  faqItem: {
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-  },
-  faqHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  faqQuestion: {
-    color: '#e7ebf8',
-    fontSize: 15,
-    fontWeight: '500',
-    flex: 1,
-  },
-  faqAnswer: {
-    color: '#8d95ac',
-    fontSize: 13,
-    lineHeight: 19,
-    marginTop: 10,
-  },
-});
+function createStyles(theme: Theme) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: '#03040b',
+    },
+    scrollContent: {
+      paddingHorizontal: 18,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
+      marginBottom: 24,
+    },
+    backBtn: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      backgroundColor: theme.background,
+      borderWidth: 1,
+      borderColor: '#242a3b',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    screenTitle: {
+      color: theme.textPrimary,
+      fontSize: 22,
+      fontWeight: '700',
+    },
+    categoryWrap: {
+      marginBottom: 20,
+    },
+    categoryTitle: {
+      color: '#696f82',
+      fontSize: 13,
+      letterSpacing: 1.2,
+      fontWeight: '600',
+      marginBottom: 10,
+    },
+    sectionCard: {
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: '#242a3b',
+      backgroundColor: '#121621',
+      overflow: 'hidden',
+    },
+    divider: {
+      height: 1,
+      backgroundColor: '#242a3b',
+      marginHorizontal: 14,
+    },
+    faqItem: {
+      paddingHorizontal: 14,
+      paddingVertical: 14,
+    },
+    faqHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 10,
+    },
+    faqQuestion: {
+      color: '#e7ebf8',
+      fontSize: 15,
+      fontWeight: '500',
+      flex: 1,
+    },
+    faqAnswer: {
+      color: '#8d95ac',
+      fontSize: 13,
+      lineHeight: 19,
+      marginTop: 10,
+    },
+  });
+}

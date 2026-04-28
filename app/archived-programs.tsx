@@ -1,17 +1,11 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Archive } from 'lucide-react-native';
 
 import { supabase } from '@/utils/supabase';
-import {
-    BACKGROUND_COLOR_DARK,
-    BORDER_COLOR,
-    CARD_BG,
-    PLACEHOLDER_TEXT,
-    TEXT_COLOR,
-    WHITE,
-} from '@/constants/colors';
+import { useTheme } from '@/contexts/ThemeContext';
+import type { Theme } from '@/constants/themes';
 
 type ArchivedProgram = {
     id: string;
@@ -33,6 +27,9 @@ function formatDate(value: string | null) {
 
 export default function ArchivedProgramsScreen() {
     const router = useRouter();
+    const { theme } = useTheme();
+    const styles = useMemo(() => createStyles(theme), [theme]);
+
     const [programs, setPrograms] = useState<ArchivedProgram[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -139,7 +136,7 @@ export default function ArchivedProgramsScreen() {
                         onPress={() => router.back()}
                         style={({ pressed }) => [styles.iconButton, pressed && { opacity: 0.8 }]}
                     >
-                        <ChevronLeft size={20} color={WHITE} />
+                        <ChevronLeft size={20} color={theme.textPrimary} />
                     </Pressable>
 
                     <Text style={styles.title}>Archived Programs</Text>
@@ -154,12 +151,12 @@ export default function ArchivedProgramsScreen() {
 
                 {loading ? (
                     <View style={styles.emptyState}>
-                        <ActivityIndicator color={WHITE} />
+                        <ActivityIndicator color={theme.textPrimary} />
                         <Text style={styles.emptyText}>Loading archived programs...</Text>
                     </View>
                 ) : programs.length === 0 ? (
                     <View style={styles.emptyState}>
-                        <Archive size={22} color={PLACEHOLDER_TEXT} />
+                        <Archive size={22} color={theme.placeholder} />
                         <Text style={styles.emptyTitle}>No archived programs yet</Text>
                         <Text style={styles.emptyText}>Programs you end will show up here.</Text>
                     </View>
@@ -204,118 +201,120 @@ export default function ArchivedProgramsScreen() {
     );
 }
 
-const styles = StyleSheet.create({
-    safeArea: {
-        flex: 1,
-        backgroundColor: BACKGROUND_COLOR_DARK,
-    },
-    container: {
-        flex: 1,
-        backgroundColor: BACKGROUND_COLOR_DARK,
-        paddingHorizontal: 16,
-        paddingTop: 8,
-    },
-    headerRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 14,
-        gap: 10,
-    },
-    iconButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: CARD_BG,
-    },
-    title: {
-        flex: 1,
-        fontSize: 22,
-        fontWeight: '800',
-        color: WHITE,
-    },
-    refreshButton: {
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-        backgroundColor: CARD_BG,
-    },
-    refreshText: {
-        color: WHITE,
-        fontWeight: '600',
-    },
-    listContent: {
-        paddingBottom: 30,
-    },
-    card: {
-        backgroundColor: CARD_BG,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-        padding: 14,
-        marginBottom: 12,
-    },
-    cardTitle: {
-        color: WHITE,
-        fontSize: 17,
-        fontWeight: '700',
-        marginBottom: 4,
-    },
-    cardGoal: {
-        color: TEXT_COLOR,
-        fontSize: 14,
-        marginBottom: 12,
-    },
-    metaRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 4,
-    },
-    metaLabel: {
-        color: PLACEHOLDER_TEXT,
-        fontSize: 13,
-    },
-    metaValue: {
-        color: WHITE,
-        fontSize: 13,
-        fontWeight: '600',
-    },
-    restoreBtn: {
-        marginTop: 14,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-        backgroundColor: CARD_BG,
-        paddingVertical: 10,
-        alignItems: 'center',
-    },
-    restoreBtnText: {
-        color: WHITE,
-        fontSize: 14,
-        fontWeight: '700',
-    },
-    emptyState: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        paddingHorizontal: 24,
-    },
-    emptyTitle: {
-        color: WHITE,
-        fontSize: 18,
-        fontWeight: '700',
-        marginTop: 4,
-    },
-    emptyText: {
-        color: PLACEHOLDER_TEXT,
-        fontSize: 14,
-        textAlign: 'center',
-    },
-});
+function createStyles(theme: Theme) {
+    return StyleSheet.create({
+        safeArea: {
+            flex: 1,
+            backgroundColor: theme.backgroundDark,
+        },
+        container: {
+            flex: 1,
+            backgroundColor: theme.backgroundDark,
+            paddingHorizontal: 16,
+            paddingTop: 8,
+        },
+        headerRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginBottom: 14,
+            gap: 10,
+        },
+        iconButton: {
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            borderWidth: 1,
+            borderColor: theme.border,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: theme.cardBg,
+        },
+        title: {
+            flex: 1,
+            fontSize: 22,
+            fontWeight: '800',
+            color: theme.textPrimary,
+        },
+        refreshButton: {
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: theme.border,
+            backgroundColor: theme.cardBg,
+        },
+        refreshText: {
+            color: theme.textPrimary,
+            fontWeight: '600',
+        },
+        listContent: {
+            paddingBottom: 30,
+        },
+        card: {
+            backgroundColor: theme.cardBg,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: theme.border,
+            padding: 14,
+            marginBottom: 12,
+        },
+        cardTitle: {
+            color: theme.textPrimary,
+            fontSize: 17,
+            fontWeight: '700',
+            marginBottom: 4,
+        },
+        cardGoal: {
+            color: theme.text,
+            fontSize: 14,
+            marginBottom: 12,
+        },
+        metaRow: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingVertical: 4,
+        },
+        metaLabel: {
+            color: theme.placeholder,
+            fontSize: 13,
+        },
+        metaValue: {
+            color: theme.textPrimary,
+            fontSize: 13,
+            fontWeight: '600',
+        },
+        restoreBtn: {
+            marginTop: 14,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: theme.border,
+            backgroundColor: theme.cardBg,
+            paddingVertical: 10,
+            alignItems: 'center',
+        },
+        restoreBtnText: {
+            color: theme.textPrimary,
+            fontSize: 14,
+            fontWeight: '700',
+        },
+        emptyState: {
+            flex: 1,
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            paddingHorizontal: 24,
+        },
+        emptyTitle: {
+            color: theme.textPrimary,
+            fontSize: 18,
+            fontWeight: '700',
+            marginTop: 4,
+        },
+        emptyText: {
+            color: theme.placeholder,
+            fontSize: 14,
+            textAlign: 'center',
+        },
+    });
+}

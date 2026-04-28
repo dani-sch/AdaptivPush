@@ -24,15 +24,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import ExerciseCard, { Exercise, WorkoutSet } from "../components/ExerciseCard";
-import {
-    BACKGROUND_COLOR_DARK,
-    BORDER_COLOR,
-    CARD_BG,
-    MUTED_BG,
-    PRIMARY_COLOR,
-    TEXT_COLOR,
-    WHITE,
-} from "../constants/colors";
+import { useTheme } from "@/contexts/ThemeContext";
+import type { Theme } from "@/constants/themes";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -119,6 +112,7 @@ const FinishModal: React.FC<{
   saving: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  styles: ReturnType<typeof createStyles>;
 }> = ({
   visible,
   elapsed,
@@ -127,6 +121,7 @@ const FinishModal: React.FC<{
   saving,
   onConfirm,
   onCancel,
+  styles,
 }) => (
   <Modal
     visible={visible}
@@ -174,6 +169,8 @@ const FinishModal: React.FC<{
 export default function NextWorkoutScreen() {
   const { workoutId } = useLocalSearchParams<{ workoutId?: string }>();
   const { program, loading, applyProgressionToNextWeek } = useCurrentProgram();
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   // Find the matching workout day; fall back to first in current week
   const programWorkout = workoutId
@@ -492,7 +489,7 @@ export default function NextWorkoutScreen() {
     return (
       <SafeAreaView style={styles.safeArea} edges={["top"]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={PRIMARY_COLOR} />
+          <ActivityIndicator size="large" color={theme.primary} />
           <Text style={styles.loadingText}>Loading workout…</Text>
         </View>
       </SafeAreaView>
@@ -515,7 +512,7 @@ export default function NextWorkoutScreen() {
             onPress={() => router.back()}
             hitSlop={8}
           >
-            <Ionicons name="chevron-back" size={24} color={WHITE} />
+            <Ionicons name="chevron-back" size={24} color={theme.textPrimary} />
           </Pressable>
           <View style={styles.headerCenter}>
             <Text style={styles.headerTitle}>{workoutName}</Text>
@@ -578,7 +575,7 @@ export default function NextWorkoutScreen() {
 
         {/* Floating timer */}
         <View style={styles.timerBubble} pointerEvents="none">
-          <Ionicons name="timer-outline" size={14} color={TEXT_COLOR} />
+          <Ionicons name="timer-outline" size={14} color={theme.text} />
           <Text style={styles.timerText}>{formatTime(elapsed)}</Text>
         </View>
       </KeyboardAvoidingView>
@@ -591,6 +588,7 @@ export default function NextWorkoutScreen() {
         saving={saving}
         onConfirm={handleFinish}
         onCancel={() => setShowFinishModal(false)}
+        styles={styles}
       />
 
       {/* PR Celebration Modal */}
@@ -610,7 +608,7 @@ export default function NextWorkoutScreen() {
             </View>
             <Pressable
               style={({ pressed }) => [{
-                backgroundColor: PRIMARY_COLOR,
+                backgroundColor: theme.primary,
                 borderRadius: 14,
                 paddingVertical: 14,
                 alignItems: "center",
@@ -672,7 +670,7 @@ export default function NextWorkoutScreen() {
       {/* Saving overlay */}
       {saving && (
         <View style={styles.savingOverlay}>
-          <ActivityIndicator size="large" color={PRIMARY_COLOR} />
+          <ActivityIndicator size="large" color={theme.primary} />
           <Text style={styles.savingText}>Saving workout…</Text>
         </View>
       )}
@@ -682,182 +680,184 @@ export default function NextWorkoutScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: BACKGROUND_COLOR_DARK,
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 16,
-  },
-  loadingText: {
-    color: TEXT_COLOR,
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: MUTED_BG,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: "center",
-  },
-  headerTitle: {
-    color: WHITE,
-    fontSize: 18,
-    fontWeight: "700",
-  },
-  headerSubtitle: {
-    color: TEXT_COLOR,
-    fontSize: 13,
-    fontWeight: "500",
-    marginTop: 2,
-  },
-  headerRight: {
-    width: 36,
-  },
-  progressBarTrack: {
-    height: 3,
-    backgroundColor: BORDER_COLOR,
-    marginHorizontal: 16,
-    borderRadius: 2,
-    marginBottom: 8,
-  },
-  progressBarFill: {
-    height: 3,
-    backgroundColor: PRIMARY_COLOR,
-    borderRadius: 2,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 120,
-  },
-  finishButton: {
-    backgroundColor: PRIMARY_COLOR,
-    borderRadius: 18,
-    paddingVertical: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 8,
-  },
-  finishButtonText: {
-    color: WHITE,
-    fontSize: 17,
-    fontWeight: "700",
-  },
-  timerBubble: {
-    position: "absolute",
-    bottom: 32,
-    right: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: CARD_BG,
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: BORDER_COLOR,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 6,
-  },
-  timerText: {
-    color: WHITE,
-    fontSize: 15,
-    fontWeight: "700",
-    fontVariant: ["tabular-nums"],
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.85)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-  },
-  modalContainer: {
-    backgroundColor: CARD_BG,
-    borderRadius: 24,
-    padding: 28,
-    width: "100%",
-    borderWidth: 1,
-    borderColor: BORDER_COLOR,
-  },
-  modalTitle: {
-    color: WHITE,
-    fontSize: 22,
-    fontWeight: "700",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  modalBody: {
-    color: TEXT_COLOR,
-    fontSize: 15,
-    fontWeight: "500",
-    textAlign: "center",
-    marginBottom: 28,
-  },
-  modalButtons: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  modalCancel: {
-    flex: 1,
-    backgroundColor: MUTED_BG,
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: BORDER_COLOR,
-  },
-  modalCancelText: {
-    color: WHITE,
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  modalConfirm: {
-    flex: 1,
-    backgroundColor: PRIMARY_COLOR,
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  modalConfirmText: {
-    color: WHITE,
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  savingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.75)",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 16,
-    zIndex: 999,
-  },
-  savingText: {
-    color: WHITE,
-    fontSize: 16,
-    fontWeight: "600",
-  },
-});
+function createStyles(theme: Theme) {
+  return StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: theme.backgroundDark,
+    },
+    loadingContainer: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 16,
+    },
+    loadingText: {
+      color: theme.text,
+      fontSize: 16,
+      fontWeight: "500",
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    backButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: theme.mutedBg,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    headerCenter: {
+      flex: 1,
+      alignItems: "center",
+    },
+    headerTitle: {
+      color: theme.textPrimary,
+      fontSize: 18,
+      fontWeight: "700",
+    },
+    headerSubtitle: {
+      color: theme.text,
+      fontSize: 13,
+      fontWeight: "500",
+      marginTop: 2,
+    },
+    headerRight: {
+      width: 36,
+    },
+    progressBarTrack: {
+      height: 3,
+      backgroundColor: theme.border,
+      marginHorizontal: 16,
+      borderRadius: 2,
+      marginBottom: 8,
+    },
+    progressBarFill: {
+      height: 3,
+      backgroundColor: theme.primary,
+      borderRadius: 2,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingHorizontal: 16,
+      paddingTop: 8,
+      paddingBottom: 120,
+    },
+    finishButton: {
+      backgroundColor: theme.primary,
+      borderRadius: 18,
+      paddingVertical: 16,
+      alignItems: "center",
+      justifyContent: "center",
+      marginTop: 8,
+    },
+    finishButtonText: {
+      color: theme.white,
+      fontSize: 17,
+      fontWeight: "700",
+    },
+    timerBubble: {
+      position: "absolute",
+      bottom: 32,
+      right: 20,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      backgroundColor: theme.cardBg,
+      borderRadius: 20,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderWidth: 1,
+      borderColor: theme.border,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 6,
+      elevation: 6,
+    },
+    timerText: {
+      color: theme.textPrimary,
+      fontSize: 15,
+      fontWeight: "700",
+      fontVariant: ["tabular-nums"],
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.85)",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 24,
+    },
+    modalContainer: {
+      backgroundColor: theme.cardBg,
+      borderRadius: 24,
+      padding: 28,
+      width: "100%",
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    modalTitle: {
+      color: theme.textPrimary,
+      fontSize: 22,
+      fontWeight: "700",
+      marginBottom: 8,
+      textAlign: "center",
+    },
+    modalBody: {
+      color: theme.text,
+      fontSize: 15,
+      fontWeight: "500",
+      textAlign: "center",
+      marginBottom: 28,
+    },
+    modalButtons: {
+      flexDirection: "row",
+      gap: 12,
+    },
+    modalCancel: {
+      flex: 1,
+      backgroundColor: theme.mutedBg,
+      borderRadius: 14,
+      paddingVertical: 14,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    modalCancelText: {
+      color: theme.textPrimary,
+      fontSize: 16,
+      fontWeight: "600",
+    },
+    modalConfirm: {
+      flex: 1,
+      backgroundColor: theme.primary,
+      borderRadius: 14,
+      paddingVertical: 14,
+      alignItems: "center",
+    },
+    modalConfirmText: {
+      color: theme.white,
+      fontSize: 16,
+      fontWeight: "700",
+    },
+    savingOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: "rgba(0,0,0,0.75)",
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 16,
+      zIndex: 999,
+    },
+    savingText: {
+      color: theme.textPrimary,
+      fontSize: 16,
+      fontWeight: "600",
+    },
+  });
+}

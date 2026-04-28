@@ -3,21 +3,17 @@ import { supabase } from '@/utils/supabase';
 import { GenerateProgramModal } from '@/components/GenerateProgramModal';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Keyboard, KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Dropdown } from 'react-native-element-dropdown';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import {
-    BACKGROUND_COLOR,
-    BACKGROUND_COLOR_DARK,
-    BORDER_COLOR,
-    PLACEHOLDER_TEXT,
-    PRIMARY_COLOR,
-    TEXT_COLOR,
-    WHITE
-} from '../../constants/colors';
+import { useTheme } from '@/contexts/ThemeContext';
+import type { Theme } from '@/constants/themes';
 
 export default function QSetupPage() {
+    const { theme } = useTheme();
+    const styles = useMemo(() => createStyles(theme), [theme]);
+
     const [dateOfBirth, setDateOfBirth] = useState('');
     const [sexAssigned, setSexAssigned] = useState('');
     const [genderIdentity, setGenderIdentity] = useState('');
@@ -73,14 +69,14 @@ export default function QSetupPage() {
     const handleContinue = async () => {
         console.log('[Quick Setup] Continue pressed');
         console.log('[Quick Setup] Current state:', { dateOfBirth, sexAssigned, experienceLevel, weight, weightUnit, genderIdentity, healthKitConnected });
-        
+
         // Validate required fields
         if (!dateOfBirth || !sexAssigned || !experienceLevel) {
             console.log('[Quick Setup] Validation failed: missing required fields');
-            console.log('[Quick Setup] Missing:', { 
-                dateOfBirth: !dateOfBirth, 
-                sexAssigned: !sexAssigned, 
-                experienceLevel: !experienceLevel 
+            console.log('[Quick Setup] Missing:', {
+                dateOfBirth: !dateOfBirth,
+                sexAssigned: !sexAssigned,
+                experienceLevel: !experienceLevel
             });
             return;
         }
@@ -99,25 +95,25 @@ export default function QSetupPage() {
         }
 
         try {
-            // Get current user session 
+            // Get current user session
             let userId: string | null = null;
-            
-            // try getSession 
+
+            // try getSession
             const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-            
+
             if (session?.user) {
                 userId = session.user.id;
                 console.log('[Quick Setup] User authenticated via getSession:', userId);
             } else {
                 //  Try getUser as fallback
                 const { data: { user }, error: authError } = await supabase.auth.getUser();
-                
+
                 if (user) {
                     userId = user.id;
                     console.log('[Quick Setup] User authenticated via getUser:', userId);
                 } else {
-                    // DEV MODE: Use hardcoded user ID for testing 
-                
+                    // DEV MODE: Use hardcoded user ID for testing
+
                     userId = 'e3f19ef7-9cac-4436-9f15-97fb6d469eba';
                     console.log('[Quick Setup]  DEV MODE: Using hardcoded user_id for testing:', userId);
                     console.log('[Quick Setup] Auth error - session:', sessionError?.message, 'user:', authError?.message);
@@ -135,7 +131,7 @@ export default function QSetupPage() {
                 weightLb = weightUnit === 'kg' ? kgToLb(weightNum) : weightNum;
             }
 
-            
+
             const payload = {
                 date_of_birth: parsedDate,
                 sex_assigned_at_birth: sexAssigned,
@@ -165,7 +161,7 @@ export default function QSetupPage() {
 
             console.log('[Quick Setup] Success! Profile updated');
             console.log('[Quick Setup] Updated data:', data);
-            
+
             setShowGenModal(true);
         } catch (e: any) {
             console.log('[Quick Setup] Unexpected error:', e?.message ?? e);
@@ -212,7 +208,7 @@ export default function QSetupPage() {
                         <View style={styles.healthCard}>
                             <View style={styles.healthCardHeader}>
                                 <View style={styles.healthIconContainer}>
-                                    <SymbolView name="heart.fill" size={24} tintColor={WHITE} />
+                                    <SymbolView name="heart.fill" size={24} tintColor={theme.white} />
                                 </View>
                                 <View style={styles.healthTextContainer}>
                                     <Text style={styles.healthCardTitle}>Connect Apple Health</Text>
@@ -247,11 +243,11 @@ export default function QSetupPage() {
                                 value={dateOfBirth}
                                 onChangeText={setDateOfBirth}
                                 placeholder="mm/dd/yyyy"
-                                placeholderTextColor={PLACEHOLDER_TEXT}
+                                placeholderTextColor={theme.placeholder}
                                 style={styles.input}
                                 keyboardType="numbers-and-punctuation"
                             />
-                            <SymbolView name="calendar" size={20} tintColor={PLACEHOLDER_TEXT} style={styles.inputIcon} />
+                            <SymbolView name="calendar" size={20} tintColor={theme.placeholder} style={styles.inputIcon} />
                         </View>
 
                         {/* Sex assigned at birth */}
@@ -269,9 +265,9 @@ export default function QSetupPage() {
                             selectedTextStyle={styles.dropdownSelectedText}
                             placeholderStyle={styles.dropdownPlaceholder}
                             renderRightIcon={() => (
-                                <SymbolView name="chevron.down" size={16} tintColor={PLACEHOLDER_TEXT} />
+                                <SymbolView name="chevron.down" size={16} tintColor={theme.placeholder} />
                             )}
-                            activeColor={BORDER_COLOR}
+                            activeColor={theme.border}
                         />
 
                         {/* Gender identity */}
@@ -289,9 +285,9 @@ export default function QSetupPage() {
                             selectedTextStyle={styles.dropdownSelectedText}
                             placeholderStyle={styles.dropdownPlaceholder}
                             renderRightIcon={() => (
-                                <SymbolView name="chevron.down" size={16} tintColor={PLACEHOLDER_TEXT} />
+                                <SymbolView name="chevron.down" size={16} tintColor={theme.placeholder} />
                             )}
-                            activeColor={BORDER_COLOR}
+                            activeColor={theme.border}
                         />
 
                         {/* Weight */}
@@ -301,7 +297,7 @@ export default function QSetupPage() {
                                 value={weight}
                                 onChangeText={setWeight}
                                 placeholder="Enter weight"
-                                placeholderTextColor={PLACEHOLDER_TEXT}
+                                placeholderTextColor={theme.placeholder}
                                 style={styles.weightInput}
                                 keyboardType="decimal-pad"
                             />
@@ -350,9 +346,9 @@ export default function QSetupPage() {
                             selectedTextStyle={styles.dropdownSelectedText}
                             placeholderStyle={styles.dropdownPlaceholder}
                             renderRightIcon={() => (
-                                <SymbolView name="chevron.down" size={16} tintColor={PLACEHOLDER_TEXT} />
+                                <SymbolView name="chevron.down" size={16} tintColor={theme.placeholder} />
                             )}
-                            activeColor={BORDER_COLOR}
+                            activeColor={theme.border}
                         />
 
                         {/* Continue Button */}
@@ -386,7 +382,7 @@ export default function QSetupPage() {
                     ]}
                     hitSlop={10}
                 >
-                    <SymbolView name="keyboard.chevron.compact.down" size={18} tintColor={WHITE} />
+                    <SymbolView name="keyboard.chevron.compact.down" size={18} tintColor={theme.textPrimary} />
                 </Pressable>
             )}
         </View>
@@ -409,229 +405,231 @@ export default function QSetupPage() {
     );
 }
 
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: BACKGROUND_COLOR_DARK,
-    },
-    content: {
-        paddingHorizontal: 24,
-        paddingBottom: 24,
-    },
-    title: {
-        color: WHITE,
-        fontSize: 30,
-        marginBottom: 8,
-        fontWeight: "600",
-    },
-    subtitle: {
-        color: TEXT_COLOR,
-        marginBottom: 24,
-        fontSize: 16,
-    },
-    healthCard: {
-        backgroundColor: BACKGROUND_COLOR,
-        borderRadius: 16,
-        padding: 16,
-        marginBottom: 24,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-    },
-    healthCardHeader: {
-        flexDirection: "row",
-        marginBottom: 16,
-    },
-    healthIconContainer: {
-        width: 48,
-        height: 48,
-        borderRadius: 12,
-        backgroundColor: PRIMARY_COLOR,
-        alignItems: "center",
-        justifyContent: "center",
-        marginRight: 12,
-    },
-    healthTextContainer: {
-        flex: 1,
-    },
-    healthCardTitle: {
-        color: WHITE,
-        fontSize: 16,
-        fontWeight: "600",
-        marginBottom: 4,
-    },
-    healthCardSubtitle: {
-        color: TEXT_COLOR,
-        fontSize: 14,
-        lineHeight: 18,
-    },
-    healthCardActions: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 16,
-    },
-    healthConnectButton: {
-        backgroundColor: PRIMARY_COLOR,
-        paddingVertical: 12,
-        paddingHorizontal: 32,
-        borderRadius: 999,
-        flex: 1,
-        alignItems: "center",
-    },
-    healthConnectButtonText: {
-        color: WHITE,
-        fontSize: 16,
-        fontWeight: "600",
-    },
-    healthNotNowText: {
-        color: TEXT_COLOR,
-        fontSize: 16,
-        fontWeight: "600",
-    },
-    label: {
-        color: TEXT_COLOR,
-        marginBottom: 8,
-        marginTop: 16,
-        fontSize: 14,
-    },
-    optional: {
-        color: PLACEHOLDER_TEXT,
-    },
-    input: {
-        backgroundColor: BACKGROUND_COLOR,
-        borderColor: BORDER_COLOR,
-        borderWidth: 1,
-        borderRadius: 16,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        color: WHITE,
-        fontSize: 16,
-    },
-    inputWithIcon: {
-        position: "relative",
-    },
-    inputIcon: {
-        position: "absolute",
-        right: 16,
-        top: 14,
-    },
-    dropdown: {
-        backgroundColor: BACKGROUND_COLOR,
-        borderColor: BORDER_COLOR,
-        borderWidth: 1,
-        borderRadius: 16,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        minHeight: 50,
-    },
-    dropdownContainer: {
-        backgroundColor: BACKGROUND_COLOR,
-        borderColor: BORDER_COLOR,
-        borderWidth: 1,
-        borderRadius: 12,
-        marginTop: 4,
-    },
-    dropdownPlaceholder: {
-        color: PLACEHOLDER_TEXT,
-        fontSize: 16,
-    },
-    dropdownSelectedText: {
-        color: WHITE,
-        fontSize: 16,
-    },
-    dropdownItemText: {
-        color: WHITE,
-        fontSize: 16,
-        padding: 12,
-    },
-    weightContainer: {
-        flexDirection: "row",
-        gap: 12,
-    },
-    weightInput: {
-        flex: 1,
-        backgroundColor: BACKGROUND_COLOR,
-        borderColor: BORDER_COLOR,
-        borderWidth: 1,
-        borderRadius: 16,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        color: WHITE,
-        fontSize: 16,
-    },
-    weightUnitToggle: {
-        flexDirection: "row",
-        backgroundColor: BACKGROUND_COLOR,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-        overflow: "hidden",
-    },
-    weightUnitButton: {
-        paddingHorizontal: 24,
-        paddingVertical: 14,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    weightUnitButtonLeft: {
-        borderTopRightRadius: 0,
-        borderBottomRightRadius: 0,
-    },
-    weightUnitButtonRight: {
-        borderTopLeftRadius: 0,
-        borderBottomLeftRadius: 0,
-    },
-    weightUnitButtonActive: {
-        backgroundColor: PRIMARY_COLOR,
-    },
-    weightUnitText: {
-        color: PLACEHOLDER_TEXT,
-        fontSize: 16,
-        fontWeight: "600",
-    },
-    weightUnitTextActive: {
-        color: WHITE,
-    },
-    primaryButton: {
-        marginTop: 24,
-        backgroundColor: PRIMARY_COLOR,
-        paddingVertical: 14,
-        borderRadius: 16,
-        alignItems: "center",
-    },
-    primaryButtonText: {
-        color: WHITE,
-        fontWeight: "600",
-        fontSize: 16,
-    },
-    secondaryButton: {
-        marginTop: 12,
-        backgroundColor: BORDER_COLOR,
-        paddingVertical: 14,
-        borderRadius: 16,
-        alignItems: "center",
-    },
-    secondaryButtonText: {
-        color: TEXT_COLOR,
-        fontWeight: "600",
-        fontSize: 16,
-    },
-    hideKeyboardButton: {
-        position: "absolute",
-        right: 16,
-        alignItems: "center",
-        justifyContent: "center",
-        width: 44,
-        height: 44,
-        borderRadius: 999,
-        backgroundColor: BACKGROUND_COLOR,
-        borderWidth: 1,
-        borderColor: BORDER_COLOR,
-        shadowOpacity: 0.25,
-        shadowRadius: 6,
-        shadowOffset: { width: 0, height: 2 },
-    },
-    scrollContent: {
-        flexGrow: 1,
-        paddingBottom: 24,
-    },
-});
+function createStyles(theme: Theme) {
+    return StyleSheet.create({
+        container: {
+            flex: 1,
+            backgroundColor: theme.backgroundDark,
+        },
+        content: {
+            paddingHorizontal: 24,
+            paddingBottom: 24,
+        },
+        title: {
+            color: theme.textPrimary,
+            fontSize: 30,
+            marginBottom: 8,
+            fontWeight: "600",
+        },
+        subtitle: {
+            color: theme.text,
+            marginBottom: 24,
+            fontSize: 16,
+        },
+        healthCard: {
+            backgroundColor: theme.background,
+            borderRadius: 16,
+            padding: 16,
+            marginBottom: 24,
+            borderWidth: 1,
+            borderColor: theme.border,
+        },
+        healthCardHeader: {
+            flexDirection: "row",
+            marginBottom: 16,
+        },
+        healthIconContainer: {
+            width: 48,
+            height: 48,
+            borderRadius: 12,
+            backgroundColor: theme.primary,
+            alignItems: "center",
+            justifyContent: "center",
+            marginRight: 12,
+        },
+        healthTextContainer: {
+            flex: 1,
+        },
+        healthCardTitle: {
+            color: theme.textPrimary,
+            fontSize: 16,
+            fontWeight: "600",
+            marginBottom: 4,
+        },
+        healthCardSubtitle: {
+            color: theme.text,
+            fontSize: 14,
+            lineHeight: 18,
+        },
+        healthCardActions: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 16,
+        },
+        healthConnectButton: {
+            backgroundColor: theme.primary,
+            paddingVertical: 12,
+            paddingHorizontal: 32,
+            borderRadius: 999,
+            flex: 1,
+            alignItems: "center",
+        },
+        healthConnectButtonText: {
+            color: theme.white,
+            fontSize: 16,
+            fontWeight: "600",
+        },
+        healthNotNowText: {
+            color: theme.text,
+            fontSize: 16,
+            fontWeight: "600",
+        },
+        label: {
+            color: theme.text,
+            marginBottom: 8,
+            marginTop: 16,
+            fontSize: 14,
+        },
+        optional: {
+            color: theme.placeholder,
+        },
+        input: {
+            backgroundColor: theme.background,
+            borderColor: theme.border,
+            borderWidth: 1,
+            borderRadius: 16,
+            paddingHorizontal: 16,
+            paddingVertical: 14,
+            color: theme.textPrimary,
+            fontSize: 16,
+        },
+        inputWithIcon: {
+            position: "relative",
+        },
+        inputIcon: {
+            position: "absolute",
+            right: 16,
+            top: 14,
+        },
+        dropdown: {
+            backgroundColor: theme.background,
+            borderColor: theme.border,
+            borderWidth: 1,
+            borderRadius: 16,
+            paddingHorizontal: 16,
+            paddingVertical: 14,
+            minHeight: 50,
+        },
+        dropdownContainer: {
+            backgroundColor: theme.background,
+            borderColor: theme.border,
+            borderWidth: 1,
+            borderRadius: 12,
+            marginTop: 4,
+        },
+        dropdownPlaceholder: {
+            color: theme.placeholder,
+            fontSize: 16,
+        },
+        dropdownSelectedText: {
+            color: theme.textPrimary,
+            fontSize: 16,
+        },
+        dropdownItemText: {
+            color: theme.textPrimary,
+            fontSize: 16,
+            padding: 12,
+        },
+        weightContainer: {
+            flexDirection: "row",
+            gap: 12,
+        },
+        weightInput: {
+            flex: 1,
+            backgroundColor: theme.background,
+            borderColor: theme.border,
+            borderWidth: 1,
+            borderRadius: 16,
+            paddingHorizontal: 16,
+            paddingVertical: 14,
+            color: theme.textPrimary,
+            fontSize: 16,
+        },
+        weightUnitToggle: {
+            flexDirection: "row",
+            backgroundColor: theme.background,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: theme.border,
+            overflow: "hidden",
+        },
+        weightUnitButton: {
+            paddingHorizontal: 24,
+            paddingVertical: 14,
+            alignItems: "center",
+            justifyContent: "center",
+        },
+        weightUnitButtonLeft: {
+            borderTopRightRadius: 0,
+            borderBottomRightRadius: 0,
+        },
+        weightUnitButtonRight: {
+            borderTopLeftRadius: 0,
+            borderBottomLeftRadius: 0,
+        },
+        weightUnitButtonActive: {
+            backgroundColor: theme.primary,
+        },
+        weightUnitText: {
+            color: theme.placeholder,
+            fontSize: 16,
+            fontWeight: "600",
+        },
+        weightUnitTextActive: {
+            color: theme.white,
+        },
+        primaryButton: {
+            marginTop: 24,
+            backgroundColor: theme.primary,
+            paddingVertical: 14,
+            borderRadius: 16,
+            alignItems: "center",
+        },
+        primaryButtonText: {
+            color: theme.white,
+            fontWeight: "600",
+            fontSize: 16,
+        },
+        secondaryButton: {
+            marginTop: 12,
+            backgroundColor: theme.border,
+            paddingVertical: 14,
+            borderRadius: 16,
+            alignItems: "center",
+        },
+        secondaryButtonText: {
+            color: theme.text,
+            fontWeight: "600",
+            fontSize: 16,
+        },
+        hideKeyboardButton: {
+            position: "absolute",
+            right: 16,
+            alignItems: "center",
+            justifyContent: "center",
+            width: 44,
+            height: 44,
+            borderRadius: 999,
+            backgroundColor: theme.background,
+            borderWidth: 1,
+            borderColor: theme.border,
+            shadowOpacity: 0.25,
+            shadowRadius: 6,
+            shadowOffset: { width: 0, height: 2 },
+        },
+        scrollContent: {
+            flexGrow: 1,
+            paddingBottom: 24,
+        },
+    });
+}
