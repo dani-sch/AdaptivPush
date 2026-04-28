@@ -49,7 +49,7 @@ const SupportAction = ({
           <Text style={styles.actionDescription}>{description}</Text>
         </View>
       </View>
-      <ChevronRight color="#6f758a" size={18} />
+      <ChevronRight color={theme.placeholder} size={18} />
     </Pressable>
   );
 };
@@ -147,23 +147,23 @@ export default function HelpSupportScreen() {
             onPress={() => router.back()}
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
           >
-            <ArrowLeft color="#e6e9f4" size={22} />
+            <ArrowLeft color={theme.textPrimary} size={22} />
           </Pressable>
           <Text style={styles.headerTitle}>Help & Support</Text>
           <View style={styles.headerSpacer} />
         </View>
 
         <LinearGradient
-          colors={['#181c29', '#12141b']}
+          colors={[theme.cardBg, theme.backgroundDark]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.heroCard}
         >
           <View style={styles.heroIconWrap}>
-            <LifeBuoy color="#dce4ff" size={23} />
+            <LifeBuoy color={theme.textPrimary} size={23} />
           </View>
           <View style={styles.heroTextWrap}>
-            <Text style={styles.heroTitle}>We've Got You</Text>
+            <Text style={styles.heroTitle}>We&apos;ve Got You</Text>
             <Text style={styles.heroSubtitle}>
               Reach support, report issues, or browse common answers in one place.
             </Text>
@@ -174,21 +174,21 @@ export default function HelpSupportScreen() {
         <View style={styles.sectionCard}>
           <SupportAction
             disabled={activeRequest !== null}
-            icon={<MessageCircle color="#9ba3b9" size={18} />}
+            icon={<MessageCircle color={theme.placeholder} size={18} />}
             title="Contact Support"
             description="Chat with the team about account or training issues"
             onPress={() => void handleSupportAction('contact')}
           />
           <SupportAction
             disabled={activeRequest !== null}
-            icon={<Bug color="#9ba3b9" size={18} />}
+            icon={<Bug color={theme.placeholder} size={18} />}
             title="Report a Bug"
             description="Share a screenshot and reproduction steps"
             onPress={() => void handleSupportAction('bug')}
           />
           <SupportAction
             disabled={activeRequest !== null}
-            icon={<Lightbulb color="#9ba3b9" size={18} />}
+            icon={<Lightbulb color={theme.placeholder} size={18} />}
             title="Feature Request"
             description="Tell us what would improve your workflow"
             onPress={() => void handleSupportAction('feature')}
@@ -197,7 +197,7 @@ export default function HelpSupportScreen() {
 
         {activeRequest ? (
           <View style={styles.loadingRow}>
-            <ActivityIndicator size="small" color="#7aa0ff" />
+            <ActivityIndicator size="small" color={theme.primary} />
             <Text style={styles.loadingText}>Submitting to backend...</Text>
           </View>
         ) : null}
@@ -207,7 +207,7 @@ export default function HelpSupportScreen() {
         <Text style={styles.sectionTitle}>Support Hours</Text>
         <View style={styles.hoursCard}>
           <View style={styles.hoursRow}>
-            <Clock3 color="#96c0ff" size={18} />
+            <Clock3 color={theme.primaryLight} size={18} />
             <Text style={styles.hoursText}>Mon to Fri, 9:00 AM to 6:00 PM ET</Text>
           </View>
           <Text style={styles.hoursCaption}>Typical first response: under 24 hours.</Text>
@@ -242,7 +242,7 @@ function createStyles(theme: Theme) {
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: '#03040b',
+      backgroundColor: theme.backgroundDark,
     },
     scrollContent: {
       paddingHorizontal: 18,
@@ -258,13 +258,13 @@ function createStyles(theme: Theme) {
       height: 44,
       borderRadius: 22,
       borderWidth: 1,
-      borderColor: '#2a2f41',
+      borderColor: theme.border,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: '#131722',
+      backgroundColor: theme.cardBg,
     },
     headerTitle: {
-      color: '#f3f6ff',
+      color: theme.textPrimary,
       fontSize: 20,
       fontWeight: '600',
     },
@@ -275,7 +275,7 @@ function createStyles(theme: Theme) {
     heroCard: {
       borderRadius: 22,
       borderWidth: 1,
-      borderColor: '#242a3b',
+      borderColor: theme.border,
       paddingHorizontal: 16,
       paddingVertical: 16,
       flexDirection: 'row',
@@ -286,7 +286,7 @@ function createStyles(theme: Theme) {
       width: 48,
       height: 48,
       borderRadius: 16,
-      backgroundColor: '#25304a',
+      backgroundColor: theme.mutedBg,
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: 12,
@@ -295,18 +295,18 @@ function createStyles(theme: Theme) {
       flex: 1,
     },
     heroTitle: {
-      color: '#eff3ff',
+      color: theme.textPrimary,
       fontSize: 17,
       fontWeight: '600',
       marginBottom: 2,
     },
     heroSubtitle: {
-      color: '#8f97ad',
+      color: theme.text,
       fontSize: 13,
       lineHeight: 19,
     },
     sectionTitle: {
-      color: '#8b91a4',
+      color: theme.text,
       fontSize: 14,
       letterSpacing: 1,
       marginBottom: 10,
@@ -315,8 +315,8 @@ function createStyles(theme: Theme) {
     sectionCard: {
       borderRadius: 22,
       borderWidth: 1,
-      borderColor: '#242a3b',
-      backgroundColor: '#121621',
+      borderColor: theme.border,
+      backgroundColor: theme.cardBg,
       paddingHorizontal: 14,
       paddingVertical: 10,
       marginBottom: 16,
@@ -327,7 +327,7 @@ function createStyles(theme: Theme) {
       alignItems: 'center',
       justifyContent: 'space-between',
       borderBottomWidth: 1,
-      borderBottomColor: 'rgba(95, 103, 124, 0.24)',
+      borderBottomColor: theme.border,
     },
     actionRowDisabled: {
       opacity: 0.65,
@@ -344,19 +344,19 @@ function createStyles(theme: Theme) {
       borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: '#1a2133',
+      backgroundColor: theme.mutedBg,
       marginRight: 10,
     },
     actionTextWrap: {
       flex: 1,
     },
     actionTitle: {
-      color: '#e7ebf8',
+      color: theme.textPrimary,
       fontSize: 15,
       fontWeight: '500',
     },
     actionDescription: {
-      color: '#8d95ac',
+      color: theme.text,
       fontSize: 12,
       marginTop: 2,
     },
@@ -368,17 +368,17 @@ function createStyles(theme: Theme) {
       marginBottom: 8,
     },
     loadingText: {
-      color: '#98a1b8',
+      color: theme.text,
       fontSize: 13,
     },
     errorFeedback: {
-      color: '#ff8088',
+      color: theme.errorLight,
       fontSize: 13,
       marginBottom: 8,
       marginLeft: 2,
     },
     successFeedback: {
-      color: '#7ae4a7',
+      color: theme.success,
       fontSize: 13,
       marginBottom: 12,
       marginLeft: 2,
@@ -386,8 +386,8 @@ function createStyles(theme: Theme) {
     hoursCard: {
       borderRadius: 18,
       borderWidth: 1,
-      borderColor: '#264e88',
-      backgroundColor: '#11213f',
+      borderColor: theme.primary,
+      backgroundColor: theme.cardBg,
       paddingHorizontal: 14,
       paddingVertical: 14,
       marginBottom: 16,
@@ -399,27 +399,27 @@ function createStyles(theme: Theme) {
       marginBottom: 6,
     },
     hoursText: {
-      color: '#d7e6ff',
+      color: theme.textPrimary,
       fontSize: 14,
       fontWeight: '500',
     },
     hoursCaption: {
-      color: '#9cb8e4',
+      color: theme.text,
       fontSize: 12,
     },
     faqItem: {
       paddingVertical: 11,
       borderBottomWidth: 1,
-      borderBottomColor: 'rgba(95, 103, 124, 0.24)',
+      borderBottomColor: theme.border,
     },
     faqQuestion: {
-      color: '#e7ebf8',
+      color: theme.textPrimary,
       fontSize: 15,
       fontWeight: '500',
       marginBottom: 4,
     },
     faqAnswer: {
-      color: '#8d95ac',
+      color: theme.text,
       fontSize: 13,
       lineHeight: 19,
     },

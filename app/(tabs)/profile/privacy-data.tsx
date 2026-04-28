@@ -61,9 +61,9 @@ const PrivacyToggleRow = ({
       <Switch
         value={value}
         onValueChange={onValueChange}
-        trackColor={{ false: '#4f5568', true: theme.primary }}
+        trackColor={{ false: theme.buttonDisabled, true: theme.primary }}
         thumbColor={theme.textPrimary}
-        ios_backgroundColor="#4f5568"
+        ios_backgroundColor={theme.buttonDisabled}
       />
     </View>
   );
@@ -287,20 +287,20 @@ export default function PrivacyDataScreen() {
             onPress={() => router.back()}
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
           >
-            <ArrowLeft color="#e6e9f4" size={22} />
+            <ArrowLeft color={theme.textPrimary} size={22} />
           </Pressable>
           <Text style={styles.headerTitle}>Privacy & Data</Text>
           <View style={styles.headerSpacer} />
         </View>
 
         <LinearGradient
-          colors={['#181c29', '#12141b']}
+          colors={[theme.cardBg, theme.backgroundDark]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.headlineCard}
         >
           <View style={styles.headlineIconWrap}>
-            <ShieldCheck color="#e6ebfc" size={22} />
+            <ShieldCheck color={theme.textPrimary} size={22} />
           </View>
           <View style={styles.headlineTextWrap}>
             <Text style={styles.headlineTitle}>You Control Your Data</Text>
@@ -315,21 +315,21 @@ export default function PrivacyDataScreen() {
           <PrivacyToggleRow
             label="Analytics"
             hint="Share anonymous usage events to improve features"
-            icon={<Activity color="#9ba3b9" size={18} />}
+            icon={<Activity color={theme.placeholder} size={18} />}
             value={analyticsEnabled}
             onValueChange={setAnalyticsEnabled}
           />
           <PrivacyToggleRow
             label="Crash Reports"
             hint="Send error traces so we can fix reliability issues"
-            icon={<Database color="#9ba3b9" size={18} />}
+            icon={<Database color={theme.placeholder} size={18} />}
             value={crashReportsEnabled}
             onValueChange={setCrashReportsEnabled}
           />
           <PrivacyToggleRow
             label="Sensitive Data Masking"
             hint="Hide health metrics in previews and widgets"
-            icon={<EyeOff color="#9ba3b9" size={18} />}
+            icon={<EyeOff color={theme.placeholder} size={18} />}
             value={sensitiveDataMasking}
             onValueChange={setSensitiveDataMasking}
           />
@@ -339,7 +339,7 @@ export default function PrivacyDataScreen() {
         <DataActionCard
           title="Export Your Data"
           description="Generate a downloadable file of your account and training records."
-          icon={<Download color="#8fc4ff" size={18} />}
+          icon={<Download color={theme.primaryLight} size={18} />}
           buttonText="Create Export"
           disabled={activeRequest !== null}
           loading={activeRequest === 'export'}
@@ -349,7 +349,7 @@ export default function PrivacyDataScreen() {
         <DataActionCard
           title="Delete Account"
           description="Permanently remove account data after a short safety verification period."
-          icon={<Trash2 color="#ff8f96" size={18} />}
+          icon={<Trash2 color={theme.errorLight} size={18} />}
           buttonText="Request Deletion"
           destructive
           disabled={activeRequest !== null}
@@ -359,12 +359,12 @@ export default function PrivacyDataScreen() {
 
         <Pressable style={({ pressed }) => [styles.learnMoreRow, pressed && styles.pressed]}>
           <Text style={styles.learnMoreText}>Read Full Data Policy</Text>
-          <ChevronRight color="#6f758a" size={18} />
+          <ChevronRight color={theme.placeholder} size={18} />
         </Pressable>
 
         {isLoading ? (
           <View style={styles.loadingRow}>
-            <ActivityIndicator size="small" color="#7aa0ff" />
+            <ActivityIndicator size="small" color={theme.primary} />
             <Text style={styles.loadingText}>Loading from backend...</Text>
           </View>
         ) : null}
@@ -393,7 +393,7 @@ function createStyles(theme: Theme) {
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: '#03040b',
+      backgroundColor: theme.backgroundDark,
     },
     scrollContent: {
       paddingHorizontal: 18,
@@ -409,13 +409,13 @@ function createStyles(theme: Theme) {
       height: 44,
       borderRadius: 22,
       borderWidth: 1,
-      borderColor: '#2a2f41',
+      borderColor: theme.border,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: '#131722',
+      backgroundColor: theme.cardBg,
     },
     headerTitle: {
-      color: '#f3f6ff',
+      color: theme.textPrimary,
       fontSize: 20,
       fontWeight: '600',
     },
@@ -426,7 +426,7 @@ function createStyles(theme: Theme) {
     headlineCard: {
       borderRadius: 22,
       borderWidth: 1,
-      borderColor: '#242a3b',
+      borderColor: theme.border,
       paddingHorizontal: 16,
       paddingVertical: 16,
       flexDirection: 'row',
@@ -437,7 +437,7 @@ function createStyles(theme: Theme) {
       width: 48,
       height: 48,
       borderRadius: 16,
-      backgroundColor: '#25304a',
+      backgroundColor: theme.mutedBg,
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: 12,
@@ -446,18 +446,18 @@ function createStyles(theme: Theme) {
       flex: 1,
     },
     headlineTitle: {
-      color: '#eff3ff',
+      color: theme.textPrimary,
       fontSize: 17,
       fontWeight: '600',
       marginBottom: 2,
     },
     headlineSubtitle: {
-      color: '#8f97ad',
+      color: theme.text,
       fontSize: 13,
       lineHeight: 19,
     },
     sectionTitle: {
-      color: '#8b91a4',
+      color: theme.text,
       fontSize: 14,
       letterSpacing: 1,
       marginBottom: 10,
@@ -466,8 +466,8 @@ function createStyles(theme: Theme) {
     sectionCard: {
       borderRadius: 22,
       borderWidth: 1,
-      borderColor: '#242a3b',
-      backgroundColor: '#121621',
+      borderColor: theme.border,
+      backgroundColor: theme.cardBg,
       paddingHorizontal: 14,
       paddingVertical: 10,
       marginBottom: 16,
@@ -478,7 +478,7 @@ function createStyles(theme: Theme) {
       alignItems: 'center',
       justifyContent: 'space-between',
       borderBottomWidth: 1,
-      borderBottomColor: 'rgba(95, 103, 124, 0.24)',
+      borderBottomColor: theme.border,
     },
     rowLeft: {
       flex: 1,
@@ -492,30 +492,30 @@ function createStyles(theme: Theme) {
       borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: '#1a2133',
+      backgroundColor: theme.mutedBg,
       marginRight: 10,
     },
     iconShellDanger: {
-      backgroundColor: '#341a20',
+      backgroundColor: theme.error,
     },
     rowTextWrap: {
       flex: 1,
     },
     rowLabel: {
-      color: '#e7ebf8',
+      color: theme.textPrimary,
       fontSize: 15,
       fontWeight: '500',
     },
     rowHint: {
-      color: '#8d95ac',
+      color: theme.text,
       fontSize: 12,
       marginTop: 2,
     },
     dataActionCard: {
       borderRadius: 22,
       borderWidth: 1,
-      borderColor: '#242a3b',
-      backgroundColor: '#121621',
+      borderColor: theme.border,
+      backgroundColor: theme.cardBg,
       paddingHorizontal: 14,
       paddingVertical: 14,
       marginBottom: 12,
@@ -529,15 +529,15 @@ function createStyles(theme: Theme) {
       flex: 1,
     },
     dataActionTitle: {
-      color: '#e8ecf9',
+      color: theme.textPrimary,
       fontSize: 16,
       fontWeight: '600',
     },
     dataActionTitleDanger: {
-      color: '#ffb2b8',
+      color: theme.errorLight,
     },
     dataActionDescription: {
-      color: '#8d95ac',
+      color: theme.text,
       fontSize: 13,
       lineHeight: 19,
       marginTop: 3,
@@ -553,29 +553,29 @@ function createStyles(theme: Theme) {
       opacity: 0.65,
     },
     dataActionButtonPrimary: {
-      borderColor: '#325ec2',
-      backgroundColor: '#1d376f',
+      borderColor: theme.primary,
+      backgroundColor: theme.primary,
     },
     dataActionButtonDanger: {
-      borderColor: '#6f2832',
-      backgroundColor: '#3c1a21',
+      borderColor: theme.error,
+      backgroundColor: theme.error,
     },
     dataActionButtonText: {
       fontSize: 15,
       fontWeight: '600',
     },
     dataActionButtonTextPrimary: {
-      color: '#c4ddff',
+      color: theme.white,
     },
     dataActionButtonTextDanger: {
-      color: '#ff9ea7',
+      color: theme.white,
     },
     learnMoreRow: {
       minHeight: 56,
       borderRadius: 14,
       borderWidth: 1,
-      borderColor: '#2b3245',
-      backgroundColor: '#121722',
+      borderColor: theme.border,
+      backgroundColor: theme.cardBg,
       paddingHorizontal: 14,
       marginBottom: 14,
       flexDirection: 'row',
@@ -583,7 +583,7 @@ function createStyles(theme: Theme) {
       justifyContent: 'space-between',
     },
     learnMoreText: {
-      color: '#c7cedf',
+      color: theme.textPrimary,
       fontSize: 15,
     },
     loadingRow: {
@@ -594,17 +594,17 @@ function createStyles(theme: Theme) {
       marginBottom: 8,
     },
     loadingText: {
-      color: '#98a1b8',
+      color: theme.text,
       fontSize: 13,
     },
     errorFeedback: {
-      color: '#ff8088',
+      color: theme.errorLight,
       fontSize: 13,
       marginBottom: 10,
       marginLeft: 2,
     },
     saveFeedback: {
-      color: '#7ae4a7',
+      color: theme.success,
       fontSize: 13,
       marginBottom: 10,
       marginLeft: 2,
@@ -613,8 +613,8 @@ function createStyles(theme: Theme) {
       minHeight: 62,
       borderRadius: 20,
       borderWidth: 1,
-      borderColor: '#336de8',
-      backgroundColor: '#2b68f0',
+      borderColor: theme.primary,
+      backgroundColor: theme.primary,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -622,7 +622,7 @@ function createStyles(theme: Theme) {
       opacity: 0.65,
     },
     saveButtonText: {
-      color: '#eef2ff',
+      color: theme.white,
       fontSize: 17,
       fontWeight: '600',
     },

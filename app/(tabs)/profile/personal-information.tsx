@@ -1,9 +1,7 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import {
   ArrowLeft,
   CalendarDays,
-  Camera,
   Mail,
   Phone,
   Save,
@@ -22,6 +20,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { parseDateInput } from '@/utils/conversions';
+import { useTheme } from '@/contexts/ThemeContext';
+import type { Theme } from '@/constants/themes';
 import { mergeUserMetadata } from '@/utils/profilePreferences';
 import { supabase } from '@/utils/supabase';
 
@@ -42,6 +42,9 @@ const ProfileField = ({
   editable = true,
   keyboardType = 'default',
 }: FieldProps) => {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   return (
     <View style={styles.fieldWrap}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -54,7 +57,7 @@ const ProfileField = ({
           editable={editable}
           keyboardType={keyboardType}
           autoCapitalize="none"
-          placeholderTextColor="#697086"
+          placeholderTextColor={theme.placeholder}
         />
       </View>
     </View>
@@ -103,6 +106,8 @@ const normalizeBirthdayForStorage = (value: string): string | null => {
 
 export default function PersonalInformationScreen() {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [fullName, setFullName] = useState('');
   const [preferredName, setPreferredName] = useState('');
   const [email, setEmail] = useState('');
@@ -112,11 +117,6 @@ export default function PersonalInformationScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [saveMessage, setSaveMessage] = useState('');
-
-  const avatarLabel = useMemo(() => {
-    const clean = preferredName.trim() || fullName.trim() || 'A';
-    return clean.slice(0, 1).toUpperCase();
-  }, [fullName, preferredName]);
 
   useEffect(() => {
     const loadPersonalInformation = async () => {
@@ -240,37 +240,11 @@ export default function PersonalInformationScreen() {
             onPress={() => router.back()}
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
           >
-            <ArrowLeft color="#e6e9f4" size={22} />
+            <ArrowLeft color={theme.textPrimary} size={22} />
           </Pressable>
           <Text style={styles.headerTitle}>Personal Information</Text>
           <View style={styles.headerSpacer} />
         </View>
-
-        <LinearGradient
-          colors={['#181c29', '#12141b']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.avatarCard}
-        >
-          <LinearGradient
-            colors={['#2c81ff', '#8626ff']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.avatar}
-          >
-            <Text style={styles.avatarLabel}>{avatarLabel}</Text>
-          </LinearGradient>
-
-          <View style={styles.avatarMeta}>
-            <Text style={styles.avatarTitle}>Profile Photo</Text>
-            <Text style={styles.avatarSubtitle}>Square image works best</Text>
-          </View>
-
-          <Pressable style={({ pressed }) => [styles.photoAction, pressed && styles.pressed]}>
-            <Camera color="#d6dbed" size={18} />
-            <Text style={styles.photoActionText}>Edit</Text>
-          </Pressable>
-        </LinearGradient>
 
         <View style={styles.sectionWrap}>
           <Text style={styles.sectionTitle}>Account Details</Text>
@@ -279,33 +253,33 @@ export default function PersonalInformationScreen() {
               label="Full Name"
               value={fullName}
               onChangeText={setFullName}
-              icon={<UserRound color="#8f97ad" size={18} />}
+              icon={<UserRound color={theme.placeholder} size={18} />}
             />
             <ProfileField
               label="Preferred Name"
               value={preferredName}
               onChangeText={setPreferredName}
-              icon={<UserRound color="#8f97ad" size={18} />}
+              icon={<UserRound color={theme.placeholder} size={18} />}
             />
             <ProfileField
               label="Email"
               value={email}
               editable={false}
               keyboardType="email-address"
-              icon={<Mail color="#8f97ad" size={18} />}
+              icon={<Mail color={theme.placeholder} size={18} />}
             />
             <ProfileField
               label="Phone"
               value={phone}
               onChangeText={setPhone}
               keyboardType="phone-pad"
-              icon={<Phone color="#8f97ad" size={18} />}
+              icon={<Phone color={theme.placeholder} size={18} />}
             />
             <ProfileField
               label="Birthday"
               value={birthday}
               onChangeText={setBirthday}
-              icon={<CalendarDays color="#8f97ad" size={18} />}
+              icon={<CalendarDays color={theme.placeholder} size={18} />}
             />
           </View>
         </View>
@@ -318,7 +292,7 @@ export default function PersonalInformationScreen() {
 
         {isLoading ? (
           <View style={styles.loadingRow}>
-            <ActivityIndicator size="small" color="#7aa0ff" />
+            <ActivityIndicator size="small" color={theme.primary} />
             <Text style={styles.loadingText}>Loading from backend...</Text>
           </View>
         ) : null}
@@ -335,7 +309,7 @@ export default function PersonalInformationScreen() {
             pressed && !isSaving && !isLoading && styles.pressed,
           ]}
         >
-          <Save color="#eef2ff" size={18} />
+          <Save color={theme.white} size={18} />
           <Text style={styles.saveButtonText}>{isSaving ? 'Saving...' : 'Save Changes'}</Text>
         </Pressable>
       </ScrollView>
@@ -343,10 +317,11 @@ export default function PersonalInformationScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(theme: Theme) {
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#03040b',
+    backgroundColor: theme.backgroundDark,
   },
   scrollContent: {
     paddingHorizontal: 18,
@@ -362,13 +337,13 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: '#2a2f41',
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#131722',
+    backgroundColor: theme.cardBg,
   },
   headerTitle: {
-    color: '#f3f6ff',
+    color: theme.textPrimary,
     fontSize: 20,
     fontWeight: '600',
   },
@@ -376,64 +351,11 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
   },
-  avatarCard: {
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#242a3b',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  avatar: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  avatarLabel: {
-    color: '#edf2ff',
-    fontSize: 24,
-    fontWeight: '600',
-  },
-  avatarMeta: {
-    flex: 1,
-    paddingRight: 10,
-  },
-  avatarTitle: {
-    color: '#eff3ff',
-    fontSize: 17,
-    fontWeight: '500',
-  },
-  avatarSubtitle: {
-    color: '#8890a7',
-    fontSize: 13,
-    marginTop: 2,
-  },
-  photoAction: {
-    height: 42,
-    paddingHorizontal: 13,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#353d52',
-    backgroundColor: '#181d2a',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  photoActionText: {
-    color: '#d8ddef',
-    fontSize: 14,
-    fontWeight: '500',
-  },
   sectionWrap: {
     marginBottom: 16,
   },
   sectionTitle: {
-    color: '#8b91a4',
+    color: theme.text,
     fontSize: 14,
     letterSpacing: 1,
     marginBottom: 10,
@@ -442,8 +364,8 @@ const styles = StyleSheet.create({
   sectionCard: {
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: '#242a3b',
-    backgroundColor: '#121621',
+    borderColor: theme.border,
+    backgroundColor: theme.cardBg,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
@@ -451,7 +373,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   fieldLabel: {
-    color: '#959cb1',
+    color: theme.text,
     fontSize: 13,
     marginBottom: 8,
     marginLeft: 2,
@@ -460,39 +382,39 @@ const styles = StyleSheet.create({
     minHeight: 54,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#30384e',
-    backgroundColor: '#151b2a',
+    borderColor: theme.border,
+    backgroundColor: theme.mutedBg,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
   },
   inputShellReadOnly: {
-    borderColor: '#272f41',
-    backgroundColor: '#121722',
+    borderColor: theme.border,
+    backgroundColor: theme.background,
   },
   inputIconWrap: {
     marginRight: 8,
   },
   input: {
     flex: 1,
-    color: '#f0f3ff',
+    color: theme.textPrimary,
     fontSize: 16,
     paddingVertical: 10,
   },
   inputReadOnly: {
-    color: '#9ea6bb',
+    color: theme.text,
   },
   noticeCard: {
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#30384a',
-    backgroundColor: '#121723',
+    borderColor: theme.border,
+    backgroundColor: theme.cardBg,
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginBottom: 14,
   },
   noticeText: {
-    color: '#98a1b8',
+    color: theme.text,
     fontSize: 13,
     lineHeight: 20,
   },
@@ -504,17 +426,17 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   loadingText: {
-    color: '#98a1b8',
+    color: theme.text,
     fontSize: 13,
   },
   errorFeedback: {
-    color: '#ff8088',
+    color: theme.errorLight,
     fontSize: 13,
     marginBottom: 10,
     marginLeft: 2,
   },
   saveFeedback: {
-    color: '#7ae4a7',
+    color: theme.success,
     fontSize: 13,
     marginBottom: 10,
     marginLeft: 2,
@@ -523,8 +445,8 @@ const styles = StyleSheet.create({
     minHeight: 62,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#336de8',
-    backgroundColor: '#2b68f0',
+    borderColor: theme.primary,
+    backgroundColor: theme.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -534,7 +456,7 @@ const styles = StyleSheet.create({
     opacity: 0.65,
   },
   saveButtonText: {
-    color: '#eef2ff',
+    color: theme.white,
     fontSize: 17,
     fontWeight: '600',
   },
@@ -542,3 +464,4 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
 });
+}
