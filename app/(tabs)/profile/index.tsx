@@ -38,6 +38,7 @@ import type { TrainingExperience } from '@/types/database';
 import { useTheme, type AppearancePreference } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
 import { PALETTES, type PaletteKey } from '@/constants/palettes';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const EXPERIENCE_LABELS: Record<TrainingExperience, string> = {
   beginner: 'Beginner',
@@ -317,6 +318,14 @@ export default function ProfileScreen() {
   const [daysSincePeriod, setDaysSincePeriod] = useState<string>('');
   const [avgCycleLength, setAvgCycleLength] = useState<string>('28');
   const [cycleSaving, setCycleSaving] = useState(false);
+  const [hapticsEnabled, setHapticsEnabled] = useState(true);
+
+  // Load haptics preference on mount
+  useEffect(() => {
+    AsyncStorage.getItem('haptics_enabled').then((val) => {
+      if (val === 'false') setHapticsEnabled(false);
+    }).catch(() => {});
+  }, []);
 
   const fetchProfileData = useCallback(async () => {
     try {
@@ -889,6 +898,22 @@ export default function ProfileScreen() {
                   </Pressable>
                 );
               })}
+            </View>
+
+            {/* Haptic feedback toggle */}
+            <View style={styles.paletteDivider} />
+            <View style={styles.cycleToggleRow}>
+              <Text style={styles.menuLabel}>Haptic Feedback</Text>
+              <Switch
+                value={hapticsEnabled}
+                onValueChange={(val) => {
+                  setHapticsEnabled(val);
+                  void AsyncStorage.setItem('haptics_enabled', val ? 'true' : 'false');
+                }}
+                trackColor={{ false: theme.buttonDisabled, true: theme.primary }}
+                thumbColor={theme.white}
+                ios_backgroundColor={theme.buttonDisabled}
+              />
             </View>
           </LinearGradient>
         </View>

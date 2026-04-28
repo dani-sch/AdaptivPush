@@ -5,6 +5,7 @@ import { ExerciseInfoPanel } from "./ExerciseInfoPanel";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { Theme } from "@/constants/themes";
 import type { MuscleGroup } from "@/types/program";
+import { haptic, Haptics } from "@/utils/haptic";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -93,7 +94,10 @@ const SetRow: React.FC<SetRowProps> = ({
                 set.logged && styles.logButtonDone,
                 pressed && { opacity: 0.7 },
             ]}
-            onPress={onToggleLogged}
+            onPress={() => {
+                if (!set.logged) void haptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
+                onToggleLogged();
+            }}
             hitSlop={6}
         >
             <Ionicons
