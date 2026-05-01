@@ -169,11 +169,6 @@ export default function QSetupPage() {
         }
     };
 
-    const handleSkip = () => {
-        console.log('[Quick Setup] Skip pressed');
-        router.replace("/(tabs)/home");
-    };
-
     const handleHealthConnect = () => {
         console.log('[Quick Setup] Apple Health Connect pressed');
         setHealthKitConnected(true);
@@ -359,13 +354,6 @@ export default function QSetupPage() {
                             <Text style={styles.primaryButtonText}>Continue</Text>
                         </Pressable>
 
-                        {/* Skip Button */}
-                        <Pressable
-                            onPress={handleSkip}
-                            style={styles.secondaryButton}
-                        >
-                            <Text style={styles.secondaryButtonText}>Skip for now</Text>
-                        </Pressable>
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>

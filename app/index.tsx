@@ -40,17 +40,6 @@ export default function Index() {
                                       onPress={() => router.push('/join')}>
                         <Text style={styles.joinButtonText}>Join Now</Text>
                     </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.joinButton}
-                                      onPress={() => router.push('/quick-setup')}>
-                        <Text style={styles.joinButtonText}>Dev Skip (Quick Setup)</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.joinButton}
-                                      onPress={() => router.push('/profile')}>
-                        <Text style={styles.joinButtonText}>Dev Skip (Profile)</Text>
-                    </TouchableOpacity>
-
                 </View>
             </View>
 
@@ -74,23 +63,6 @@ function createStyles(theme: Theme) {
             flex: 1,
             backgroundColor: theme.backgroundDark,
             justifyContent: 'space-between',
-        },
-        devSkipButton: {
-          position: 'absolute',
-          top: 50,
-          right: 16,
-          backgroundColor: theme.buttonDisabled,
-          paddingHorizontal: 12,
-          paddingVertical: 6,
-          borderRadius: 8,
-          borderWidth: 1,
-          borderColor: theme.placeholder,
-          zIndex: 999,
-        },
-        devSkipText: {
-          color: theme.text,
-          fontSize: 12,
-          fontWeight: '500',
         },
         content: {
             flex: 1,
