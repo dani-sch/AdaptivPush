@@ -3,6 +3,7 @@ import {
     Alert,
     Keyboard,
     KeyboardAvoidingView,
+    Modal,
     Platform,
     Pressable,
     ScrollView,
@@ -23,7 +24,27 @@ import type { Theme } from '@/constants/themes';
 interface ProgramDay {
     id: string;
     name: string;
-    exercises: string[]; // should eventually store exercises.id UUIDs
+    exercises: SelectedExercise[];
+}
+
+interface ExerciseOption {
+    id: string;
+    name: string;
+    primary_muscle: string | null;
+    target_muscle: string | null;
+}
+
+interface SelectedExercise {
+    exercise_id: string;
+    name: string;
+    primary_muscle?: string | null;
+    target_muscle?: string | null;
+    set_count: number;
+    rep_range_min: number;
+    rep_range_max: number;
+    target_rpe?: number | null;
+    suggested_weight_lb?: number | null;
+    notes?: string | null;
 }
 
 const DEFAULT_DAY_NAMES = [
@@ -66,10 +87,6 @@ function todayISODate() {
     return `${yyyy}-${mm}-${dd}`;
 }
 
-function looksLikeUuid(value: string) {
-    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
-}
-
 async function requireUserId() {
     const { data, error } = await supabase.auth.getUser();
     if (error) throw error;
@@ -89,6 +106,20 @@ export default function CreateProgramScreen() {
     const [programLength, setProgramLength] = useState('12');
     const [days, setDays] = useState<ProgramDay[]>(generateDays(4));
     const [saving, setSaving] = useState(false);
+    const [pickerVisible, setPickerVisible] = useState(false);
+    const [pickerDayIndex, setPickerDayIndex] = useState<number | null>(null);
+    const [exerciseOptions, setExerciseOptions] = useState<ExerciseOption[]>([]);
+    const [exerciseLoading, setExerciseLoading] = useState(false);
+    const [exerciseError, setExerciseError] = useState<string | null>(null);
+    const [exerciseSearch, setExerciseSearch] = useState('');
+    const [muscleFilter, setMuscleFilter] = useState('all');
+    const [selectedExerciseOption, setSelectedExerciseOption] = useState<ExerciseOption | null>(null);
+    const [setCountInput, setSetCountInput] = useState('3');
+    const [repMinInput, setRepMinInput] = useState('8');
+    const [repMaxInput, setRepMaxInput] = useState('12');
+    const [targetRpeInput, setTargetRpeInput] = useState('');
+    const [weightInput, setWeightInput] = useState('');
+    const [notesInput, setNotesInput] = useState('');
 
     const [keyboardVisible, setKeyboardVisible] = useState(false);
     const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -131,20 +162,76 @@ export default function CreateProgramScreen() {
         );
     };
 
-    const handleAddExercise = (dayIndex: number) => {
-        // TODO: replace this with your real exercise picker/modal.
-        // This placeholder only adds local demo values and will not save to program_day_exercises
-        // unless they are real exercise UUIDs.
-        setDays((prev) =>
-            prev.map((day, idx) =>
-                idx === dayIndex
-                    ? {
-                        ...day,
-                        exercises: [...day.exercises, `Exercise ${day.exercises.length + 1}`],
-                    }
-                    : day
-            )
-        );
+    const fetchExercises = async () => {
+        setExerciseLoading(true);
+        setExerciseError(null);
+        const { data, error } = await supabase
+            .from('exercises')
+            .select('id, name, primary_muscle, target_muscle')
+            .order('name', { ascending: true });
+        if (error) {
+            setExerciseError('Could not load exercises. Please try again.');
+            setExerciseOptions([]);
+        } else {
+            setExerciseOptions((data as ExerciseOption[]) ?? []);
+        }
+        setExerciseLoading(false);
+    };
+
+    const handleAddExercise = async (dayIndex: number) => {
+        setPickerDayIndex(dayIndex);
+        setPickerVisible(true);
+        setSelectedExerciseOption(null);
+        setSetCountInput('3');
+        setRepMinInput('8');
+        setRepMaxInput('12');
+        setTargetRpeInput('');
+        setWeightInput('');
+        setNotesInput('');
+        if (exerciseOptions.length === 0 && !exerciseLoading) await fetchExercises();
+    };
+
+    const filteredExerciseOptions = useMemo(() => {
+        return exerciseOptions.filter((ex) => {
+            const matchesName = ex.name.toLowerCase().includes(exerciseSearch.toLowerCase().trim());
+            if (!matchesName) return false;
+            if (muscleFilter === 'all') return true;
+            return ex.primary_muscle === muscleFilter || ex.target_muscle === muscleFilter;
+        });
+    }, [exerciseOptions, exerciseSearch, muscleFilter]);
+
+    const muscleOptions = useMemo(() => {
+        const set = new Set<string>();
+        exerciseOptions.forEach((ex) => {
+            if (ex.primary_muscle) set.add(ex.primary_muscle);
+            if (ex.target_muscle) set.add(ex.target_muscle);
+        });
+        return ['all', ...Array.from(set).sort((a, b) => a.localeCompare(b))];
+    }, [exerciseOptions]);
+
+    const handleConfirmExercise = () => {
+        if (pickerDayIndex === null || !selectedExerciseOption) return;
+        const setCount = Number(setCountInput);
+        const repMin = Number(repMinInput);
+        const repMax = Number(repMaxInput);
+        if (setCount <= 0 || repMin <= 0 || repMax < repMin) {
+            Alert.alert('Invalid values', 'Sets/reps must be valid positive numbers.');
+            return;
+        }
+        const selectedExercise: SelectedExercise = {
+            exercise_id: selectedExerciseOption.id,
+            name: selectedExerciseOption.name,
+            primary_muscle: selectedExerciseOption.primary_muscle,
+            target_muscle: selectedExerciseOption.target_muscle,
+            set_count: setCount,
+            rep_range_min: repMin,
+            rep_range_max: repMax,
+            target_rpe: targetRpeInput.trim() ? Number(targetRpeInput) : null,
+            suggested_weight_lb: weightInput.trim() ? Number(weightInput) : null,
+            notes: notesInput.trim() || null,
+        };
+        setDays((prev) => prev.map((d, i) => i === pickerDayIndex ? { ...d, exercises: [...d.exercises, selectedExercise] } : d));
+        setPickerVisible(false);
     };
 
     const handleSave = async () => {
@@ -182,6 +269,7 @@ export default function CreateProgramScreen() {
                     name: trimmedName,
                     goal: trimmedGoal,
                     duration_weeks: parsedLength,
+                    days_per_week: daysPerWeek,
                     start_date: todayISODate(),
                     is_active: true,
                 })
@@ -210,7 +298,7 @@ export default function CreateProgramScreen() {
                 .from('program_days')
                 .insert(dayRows)
                 .select('id, order_in_week')
-                .returns<Array<{ id: string; order_in_week: number }>>();
+                .returns<{ id: string; order_in_week: number }[]>();
 
             if (daysError) throw daysError;
 
@@ -221,17 +309,17 @@ export default function CreateProgramScreen() {
                     if (!originalDay) return [];
 
                     return originalDay.exercises
-                        .filter((exerciseId) => looksLikeUuid(exerciseId))
-                        .map((exerciseId, exerciseIndex) => ({
+                        .filter((exercise) => exercise.set_count > 0 && exercise.rep_range_min > 0 && exercise.rep_range_max >= exercise.rep_range_min)
+                        .map((exercise, exerciseIndex) => ({
                             program_day_id: createdDay.id,
-                            exercise_id: exerciseId,
+                            exercise_id: exercise.exercise_id,
                             position: exerciseIndex + 1,
-                            set_count: 3,
-                            rep_range_min: 8,
-                            rep_range_max: 12,
-                            target_rpe: null,
-                            suggested_weight_lb: null,
-                            notes: null,
+                            set_count: exercise.set_count,
+                            rep_range_min: exercise.rep_range_min,
+                            rep_range_max: exercise.rep_range_max,
+                            target_rpe: exercise.target_rpe ?? null,
+                            suggested_weight_lb: exercise.suggested_weight_lb ?? null,
+                            notes: exercise.notes ?? null,
                         }));
                 }) ?? [];
 
@@ -445,8 +533,11 @@ export default function CreateProgramScreen() {
                                                             style={styles.exerciseChip}
                                                         >
                                                             <Text style={styles.exerciseChipText}>
-                                                                {exercise}
+                                                                {exercise.name} • {exercise.set_count}x{exercise.rep_range_min}-{exercise.rep_range_max}
                                                             </Text>
+                                                            <Pressable onPress={() => setDays((prev) => prev.map((d, di) => di === idx ? { ...d, exercises: d.exercises.filter((_, ei) => ei !== exerciseIdx) } : d))}>
+                                                                <Text style={styles.removeText}>Remove</Text>
+                                                            </Pressable>
                                                         </View>
                                                     ))}
                                                 </View>
@@ -502,6 +593,39 @@ export default function CreateProgramScreen() {
                     )}
                 </View>
             </KeyboardAvoidingView>
+            <Modal visible={pickerVisible} transparent animationType="slide" onRequestClose={() => setPickerVisible(false)}>
+                <View style={styles.modalBackdrop}>
+                    <View style={styles.modalCard}>
+                        <Text style={styles.sectionTitle}>Add Exercise</Text>
+                        <TextInput value={exerciseSearch} onChangeText={setExerciseSearch} placeholder="Search by name" placeholderTextColor={theme.placeholder} style={styles.input} />
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+                            {muscleOptions.map((option) => (
+                                <Pressable key={option} onPress={() => setMuscleFilter(option)} style={[styles.filterChip, muscleFilter === option && styles.filterChipActive]}>
+                                    <Text style={styles.exerciseChipText}>{option === 'all' ? 'All muscles' : option}</Text>
+                                </Pressable>
+                            ))}
+                        </ScrollView>
+                        {exerciseLoading ? <Text style={styles.label}>Loading exercises...</Text> : null}
+                        {!exerciseLoading && exerciseError ? <Text style={styles.label}>{exerciseError}</Text> : null}
+                        {!exerciseLoading && !exerciseError && filteredExerciseOptions.length === 0 ? <Text style={styles.label}>No exercises found. Try another search/filter.</Text> : null}
+                        <ScrollView style={{ maxHeight: 180 }}>
+                            {filteredExerciseOptions.map((exercise) => (
+                                <Pressable key={exercise.id} onPress={() => setSelectedExerciseOption(exercise)} style={[styles.optionRow, selectedExerciseOption?.id === exercise.id && styles.filterChipActive]}>
+                                    <Text style={styles.exerciseChipText}>{exercise.name}</Text>
+                                </Pressable>
+                            ))}
+                        </ScrollView>
+                        <TextInput value={setCountInput} onChangeText={setSetCountInput} keyboardType="number-pad" placeholder="Sets" placeholderTextColor={theme.placeholder} style={styles.input} />
+                        <TextInput value={repMinInput} onChangeText={setRepMinInput} keyboardType="number-pad" placeholder="Rep min" placeholderTextColor={theme.placeholder} style={styles.input} />
+                        <TextInput value={repMaxInput} onChangeText={setRepMaxInput} keyboardType="number-pad" placeholder="Rep max" placeholderTextColor={theme.placeholder} style={styles.input} />
+                        <TextInput value={targetRpeInput} onChangeText={setTargetRpeInput} keyboardType="decimal-pad" placeholder="Target RPE (optional)" placeholderTextColor={theme.placeholder} style={styles.input} />
+                        <TextInput value={weightInput} onChangeText={setWeightInput} keyboardType="decimal-pad" placeholder="Suggested weight lb (optional)" placeholderTextColor={theme.placeholder} style={styles.input} />
+                        <TextInput value={notesInput} onChangeText={setNotesInput} placeholder="Notes (optional)" placeholderTextColor={theme.placeholder} style={styles.input} />
+                        <Pressable onPress={handleConfirmExercise} style={styles.primaryButton}><Text style={styles.primaryButtonText}>Add To Day</Text></Pressable>
+                        <Pressable onPress={() => setPickerVisible(false)} style={styles.cancelButton}><Text style={styles.cancelButtonText}>Close</Text></Pressable>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -685,7 +809,15 @@ function createStyles(theme: Theme) {
             borderRadius: 999,
             paddingHorizontal: 12,
             paddingVertical: 8,
+            gap: 6,
         },
+        removeText: { color: theme.primary, fontSize: 12, fontWeight: '600' },
+        modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+        modalCard: { backgroundColor: theme.cardBg, borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16, gap: 10, maxHeight: '88%' },
+        filterRow: { gap: 8, paddingVertical: 4 },
+        filterChip: { borderWidth: 1, borderColor: theme.border, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 12 },
+        filterChipActive: { backgroundColor: theme.border },
+        optionRow: { borderWidth: 1, borderColor: theme.border, borderRadius: 10, padding: 10, marginBottom: 8 },
         exerciseChipText: {
             color: theme.textPrimary,
             fontSize: 13,
