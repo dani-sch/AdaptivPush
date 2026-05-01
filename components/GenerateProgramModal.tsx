@@ -423,14 +423,6 @@ export function GenerateProgramModal({
                   {loading ? 'Generating…' : 'Generate My Program'}
                 </Text>
               </Pressable>
-
-              <Pressable
-                onPress={loading ? undefined : onClose}
-                accessibilityLabel="Skip for now"
-                style={({ pressed }) => [styles.skipBtn, pressed && { opacity: 0.7 }]}
-              >
-                <Text style={styles.skipBtnText}>Skip for now</Text>
-              </Pressable>
             </View>
           </>
         )}
