@@ -189,4 +189,4 @@ vite.config.ts.timestamp-*
 .claude/*
 CLAUDE.md
 .github/*
-reports/*
+
