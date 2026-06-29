@@ -2029,6 +2029,52 @@
 
 ---
 
+## dev-doc/
+
+| File       | Purpose                             |
+| ---------- | ----------------------------------- |
+| `README.md` | active development documentation guide |
+
+---
+
+### dev-doc/main/
+
+| File             | Purpose                                  |
+| ---------------- | ---------------------------------------- |
+| `ARCHITECTURE.md` | active architecture summary              |
+| `COMMAND-TOC.md` | high-value command and routing reference |
+| `CURRENT-STATE.md` | operational snapshot and verification posture |
+| `OVERVIEW.md`    | first-read project summary               |
+| `ROADMAP.md`     | active milestone and sequencing view     |
+| `TODO.md`        | active task board with status markers    |
+| `TOC.md`         | active documentation index               |
+
+---
+
+### dev-doc/plans/active/
+
+| File            | Purpose                     |
+| --------------- | --------------------------- |
+| `PLAN-INDEX.md` | index of active plan files  |
+
+---
+
+### dev-doc/plans/legacy/
+
+| File        | Purpose                        |
+| ----------- | ------------------------------ |
+| `README.md` | archive rules for executed plans |
+
+---
+
+### dev-doc/reports/
+
+| File         | Purpose                        |
+| ------------ | ------------------------------ |
+| `DEV-LOG.md` | active development log report  |
+
+---
+
 ## reports/
 
 | File                                     | Purpose                                 |
@@ -2062,10 +2108,13 @@
 
 ### reports/plans/
 
-| File                     | Purpose                          |
-| ------------------------ | -------------------------------- |
-| `IMPLEMENTATION-PLAN.md` | implementation planning document |
-| `POSSIBLE-FEATURES.md`   | report for possible features     |
+| File                                   | Purpose                                          |
+| -------------------------------------- | ------------------------------------------------ |
+| `EVIDENCE-BACKED-EXECUTION-PLAN.md`    | evidence-backed execution planning document      |
+| `EVIDENCE-BACKED-IMPLEMENTATION-PLAN.md` | evidence-backed implementation planning document |
+| `EVIDENCE-BACKED-UI-REDESIGN-PLAN.md`  | evidence-backed UI redesign planning document    |
+| `IMPLEMENTATION-PLAN.md`               | implementation planning document                 |
+| `POSSIBLE-FEATURES.md`                 | report for possible features                     |
 
 ---
 
