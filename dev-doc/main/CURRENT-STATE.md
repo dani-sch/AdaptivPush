@@ -36,11 +36,12 @@
 - `dev-doc/` was created and indexed so the repo now has the intended living-doc structure referenced by the active instructions
 - the archival rule for executed plans is now explicit through `dev-doc/plans/legacy/README.md` and `dev-doc/plans/active/PLAN-INDEX.md`
 - Phase 1 of the evidence-backed execution plan is now complete: the evidence/policy foundation landed, lint passed, seeded generator output matched `HEAD` when explanation metadata was stripped, and the in-app Generate Program flow succeeded
+- Phase 2 additive schema and compatibility code has now landed in the working tree, including migrations 007-014, the refreshed schema reference, onboarding/profile compatibility writes, and program-generation-context persistence wiring
 
 ## Immediate execution lane
 
-- active implementation focus has moved from Phase 1 completion work to Phase 2 schema and compatibility work
-- first Phase 2 action remains the schema audit called out in `reports/plans/EVIDENCE-BACKED-EXECUTION-PLAN.md`
+- active implementation focus remains Phase 2 closeout, not Phase 3
+- remaining Phase 2 blockers are manual Supabase schema review plus manual onboarding, profile, and program-save validation against the migrated schema
 
 ## Immediate constraints
 

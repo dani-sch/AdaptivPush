@@ -190,6 +190,8 @@ vite.config.ts.timestamp-*
 CLAUDE.md
 .github/*
 reports/*
+!reports/migrations/
+!reports/migrations/*.sql
 scripts/*
 
 

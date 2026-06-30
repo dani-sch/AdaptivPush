@@ -145,7 +145,12 @@ export function GenerateProgramModal({
       };
 
       const programName = customName.trim() || pendingProgram.name;
-      await saveProgramToDb(user.id, params, { ...pendingProgram, name: programName });
+      await saveProgramToDb(
+        user.id,
+        params,
+        { ...pendingProgram, name: programName },
+        { programGenerationContextMode: 'create' },
+      );
 
       onProgramCreated();
       onClose();
