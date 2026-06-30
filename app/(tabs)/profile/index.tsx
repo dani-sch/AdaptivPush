@@ -31,7 +31,13 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { mergeUserMetadata, parseReadinessPreferences } from '@/utils/profilePreferences';
+import {
+  buildUserAdaptationPreferencesUpdate,
+  isMissingRelationOrColumnError,
+  mergeUserMetadata,
+  parseUserAdaptationPreferences,
+  resolveReadinessPreferences,
+} from '@/utils/profilePreferences';
 import { supabase } from '@/utils/supabase';
 import { uploadAvatar } from '@/utils/uploadAvatar';
 import type { TrainingExperience } from '@/types/database';
@@ -271,24 +277,11 @@ const fetchRowsFromTable = async (
   };
 };
 
-const isMissingUserProfileSchemaError = (error: {
-  code?: string | null;
-  message?: string | null;
-} | null | undefined): boolean => {
-  if (!error) {
-    return false;
-  }
-
-  if (error.code === 'PGRST205' || error.code === 'PGRST204') {
-    return true;
-  }
-
-  const normalized = error.message?.toLowerCase() ?? '';
-  return (
-    normalized.includes("could not find the table 'public.user_profile'") ||
-    normalized.includes("could not find the 'healthkit_enabled' column")
-  );
-};
+const isMissingUserProfileSchemaError = (
+  error: { code?: string | null; message?: string | null } | null | undefined,
+): boolean =>
+  isMissingRelationOrColumnError(error, 'user_profile') ||
+  isMissingRelationOrColumnError(error, 'user_profile', 'healthkit_enabled');
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -358,7 +351,17 @@ export default function ProfileScreen() {
         .maybeSingle();
       setAvatarUrl(profileRow?.avatar_url ?? null);
 
-      const readinessPreferences = parseReadinessPreferences(
+      const { data: adaptationPreferencesData, error: adaptationPreferencesError } = await supabase
+        .from('user_adaptation_preferences')
+        .select(
+          'readiness_enabled, readiness_checkin_mode, cycle_support_enabled, symptom_tracking_enabled, wearables_enabled, wearables_priority',
+        )
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      const parsedAdaptationPreferences = parseUserAdaptationPreferences(adaptationPreferencesData);
+      const readinessPreferences = resolveReadinessPreferences(
+        adaptationPreferencesData,
         user.user_metadata?.readiness_preferences,
       );
       setReadinessSource(readinessPreferences.source);
@@ -370,6 +373,13 @@ export default function ProfileScreen() {
       });
 
       let nextError: string | null = null;
+
+      if (
+        adaptationPreferencesError &&
+        !isMissingRelationOrColumnError(adaptationPreferencesError, 'user_adaptation_preferences')
+      ) {
+        nextError = adaptationPreferencesError.message;
+      }
 
       const { data: userProfileData, error: userProfileError } = await supabase
         .from('user_profile')
@@ -395,7 +405,11 @@ export default function ProfileScreen() {
         if (userProfileData?.experience_level) {
           setExperienceLevel(userProfileData.experience_level as TrainingExperience);
         }
-        setCycleEnabled(userProfileData?.cycle_enabled ?? false);
+        setCycleEnabled(
+          userProfileData?.cycle_enabled ??
+            parsedAdaptationPreferences.cycle_support_enabled ??
+            false,
+        );
         setAvgCycleLength(String(userProfileData?.avg_cycle_length_days ?? 28));
         if (userProfileData?.last_period_start_date) {
           const { daysSincePeriod: dsp } = await import('@/utils/cyclePhase');
@@ -525,6 +539,29 @@ export default function ProfileScreen() {
         return;
       }
 
+      const { error: adaptationError } = await supabase
+        .from('user_adaptation_preferences')
+        .upsert(
+          buildUserAdaptationPreferencesUpdate({
+            userId: user.id,
+            readinessSource: normalizedSource,
+            promptsEnabled: isReadinessPromptsEnabled,
+            cycleSupportEnabled: cycleEnabled,
+            symptomTrackingEnabled: readinessQuestions.menstrualCycle,
+            wearablesEnabled: isAppleHealthConnected,
+          }),
+          { onConflict: 'user_id' },
+        );
+
+      if (
+        adaptationError &&
+        !isMissingRelationOrColumnError(adaptationError, 'user_adaptation_preferences')
+      ) {
+        setReadinessStatusType('error');
+        setReadinessStatusMessage(adaptationError.message);
+        return;
+      }
+
       const { error: metadataError } = await supabase.auth.updateUser({
         data: mergeUserMetadata(user.user_metadata, {
           readiness_preferences: {
@@ -609,12 +646,37 @@ export default function ProfileScreen() {
       const periodDate = !isNaN(daysNum) && daysNum >= 0 ? dateFromDaysAgo(daysNum) : null;
       const cycleLen = parseInt(avgCycleLength, 10);
 
-      await supabase.from('user_profile').update({
+      const { error: cycleProfileError } = await supabase.from('user_profile').update({
         cycle_enabled: cycleEnabled,
         last_period_start_date: cycleEnabled ? periodDate : null,
         avg_cycle_length_days: !isNaN(cycleLen) && cycleLen > 0 ? cycleLen : 28,
         updated_at: new Date().toISOString(),
       }).eq('user_id', user.id);
+
+      if (cycleProfileError) {
+        throw cycleProfileError;
+      }
+
+      const { error: adaptationError } = await supabase
+        .from('user_adaptation_preferences')
+        .upsert(
+          buildUserAdaptationPreferencesUpdate({
+            userId: user.id,
+            readinessSource,
+            promptsEnabled: isReadinessPromptsEnabled,
+            cycleSupportEnabled: cycleEnabled,
+            symptomTrackingEnabled: readinessQuestions.menstrualCycle,
+            wearablesEnabled: isAppleHealthConnected,
+          }),
+          { onConflict: 'user_id' },
+        );
+
+      if (
+        adaptationError &&
+        !isMissingRelationOrColumnError(adaptationError, 'user_adaptation_preferences')
+      ) {
+        throw adaptationError;
+      }
     } finally {
       setCycleSaving(false);
     }

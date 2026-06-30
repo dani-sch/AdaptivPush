@@ -10,6 +10,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
 import type { SexAssigned, TrainingExperience, UserProfileUpdate } from '@/types/database';
+import {
+    buildEvidenceDisplayPreferencesUpdate,
+    buildUserAdaptationPreferencesUpdate,
+    isMissingRelationOrColumnError,
+} from '@/utils/profilePreferences';
 
 export default function QSetupPage() {
     const { theme } = useTheme();
@@ -120,7 +125,7 @@ export default function QSetupPage() {
             }
 
 
-            const payload: UserProfileUpdate & { user_id: string } = {
+            const legacyPayload: UserProfileUpdate & { user_id: string } = {
                 user_id: user.id,
                 date_of_birth: parsedDate,
                 sex_assigned_at_birth: sexAssigned,
@@ -132,12 +137,70 @@ export default function QSetupPage() {
                 onboarded: true,
             };
 
-            const { error: updateError } = await supabase
-                .from('user_profile')
-                .upsert(payload, { onConflict: 'user_id' });
+            const phaseTwoPayload: UserProfileUpdate & { user_id: string } = {
+                ...legacyPayload,
+                depth_mode: 'guided',
+            };
 
-            if (updateError) {
-                setFormError(updateError.message);
+            const { error: phaseTwoProfileError } = await supabase
+                .from('user_profile')
+                .upsert(phaseTwoPayload, { onConflict: 'user_id' });
+
+            if (phaseTwoProfileError) {
+                if (
+                    !isMissingRelationOrColumnError(
+                        phaseTwoProfileError,
+                        'user_profile',
+                        'depth_mode',
+                    )
+                ) {
+                    setFormError(phaseTwoProfileError.message);
+                    return;
+                }
+
+                const { error: legacyProfileError } = await supabase
+                    .from('user_profile')
+                    .upsert(legacyPayload, { onConflict: 'user_id' });
+
+                if (legacyProfileError) {
+                    setFormError(legacyProfileError.message);
+                    return;
+                }
+            }
+
+            const { error: adaptationError } = await supabase
+                .from('user_adaptation_preferences')
+                .upsert(
+                    buildUserAdaptationPreferencesUpdate({
+                        userId: user.id,
+                        readinessSource: healthKitConnected ? 'apple' : 'manual',
+                        promptsEnabled: true,
+                        cycleSupportEnabled: false,
+                        symptomTrackingEnabled: false,
+                        wearablesEnabled: healthKitConnected,
+                    }),
+                    { onConflict: 'user_id' },
+                );
+
+            if (
+                adaptationError &&
+                !isMissingRelationOrColumnError(adaptationError, 'user_adaptation_preferences')
+            ) {
+                setFormError(adaptationError.message);
+                return;
+            }
+
+            const { error: evidenceError } = await supabase
+                .from('evidence_display_preferences')
+                .upsert(buildEvidenceDisplayPreferencesUpdate(user.id), {
+                    onConflict: 'user_id',
+                });
+
+            if (
+                evidenceError &&
+                !isMissingRelationOrColumnError(evidenceError, 'evidence_display_preferences')
+            ) {
+                setFormError(evidenceError.message);
                 return;
             }
 
