@@ -2,8 +2,8 @@
 
 ## Core execution sequence
 
-1. Land evidence and policy foundations for transparent recommendations.
-2. Land additive schema and compatibility work for new readiness, preference, and generation-context flows.
+1. [DONE] Land evidence and policy foundations for transparent recommendations.
+2. [ACTIVE] Land additive schema and compatibility work for new readiness, preference, and generation-context flows.
 3. Ship Milestone 1 across Intelligence, Experience, and Trust.
 4. Ship optional physiology personalization and generator-v2 core as Milestone 2.
 5. Ship progression, deload, rationale, and analytics deepening as Milestone 3.

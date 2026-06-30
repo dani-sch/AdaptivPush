@@ -2,7 +2,7 @@
 
 ## [ACTIVE]
 
-- [ACTIVE] Bootstrap the canonical evidence and policy layer described in `reports/plans/EVIDENCE-BACKED-EXECUTION-PLAN.md` Phase 1.
+- [ACTIVE] Execute Phase 2 additive schema and compatibility work from `reports/plans/EVIDENCE-BACKED-EXECUTION-PLAN.md`, starting with the schema audit and migrations 007-014.
 - [ACTIVE] Audit real schema vs documented schema before additive migration work for new preference and readiness surfaces.
 - [ACTIVE] Prepare Milestone 1 UI implementation slices from `reports/plans/EVIDENCE-BACKED-UI-REDESIGN-PLAN.md`.
 - [ACTIVE] Use `dev-doc/reports/DEV-LOG.md` for ongoing execution logging.
