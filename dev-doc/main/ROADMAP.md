@@ -3,7 +3,7 @@
 ## Core execution sequence
 
 1. [DONE] Land evidence and policy foundations for transparent recommendations.
-2. [ACTIVE] Land additive schema and compatibility work for new readiness, preference, and generation-context flows.
+2. [ACTIVE] Land and manually close additive schema and compatibility work for new readiness, preference, and generation-context flows.
 3. Ship Milestone 1 across Intelligence, Experience, and Trust.
 4. Ship optional physiology personalization and generator-v2 core as Milestone 2.
 5. Ship progression, deload, rationale, and analytics deepening as Milestone 3.

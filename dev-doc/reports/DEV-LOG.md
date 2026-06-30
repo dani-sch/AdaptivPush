@@ -5,6 +5,54 @@
 
 ---
 
+### 2026-06-30 Phase 2 schema-and-compatibility pass {#2026-06-30-phase-2-schema-and-compatibility-pass}
+
+**Summary**: Landed the Phase 2 additive schema and compatibility slice in code: added migrations 007-014, expanded the in-repo schema reference and TS data model, wired onboarding/profile compatibility reads and writes, and made program saves intentionally create `program_generation_context`. Phase 2 is not fully closed yet because manual validation remains.
+
+**Changes**:
+| Component | Change |
+|---|---|
+| database migrations | Added additive Phase 2 migration files 007 through 014 for profile defaults, adaptation preferences, readiness check-ins, cycle symptoms, generation context, adaptation events, deload recommendations, and evidence display preferences |
+| schema reference | Replaced the schema reference with the current post-migration Phase 2 schema supplied from Supabase |
+| TypeScript data model | Expanded `types/database.ts` and profile preference helpers to model the new Phase 2 tables and preserve legacy metadata compatibility |
+| onboarding/profile flows | Wired quick setup and profile readiness/cycle settings to dual-write the new Phase 2 tables while preserving legacy metadata writes |
+| generation save flow | Updated program save to persist `session_length_preference_min` and intentionally create `program_generation_context` |
+| repo hygiene | Unignored `reports/migrations/*.sql` so the Phase 2 migration files can be committed |
+
+**Files Added/Modified**:
+| File | Action | Purpose |
+|---|---|---|
+| `.gitignore` | modified | allow Phase 2 SQL migration files under `reports/migrations/` to be committed |
+| `reports/migrations/007_user_profile_adaptive_defaults.sql` | added | add stable user-profile defaults for Phase 2 |
+| `reports/migrations/008_user_adaptation_preferences.sql` | added | add durable adaptation-preferences storage |
+| `reports/migrations/009_readiness_checkins.sql` | added | add the readiness-v2 check-in table |
+| `reports/migrations/010_cycle_symptom_logs.sql` | added | add optional cycle symptom logging |
+| `reports/migrations/011_program_generation_context.sql` | added | add program generation-context snapshot storage |
+| `reports/migrations/012_adaptation_events.sql` | added | add adaptation event audit storage |
+| `reports/migrations/013_deload_recommendations.sql` | added | add deload recommendation storage |
+| `reports/migrations/014_evidence_display_preferences.sql` | added | add evidence display preference storage |
+| `lib/adaptivpush_database_schema.md` | added | record the current post-migration schema reference |
+| `types/database.ts` | modified | model the new Phase 2 schema and compatibility shapes |
+| `utils/profilePreferences.ts` | modified | add dual-read and dual-write compatibility helpers for readiness preferences |
+| `utils/saveProgramToDb.ts` | modified | persist session-length defaults and generation-context snapshots intentionally |
+| `app/(qsetup)/quick-setup.tsx` | modified | seed Phase 2 defaults during onboarding without breaking legacy-compatible behavior |
+| `app/(tabs)/profile/index.tsx` | modified | dual-read and dual-write readiness/cycle settings using Phase 2 tables and legacy metadata |
+| `components/GenerateProgramModal.tsx` | modified | save generated programs with explicit generation-context behavior |
+
+**Validation**:
+| Check | Result |
+|---|---|
+| `npm run lint` | passed with 0 errors and only pre-existing warnings outside the Phase 2 slice |
+| schema reference refresh | completed against the current Phase 2 schema provided from Supabase |
+
+**Remaining tasks/tests before Phase 2 is complete**:
+- review the applied Phase 2 schema in Supabase against `lib/adaptivpush_database_schema.md`
+- manually verify onboarding writes the new defaults without breaking legacy-compatible reads
+- manually verify profile readiness and cycle settings dual-read and dual-write correctly
+- manually verify program save intentionally creates `program_generation_context` and does not regress the existing generation flow
+
+---
+
 ### 2026-06-30 Phase 1 complete and Phase 2 queued {#2026-06-30-phase-1-complete-and-phase-2-queued}
 
 **Summary**: Closed Phase 1 of the evidence-backed execution plan after the manual in-app `GenerateProgramModal` smoke succeeded, then moved the active documentation lane to Phase 2 schema and compatibility work.
