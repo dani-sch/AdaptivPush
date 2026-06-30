@@ -169,7 +169,7 @@ const FinishModal: React.FC<{
 
 export default function NextWorkoutScreen() {
   const { workoutId } = useLocalSearchParams<{ workoutId?: string }>();
-  const { program, loading, applyProgressionToNextWeek } = useCurrentProgram();
+  const { program, loading, applyProgressionToNextWeek, swapExercise } = useCurrentProgram();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -317,6 +317,35 @@ export default function NextWorkoutScreen() {
     );
   };
 
+  const applyWorkoutSwap = async ({
+    exerciseId,
+    replacement,
+    applyToProgram,
+  }: {
+    exerciseId: string;
+    replacement: ProgramWorkout["exercises"][number];
+    applyToProgram: boolean;
+  }) => {
+    if (applyToProgram) {
+      await swapExercise({ exerciseId, replacement, applyToProgram: true });
+    }
+
+    setExercises((prev) =>
+      prev.map((ex) =>
+        ex.id === exerciseId
+          ? {
+              ...ex,
+              exerciseId: replacement.exerciseId ?? replacement.id,
+              name: replacement.name,
+              muscleGroup: replacement.muscleGroup,
+              imageUrl: replacement.imageUrl,
+              description: replacement.description,
+            }
+          : ex,
+      ),
+    );
+  };
+
   const handleFinish = async () => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     setShowFinishModal(false);
@@ -397,7 +426,7 @@ export default function NextWorkoutScreen() {
       // For each exercise, find the best weight×reps set just saved and compare
       // against the user's all-time best for that exercise.
       const newPrNames: string[] = [];
-      const newPrs: Array<{ name: string; weight: number; reps: number }> = [];
+      const newPrs: { name: string; weight: number; reps: number }[] = [];
       try {
         for (const ex of exercises) {
           if (!ex.exerciseId) continue;
@@ -460,8 +489,14 @@ export default function NextWorkoutScreen() {
       // Trigger progression for next week now that new data is available
       try {
         await applyProgressionToNextWeek();
-      } catch (progressionErr) {
-        console.warn("[handleFinish] Progression update failed:", progressionErr);
+      } catch {
+        setSaving(false);
+        Alert.alert(
+          "Workout saved",
+          "Your workout was saved, but we couldn't update next week's progression. Please refresh before your next session.",
+          [{ text: "OK", onPress: () => router.back() }],
+        );
+        return;
       }
 
       setSaving(false);
@@ -632,22 +667,20 @@ export default function NextWorkoutScreen() {
             exerciseId={swapTargetId}
             context="workout"
             onClose={() => setSwapTargetId(null)}
-            onSwap={({ exerciseId, replacement }) => {
+            onSwap={(swapArgs) => {
                 void haptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
-                setExercises((prev) =>
-                prev.map((ex) =>
-                  ex.id === exerciseId
-                    ? {
-                        ...ex,
-                        id: replacement.id,
-                        exerciseId: replacement.exerciseId,
-                        name: replacement.name,
-                        muscleGroup: replacement.muscleGroup,
-                      }
-                    : ex,
-                ),
-              );
-              setSwapTargetId(null);
+                void applyWorkoutSwap(swapArgs)
+                  .then(() => {
+                    setSwapTargetId(null);
+                  })
+                  .catch((error: unknown) => {
+                    Alert.alert(
+                      "Couldn't swap exercise",
+                      error instanceof Error
+                        ? error.message
+                        : "Please try again.",
+                    );
+                  });
             }}
           />
         )}

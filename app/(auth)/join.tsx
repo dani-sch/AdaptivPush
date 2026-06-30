@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Platform, Keyboard, View, Text, TextInput, Pressable, StyleSheet } from "react-native";
+import { Alert, Keyboard, KeyboardAvoidingView, ScrollView, View, Text, TextInput, Pressable, StyleSheet } from "react-native";
 import { Link, router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { KeyboardAvoidingView, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { supabase } from "@/utils/supabase";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -18,6 +17,7 @@ export default function JoinScreen() {
     const [fullName, setFullName] = useState('');
     const [emailError, setEmailError] = useState('');
     const [passwordError, setPasswordError] = useState('');
+    const [authError, setAuthError] = useState('');
     const [keyboardVisible, setKeyboardVisible] = useState(false);
     const [keyboardHeight, setKeyboardHeight] = useState(0);
 
@@ -68,23 +68,17 @@ export default function JoinScreen() {
     };
 
     const handleSubmit = async () => {
-        console.log("SUPABASE_URL:", process.env.EXPO_PUBLIC_SUPABASE_URL);
-        console.log("SUPABASE_KEY exists:", !!process.env.EXPO_PUBLIC_SUPABASE_KEY);
-        console.log("[Sign up clicked] User attempting to join with: ", fullName, email, password);
+        setAuthError('');
+
         if (emailError) {
-            console.log("[Sign up clicked] Email error: ", emailError);
-            //TODO: show error in ui
+            setAuthError(emailError);
             return;
         } else if (passwordError) {
-            console.log("[Sign up clicked] Password error: ", passwordError);
-            //TODO: show error in ui
+            setAuthError(passwordError);
             return;
         } else if (!email || !password || !fullName){
-            console.log("[Sign up clicked] Some fields incomplete")
-            //TODO: show error in ui
+            setAuthError('Please complete all fields.');
             return;
-        } else {
-            console.log("[Sign up clicked] All fields complete")
         }
 
         const { data, error}  = await supabase.auth.signUp({
@@ -98,15 +92,20 @@ export default function JoinScreen() {
         });
 
         if (error) {
-            console.log("[Sign up clicked] Error: ", error.message);
-            //TODO: show error in ui
+            setAuthError(error.message);
             return;
         }
 
-        console.log("[Sign up clicked] Success! User signed up with id: ", data.user?.id);
+        if (!data.session?.user) {
+            Alert.alert(
+                'Check your email',
+                'Confirm your email address, then sign in to finish quick setup.',
+            );
+            router.replace('/login');
+            return;
+        }
 
-        // Navigate to quick setup after successful signup
-        router.push("/quick-setup");
+        router.replace('/quick-setup');
     };
 
 
@@ -246,6 +245,7 @@ export default function JoinScreen() {
                         )}
 
                         {/* Primary Button */}
+                        {!!authError && <Text style={styles.errorText}>{authError}</Text>}
                         <Pressable
                             onPress={handleSubmit}
                             disabled={disabled}

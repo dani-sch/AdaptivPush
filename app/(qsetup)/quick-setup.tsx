@@ -9,19 +9,22 @@ import { Dropdown } from 'react-native-element-dropdown';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
+import type { SexAssigned, TrainingExperience, UserProfileUpdate } from '@/types/database';
 
 export default function QSetupPage() {
     const { theme } = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
 
     const [dateOfBirth, setDateOfBirth] = useState('');
-    const [sexAssigned, setSexAssigned] = useState('');
+    const [sexAssigned, setSexAssigned] = useState<SexAssigned | ''>('');
     const [genderIdentity, setGenderIdentity] = useState('');
     const [weight, setWeight] = useState('');
     const [weightUnit, setWeightUnit] = useState<'lb' | 'kg'>('lb');
-    const [experienceLevel, setExperienceLevel] = useState('');
+    const [experienceLevel, setExperienceLevel] = useState<TrainingExperience | ''>('');
     const [healthKitConnected, setHealthKitConnected] = useState(false);
     const [showGenModal, setShowGenModal] = useState(false);
+    const [formError, setFormError] = useState('');
+    const [saving, setSaving] = useState(false);
 
     const [keyboardVisible, setKeyboardVisible] = useState(false);
     const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -67,57 +70,42 @@ export default function QSetupPage() {
     }, []);
 
     const handleContinue = async () => {
-        console.log('[Quick Setup] Continue pressed');
-        console.log('[Quick Setup] Current state:', { dateOfBirth, sexAssigned, experienceLevel, weight, weightUnit, genderIdentity, healthKitConnected });
+        setFormError('');
 
         // Validate required fields
         if (!dateOfBirth || !sexAssigned || !experienceLevel) {
-            console.log('[Quick Setup] Validation failed: missing required fields');
-            console.log('[Quick Setup] Missing:', {
-                dateOfBirth: !dateOfBirth,
-                sexAssigned: !sexAssigned,
-                experienceLevel: !experienceLevel
-            });
+            setFormError('Please complete your date of birth, sex assigned at birth, and training experience.');
             return;
         }
 
         // Parse and validate date
         const parsedDate = parseDateInput(dateOfBirth);
-        console.log('[Quick Setup] Parsed date:', parsedDate, 'from input:', dateOfBirth);
         if (!parsedDate) {
-            console.log('[Quick Setup] Invalid date format');
+            setFormError('Enter a valid date of birth in mm/dd/yyyy format.');
             return;
         }
 
         if (!isOldEnough(parsedDate, 13)) {
-            console.log('[Quick Setup] User must be at least 13 years old');
+            setFormError('You must be at least 13 years old to continue.');
             return;
         }
 
         try {
-            // Get current user session
-            let userId: string | null = null;
+            setSaving(true);
 
-            // try getSession
-            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            const {
+                data: { user },
+                error: authError,
+            } = await supabase.auth.getUser();
 
-            if (session?.user) {
-                userId = session.user.id;
-                console.log('[Quick Setup] User authenticated via getSession:', userId);
-            } else {
-                //  Try getUser as fallback
-                const { data: { user }, error: authError } = await supabase.auth.getUser();
+            if (authError) {
+                throw authError;
+            }
 
-                if (user) {
-                    userId = user.id;
-                    console.log('[Quick Setup] User authenticated via getUser:', userId);
-                } else {
-                    // DEV MODE: Use hardcoded user ID for testing
-
-                    userId = 'e3f19ef7-9cac-4436-9f15-97fb6d469eba';
-                    console.log('[Quick Setup]  DEV MODE: Using hardcoded user_id for testing:', userId);
-                    console.log('[Quick Setup] Auth error - session:', sessionError?.message, 'user:', authError?.message);
-                }
+            if (!user) {
+                setFormError('Your session expired. Please sign in again to finish setup.');
+                router.replace('/login');
+                return;
             }
 
             // Convert weight if provided
@@ -125,14 +113,15 @@ export default function QSetupPage() {
             if (weight) {
                 const weightNum = parseFloat(weight);
                 if (isNaN(weightNum) || weightNum <= 0) {
-                    console.log('[Quick Setup] Invalid weight value');
+                    setFormError('Enter a valid weight or leave it blank.');
                     return;
                 }
                 weightLb = weightUnit === 'kg' ? kgToLb(weightNum) : weightNum;
             }
 
 
-            const payload = {
+            const payload: UserProfileUpdate & { user_id: string } = {
+                user_id: user.id,
                 date_of_birth: parsedDate,
                 sex_assigned_at_birth: sexAssigned,
                 gender_identity: genderIdentity || null,
@@ -143,40 +132,33 @@ export default function QSetupPage() {
                 onboarded: true,
             };
 
-            console.log('[Quick Setup] Updating user_profile with payload:', payload);
-            console.log('[Quick Setup] Using user_id:', userId);
-
-            // Update user profile
-            const { data, error: updateError } = await supabase
+            const { error: updateError } = await supabase
                 .from('user_profile')
-                .update(payload)
-                .eq('user_id', userId)
-                .select();
+                .upsert(payload, { onConflict: 'user_id' });
 
             if (updateError) {
-                console.log('[Quick Setup] Update error:', updateError.message);
-                console.log('[Quick Setup] Full error object:', JSON.stringify(updateError, null, 2));
+                setFormError(updateError.message);
                 return;
             }
 
-            console.log('[Quick Setup] Success! Profile updated');
-            console.log('[Quick Setup] Updated data:', data);
-
             setShowGenModal(true);
-        } catch (e: any) {
-            console.log('[Quick Setup] Unexpected error:', e?.message ?? e);
-            console.log('[Quick Setup] Full error:', e);
+        } catch (error: unknown) {
+            setFormError(
+                error instanceof Error
+                    ? error.message
+                    : 'Something went wrong while saving your setup.',
+            );
+        } finally {
+            setSaving(false);
         }
     };
 
     const handleHealthConnect = () => {
-        console.log('[Quick Setup] Apple Health Connect pressed');
         setHealthKitConnected(true);
         // TODO: Actual HealthKit permission flow
     };
 
     const handleHealthNotNow = () => {
-        console.log('[Quick Setup] Apple Health Not Now pressed');
         setHealthKitConnected(false);
     };
 
@@ -347,11 +329,15 @@ export default function QSetupPage() {
                         />
 
                         {/* Continue Button */}
+                        {!!formError && <Text style={styles.errorText}>{formError}</Text>}
                         <Pressable
                             onPress={handleContinue}
-                            style={styles.primaryButton}
+                            disabled={saving}
+                            style={[styles.primaryButton, saving && styles.primaryButtonDisabled]}
                         >
-                            <Text style={styles.primaryButtonText}>Continue</Text>
+                            <Text style={styles.primaryButtonText}>
+                                {saving ? 'Saving...' : 'Continue'}
+                            </Text>
                         </Pressable>
 
                     </View>
@@ -583,10 +569,17 @@ function createStyles(theme: Theme) {
             borderRadius: 16,
             alignItems: "center",
         },
+        primaryButtonDisabled: {
+            opacity: 0.6,
+        },
         primaryButtonText: {
             color: theme.white,
             fontWeight: "600",
             fontSize: 16,
+        },
+        errorText: {
+            color: theme.errorLight,
+            marginTop: 12,
         },
         secondaryButton: {
             marginTop: 12,

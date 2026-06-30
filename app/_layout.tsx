@@ -3,7 +3,7 @@ import {
   DefaultTheme,
   ThemeProvider,
 } from "@react-navigation/native";
-import { Stack, router, useRootNavigationState } from "expo-router";
+import { Stack, router, useRootNavigationState, useSegments } from "expo-router";
 import * as Notifications from "expo-notifications";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
@@ -26,22 +26,61 @@ Notifications.setNotificationHandler({
 function RootLayoutInner() {
   const colorScheme = useColorScheme();
   const navigationState = useRootNavigationState();
+  const segments = useSegments();
   const { isDark } = useTheme();
 
   useEffect(() => {
     if (!navigationState?.key) return;
 
-    supabase.auth
-      .getSession()
-      .then(({ data: { session } }) => {
-        if (session) {
-          router.replace("/(tabs)/home");
+    let cancelled = false;
+
+    const syncRoute = async () => {
+      const rootSegment = segments[0];
+      const isAuthRoute = rootSegment === "(auth)";
+      const isSetupRoute = rootSegment === "(qsetup)";
+      const isRootRoute = rootSegment == null;
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (cancelled) return;
+
+      if (!session?.user) {
+        if (!isAuthRoute && !isRootRoute) {
+          router.replace("/");
         }
-      })
-      .catch(() => {
-        // Network unavailable or credentials not yet configured — stay on current screen
-      });
-  }, [navigationState?.key]);
+        return;
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from("user_profile")
+        .select("onboarded")
+        .eq("user_id", session.user.id)
+        .maybeSingle<{ onboarded: boolean | null }>();
+
+      if (cancelled || profileError) return;
+
+      if (profile?.onboarded !== true) {
+        if (!isSetupRoute) {
+          router.replace("/quick-setup");
+        }
+        return;
+      }
+
+      if (isAuthRoute || isSetupRoute || isRootRoute) {
+        router.replace("/(tabs)/home");
+      }
+    };
+
+    syncRoute().catch(() => {
+      // Network unavailable or credentials not yet configured — stay on current screen
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [navigationState?.key, segments]);
 
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>

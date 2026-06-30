@@ -6,6 +6,7 @@ import { Link, router } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Pressable,
@@ -73,18 +74,28 @@ export default function LoginScreen() {
       });
 
       if (error) {
-        console.log("[Login] Error:", error.message);
         setAuthError(error.message);
         return;
       }
 
-      console.log("[Login] Success! User id:", data.user?.id);
+      const { data: profile, error: profileError } = await supabase
+        .from("user_profile")
+        .select("onboarded")
+        .eq("user_id", data.user.id)
+        .maybeSingle<{ onboarded: boolean | null }>();
 
-      // Navigate into the app
-      router.replace("/(tabs)/home");
-    } catch (e: any) {
-      console.log("[Login] Unexpected error:", e?.message ?? e);
-      setAuthError(e?.message ?? "Something went wrong. Please try again.");
+      if (profileError) {
+        setAuthError("We couldn't load your account setup. Please try again.");
+        return;
+      }
+
+      router.replace(profile?.onboarded ? "/(tabs)/home" : "/quick-setup");
+    } catch (error: unknown) {
+      setAuthError(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -175,7 +186,10 @@ export default function LoginScreen() {
             {/* Forgot password (outline) */}
             <Pressable
               onPress={() => {
-                router.push("/(auth)/forgot-password");
+                Alert.alert(
+                  "Password reset unavailable",
+                  "Password reset is not available in this build yet.",
+                );
               }}
               style={styles.forgotWrap}
             >

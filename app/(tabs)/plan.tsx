@@ -310,7 +310,7 @@ export default function PlanScreen() {
 
                 {/* Week View */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>This Week's Workouts</Text>
+                    <Text style={styles.sectionTitle}>This Week&apos;s Workouts</Text>
 
                     {/* Weekly Progress */}
                     <View style={styles.section}>
