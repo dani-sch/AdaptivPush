@@ -1,154 +1,93 @@
+import { ADAPTATION_POLICIES } from '@/constants/adaptationPolicies';
+import { EVIDENCE_REGISTRY } from '@/constants/evidenceRegistry';
+import {
+  COMPOUND_EQUIPMENT,
+  DAY_INDEXES,
+  EXPERIENCE_MODIFIERS,
+  GENERATOR_DEFAULTS,
+  GOAL_LABELS,
+  GOAL_PARAMS,
+  SPLIT_DAYS,
+  SPLIT_STRUCTURE,
+  WORKOUT_NAMES,
+  type GoalParams,
+} from '@/constants/programDefaults';
 import {
   type GeneratedExerciseSlot,
   type GeneratedProgram,
   type GeneratedProgramDay,
+  type GeneratedProgramDayExplanation,
+  type GeneratedProgramExplanation,
   type MuscleGroup,
   type ProgramGenParams,
-  type TrainingGoal,
+  type GeneratedExerciseExplanation,
 } from '@/types/program';
 import { type TrainingExperience } from '@/types/database';
+import {
+  type AdaptationPolicyId,
+  type EvidenceKey,
+  type EvidenceReference,
+  type ExplanationMetadata,
+} from '@/types/evidence';
 import { type CyclePhase } from '@/utils/cyclePhase';
 import {
   exercisesByMuscleGroup,
   type LocalExercise,
 } from '@/lib/exerciseDatabase';
 
-// ─── Goal parameters ──────────────────────────────────────────────────────────
-
-interface GoalParams {
-  sets: number;
-  repMin: number;
-  repMax: number;
-  rpe: number;
-  weightMultiplier: number;
-}
-
-const GOAL_PARAMS: Record<TrainingGoal, GoalParams> = {
-  strength:        { sets: 5, repMin: 3,  repMax: 5,  rpe: 8.5, weightMultiplier: 1.00 },
-  hypertrophy:     { sets: 4, repMin: 8,  repMax: 12, rpe: 7.5, weightMultiplier: 0.75 },
-  endurance:       { sets: 3, repMin: 15, repMax: 20, rpe: 6.0, weightMultiplier: 0.50 },
-  fat_loss:        { sets: 3, repMin: 12, repMax: 15, rpe: 7.0, weightMultiplier: 0.60 },
-  general_fitness: { sets: 3, repMin: 8,  repMax: 12, rpe: 7.0, weightMultiplier: 0.70 },
-};
-
-// ─── Experience level modifiers ───────────────────────────────────────────────
-
-interface ExperienceModifier {
-  setsMultiplier: number; // scales final slot sets (e.g. 0.85 → fewer sets for beginner)
-  rpeOffset:      number; // added to periodized RPE after slot adjustment
-}
-
-const EXPERIENCE_MODIFIERS: Record<TrainingExperience, ExperienceModifier> = {
-  beginner:     { setsMultiplier: 0.85, rpeOffset: -1.0 },
-  intermediate: { setsMultiplier: 1.00, rpeOffset:  0.0 },
-  advanced:     { setsMultiplier: 1.15, rpeOffset: +0.5 },
-};
-
-// ─── Split definitions ────────────────────────────────────────────────────────
-
-type SplitDayType =
-  | 'Full Body'
-  | 'Upper'
-  | 'Upper A'
-  | 'Upper B'
-  | 'Lower'
-  | 'Lower A'
-  | 'Lower B'
-  | 'Push'
-  | 'Push A'
-  | 'Push B'
-  | 'Pull'
-  | 'Pull A'
-  | 'Pull B'
-  | 'Legs'
-  | 'Legs A'
-  | 'Legs B'
-  | 'Full Body Deload';
-
-interface SplitDay {
-  type: SplitDayType;
-  muscleGroups: MuscleGroup[];
-  /** prefer compound equipment (Barbell) over isolation on this day */
-  compoundEmphasis: boolean;
-}
-
-const SPLIT_DAYS: Record<SplitDayType, SplitDay> = {
-  'Full Body':        { type: 'Full Body',        muscleGroups: ['Legs', 'Chest', 'Back', 'Shoulders', 'Core'],              compoundEmphasis: true  },
-  'Full Body Deload': { type: 'Full Body Deload',  muscleGroups: ['Legs', 'Chest', 'Back', 'Shoulders', 'Core'],              compoundEmphasis: false },
-  'Upper':            { type: 'Upper',             muscleGroups: ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps'],         compoundEmphasis: true  },
-  'Upper A':          { type: 'Upper A',           muscleGroups: ['Chest', 'Shoulders', 'Triceps', 'Back', 'Biceps'],         compoundEmphasis: true  },
-  'Upper B':          { type: 'Upper B',           muscleGroups: ['Chest', 'Shoulders', 'Triceps', 'Back', 'Biceps'],         compoundEmphasis: false },
-  'Lower':            { type: 'Lower',             muscleGroups: ['Legs', 'Glutes', 'Core'],                                  compoundEmphasis: true  },
-  'Lower A':          { type: 'Lower A',           muscleGroups: ['Legs', 'Glutes', 'Core'],                                  compoundEmphasis: true  },
-  'Lower B':          { type: 'Lower B',           muscleGroups: ['Legs', 'Glutes', 'Core'],                                  compoundEmphasis: false },
-  'Push':             { type: 'Push',              muscleGroups: ['Chest', 'Shoulders', 'Triceps'],                           compoundEmphasis: true  },
-  'Push A':           { type: 'Push A',            muscleGroups: ['Chest', 'Shoulders', 'Triceps'],                           compoundEmphasis: true  },
-  'Push B':           { type: 'Push B',            muscleGroups: ['Chest', 'Shoulders', 'Triceps'],                           compoundEmphasis: false },
-  'Pull':             { type: 'Pull',              muscleGroups: ['Back', 'Biceps'],                                          compoundEmphasis: true  },
-  'Pull A':           { type: 'Pull A',            muscleGroups: ['Back', 'Biceps'],                                          compoundEmphasis: true  },
-  'Pull B':           { type: 'Pull B',            muscleGroups: ['Back', 'Biceps'],                                          compoundEmphasis: false },
-  'Legs':             { type: 'Legs',              muscleGroups: ['Legs', 'Glutes', 'Core'],                                  compoundEmphasis: true  },
-  'Legs A':           { type: 'Legs A',            muscleGroups: ['Legs', 'Glutes', 'Core'],                                  compoundEmphasis: true  },
-  'Legs B':           { type: 'Legs B',            muscleGroups: ['Legs', 'Glutes', 'Core'],                                  compoundEmphasis: false },
-};
-
-/** Split structure per daysPerWeek value */
-const SPLIT_STRUCTURE: Record<number, SplitDayType[]> = {
-  1: ['Full Body'],
-  2: ['Upper', 'Lower'],
-  3: ['Push', 'Pull', 'Legs'],
-  4: ['Upper A', 'Lower A', 'Upper B', 'Lower B'],
-  5: ['Push', 'Pull', 'Legs', 'Upper', 'Lower'],
-  6: ['Push A', 'Pull A', 'Legs A', 'Push B', 'Pull B', 'Legs B'],
-  7: ['Push A', 'Pull A', 'Legs A', 'Push B', 'Pull B', 'Legs B', 'Full Body Deload'],
-};
-
-/** Day-of-week indexes (1=Monday) assigned per daysPerWeek value */
-const DAY_INDEXES: Record<number, number[]> = {
-  1: [1],
-  2: [1, 4],
-  3: [1, 3, 5],
-  4: [1, 2, 4, 5],
-  5: [1, 2, 3, 5, 6],
-  6: [1, 2, 3, 4, 5, 6],
-  7: [1, 2, 3, 4, 5, 6, 7],
-};
-
-// ─── Workout name mapping ─────────────────────────────────────────────────────
-
-const WORKOUT_NAMES: Record<SplitDayType, string> = {
-  'Full Body':        'Full Body',
-  'Full Body Deload': 'Full Body (Deload)',
-  'Upper':            'Upper Body',
-  'Upper A':          'Upper Body A',
-  'Upper B':          'Upper Body B',
-  'Lower':            'Lower Body',
-  'Lower A':          'Lower Body A',
-  'Lower B':          'Lower Body B',
-  'Push':             'Push Day',
-  'Push A':           'Push Day A',
-  'Push B':           'Push Day B',
-  'Pull':             'Pull Day',
-  'Pull A':           'Pull Day A',
-  'Pull B':           'Pull Day B',
-  'Legs':             'Leg Day',
-  'Legs A':           'Leg Day A',
-  'Legs B':           'Leg Day B',
-};
-
-const GOAL_LABELS: Record<TrainingGoal, string> = {
-  strength:        'Strength',
-  hypertrophy:     'Hypertrophy',
-  endurance:       'Endurance',
-  fat_loss:        'Fat Loss',
-  general_fitness: 'General Fitness',
-};
-
-// ─── Compound equipment (preferred for first slot) ────────────────────────────
-
-const COMPOUND_EQUIPMENT = new Set(['Barbell', 'Dumbbell']);
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function buildEvidenceReferences(policyIds: readonly AdaptationPolicyId[]): EvidenceReference[] {
+  const seenEvidenceKeys = new Set<EvidenceKey>();
+  const evidence: EvidenceReference[] = [];
+
+  for (const policyId of policyIds) {
+    for (const evidenceKey of ADAPTATION_POLICIES[policyId].evidenceKeys) {
+      if (seenEvidenceKeys.has(evidenceKey)) {
+        continue;
+      }
+
+      const entry = EVIDENCE_REGISTRY[evidenceKey];
+      evidence.push({
+        key: entry.key,
+        label: entry.label,
+        strength: entry.strength,
+        sourceRoute: entry.sourceRoute,
+      });
+      seenEvidenceKeys.add(evidenceKey);
+    }
+  }
+
+  return evidence;
+}
+
+function uniquePolicyIds(policyIds: readonly AdaptationPolicyId[]): AdaptationPolicyId[] {
+  const seen = new Set<AdaptationPolicyId>();
+  const unique: AdaptationPolicyId[] = [];
+
+  for (const policyId of policyIds) {
+    if (!seen.has(policyId)) {
+      seen.add(policyId);
+      unique.push(policyId);
+    }
+  }
+
+  return unique;
+}
+
+function buildExplanation(summary: string, policyIds: readonly AdaptationPolicyId[]): ExplanationMetadata {
+  const normalizedPolicyIds = uniquePolicyIds(policyIds);
+
+  return {
+    summary,
+    policyIds: normalizedPolicyIds,
+    evidence: buildEvidenceReferences(normalizedPolicyIds),
+  };
+}
+
+function isCompoundExercise(position: number, equipment: string): boolean {
+  return position <= GENERATOR_DEFAULTS.compoundPrioritySlots || COMPOUND_EQUIPMENT.has(equipment);
+}
 
 /** In-place Fisher-Yates shuffle — returns the same array for convenience. */
 function shuffle<T>(arr: T[]): T[] {
@@ -240,24 +179,40 @@ function resolveSlotParams(
 ): GoalParams {
   // RPE ramp: week 1 starts at base - 1.5, linearly reaches base by final loading week
   const rpeRamp = totalLoadingWeeks > 1
-    ? baseParams.rpe - 1.5 + (1.5 * (effectiveWeek - 1)) / (totalLoadingWeeks - 1)
+    ? baseParams.rpe
+        - GENERATOR_DEFAULTS.periodizationRpeRampDelta
+        + (GENERATOR_DEFAULTS.periodizationRpeRampDelta * (effectiveWeek - 1)) / (totalLoadingWeeks - 1)
     : baseParams.rpe;
   const periodizedRPE = Math.round(Math.min(rpeRamp, baseParams.rpe) * 10) / 10;
 
   // Slot-type adjustment (compound vs accessory)
-  const isCompound = position <= 2 || COMPOUND_EQUIPMENT.has(exercise.equipment);
-  const slotSets = isCompound ? baseParams.sets : Math.max(baseParams.sets - 1, 2);
-  const slotRPE  = isCompound ? periodizedRPE   : Math.max(periodizedRPE - 0.5, 5.0);
+  const isCompound = isCompoundExercise(position, exercise.equipment);
+  const slotSets = isCompound
+    ? baseParams.sets
+    : Math.max(baseParams.sets - GENERATOR_DEFAULTS.accessorySetReduction, GENERATOR_DEFAULTS.minSets);
+  const slotRPE = isCompound
+    ? periodizedRPE
+    : Math.max(periodizedRPE - GENERATOR_DEFAULTS.accessoryRpeReduction, GENERATOR_DEFAULTS.minRpe);
 
   // Experience modifier
   const mod = EXPERIENCE_MODIFIERS[experienceLevel];
-  let finalSets = Math.max(Math.round(slotSets * mod.setsMultiplier), 2);
-  let finalRPE  = Math.round(Math.min(Math.max(slotRPE + mod.rpeOffset, 5.0), 10.0) * 10) / 10;
+  let finalSets = Math.max(Math.round(slotSets * mod.setsMultiplier), GENERATOR_DEFAULTS.minSets);
+  let finalRPE = Math.round(
+    Math.min(
+      Math.max(slotRPE + mod.rpeOffset, GENERATOR_DEFAULTS.minRpe),
+      GENERATOR_DEFAULTS.maxRpe,
+    ) * 10,
+  ) / 10;
 
   // Cycle phase modifier — menstrual and luteal phases reduce intensity
   if (cyclePhase === 'menstrual' || cyclePhase === 'luteal') {
-    finalSets = Math.max(isCompound ? finalSets - 1 : finalSets, 2);
-    finalRPE  = Math.round(Math.max(finalRPE - 0.5, 5.0) * 10) / 10;
+    finalSets = Math.max(
+      isCompound ? finalSets - GENERATOR_DEFAULTS.cyclePhaseSetReduction : finalSets,
+      GENERATOR_DEFAULTS.minSets,
+    );
+    finalRPE = Math.round(
+      Math.max(finalRPE - GENERATOR_DEFAULTS.cyclePhaseRpeReduction, GENERATOR_DEFAULTS.minRpe) * 10,
+    ) / 10;
   }
 
   return { ...baseParams, sets: finalSets, rpe: finalRPE };
@@ -276,6 +231,7 @@ function buildSlot(
   cyclePhase?: CyclePhase,
 ): GeneratedExerciseSlot {
   const slotParams = resolveSlotParams(goalParams, position, effectiveWeek, totalLoadingWeeks, exercise, experienceLevel, cyclePhase);
+  const isCompound = isCompoundExercise(position, exercise.equipment);
   const expMult = exercise.experienceMultipliers[experienceLevel];
   const baseWeight =
     exercise.bodyweightMultiplier === 0
@@ -287,14 +243,42 @@ function buildSlot(
 
   // Progressive overload: +5% per effective loading week.
   // Deload weeks use 70% of the last loading week's weight.
-  const weeklyFactor = 1 + 0.05 * (effectiveWeek - 1);
-  const deloadFactor = isDeload ? 0.70 : 1.0;
+  const weeklyFactor = 1 + GENERATOR_DEFAULTS.progressiveOverloadPerWeek * (effectiveWeek - 1);
+  const deloadFactor = isDeload ? GENERATOR_DEFAULTS.deloadWeightFactor : 1.0;
   const suggested = roundWeight(baseWeight * weeklyFactor * deloadFactor);
 
   // Deload: reduce RPE by 2.0 from base (already periodized RPE doesn't matter for deload)
   const finalRPE = isDeload
-    ? Math.max(slotParams.rpe - 2.0, 5.0)
+    ? Math.max(slotParams.rpe - GENERATOR_DEFAULTS.deloadRpeReduction, GENERATOR_DEFAULTS.minRpe)
     : slotParams.rpe;
+  const policyIds: AdaptationPolicyId[] = [
+    'goal_prescription',
+    'exercise_stability',
+    'progressive_overload',
+  ];
+
+  if (isCompound) {
+    policyIds.push('compound_priority');
+  }
+  if (experienceLevel !== 'intermediate') {
+    policyIds.push('experience_scaling');
+  }
+  if (isDeload) {
+    policyIds.push('deload_cadence');
+  }
+  if (cyclePhase === 'menstrual' || cyclePhase === 'luteal') {
+    policyIds.push('cycle_phase_caution');
+  }
+
+  const explanation: GeneratedExerciseExplanation = {
+    slotType: isCompound ? 'compound' : 'accessory',
+    ...buildExplanation(
+      isCompound
+        ? `Compound-forward slot with ${slotParams.sets} sets in the ${slotParams.repMin}-${slotParams.repMax} rep range.`
+        : `Accessory slot with recoverability-adjusted volume in the ${slotParams.repMin}-${slotParams.repMax} rep range.`,
+      policyIds,
+    ),
+  };
 
   return {
     localExerciseId: exercise.id,
@@ -305,6 +289,7 @@ function buildSlot(
     repRangeMax: slotParams.repMax,
     targetRPE: finalRPE,
     suggestedWeightLb: suggested,
+    explanation,
   };
 }
 
@@ -312,21 +297,31 @@ function buildSlot(
 function exercisesPerDay(daysPerWeek: number, targetMinutes?: number | null, setCount?: number): number {
   // Default uncapped counts (same as before)
   let uncapped: number;
-  if (daysPerWeek <= 2) uncapped = 6;
-  else if (daysPerWeek <= 4) uncapped = 5;
-  else uncapped = 4;
+  if (daysPerWeek <= GENERATOR_DEFAULTS.lowFrequencyMaxDays) {
+    uncapped = GENERATOR_DEFAULTS.lowFrequencyExerciseCount;
+  } else if (daysPerWeek <= GENERATOR_DEFAULTS.mediumFrequencyMaxDays) {
+    uncapped = GENERATOR_DEFAULTS.mediumFrequencyExerciseCount;
+  } else {
+    uncapped = GENERATOR_DEFAULTS.highFrequencyExerciseCount;
+  }
 
   if (!targetMinutes || !setCount) return uncapped;
 
   // ~2.5 min per set (30-45s work + 60-90s rest) + 2 min transition per exercise
-  const minutesPerExercise = setCount * 2.5 + 2;
-  const maxFromTime = Math.max(3, Math.floor(targetMinutes / minutesPerExercise));
+  const minutesPerExercise =
+    setCount * GENERATOR_DEFAULTS.minutesPerSet + GENERATOR_DEFAULTS.transitionMinutesPerExercise;
+  const maxFromTime = Math.max(
+    GENERATOR_DEFAULTS.minExercisesPerDay,
+    Math.floor(targetMinutes / minutesPerExercise),
+  );
   return Math.min(uncapped, maxFromTime);
 }
 
 /** Estimated session duration in minutes. */
 function estimateDuration(exerciseCount: number, setCount: number): number {
-  return exerciseCount * (setCount * 2.5 + 2);
+  return exerciseCount * (
+    setCount * GENERATOR_DEFAULTS.minutesPerSet + GENERATOR_DEFAULTS.transitionMinutesPerExercise
+  );
 }
 
 // ─── Slot-map helper ─────────────────────────────────────────────────────────
@@ -435,14 +430,14 @@ export function generateProgram(
   const allDays: GeneratedProgramDay[] = [];
 
   // Total loading weeks (non-deload) — used for RPE periodization ramp
-  const totalLoadingWeeks = durationWeeks - Math.floor(durationWeeks / 4);
+  const totalLoadingWeeks = durationWeeks - Math.floor(durationWeeks / GENERATOR_DEFAULTS.deloadEveryWeeks);
 
   // effectiveWeek counts only loading weeks (deloads don't advance progression).
   let effectiveWeek = 0;
 
   for (let week = 1; week <= durationWeeks; week++) {
     // Every 4th week is a deload (weeks 4, 8, 12, 16, …).
-    const isDeloadWeek = week % 4 === 0;
+    const isDeloadWeek = week % GENERATOR_DEFAULTS.deloadEveryWeeks === 0;
     if (!isDeloadWeek) effectiveWeek++;
 
     for (let orderInWeek = 0; orderInWeek < daysPerWeek; orderInWeek++) {
@@ -452,7 +447,7 @@ export function generateProgram(
       const dayGoalParams: GoalParams = isDeloadWeek
         ? {
             ...goalParams,
-            sets: Math.max(goalParams.sets - 2, 2),
+            sets: Math.max(goalParams.sets - 2, GENERATOR_DEFAULTS.minSets),
             weightMultiplier: goalParams.weightMultiplier, // handled in buildSlot
           }
         : goalParams;
@@ -465,6 +460,34 @@ export function generateProgram(
       const workoutName = isDeloadWeek
         ? `${WORKOUT_NAMES[splitType]} (Deload)`
         : WORKOUT_NAMES[splitType];
+      const dayPolicyIds: AdaptationPolicyId[] = [
+        'goal_prescription',
+        'split_selection',
+        'session_time_budget',
+        'exercise_stability',
+      ];
+
+      if (SPLIT_DAYS[splitType].compoundEmphasis) {
+        dayPolicyIds.push('compound_priority');
+      }
+      if (isDeloadWeek) {
+        dayPolicyIds.push('deload_cadence');
+      }
+      if (cyclePhase === 'menstrual' || cyclePhase === 'luteal') {
+        dayPolicyIds.push('cycle_phase_caution');
+      }
+
+      const explanation: GeneratedProgramDayExplanation = {
+        splitType,
+        isDeloadWeek,
+        targetExerciseCount: targetExercisesPerDay,
+        ...buildExplanation(
+          isDeloadWeek
+            ? `${splitType} day trimmed for a deload week while keeping the same movement pattern emphasis.`
+            : `${splitType} day sized for about ${targetExercisesPerDay} exercises based on weekly frequency and session length.`,
+          dayPolicyIds,
+        ),
+      };
 
       allDays.push({
         weekNumber: week,
@@ -475,9 +498,35 @@ export function generateProgram(
           exercises.reduce((sum, ex) => sum + estimateDuration(1, ex.setCount), 0),
         ),
         exercises,
+        explanation,
       });
     }
   }
+
+  const programPolicyIds: AdaptationPolicyId[] = [
+    'goal_prescription',
+    'split_selection',
+    'session_time_budget',
+    'exercise_stability',
+    'progressive_overload',
+    'deload_cadence',
+  ];
+
+  if (experienceLevel !== 'intermediate') {
+    programPolicyIds.push('experience_scaling');
+  }
+  if (cyclePhase === 'menstrual' || cyclePhase === 'luteal') {
+    programPolicyIds.push('cycle_phase_caution');
+  }
+
+  const explanation: GeneratedProgramExplanation = {
+    targetExercisesPerDay,
+    deloadEveryWeeks: GENERATOR_DEFAULTS.deloadEveryWeeks,
+    ...buildExplanation(
+      `${daysPerWeek}-day ${GOAL_LABELS[goal]} plan with a stable weekly template, gradual loading, and a simple deload rhythm.`,
+      programPolicyIds,
+    ),
+  };
 
   return {
     name: `${daysPerWeek}-Day ${GOAL_LABELS[goal]} Program`,
@@ -485,5 +534,6 @@ export function generateProgram(
     durationWeeks,
     daysPerWeek,
     days: allDays,
+    explanation,
   };
 }
