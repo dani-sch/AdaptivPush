@@ -284,21 +284,22 @@ export default function CreateProgramScreen() {
             const programId = createdProgram.id;
             const chosenDayIndexes = DEFAULT_DAY_INDEXES_BY_COUNT[daysPerWeek];
 
-            // Create week 1 program_days
-            const dayRows = visibleDays.map((day, index) => ({
-                program_id: programId,
-                week_number: 1,
-                day_index: chosenDayIndexes[index],
-                order_in_week: index + 1,
-                workout_name: day.name.trim() || `Day ${index + 1}`,
-                estimated_duration_min: 45,
-            }));
+            const dayRows = Array.from({ length: parsedLength }, (_, weekOffset) =>
+                visibleDays.map((day, index) => ({
+                    program_id: programId,
+                    week_number: weekOffset + 1,
+                    day_index: chosenDayIndexes[index],
+                    order_in_week: index + 1,
+                    workout_name: day.name.trim() || `Day ${index + 1}`,
+                    estimated_duration_min: 45,
+                })),
+            ).flat();
 
             const { data: createdDays, error: daysError } = await supabase
                 .from('program_days')
                 .insert(dayRows)
-                .select('id, order_in_week')
-                .returns<{ id: string; order_in_week: number }[]>();
+                .select('id, week_number, order_in_week')
+                .returns<{ id: string; week_number: number; order_in_week: number }[]>();
 
             if (daysError) throw daysError;
 

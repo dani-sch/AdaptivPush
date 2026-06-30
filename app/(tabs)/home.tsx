@@ -768,7 +768,7 @@ export default function HomeScreen() {
               </Text>
             </View>
             <Text style={{ color: theme.text, fontSize: 13, lineHeight: 19, marginBottom: 14 }}>
-              You've been on the same accessory exercises for {program.swapIntervalWeeks} weeks. Swapping helps avoid plateaus and keeps training fresh.
+              You&apos;ve been on the same accessory exercises for {program.swapIntervalWeeks} weeks. Swapping helps avoid plateaus and keeps training fresh.
             </Text>
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <Pressable

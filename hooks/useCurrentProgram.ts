@@ -256,11 +256,12 @@ export function useCurrentProgram() {
         if (nextWeek > program.totalWeeks) return;
 
         // Fetch user profile fields needed for progression adjustments
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
             .from('user_profile')
             .select('experience_level, cycle_enabled, last_period_start_date, avg_cycle_length_days')
             .eq('user_id', userId)
             .single();
+        if (profileError) throw profileError;
         const experienceLevel = (profile?.experience_level ?? 'intermediate') as TrainingExperience;
 
         const cyclePhase = profile?.cycle_enabled && profile?.last_period_start_date
@@ -270,7 +271,7 @@ export function useCurrentProgram() {
         const isCycleReduced = cyclePhase === 'menstrual' || cyclePhase === 'luteal';
 
         // Get next week's program_days with nested program_day_exercises
-        const { data: nextDays } = await supabase
+        const { data: nextDays, error: nextDaysError } = await supabase
             .from('program_days')
             .select(`
               id,
@@ -287,6 +288,7 @@ export function useCurrentProgram() {
             `)
             .eq('program_id', program.id)
             .eq('week_number', nextWeek);
+        if (nextDaysError) throw nextDaysError;
 
         if (!nextDays) return;
 
@@ -299,25 +301,28 @@ export function useCurrentProgram() {
 
                 // Fetch most recent logged sets for this exercise (scoped to this user).
                 // First find the most recent session_id, then get all sets from that session.
-                const { data: latestSession } = await supabase
+                const { data: latestSession, error: latestSessionError } = await supabase
                     .from('workout_exercise_sets')
                     .select('session_id, workout_sessions!inner(user_id)')
                     .eq('exercise_id', pde.exercise_id)
                     .eq('workout_sessions.user_id', userId)
                     .order('created_at', { ascending: false })
                     .limit(1);
+                if (latestSessionError) throw latestSessionError;
 
                 const latestSessionId = (latestSession?.[0] as any)?.session_id;
 
-                const recentSets = latestSessionId
-                    ? (await supabase
+                let recentSets = null;
+                if (latestSessionId) {
+                    const { data: latestSets, error: recentSetsError } = await supabase
                         .from('workout_exercise_sets')
                         .select('set_number, weight_lb, reps, rpe')
                         .eq('exercise_id', pde.exercise_id)
                         .eq('session_id', latestSessionId)
                         .order('set_number', { ascending: true })
-                    ).data
-                    : null;
+                    if (recentSetsError) throw recentSetsError;
+                    recentSets = latestSets;
+                }
 
                 const lastSessionSets: LoggedSet[] = (recentSets ?? [])
                     .filter((s: any) => s.weight_lb !== null && s.reps !== null)
@@ -415,12 +420,14 @@ export function useCurrentProgram() {
                 }
 
                 updates.push(
-                    Promise.resolve(
-                        supabase
+                    (async () => {
+                        const { error: updateError } = await supabase
                             .from('program_day_exercises')
                             .update(dbUpdate)
-                            .eq('id', pde.id)
-                    ).then(() => { return; })
+                            .eq('id', pde.id);
+
+                        if (updateError) throw updateError;
+                    })()
                 );
             }
         }

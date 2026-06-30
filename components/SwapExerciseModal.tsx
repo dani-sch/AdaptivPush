@@ -72,11 +72,11 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
                 }
             }
         }
-        loadAlternatives(muscleGroup);
+        loadAlternatives(muscleGroup, currentExercise.exerciseId);
         setResolvedMuscleGroup(muscleGroup);
-    }, [currentExercise?.id]);
+    }, [currentExercise]);
 
-    async function loadAlternatives(muscleGroup: MuscleGroup | undefined) {
+    async function loadAlternatives(muscleGroup: MuscleGroup | undefined, excludedExerciseId?: string) {
         setLoadingExercises(true);
         try {
             let query = supabase
@@ -102,7 +102,7 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
                     description: (ex.instructions as string[] | null)?.[0] ?? undefined,
                 })));
             } else if (muscleGroup) {
-                const local = getAlternativesFor(muscleGroup, [exerciseId]);
+                const local = getAlternativesFor(muscleGroup, excludedExerciseId ? [excludedExerciseId] : []);
                 setAlternatives(local.map(ex => ({
                     id:          ex.id,
                     name:        ex.name,
@@ -120,12 +120,12 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
     const filteredAlternatives = useMemo(() => {
         const q = searchQuery.trim().toLowerCase();
         return alternatives.filter(ex => {
-            if (ex.id === exerciseId) return false;
+            if (currentExercise?.exerciseId && ex.id === currentExercise.exerciseId) return false;
             if (currentExercise && ex.name === currentExercise.name) return false;
             if (!q) return true;
             return ex.name.toLowerCase().includes(q);
         });
-    }, [alternatives, searchQuery, exerciseId, currentExercise]);
+    }, [alternatives, searchQuery, currentExercise]);
 
     const handleSwap = () => {
         if (!selectedExercise) return;
@@ -133,11 +133,14 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
             exerciseId,
             replacement: {
                 id:          selectedExercise.id,
+                exerciseId:  selectedExercise.id,
                 name:        selectedExercise.name,
                 muscleGroup: selectedExercise.muscleGroup,
                 equipment:   selectedExercise.equipment,
                 sets:        selectedExercise.sets,
                 reps:        selectedExercise.reps,
+                imageUrl:    selectedExercise.imageUrl,
+                description: selectedExercise.description,
             },
             applyToProgram: context === 'workout' ? applyToProgram : true,
         });
