@@ -1,3 +1,5 @@
+import type { ExplanationMetadata } from '@/types/evidence';
+
 export type MuscleGroup =
     | 'Chest'
     | 'Back'
@@ -37,6 +39,21 @@ export type WorkoutExercise = {
     imageUrl?: string;    // RapidAPI image endpoint URL (key added at request time)
     description?: string; // first instruction sentence
 };
+
+export interface GeneratedExerciseExplanation extends ExplanationMetadata {
+  slotType: 'compound' | 'accessory';
+}
+
+export interface GeneratedProgramDayExplanation extends ExplanationMetadata {
+  splitType: string;
+  isDeloadWeek: boolean;
+  targetExerciseCount: number;
+}
+
+export interface GeneratedProgramExplanation extends ExplanationMetadata {
+  targetExercisesPerDay: number;
+  deloadEveryWeeks: number;
+}
 
 export type ProgramWorkout = {
     id: string;
@@ -85,6 +102,7 @@ export interface GeneratedExerciseSlot {
   repRangeMax: number;
   targetRPE: number;
   suggestedWeightLb: number;
+  explanation?: GeneratedExerciseExplanation;
 }
 
 export interface GeneratedProgramDay {
@@ -94,6 +112,7 @@ export interface GeneratedProgramDay {
   workoutName: string;
   estimatedDurationMin: number;
   exercises: GeneratedExerciseSlot[];
+  explanation?: GeneratedProgramDayExplanation;
 }
 
 export interface GeneratedProgram {
@@ -102,19 +121,18 @@ export interface GeneratedProgram {
   durationWeeks: number;
   daysPerWeek: number;
   days: GeneratedProgramDay[];   // all weeks × days
+  explanation?: GeneratedProgramExplanation;
 }
 
 export interface ExerciseHistoryEntry {
   sessionId: string;
   workoutName: string;
   completedAt: string;           // ISO string
-  sets: Array<{
+  sets: {
     setNumber: number;
     weightLb: number | null;
     reps: number | null;
     rpe: number | null;
-  }>;
+  }[];
   totalVolumeLb: number;
 }
-
-

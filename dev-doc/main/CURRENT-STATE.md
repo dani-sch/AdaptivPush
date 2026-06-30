@@ -20,6 +20,7 @@
 - smallest available local gate: `npm run lint`
 - no broad automated test suite is currently documented as the default gate
 - major implementation phases still require manual regression slices across onboarding, readiness, program generation, workout execution, trust surfaces, and compatibility paths
+- Phase 1 closeout validation now includes a completed in-app `GenerateProgramModal` smoke pass in addition to the lint gate and seeded generator regression checks
 
 ## Current active plans
 
@@ -34,6 +35,12 @@
 - `reports/plans/EVIDENCE-BACKED-IMPLEMENTATION-PLAN.md` now includes resolved clarification answers for product promise, depth modes, onboarding scope, readiness authority, cycle support, transparency, analytics, integrations, and rollout structure
 - `dev-doc/` was created and indexed so the repo now has the intended living-doc structure referenced by the active instructions
 - the archival rule for executed plans is now explicit through `dev-doc/plans/legacy/README.md` and `dev-doc/plans/active/PLAN-INDEX.md`
+- Phase 1 of the evidence-backed execution plan is now complete: the evidence/policy foundation landed, lint passed, seeded generator output matched `HEAD` when explanation metadata was stripped, and the in-app Generate Program flow succeeded
+
+## Immediate execution lane
+
+- active implementation focus has moved from Phase 1 completion work to Phase 2 schema and compatibility work
+- first Phase 2 action remains the schema audit called out in `reports/plans/EVIDENCE-BACKED-EXECUTION-PLAN.md`
 
 ## Immediate constraints
 

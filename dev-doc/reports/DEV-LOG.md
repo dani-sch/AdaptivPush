@@ -5,6 +5,69 @@
 
 ---
 
+### 2026-06-30 Phase 1 complete and Phase 2 queued {#2026-06-30-phase-1-complete-and-phase-2-queued}
+
+**Summary**: Closed Phase 1 of the evidence-backed execution plan after the manual in-app `GenerateProgramModal` smoke succeeded, then moved the active documentation lane to Phase 2 schema and compatibility work.
+
+**Changes**:
+| Component | Change |
+|---|---|
+| Phase 1 validation | Confirmed the in-app Generate Program flow now succeeds, clearing the last documented blocker |
+| living docs | Updated TODO, current-state, roadmap, and plan-index surfaces to reflect that Phase 1 is complete and Phase 2 is the active next slice |
+| execution handoff | Prepared a Phase 2 execution packet rooted in the current completed Phase 1 state |
+
+**Files Added/Modified**:
+| File | Action | Purpose |
+|---|---|---|
+| `dev-doc/main/TODO.md` | modified | move the active implementation lane from the Phase 1 smoke blocker to Phase 2 schema work |
+| `dev-doc/main/CURRENT-STATE.md` | modified | record that Phase 1 is complete and Phase 2 is now the immediate execution lane |
+| `dev-doc/main/ROADMAP.md` | modified | mark roadmap step 1 done and step 2 active |
+| `dev-doc/plans/active/PLAN-INDEX.md` | modified | reflect that the evidence-backed execution plan has finished Phase 1 and now points at Phase 2 |
+| `dev-doc/reports/DEV-LOG.md` | modified | add the Phase 1 completion and Phase 2 transition entry |
+
+**Validation**:
+| Check | Result |
+|---|---|
+| in-app `GenerateProgramModal` smoke | passed |
+| Phase 1 closeout gate set | now includes lint, seeded generator regression, and the successful in-app generation flow |
+
+**Next execution lane**:
+- start Phase 2 with the schema audit and additive migration slice defined in `reports/plans/EVIDENCE-BACKED-EXECUTION-PLAN.md`
+
+---
+
+### 2026-06-30 Phase 1 evidence-foundation closure pass {#2026-06-30-phase-1-evidence-foundation-closure-pass}
+
+**Summary**: Finalized the Phase 1 evidence-foundation alignment by normalizing the canonical evidence-strength vocabulary to the execution-plan wording, correcting the remaining plan/file-path drift, and validating that the generator still matches `HEAD` when explanation metadata is stripped. This entry's remaining manual-smoke blocker was cleared later the same day.
+
+**Changes**:
+| Component | Change |
+|---|---|
+| evidence vocabulary | Normalized `types/evidence.ts` and `constants/evidenceRegistry.ts` to use the canonical `strong`, `moderate`, `mixed`, `emerging`, and `expert heuristic` vocabulary |
+| planning docs | Corrected the Phase 1 implementation-plan file reference from `constants/programPolicies.ts` to `constants/adaptationPolicies.ts` |
+| living status docs | Narrowed the active TODO from broad Phase 1 architecture work to the precise remaining blocker: the in-app modal smoke check |
+
+**Files Added/Modified**:
+| File | Action | Purpose |
+|---|---|---|
+| `types/evidence.ts` | modified | align evidence-strength identifiers with the approved Phase 1 vocabulary |
+| `constants/evidenceRegistry.ts` | modified | map existing evidence entries onto the canonical strength labels |
+| `reports/plans/EVIDENCE-BACKED-IMPLEMENTATION-PLAN.md` | modified | remove the stale `programPolicies` filename from the Phase 1 task list |
+| `dev-doc/main/TODO.md` | modified | replace the broad Phase 1 active item with the precise remaining blocker |
+| `dev-doc/reports/DEV-LOG.md` | modified | record this closure pass and its current blocker |
+
+**Validation**:
+| Check | Result |
+|---|---|
+| `npm run lint` | passed with 0 errors and only pre-existing warnings outside the Phase 1 slice |
+| direct `generateProgram(...)` smoke | passed across multiple scenarios, with explanation metadata present at program, day, and exercise levels |
+| seeded comparison against `HEAD` with explanations stripped | matched across all sampled scenarios |
+
+**Residual blocker at time of entry**:
+- complete the manual in-app `GenerateProgramModal` smoke check before marking Phase 1 fully done
+
+---
+
 ### 2026-06-29 Last-two-days planning sync for dev-doc {#2026-06-29-last-two-days-planning-sync-for-dev-doc}
 
 **Summary**: Updated the new `dev-doc` spine to reflect the active planning work from the last two days, including creation of the evidence-backed execution plan and companion UI redesign plan in this chat, the resolved implementation-plan answers, and the shift to `dev-doc/` as the canonical living-doc workspace.

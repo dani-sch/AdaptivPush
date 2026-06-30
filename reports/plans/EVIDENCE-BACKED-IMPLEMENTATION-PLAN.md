@@ -150,135 +150,226 @@ This is the complete planning question inventory to keep future planning flowing
 ## A. Product positioning and core promise
 
 1. Should AdaptivPush position itself primarily as an **adaptive coach**, an **evidence-based planner**, a **performance optimizer**, or a hybrid?
+   - **Answer:** Hybrid.
 2. How “scientific” should the public tone feel: clinical, coach-like, premium-athlete, or friendly evidence-informed?
+   - **Answer:** Friendly evidence-informed.
 3. Should the app prioritize **better decisions** or **better understanding of those decisions** when trade-offs appear?
+   - **Answer:** Balance both equally.
 4. Should the first release optimize more for **broad appeal** or for **serious lifter credibility**?
+   - **Answer:** Balance both.
 5. Is the goal to feel more like **Fitbod-style adaptive convenience**, **Boostcamp-style programming rigor**, or something more transparent than both?
+   - **Answer:** Something more transparent than both, with a holistic, health-and-improvement focus that feels personalized, user-focused, helps people feel good, and supports consistency.
 
 ## B. User segmentation and depth modes
 
 6. What user tiers should exist for experience depth: simple / guided / advanced, or another model?
+   - **Answer:** Essential / Guided / Advanced.
 7. Should the chosen depth mode be set during onboarding, changeable later, or inferred from behavior?
+   - **Answer:** Set during onboarding and changeable later, with small examples shown during onboarding so users can quickly understand the differences before choosing.
 8. Should depth mode influence only UI complexity, or also the adaptation logic itself?
+   - **Answer:** UI complexity, adaptation logic, and explanation density.
 9. Should beginners be shielded from RPE/RIR detail unless they opt in?
+   - **Answer:** Yes.
 10. Should advanced users be able to opt into more assertive autoregulation and denser analytics?
+   - **Answer:** Yes.
 11. Should users be able to separately tune **data depth**, **adaptation aggressiveness**, and **explanation verbosity**?
+   - **Answer:** Yes.
 
 ## C. Onboarding and profile capture
 
 12. What must be mandatory in onboarding versus optional?
+   - **Answer:** Mandatory: primary goal, training days per week, experience level, equipment access, and session length/time budget.
 13. Should onboarding stay short and defer advanced physiology questions until after first workout/program generation?
+   - **Answer:** Yes.
 14. Should onboarding ask about equipment access in more detail than it does now?
+   - **Answer:** Yes, a bit more detail.
 15. Should onboarding ask about injury/pain history, or is that too sensitive for first-run flow?
+   - **Answer:** Yes, but lightly and optionally.
 16. Should the app ask about primary goal time horizon: physique, strength, general health, sport performance, return from inconsistency?
+   - **Answer:** Yes.
 17. Should the app ask about lifestyle constraints like sleep schedule, job stress, or available recovery time?
+   - **Answer:** Yes, but keep it optional or defer it until later.
 18. Should onboarding ask about prior familiarity with RPE, reps in reserve, and structured training?
+   - **Answer:** Yes, mainly for Guided and Advanced contexts.
 
 ## D. Program generation philosophy
 
 19. Should generation remain mostly template-driven with smarter rules, or become a more explicit decision engine?
+   - **Answer:** Hybrid.
 20. How flexible should split selection be versus user-directed split selection?
+   - **Answer:** Balanced.
 21. Should the app recommend a split, allow override, or do both?
+   - **Answer:** Recommend a split and allow override.
 22. How strongly should focus muscles change weekly volume and exercise order?
+   - **Answer:** Moderately.
 23. Should the app expose weekly set targets by muscle group to the user?
+   - **Answer:** Yes.
 24. Should session length be treated as a hard cap or a target band?
+   - **Answer:** A soft target with user override.
 25. Should exercise order, rest recommendations, and warm-up structure be visible in generated programs by default?
+   - **Answer:** Yes.
 26. Should the generator account for exercise stability windows automatically, or let users control variation cadence?
+   - **Answer:** Automatic by default, with optional user controls.
 27. Should “program generation” include default deload philosophy up front, or wait until fatigue signals emerge?
+   - **Answer:** Mention the deload policy up front, but do not schedule anything initially.
 
 ## E. Readiness and daily adaptation
 
 28. How much authority should readiness have over a planned workout?
+   - **Answer:** Moderate authority.
 29. Should low readiness reduce volume, complexity, load, or all three depending on severity?
+   - **Answer:** All three depending on severity.
 30. Should high readiness ever increase planned difficulty automatically, or only offer an optional “push” suggestion?
+   - **Answer:** Only offer an optional “push” suggestion.
 31. Should readiness support a one-tap simplified check-in and a deeper optional check-in?
+   - **Answer:** Yes. Use a one-tap check-in plus an optional deeper check-in.
 32. Which inputs should count in readiness v2: sleep, stress, soreness, motivation, pain, illness, menstrual symptoms, workload, resting heart rate, HRV, bodyweight fluctuation?
+   - **Answer:** Sleep, stress, soreness, motivation, pain, illness, and workload/life load.
 33. Should readiness primarily shape **today’s session overlay**, **future progression**, or both with different rules?
+   - **Answer:** Both, with different rules.
 34. Should users be allowed to ignore readiness adjustments without penalty or nudging?
+   - **Answer:** Yes.
 35. Should the app ever recommend converting a session into a recovery session?
+   - **Answer:** Yes.
 36. Should poor readiness trigger an explanation that references evidence strength and uncertainty?
+   - **Answer:** Yes.
 
 ## F. Menstrual-cycle and symptom support
 
 37. Should cycle support be completely hidden unless the user opts in?
+   - **Answer:** Yes.
 38. Should cycle handling be symptom-first, calendar-first, or hybrid with symptom priority?
+   - **Answer:** Hybrid with symptom priority.
 39. Which symptoms should be trackable: cramps, fatigue, sleep disruption, mood, pain, GI discomfort, motivation, bloating?
+   - **Answer:** Cramps, fatigue, sleep disruption, mood, pain, motivation, and bloating.
 40. Should the app show phase names openly or just use them in background logic?
+   - **Answer:** Show them lightly when relevant.
 41. Should cycle-aware guidance change generation, day-of suggestions, recovery prompts, analytics, or all four?
+   - **Answer:** All four: generation, day-of suggestions, recovery prompts, and analytics.
 42. How prominent should privacy reassurance be in the UX?
+   - **Answer:** Clear but not overbearing.
 43. Should the app store historical cycle patterns for better personalization later?
+   - **Answer:** Yes.
 44. How should the app behave for irregular cycles or uncertain dates?
+   - **Answer:** Use symptoms first, with light calendar context only when available.
 
 ## G. Progression, plateau, and deload logic
 
 45. Should double progression remain the universal default or vary by goal?
+   - **Answer:** Double progression should stay the default, with more advanced variants added later.
 46. Should strength-focused users get more explicit top-set/back-off or percentage-style options later?
+   - **Answer:** Yes.
 47. How much should adherence and missed sessions affect progression decisions?
+   - **Answer:** Moderately.
 48. What qualifies as a plateau in the product: missed top rep range, repeated high RPE, stagnant estimated strength, user frustration input?
+   - **Answer:** Missing the top rep range repeatedly, repeated high RPE, stagnant estimated strength, and user frustration input.
 49. Should deloads be reactive only, optionally scheduled, or both?
+   - **Answer:** Both reactive and optionally scheduled.
 50. Should the app proactively explain *why* it is recommending a deload?
+   - **Answer:** Yes.
 51. Should users be able to reject a suggested deload and continue normally?
+   - **Answer:** Yes.
 52. Should deload logic prioritize volume reduction while preserving movement practice?
+   - **Answer:** Yes. Reduce volume while preserving movement practice.
 
 ## H. Warm-up, cooldown, mobility, and recovery content
 
 53. Should warm-up guidance be auto-generated per workout or delivered as reusable templates?
+   - **Answer:** Both.
 54. Should cooldowns be framed as optional comfort tools rather than recovery essentials?
+   - **Answer:** Yes.
 55. Should mobility guidance be linked to specific movement limitations instead of generic routines?
+   - **Answer:** Yes.
 56. Should recovery content remain in a library, or also surface contextually after certain sessions/readiness states?
+   - **Answer:** Both a library and contextual surfaces.
 57. Should the app include evidence notes explaining why some popular recovery rituals are “optional” rather than required?
+   - **Answer:** Yes.
 58. Should prehab/rehab-style modules exist only when tied to a stated issue?
+   - **Answer:** They can exist more broadly, but should be de-emphasized unless tied to a stated issue.
 
 ## I. Transparency, explanations, and source links
 
 59. How visible should source links be across the app?
+   - **Answer:** Use subtle affordances such as “Learn why.”
 60. Should every adaptive decision show a short rationale with optional deep dive?
+   - **Answer:** Yes. Show a short rationale with an optional deep dive.
 61. Should each recommendation carry an evidence label like **strong**, **moderate**, **mixed**, **emerging**, or **expert heuristic**?
+   - **Answer:** Yes.
 62. Should the app distinguish between “research-backed,” “best-practice,” and “product heuristic” rules?
+   - **Answer:** Yes.
 63. Should source links open in-app, on web, or inside a dedicated evidence screen?
+   - **Answer:** Inside a dedicated evidence screen.
 64. Should users be able to choose explanation verbosity by depth mode?
+   - **Answer:** Yes.
 65. Should the FAQ and Recovery Library reuse the same evidence registry as live workout decisions?
+   - **Answer:** Yes.
 
 ## J. Analytics and insight surfaces
 
 66. Which insights matter most: readiness trends, weekly volume, consistency streaks, plateau flags, muscle-group distribution, fatigue accumulation, PR momentum?
+   - **Answer:** Readiness trends, weekly volume, consistency streaks, plateau flags, and fatigue accumulation.
 67. Should analytics emphasize coaching interpretation or raw numbers?
+   - **Answer:** Balanced.
 68. Should the app surface estimated “too much / too little / just right” workload guidance?
+   - **Answer:** Yes.
 69. Should analytics compare planned versus completed work?
+   - **Answer:** No.
 70. Should analytics show when adjustments were driven by readiness, symptoms, or deload logic?
+   - **Answer:** Yes.
 71. Should users be able to trace back “why did my program change over the last 4 weeks?”
+   - **Answer:** Yes.
 
 ## K. Integrations and external signals
 
 72. Should HealthKit be part of the first implementation wave or only a later enrichment?
+   - **Answer:** Design the foundation for it now, but ship the feature later.
 73. If HealthKit is used, which data matters most first: body mass, cycle tracking, sleep, resting heart rate, HRV, workouts?
+   - **Answer:** Body mass, sleep, workouts, and cycle tracking.
 74. How much trust should the app place in wearables versus subjective check-ins and training performance?
+   - **Answer:** Wearables should remain secondary.
 75. Should integrations be optional enhancements rather than central dependencies?
+   - **Answer:** Yes.
 76. Should the app be designed from the start for Android parity, even if iOS launches first?
+   - **Answer:** Core product parity should be designed from the start, even if integrations lag behind on Android.
 
 ## L. UX and interaction style
 
 77. Should the app feel calm and quietly intelligent, or actively conversational and coach-like?
+   - **Answer:** Calm and quietly intelligent.
 78. Should the app proactively explain changes, or only when the user taps “why?”
+   - **Answer:** Hybrid.
 79. Should the home screen prioritize today’s action or high-level training context?
+   - **Answer:** Today’s action.
 80. Should the program overview emphasize prescription clarity, rationale, or both?
+   - **Answer:** Both.
 81. Should adaptation surfaces show uncertainty notes when the evidence is mixed?
+   - **Answer:** No.
 82. Should the app nudge users toward learning concepts like RPE progressively?
+   - **Answer:** Yes.
 
 ## M. Risk, privacy, and safety framing
 
 83. How explicit should the app be about not replacing medical advice?
+   - **Answer:** Clear.
 84. Should pain and symptom guidance include red-flag education?
+   - **Answer:** Yes.
 85. Should the app avoid moralizing language around missed sessions, body composition, pain, or menstrual symptoms?
+   - **Answer:** Yes.
 86. Should sensitive physiology data have special privacy copy and controls?
+   - **Answer:** Yes.
 87. Should users be able to disable physiology-aware adaptation entirely and still use the app as a clean logger/program builder?
+   - **Answer:** Yes.
 
 ## N. Rollout and sequencing
 
 88. Should the first shippable milestone focus on architectural foundations only, or include visible UI wins immediately?
+   - **Answer:** Include architectural foundations plus visible UI wins immediately.
 89. Which is more important for the first visible milestone: better generation, better readiness, or visible research transparency?
+   - **Answer:** Balance all three.
 90. Should big physiology changes roll out behind feature flags by user depth mode?
+   - **Answer:** Yes, behind feature flags aligned to depth mode.
 91. Do you want a single master implementation plan, or a master plan plus separate execution plans per milestone/workstream?
+   - **Answer:** A master plan plus separate execution plans per milestone/workstream.
 
 # User depth model proposal
 
@@ -388,7 +479,7 @@ Create a single evidence-backed source of truth that can feed generation, readin
   Proposed files:  
   - `constants/evidenceRegistry.ts`  
   - `types/evidence.ts`  
-  - `constants/programPolicies.ts`  
+  - `constants/adaptationPolicies.ts`  
   Research basis: explicit evidence-strength mapping and “strong vs mixed vs emerging” distinctions.  
   Links: https://www.acsm.org/science-spotlight-acsm-releases-new-position-stand-on-resistance-training/ | https://pmc.ncbi.nlm.nih.gov/articles/PMC9302196/
 
@@ -753,19 +844,19 @@ Each milestone should ship something in all three workstreams, even if the engin
 - **Risk: generator refactor destabilizes existing program creation.**  
   Mitigation: preserve existing output shapes first, then iterate on richer policy inputs behind flags.
 
-# Open questions to resolve together
+# Clarification pass resolutions
 
-1. What is the **primary product promise** for this implementation wave: smartest program generation, smartest daily adaptation, best educational transparency, or all three equally?
-2. How far do you want to go on **physiology capture**: minimal user-friendly inputs, or richer logging even if it adds friction?
-3. Should the app present itself as **evidence-informed coaching** or as a more assertive “adaptive performance engine” brand?
-4. How visible should source links be in the UI: subtle “Learn why” affordances or prominent references on every relevant screen?
-5. For menstrual support, do you want **calendar + symptoms**, **symptoms only**, or **cycle insights hidden unless explicitly enabled**?
-6. Should readiness adjustments stay **conservative by default**, or do you want a bolder mode for experienced users?
-7. Do you want the first implementation wave to include **reactive deloads** immediately, or should that wait until the readiness and analytics foundations are stable?
-8. How much of the recovery-library/FAQ should become **research-linked educational content** versus lightweight UX guidance?
-9. Do you want HealthKit treated as a near-term part of this initiative or parked until the physiology core is stable?
-10. Should the eventual plan exported into `reports/plans/` be one giant master plan or a family of linked execution plans?
+1. **Primary product promise:** all three equally, delivered as a hybrid product that blends adaptive coaching, evidence-based planning, and transparent decision support.
+2. **Physiology capture:** start with minimal, user-friendly required inputs and defer richer physiology logging into optional later flows or deeper modes.
+3. **Brand posture:** friendly evidence-informed rather than clinical or aggressively “performance engine” branded.
+4. **Source-link visibility:** subtle “Learn why” style affordances that open into a dedicated evidence screen.
+5. **Menstrual support:** hidden unless explicitly enabled, using a hybrid model with symptom priority and light calendar context where available.
+6. **Readiness aggressiveness:** moderate authority by default, with optional stronger controls for advanced users.
+7. **Deload timing:** include reactive deload logic in the implementation wave, while also allowing optionally scheduled deloads later for advanced use cases.
+8. **Education depth:** make FAQ and Recovery Library research-linked and evidence-aware, while keeping live-product explanations concise with optional deep dives.
+9. **HealthKit timing:** prepare the foundation now, but treat HealthKit as a later enrichment rather than a first-wave dependency.
+10. **Plan structure:** keep this master plan and break execution into separate milestone/workstream plans.
 
 # Recommendation for the next planning turn
 
-Start by locking the product promise and the desired aggressiveness of adaptation. Those two choices will heavily change the scope, copy tone, data model, and rollout order for everything else.
+Convert the resolved clarification answers into a milestone-based execution packet: one master roadmap plus separate implementation plans for Intelligence, Experience, and Trust workstreams.
