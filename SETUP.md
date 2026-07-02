@@ -96,6 +96,7 @@ git config --global core.autocrlf input
 4. To run the app, input `npx expo start` into the terminal. 
 5. Scan qr with your phone and open Expo Go app.
 
+
 ## Git Commands
 
 ### Add, commit, push

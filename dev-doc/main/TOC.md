@@ -16,10 +16,11 @@
 
 | File | Role |
 |---|---|
+| `reports/plans/FABLE-5-MASTER-IMPLEMENTATION-EXECUTION-PLAN.md` | canonical master implementation execution plan |
 | `dev-doc/plans/active/PLAN-INDEX.md` | index of active plans and execution owners |
-| `reports/plans/EVIDENCE-BACKED-EXECUTION-PLAN.md` | canonical feature execution plan |
-| `reports/plans/EVIDENCE-BACKED-UI-REDESIGN-PLAN.md` | canonical UI redesign companion plan |
-| `reports/plans/EVIDENCE-BACKED-IMPLEMENTATION-PLAN.md` | approved strategy and product-direction baseline |
+| `reports/plans/EVIDENCE-BACKED-EXECUTION-PLAN.md` | source execution plan now superseded by the master plan |
+| `reports/plans/EVIDENCE-BACKED-UI-REDESIGN-PLAN.md` | UI workstream source material feeding the master plan |
+| `reports/plans/EVIDENCE-BACKED-IMPLEMENTATION-PLAN.md` | approved strategy and product-direction baseline feeding the master plan |
 
 ## Durable reports
 
@@ -41,4 +42,3 @@
 | `utils/` | generation, progression, notifications, Supabase helpers |
 | `constants/themes.ts` | active light and dark theme tokens |
 | `contexts/ThemeContext.tsx` | appearance and theme switching |
-

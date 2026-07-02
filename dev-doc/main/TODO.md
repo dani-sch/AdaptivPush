@@ -2,11 +2,12 @@
 
 ## [ACTIVE]
 
-- [ACTIVE] Close Phase 2 of `reports/plans/EVIDENCE-BACKED-EXECUTION-PLAN.md` with manual validation and signoff for onboarding, profile, and program-save compatibility flows.
+- [ACTIVE] Use `reports/plans/FABLE-5-MASTER-IMPLEMENTATION-EXECUTION-PLAN.md` as the canonical implementation driver for all future execution.
+- [ACTIVE] Close schema-truth and compatibility validation for onboarding, profile, and program-save flows so the master plan starts from verified repo reality.
 - [ACTIVE] Review the applied Phase 2 schema in Supabase against `lib/adaptivpush_database_schema.md` before marking the phase complete.
 - [ACTIVE] Prepare Milestone 1 UI implementation slices from `reports/plans/EVIDENCE-BACKED-UI-REDESIGN-PLAN.md`.
 - [ACTIVE] Use `dev-doc/reports/DEV-LOG.md` for ongoing execution logging.
-- [ACTIVE] Convert the clarified product answers in `reports/plans/EVIDENCE-BACKED-IMPLEMENTATION-PLAN.md` into bounded implementation slices under the active execution plan.
+- [ACTIVE] Treat the prior evidence-backed execution, implementation, UI, and research documents as source material only, not parallel execution plans.
 
 ## [NEXT]
 
@@ -16,7 +17,7 @@
 - [NEXT] Define the first shared UI primitives and token layer for the redesign workstream.
 - [NEXT] Add deterministic in-repo feature flags before rollout-sensitive behavior is exposed broadly.
 - [NEXT] Confirm whether the dedicated evidence route should use `app/evidence.tsx` or `app/evidence/[key].tsx`.
-- [NEXT] Decide the first execution slice order across Milestone 1 Experience, Trust, and Intelligence work.
+- [NEXT] Decide the first execution slice order from the master plan across Milestone 1 Experience, Trust, and Intelligence work.
 
 ## [PARKED]
 

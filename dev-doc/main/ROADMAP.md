@@ -35,5 +35,6 @@
 
 ## Active plan references
 
+- master driver: `reports/plans/FABLE-5-MASTER-IMPLEMENTATION-EXECUTION-PLAN.md`
 - feature execution: `reports/plans/EVIDENCE-BACKED-EXECUTION-PLAN.md`
 - UI redesign: `reports/plans/EVIDENCE-BACKED-UI-REDESIGN-PLAN.md`

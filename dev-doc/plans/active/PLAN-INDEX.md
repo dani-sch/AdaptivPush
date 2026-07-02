@@ -4,9 +4,10 @@
 
 | Plan | Path | Status | Scope | Next owner |
 |---|---|---|---|---|
-| Evidence-backed execution plan | `reports/plans/EVIDENCE-BACKED-EXECUTION-PLAN.md` | active - Phase 1 complete, Phase 2 implemented in code, manual validation pending | feature sequencing, schema strategy, rollout, trust surfaces | close Phase 2 with manual schema review and onboarding/profile/program-save validation |
-| Evidence-backed UI redesign plan | `reports/plans/EVIDENCE-BACKED-UI-REDESIGN-PLAN.md` | active | UI structure, component system, theme-aware redesign, plan-to-milestone mapping | direct implementation or bounded `typescript-agent` UI slices |
-| Evidence-backed implementation plan | `reports/plans/EVIDENCE-BACKED-IMPLEMENTATION-PLAN.md` | active reference | approved strategy, resolved clarification answers, milestone/workstream framing inputs | direct planning reference feeding the execution plan |
+| FABLE-5 master implementation execution plan | `reports/plans/FABLE-5-MASTER-IMPLEMENTATION-EXECUTION-PLAN.md` | active canonical driver | consolidated product definition, current-state audit, IA, data model, rules, build order, QA | direct implementation from the master plan, starting with schema-truth and compatibility validation |
+| Evidence-backed execution plan | `reports/plans/EVIDENCE-BACKED-EXECUTION-PLAN.md` | source reference | prior feature sequencing, schema strategy, rollout, trust-surface planning | reference only where the master plan points back to it |
+| Evidence-backed UI redesign plan | `reports/plans/EVIDENCE-BACKED-UI-REDESIGN-PLAN.md` | source reference | UI structure, component system, theme-aware redesign, plan-to-milestone mapping | reference only where the master plan points back to it |
+| Evidence-backed implementation plan | `reports/plans/EVIDENCE-BACKED-IMPLEMENTATION-PLAN.md` | source reference | approved strategy, resolved clarification answers, milestone/workstream framing inputs | reference only where the master plan points back to it |
 
 ## Last 2 days of plan updates
 

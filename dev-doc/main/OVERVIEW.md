@@ -13,11 +13,12 @@ AdaptivPush is an Expo Router mobile app for generating, running, and adapting s
 
 ## Active implementation lane
 
-The current execution lane is driven by:
+The current execution lane is now driven by:
 
-- `reports/plans/EVIDENCE-BACKED-EXECUTION-PLAN.md`
-- `reports/plans/EVIDENCE-BACKED-UI-REDESIGN-PLAN.md`
+- `reports/plans/FABLE-5-MASTER-IMPLEMENTATION-EXECUTION-PLAN.md`
 - `dev-doc/plans/active/PLAN-INDEX.md`
+
+The prior evidence-backed execution, implementation, UI, and research documents remain source material and reference inputs, not independent execution drivers.
 
 ## Last 2 days of planning changes
 

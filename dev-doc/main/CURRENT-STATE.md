@@ -24,8 +24,12 @@
 
 ## Current active plans
 
-- `reports/plans/EVIDENCE-BACKED-EXECUTION-PLAN.md`
-- `reports/plans/EVIDENCE-BACKED-UI-REDESIGN-PLAN.md`
+- `reports/plans/FABLE-5-MASTER-IMPLEMENTATION-EXECUTION-PLAN.md`
+- source references:
+  - `reports/plans/EVIDENCE-BACKED-EXECUTION-PLAN.md`
+  - `reports/plans/EVIDENCE-BACKED-UI-REDESIGN-PLAN.md`
+  - `reports/plans/EVIDENCE-BACKED-IMPLEMENTATION-PLAN.md`
+  - `research/deep-research-report.md`
 
 ## Last 2 days of active changes
 
@@ -40,8 +44,8 @@
 
 ## Immediate execution lane
 
-- active implementation focus remains Phase 2 closeout, not Phase 3
-- remaining Phase 2 blockers are manual Supabase schema review plus manual onboarding, profile, and program-save validation against the migrated schema
+- the canonical implementation driver is now `reports/plans/FABLE-5-MASTER-IMPLEMENTATION-EXECUTION-PLAN.md`
+- immediate implementation entry remains current-schema and compatibility validation so the master plan starts from verified repo reality rather than assumed Phase 2 completion
 
 ## Immediate constraints
 
