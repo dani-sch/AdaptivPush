@@ -1,40 +1,27 @@
-# Active Roadmap
+# Active roadmap
 
-## Core execution sequence
+## Stable execution sequence
 
-1. [DONE] Land evidence and policy foundations for transparent recommendations.
-2. [ACTIVE] Land and manually close additive schema and compatibility work for new readiness, preference, and generation-context flows.
-3. Ship Milestone 1 across Intelligence, Experience, and Trust.
-4. Ship optional physiology personalization and generator-v2 core as Milestone 2.
-5. Ship progression, deload, rationale, and analytics deepening as Milestone 3.
-6. Land rollout controls and optional integrations as Milestone 4.
-
-## Milestone view
-
-| Milestone | Focus | Primary user-visible outcome |
+| Stage | State | Primary outcome |
 |---|---|---|
-| Milestone 1 - Visible adaptive foundation | readiness framing, trust entry point, generation context | visible reason for today's adjustment and first evidence entry point |
-| Milestone 2 - Optional physiology personalization | cycle support, split recommendation, session-length-aware planning | more transparent planning and optional hidden-until-enabled personalization |
-| Milestone 3 - Adaptive workload and deload intelligence | progression-v2, deloads, rationale history | explainable plan changes and adaptation analytics |
-| Milestone 4 - Rollout hardening and integration enrichment | flags, gating, optional health enrichment | stable rollout and controlled expansion |
+| `F5-S0` Evidence/policy foundation | complete | Shared evidence and explanation metadata foundation |
+| `F5-S1` Schema truth, RLS, compatibility, authority | active | Verified safe data foundation and one execution authority |
+| `F5-S2` Feature gates and shared UX/state | pending | Safe rollout controls and reusable mobile UI primitives |
+| `F5-S3` Onboarding/profile/preferences | pending | Meaningful personalization and honest optional settings |
+| `F5-S4` Generator-v2 and plan transparency | pending | Explainable split/volume recommendations and overrides |
+| `F5-S5` Readiness-v2 and day-of coaching | pending | Conservative explicit recommendations with user control |
+| `F5-S6` Progression, plateau, deload, workout durability | pending | Explainable long-term adaptation and safer persistence |
+| `F5-S7` History, analytics, evidence, education | pending | Interpreted trends and shared trust surfaces |
+| `F5-S8` Production hardening, privacy, release, integration | pending | Production-real support paths, identity, accessibility, and rollout |
 
-## UI workstream overlay
+## Milestone packaging
 
-| UI milestone | Maps to | Focus |
+| Milestone | Included stages | User-visible outcome |
 |---|---|---|
-| UI-M1 | Milestone 1 | Home, Next Workout, Quick Setup, Profile entry, first trust shell |
-| UI-M2 | Milestone 2 | Generate Program, Plan, Program Overview |
-| UI-M3 | Milestone 3 | History, workout-detail rationale, deload explanation |
-| UI-M4 | Milestone 4 | evidence route, FAQ, Recovery Library, gated-state parity |
+| Foundation closeout | `F5-S1` | Safe compatibility baseline; no new behavior exposure |
+| Visible adaptive foundation | `F5-S2`, `F5-S3`, first `F5-S5` trust/readiness slice | Better check-in framing, visible adjustment reason, first evidence entry |
+| Transparent planning | `F5-S4` and relevant `F5-S7` trust slice | Explainable generation, set targets, plan rationale, safe override |
+| Adaptive workload intelligence | remainder of `F5-S5`, `F5-S6`, analytics slice of `F5-S7` | Durable adaptation, plateau/deload guidance, interpreted history |
+| Production completion | `F5-S8` | Honest operational support paths, release identity, accessibility, privacy, and controlled rollout |
 
-## Last 2 days of roadmap-aligned changes
-
-- clarified the master implementation plan from open planning questions into explicit product-direction answers
-- added a separate evidence-backed UI redesign plan so structural UI work can move in parallel with the feature execution plan without replacing it
-- formalized the living-doc lane in `dev-doc/` so roadmap, current state, TODO, and plan indexing now have stable owning files
-
-## Active plan references
-
-- master driver: `reports/plans/FABLE-5-MASTER-IMPLEMENTATION-EXECUTION-PLAN.md`
-- feature execution: `reports/plans/EVIDENCE-BACKED-EXECUTION-PLAN.md`
-- UI redesign: `reports/plans/EVIDENCE-BACKED-UI-REDESIGN-PLAN.md`
+HealthKit is an optional enrichment after core manual parity; it is not on the critical path to the first four product milestones.

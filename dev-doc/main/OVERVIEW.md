@@ -16,18 +16,19 @@ AdaptivPush is an Expo Router mobile app for generating, running, and adapting s
 The current execution lane is now driven by:
 
 - `reports/plans/FABLE-5-MASTER-IMPLEMENTATION-EXECUTION-PLAN.md`
+- `dev-doc/plans/active/FABLE-5-EXECUTION-REGISTER.md`
+- `dev-doc/plans/active/FABLE-5-CODE-IMPLEMENTATION-STATUS.md`
 - `dev-doc/plans/active/PLAN-INDEX.md`
 
-The prior evidence-backed execution, implementation, UI, and research documents remain source material and reference inputs, not independent execution drivers.
+The prior evidence-backed execution, implementation, UI, and research documents are explicitly marked source references, not independent execution drivers.
 
-## Last 2 days of planning changes
+## Current planning model
 
-- this chat created `reports/plans/EVIDENCE-BACKED-EXECUTION-PLAN.md` as the execution-ready feature plan
-- this chat created `reports/plans/EVIDENCE-BACKED-UI-REDESIGN-PLAN.md` as the companion UI workstream plan
-- the evidence-backed implementation strategy was clarified with direct product-direction answers inside `reports/plans/EVIDENCE-BACKED-IMPLEMENTATION-PLAN.md`
-- the execution work is now split more cleanly between a canonical feature execution plan and a companion UI redesign plan
-- `dev-doc/` was bootstrapped as the active documentation spine so future planning and implementation updates have a canonical home
-- active dev logging now lives in `dev-doc/reports/DEV-LOG.md`, while `reports/DEV-LOG.md` remains the historical pre-bootstrap log
+- FABLE-5 defines the complete app and technical contract.
+- The execution register assigns stable `F5-S*` identifiers and gates.
+- The code status snapshot records what actually works, what is partial, and what is missing.
+- Living docs summarize current architecture, state, roadmap, and immediate work.
+- `dev-doc/reports/DEV-LOG.md` records executed evidence and external validation.
 
 ## Current product direction
 

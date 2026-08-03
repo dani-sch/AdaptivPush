@@ -5,6 +5,39 @@
 
 ---
 
+### 2026-08-03 FABLE-5 execution-authority and code-status audit {#2026-08-03-fable-5-execution-authority-code-status-audit}
+
+**Summary**: Rebuilt the active planning lane around one FABLE-5 product contract, stable `F5-S*` execution identifiers, and a code-backed capability inventory. Marked older evidence-backed plans as source references and documented production gaps found directly in the repository.
+
+**Changes**:
+
+| Component | Change |
+|---|---|
+| canonical plan | Added execution authority, stable stage status, RLS qualification, resolved decisions, and production completion requirements to FABLE-5 |
+| execution register | Added `F5-S0` through `F5-S8` with dependencies, file targets, behavioral requirements, gates, and decision resolutions |
+| code status | Added route, domain, data, security, release, and planned-file status based on the audited `74f9e8a` code baseline |
+| source plans | Changed evidence-backed execution, implementation, and UI plans to source-reference status |
+| living docs | Aligned architecture, current state, roadmap, TODO, plan index, command reference, overview, and generated TOC |
+| governance | Corrected the documented Git baseline and Expo/React Native TypeScript review guidance in local instruction surfaces |
+
+**Important code-backed findings**:
+
+- core auth, generation, workout logging, PR, history, archive, local notification, and theme paths exist;
+- readiness, progression, cycle, deload, analytics, evidence, notification, privacy, and support behavior remain partial or scaffolded;
+- password reset, feature flags, automated tests, real HealthKit, production app identity, and real support/export/deletion processing are missing;
+- migrations 008-014 do not contain RLS enablement or ownership policies, making live RLS proof and an additive policy migration the first `F5-S1` gate.
+
+**Validation**:
+
+| Check | Result |
+|---|---|
+| code inventory and targeted source inspection | completed |
+| `python scripts/tools/generators/toc_generate.py --output dev-doc/main/TOC.md` | passed |
+| `git diff --check` | passed |
+| live Supabase and device checks | not performed; explicitly retained as `F5-S1` work |
+
+---
+
 ### 2026-06-30 Phase 2 schema-and-compatibility pass {#2026-06-30-phase-2-schema-and-compatibility-pass}
 
 **Summary**: Landed the Phase 2 additive schema and compatibility slice in code: added migrations 007-014, expanded the in-repo schema reference and TS data model, wired onboarding/profile compatibility reads and writes, and made program saves intentionally create `program_generation_context`. Phase 2 is not fully closed yet because manual validation remains.

@@ -1,22 +1,32 @@
-# Active Plan Index
+# Active plan index
 
-## Current active plans
+## Execution authority
 
-| Plan | Path | Status | Scope | Next owner |
-|---|---|---|---|---|
-| FABLE-5 master implementation execution plan | `reports/plans/FABLE-5-MASTER-IMPLEMENTATION-EXECUTION-PLAN.md` | active canonical driver | consolidated product definition, current-state audit, IA, data model, rules, build order, QA | direct implementation from the master plan, starting with schema-truth and compatibility validation |
-| Evidence-backed execution plan | `reports/plans/EVIDENCE-BACKED-EXECUTION-PLAN.md` | source reference | prior feature sequencing, schema strategy, rollout, trust-surface planning | reference only where the master plan points back to it |
-| Evidence-backed UI redesign plan | `reports/plans/EVIDENCE-BACKED-UI-REDESIGN-PLAN.md` | source reference | UI structure, component system, theme-aware redesign, plan-to-milestone mapping | reference only where the master plan points back to it |
-| Evidence-backed implementation plan | `reports/plans/EVIDENCE-BACKED-IMPLEMENTATION-PLAN.md` | source reference | approved strategy, resolved clarification answers, milestone/workstream framing inputs | reference only where the master plan points back to it |
+| Document | Status | Owns |
+|---|---|---|
+| `reports/plans/FABLE-5-MASTER-IMPLEMENTATION-EXECUTION-PLAN.md` | active canonical driver | Complete app definition, architecture direction, domain rules, build contract, QA, and completion criteria |
+| `dev-doc/plans/active/FABLE-5-EXECUTION-REGISTER.md` | active execution ledger | Stable `F5-S*` IDs, status, dependencies, bounded slices, decisions, and gates |
+| `dev-doc/plans/active/FABLE-5-CODE-IMPLEMENTATION-STATUS.md` | active code snapshot | Working/partial/scaffolded/missing status with current and planned file evidence |
+| `dev-doc/main/TODO.md` | active task board | Immediate and next actionable work only |
 
-## Last 2 days of plan updates
+## Source references
 
-- the evidence-backed execution plan was created in this chat as the main execution-ready implementation driver
-- the UI redesign plan was created in this chat as a companion workstream plan rather than folded into the feature execution plan
-- the implementation plan was updated from open questions into resolved planning answers
-- active plan ownership now expects execution to flow from the execution plan and UI plan, with the implementation plan remaining a strategy and clarification reference
-- Phase 1 of the evidence-backed execution plan is complete and the current bounded implementation lane is Phase 2 closeout after the schema and compatibility pass
+| Document | Status | Retained value |
+|---|---|---|
+| `reports/plans/EVIDENCE-BACKED-EXECUTION-PLAN.md` | source-reference | Detailed historical schema, rule, rollout, and phase rationale |
+| `reports/plans/EVIDENCE-BACKED-UI-REDESIGN-PLAN.md` | source-reference | UI intent, candidate primitives, and screen decomposition |
+| `reports/plans/EVIDENCE-BACKED-IMPLEMENTATION-PLAN.md` | source-reference | Approved product answers and research-to-feature translation |
+| `research/deep-research-report.md` | research source | Evidence framing and research constraints |
+
+Source references may inform a bounded implementation decision, but they cannot change active stage status or sequence. If a source conflicts with current code or the FABLE-5 contract, record the conflict and follow current authority.
+
+## Current lane
+
+- completed: `F5-S0`
+- active: `F5-S1`
+- next: `F5-S2`
+- pending: `F5-S3` through `F5-S8`
 
 ## Archival rule
 
-When a plan has been executed and is no longer the active driver for implementation, move the plan markdown file into `dev-doc/plans/legacy/` and update this index to reflect the new active source.
+Move an executed plan to `dev-doc/plans/legacy/` only when it no longer provides active execution or source-reference value. Update this index in the same change.

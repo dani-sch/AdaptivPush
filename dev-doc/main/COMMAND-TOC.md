@@ -21,7 +21,7 @@
 | `/sprint` | sync living docs needed for workflow closeout |
 | `/action` | create a concise execution handoff prompt |
 
-## Current stage-3 execution owner
+## Current execution lane
 
-The current evidence-backed implementation work is best executed through bounded `typescript-agent` slices because the active work is overwhelmingly Expo, TypeScript, and Supabase client logic.
+Use bounded Expo/TypeScript/Supabase slices identified by `F5-S*`. The active lane is `F5-S1`; no v2 behavior should be exposed until schema ownership and compatibility gates close.
 

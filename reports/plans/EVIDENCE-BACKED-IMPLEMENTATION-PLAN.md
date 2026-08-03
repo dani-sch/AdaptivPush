@@ -1,12 +1,18 @@
 ---
 title: "AdaptivPush evidence-backed implementation plan"
 created: "2026-05-07"
-status: draft
+status: source-reference
 workflow: pydev-workflow
+superseded_by: "reports/plans/FABLE-5-MASTER-IMPLEMENTATION-EXECUTION-PLAN.md"
+execution_register: "dev-doc/plans/active/FABLE-5-EXECUTION-REGISTER.md"
 estimated_effort: XL
 ---
 
-# Problem and approach
+# AdaptivPush evidence-backed implementation source
+
+> Source-reference notice: This document preserves approved product answers, research translation, and original implementation reasoning. It no longer controls execution order or status. Use the FABLE-5 master plan and `F5-S*` execution register.
+
+## Problem and approach
 
 AdaptivPush already has promising adaptive-training primitives, but the current product only partially expresses the research it aims to embody. The next implementation arc should convert the deep research report into a coherent product system: evidence-backed generation, evidence-backed day-of-workout adaptation, evidence-backed recovery education, and transparent in-app explanations that help users understand *why* the app is making each recommendation.
 
