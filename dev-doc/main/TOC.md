@@ -15,12 +15,12 @@
 | Tool Scripts | 27 |
 | Power Automate Scripts | 1 |
 | VBA Scripts | 5 |
-| Documentation | 12 |
+| Documentation | 13 |
 | Configuration | 8 |
 | Skills | 62 |
 | Agents | 17 |
 | Commands | 8 |
-| **Total** | **191** |
+| **Total** | **192** |
 
 ---
 
@@ -198,6 +198,7 @@ _Living documents and active plans_
     │   └── TODO.md — Active TODO
     ├── plans/
     │   ├── active/
+    │   │   ├── EXECUTION-PROMPT.md — FABLE-5 execution prompt
     │   │   ├── FABLE-5-CODE-IMPLEMENTATION-STATUS.md — FABLE-5 code implementation status
     │   │   ├── FABLE-5-EXECUTION-REGISTER.md — FABLE-5 execution register
     │   │   └── PLAN-INDEX.md — Active plan index

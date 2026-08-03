@@ -9,6 +9,10 @@
 | `dev-doc/plans/active/FABLE-5-CODE-IMPLEMENTATION-STATUS.md` | active code snapshot | Working/partial/scaffolded/missing status with current and planned file evidence |
 | `dev-doc/main/TODO.md` | active task board | Immediate and next actionable work only |
 
+## Execution handoff
+
+`dev-doc/plans/active/EXECUTION-PROMPT.md` is the paste-ready operational handoff for a fresh executor. It summarizes verified context and execution safeguards, but it does not override the authority or live status of the documents above. The executor must re-read current state before selecting a bounded slice.
+
 ## Source references
 
 | Document | Status | Retained value |
