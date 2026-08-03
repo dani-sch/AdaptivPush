@@ -36,7 +36,10 @@ export async function uploadAvatar(userId: string): Promise<string | null> {
   const base64 = await readAsStringAsync(resized.uri, { encoding: EncodingType.Base64 });
   const bytes = toByteArray(base64);
 
-  const path = `${userId}/${Date.now()}.jpg`;
+  // A stable owner-scoped path makes upsert replace the previous avatar instead
+  // of leaving an unbounded series of timestamped objects in public storage.
+  const path = `${userId}/avatar.jpg`;
+  const cacheVersion = Date.now();
 
   const { error: uploadError } = await supabase.storage
     .from('avatars')
@@ -48,5 +51,5 @@ export async function uploadAvatar(userId: string): Promise<string | null> {
   }
 
   const { data } = supabase.storage.from('avatars').getPublicUrl(path);
-  return data.publicUrl;
+  return `${data.publicUrl}?v=${cacheVersion}`;
 }
