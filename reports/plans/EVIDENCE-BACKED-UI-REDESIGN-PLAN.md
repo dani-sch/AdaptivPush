@@ -1,13 +1,16 @@
 ---
 title: "AdaptivPush evidence-backed UI redesign plan"
 created: "2026-06-29"
-status: draft
+status: source-reference
 workflow: direct
-source_of_truth: "reports/plans/EVIDENCE-BACKED-EXECUTION-PLAN.md"
+superseded_by: "reports/plans/FABLE-5-MASTER-IMPLEMENTATION-EXECUTION-PLAN.md"
+execution_register: "dev-doc/plans/active/FABLE-5-EXECUTION-REGISTER.md"
 estimated_effort: XL
 ---
 
 # AdaptivPush evidence-backed UI redesign plan
+
+> Source-reference notice: This document preserves UI research, component targets, and screen decomposition. It does not control implementation order or status. Use the FABLE-5 master plan, execution register, and code implementation status document for all active work.
 
 ## Scope statement
 
@@ -15,10 +18,12 @@ This document defines an execution-ready UI redesign workstream for AdaptivPush 
 
 ## Planning contract
 
-- Canonical feature and milestone sequencing: `reports/plans/EVIDENCE-BACKED-EXECUTION-PLAN.md`
-- Current app architecture reference: `reports/ARCHITECTURE.md`
-- Current repository inventory reference: `TABLE-OF-CONTENTS.md`
-- Current task tracker substitute: `reports/TODO.md`
+- Canonical feature contract: `reports/plans/FABLE-5-MASTER-IMPLEMENTATION-EXECUTION-PLAN.md`
+- Stable stage sequencing: `dev-doc/plans/active/FABLE-5-EXECUTION-REGISTER.md`
+- Code-backed status: `dev-doc/plans/active/FABLE-5-CODE-IMPLEMENTATION-STATUS.md`
+- Current architecture: `dev-doc/main/ARCHITECTURE.md`
+- Current repository inventory: `dev-doc/main/TOC.md`
+- Current task tracker: `dev-doc/main/TODO.md`
 
 This plan is a companion execution layer for UI work. It does not replace the approved feature plan.
 
@@ -58,7 +63,7 @@ This plan is a companion execution layer for UI work. It does not replace the ap
 
 ## Key findings
 
-1. The repository does not contain the expected `dev-doc/main/*` planning surfaces; the evidence-backed execution plan explicitly says this effort should use `reports/*` plus source inspection as planning authority.
+1. The repository now contains the `dev-doc/main/*` living-document spine. Older references to its absence are superseded.
 2. The current architecture is an Expo Router mobile app with most orchestration on the client, so the redesign should target screen and component structure rather than assume a server-rendered design system.
 3. The evidence-backed plan already identifies the key UI surfaces and their milestone sequencing, especially Home, Next Workout, Quick Setup, Profile, Plan, Program Overview, History, FAQ, Recovery Library, and the future evidence route.
 4. Theme support already exists in `contexts/ThemeContext.tsx` and `constants/themes.ts`, which makes a two-theme redesign feasible without inventing a new theming mechanism.
@@ -143,7 +148,7 @@ U1 -> U2 -> U3 -> U4/U5 -> U6
   - History and workout detail loading with sparse or legacy data
   - dark mode, light mode, and system mode parity
 
-## Recommended execution order
+## Historical UI decomposition order
 
 1. Establish tokens, layout primitives, and shared bottom-sheet/card patterns.
 2. Ship Milestone 1 UI surfaces: Quick Setup, Profile settings entry, Home, Next Workout, `NextWorkoutCard`, and the first trust affordance.
@@ -152,8 +157,8 @@ U1 -> U2 -> U3 -> U4/U5 -> U6
 5. Finish trust and education surfaces: FAQ, Recovery Library, and evidence route.
 6. Run rollout and theme-parity hardening across all touched surfaces.
 
-## Notes
+## Source-reference notes
 
-- Use `reports/ARCHITECTURE.md`, `TABLE-OF-CONTENTS.md`, `reports/TODO.md`, and `reports/plans/EVIDENCE-BACKED-EXECUTION-PLAN.md` as the active planning authority for this repo state.
+- Use this document only for UI intent and candidate file decomposition. Active authority lives in the FABLE-5 master plan and execution register.
 - The visual target is a major structural redesign inspired by the provided references, not a shallow color refresh.
 - Preserve brand colors, one-handed use, current themes, and dark/light/system appearance switching as non-negotiable constraints.

@@ -1,55 +1,43 @@
-# Current State
+# Current state
 
-## Product and code posture
+## Active execution state
 
-- Client: Expo 54, React Native 0.81, React 19, TypeScript 5.9
-- Backend: Supabase Auth, Postgres, Storage
-- Theme system: present and user-switchable through `ThemeContext`
-- Health integration: UI placeholder only; no implemented HealthKit adapter yet
-- Feature flags: not implemented yet; planned in-repo first
+- canonical driver: `reports/plans/FABLE-5-MASTER-IMPLEMENTATION-EXECUTION-PLAN.md`
+- stable execution stage: `F5-S1` - schema truth, RLS, compatibility, and authority closeout
+- `F5-S0` evidence/policy foundation: complete
+- Phase 2 schema/type/compatibility code: merged
+- Phase 2 live schema and two-user RLS isolation: verified 2026-08-03
+- Phase 2 complete manual app compatibility matrix: not closed
+- feature flags: missing
+- readiness-v2 engine: missing
+- automated application tests: missing
 
-## Confirmed working assumptions for current planning
+## Code-backed product posture
 
-- active plans still live under `reports/plans/` and are indexed from `dev-doc/plans/active/PLAN-INDEX.md`
-- `reports/ARCHITECTURE.md` is the best current detailed architecture source
-- `reports/TODO.md` remains useful historical context, but `dev-doc/main/TODO.md` is now the active board
-- `dev-doc/` has been bootstrapped to satisfy the repo's intended documentation layout
+Working core paths include authentication, onboarding/profile seeding, generated and manual programs, active-plan loading, exercise swaps, workout logging, personal records, raw history, local notifications, archive/restore, and theme/palette switching.
+
+Partial or scaffolded paths include readiness, day-of adaptation, progression, scheduled deloads, cycle support, analytics, evidence UI, notifications, privacy requests, and support requests.
+
+Missing production paths include real password reset, feature gates, reactive deload lifecycle, keyed evidence route, real HealthKit, real support/export/deletion processing, automated tests, and production application identity.
+
+The detailed status and file evidence live in `dev-doc/plans/active/FABLE-5-CODE-IMPLEMENTATION-STATUS.md`.
 
 ## Verification posture
 
-- smallest available local gate: `npm run lint`
-- no broad automated test suite is currently documented as the default gate
-- major implementation phases still require manual regression slices across onboarding, readiness, program generation, workout execution, trust surfaces, and compatibility paths
-- Phase 1 closeout validation now includes a completed in-app `GenerateProgramModal` smoke pass in addition to the lint gate and seeded generator regression checks
-
-## Current active plans
-
-- `reports/plans/FABLE-5-MASTER-IMPLEMENTATION-EXECUTION-PLAN.md`
-- source references:
-  - `reports/plans/EVIDENCE-BACKED-EXECUTION-PLAN.md`
-  - `reports/plans/EVIDENCE-BACKED-UI-REDESIGN-PLAN.md`
-  - `reports/plans/EVIDENCE-BACKED-IMPLEMENTATION-PLAN.md`
-  - `research/deep-research-report.md`
-
-## Last 2 days of active changes
-
-- no commits were recorded in the last-two-day window; the changes are currently represented as working-tree planning and documentation updates
-- `reports/plans/EVIDENCE-BACKED-EXECUTION-PLAN.md` was created in this chat as the execution-ready feature plan
-- `reports/plans/EVIDENCE-BACKED-UI-REDESIGN-PLAN.md` was created in this chat as the companion UI workstream plan aligned to the execution plan
-- `reports/plans/EVIDENCE-BACKED-IMPLEMENTATION-PLAN.md` now includes resolved clarification answers for product promise, depth modes, onboarding scope, readiness authority, cycle support, transparency, analytics, integrations, and rollout structure
-- `dev-doc/` was created and indexed so the repo now has the intended living-doc structure referenced by the active instructions
-- the archival rule for executed plans is now explicit through `dev-doc/plans/legacy/README.md` and `dev-doc/plans/active/PLAN-INDEX.md`
-- Phase 1 of the evidence-backed execution plan is now complete: the evidence/policy foundation landed, lint passed, seeded generator output matched `HEAD` when explanation metadata was stripped, and the in-app Generate Program flow succeeded
-- Phase 2 additive schema and compatibility code has now landed in the working tree, including migrations 007-014, the refreshed schema reference, onboarding/profile compatibility writes, and program-generation-context persistence wiring
-
-## Immediate execution lane
-
-- the canonical implementation driver is now `reports/plans/FABLE-5-MASTER-IMPLEMENTATION-EXECUTION-PLAN.md`
-- immediate implementation entry remains current-schema and compatibility validation so the master plan starts from verified repo reality rather than assumed Phase 2 completion
+- available static app gate: `npm run lint`
+- tests configured: none
+- last recorded generator closeout: lint, seeded output comparison, and in-app Generate Program smoke passed
+- live schema, constraints, indexes, storage policy, exercise metadata, and two-user RLS isolation were verified on 2026-08-03
+- Phase 2 manual application validation still required: new-user onboarding, legacy fallback reads, profile dual-write, and full generated-program save/cleanup UX
+- remote schema changes before migration 015 were made through the Dashboard; Supabase CLI baseline/pull and migration-history normalization remain a release-process prerequisite
+- no claim about live Supabase or device behavior is complete until recorded in `dev-doc/reports/DEV-LOG.md`
+- the documented `integrator` clone/actor was not present in the audited Git worktree list and must be configured or explicitly bypassed by the approved workflow before integration automation is assumed
 
 ## Immediate constraints
 
-- preserve brand colors and theme switching
-- preserve one-handed usability in the mobile UI
-- keep trust surfaces calm and compact by default
-- keep rollout-sensitive features behind explicit flags once the flag layer exists
+- keep rollout-sensitive behavior off until deterministic feature gates exist;
+- preserve legacy `readiness_logs` during the compatibility window;
+- preserve dark/light/system and palette behavior;
+- keep cycle/symptom support opt-in and hidden by default;
+- do not expose HealthKit, support, export, deletion, email, or SMS as operational unless a real backend/device path exists;
+- do not advance to `F5-S2` until the remaining application compatibility smoke matrix is recorded.

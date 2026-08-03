@@ -1,25 +1,34 @@
 # Active TODO
 
-## [ACTIVE]
+## [ACTIVE] `F5-S1`
 
-- [ACTIVE] Use `reports/plans/FABLE-5-MASTER-IMPLEMENTATION-EXECUTION-PLAN.md` as the canonical implementation driver for all future execution.
-- [ACTIVE] Close schema-truth and compatibility validation for onboarding, profile, and program-save flows so the master plan starts from verified repo reality.
-- [ACTIVE] Review the applied Phase 2 schema in Supabase against `lib/adaptivpush_database_schema.md` before marking the phase complete.
-- [ACTIVE] Prepare Milestone 1 UI implementation slices from `reports/plans/EVIDENCE-BACKED-UI-REDESIGN-PLAN.md`.
-- [ACTIVE] Use `dev-doc/reports/DEV-LOG.md` for ongoing execution logging.
-- [ACTIVE] Treat the prior evidence-backed execution, implementation, UI, and research documents as source material only, not parallel execution plans.
+- [COMPLETE] Compare live Supabase tables, columns, constraints, and indexes with migrations 001-014 and `lib/adaptivpush_database_schema.md`; drift is recorded in the 2026-08-03 live audit.
+- [COMPLETE] Add and deploy migration 015 and prove two-user RLS ownership isolation for every Phase 2 table with a rolled-back verification script.
+- [COMPLETE] Harden the avatar bucket contract and repair the deployed `exercises.exercisedb_id` column/index.
+- [ACTIVE] Run new-user onboarding writes for `user_profile`, `user_adaptation_preferences`, and `evidence_display_preferences`.
+- [ACTIVE] Run legacy/missing-row profile read and dual-write compatibility checks.
+- [ACTIVE] Verify generated-program save creates `program_generation_context` and failure cleanup behaves as documented.
+- [ACTIVE] Keep the FABLE-5 master, execution register, code status snapshot, and living docs synchronized.
 
-## [NEXT]
+## [NEXT] `F5-S2`
 
-- [NEXT] Manually verify onboarding writes the new Phase 2 defaults without breaking legacy-compatible reads.
-- [NEXT] Manually verify profile readiness and cycle settings dual-read and dual-write correctly with migrated rows present.
-- [NEXT] Manually verify program save intentionally creates `program_generation_context` and still preserves the existing generation flow.
-- [NEXT] Define the first shared UI primitives and token layer for the redesign workstream.
-- [NEXT] Add deterministic in-repo feature flags before rollout-sensitive behavior is exposed broadly.
-- [NEXT] Confirm whether the dedicated evidence route should use `app/evidence.tsx` or `app/evidence/[key].tsx`.
-- [NEXT] Decide the first execution slice order from the master plan across Milestone 1 Experience, Trust, and Intelligence work.
+- [NEXT] Add deterministic in-repo feature flags with all behavioral v2 flags off by default.
+- [NEXT] Add a minimal pure TypeScript test runner and initial feature-gate tests.
+- [NEXT] Implement shared screen, surface, section, metric, bottom-action, loading, empty, and error primitives.
+- [NEXT] Verify Home, Plan, and Profile with flags off across dark/light/system modes.
 
-## [PARKED]
+## [QUEUED]
 
-- [PARKED] HealthKit enrichment remains outside the critical path for Milestones 1-3.
-- [PARKED] Deep automation beyond `npm run lint` is useful later, but not a blocker for current planning execution.
+- [QUEUED] Execute `F5-S3` onboarding/profile completion.
+- [QUEUED] Execute `F5-S4` generator-v2 and plan transparency.
+- [QUEUED] Execute `F5-S5` readiness-v2 and explicit day-of coaching.
+- [QUEUED] Execute `F5-S6` workout durability, progression, plateau, and deload.
+- [QUEUED] Execute `F5-S7` analytics, evidence, FAQ, and Recovery Library integration.
+- [QUEUED] Execute `F5-S8` password reset, real privacy/support operations, production identity, accessibility, release, and optional HealthKit.
+
+## [BLOCKED]
+
+- [BLOCKED] Supabase CLI history normalization requires a project access token and a deliberate `db pull`/`migration repair` baseline; do not fabricate the internal migration ledger from Dashboard SQL.
+- [BLOCKED] Automated Supabase backups are unavailable on the current Free plan; production release requires a paid backup capability or an approved external backup job.
+- [BLOCKED] Deleting 16 historical unreferenced avatar objects requires explicit destructive-action confirmation; stable-path uploads prevent new accumulation.
+- [BLOCKED] HealthKit library selection requires a focused Expo 54 native compatibility spike and is intentionally deferred.

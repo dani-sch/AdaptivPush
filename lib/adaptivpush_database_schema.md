@@ -1,3 +1,10 @@
+# AdaptivPush deployed database schema
+
+Verified against Supabase project `thfxcvxcsfvrzdysdnkq` on 2026-08-03.
+User-owned Phase 2 tables have RLS enabled with four authenticated ownership
+policies each. Full evidence and drift notes are recorded in
+`dev-doc/reports/FABLE-5-LIVE-SUPABASE-AUDIT-2026-08-03.md`.
+
 ## Table `user_profile`
 
 ### Columns
@@ -82,6 +89,7 @@
 | `secondary_muscles` | `_text` |  Nullable |
 | `instructions` | `_text` |  Nullable |
 | `image_url` | `text` |  Nullable |
+| `exercisedb_id` | `text` | Nullable, indexed when present |
 
 ## Table `program_day_exercises`
 
