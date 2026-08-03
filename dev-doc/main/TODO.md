@@ -2,8 +2,9 @@
 
 ## [ACTIVE] `F5-S1`
 
-- [ACTIVE] Compare live Supabase tables, columns, constraints, indexes, and migration history with migrations 001-014 and `lib/adaptivpush_database_schema.md`.
-- [ACTIVE] Prove RLS and user ownership isolation for every Phase 2 table; prepare an additive policy migration where coverage is missing.
+- [COMPLETE] Compare live Supabase tables, columns, constraints, and indexes with migrations 001-014 and `lib/adaptivpush_database_schema.md`; drift is recorded in the 2026-08-03 live audit.
+- [COMPLETE] Add and deploy migration 015 and prove two-user RLS ownership isolation for every Phase 2 table with a rolled-back verification script.
+- [COMPLETE] Harden the avatar bucket contract and repair the deployed `exercises.exercisedb_id` column/index.
 - [ACTIVE] Run new-user onboarding writes for `user_profile`, `user_adaptation_preferences`, and `evidence_display_preferences`.
 - [ACTIVE] Run legacy/missing-row profile read and dual-write compatibility checks.
 - [ACTIVE] Verify generated-program save creates `program_generation_context` and failure cleanup behaves as documented.
@@ -27,5 +28,7 @@
 
 ## [BLOCKED]
 
-- [BLOCKED] Live schema/RLS conclusions require access to the target Supabase project and two test identities.
+- [BLOCKED] Supabase CLI history normalization requires a project access token and a deliberate `db pull`/`migration repair` baseline; do not fabricate the internal migration ledger from Dashboard SQL.
+- [BLOCKED] Automated Supabase backups are unavailable on the current Free plan; production release requires a paid backup capability or an approved external backup job.
+- [BLOCKED] Deleting 16 historical unreferenced avatar objects requires explicit destructive-action confirmation; stable-path uploads prevent new accumulation.
 - [BLOCKED] HealthKit library selection requires a focused Expo 54 native compatibility spike and is intentionally deferred.

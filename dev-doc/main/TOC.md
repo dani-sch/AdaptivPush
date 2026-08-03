@@ -194,7 +194,7 @@ _Living documents and active plans_
     │   ├── CURRENT-STATE.md — Current state
     │   ├── OVERVIEW.md — AdaptivPush Overview
     │   ├── ROADMAP.md — Active roadmap
-    │   ├── TOC.md — Active Documentation Index
+    │   ├── TOC.md — Table of Contents
     │   └── TODO.md — Active TODO
     ├── plans/
     │   ├── active/

@@ -240,3 +240,26 @@
 ---
 
 Historical entries before the `dev-doc/` bootstrap remain in `reports/DEV-LOG.md`.
+# 2026-08-03 FABLE-5 live Supabase remediation
+
+**Summary**: Audited and repaired the live AdaptivPush Supabase foundation for
+`F5-S1`. Deployed Phase 2 ownership policies, proved two-user isolation with a
+rolled-back test, hardened avatar storage, and repaired ExerciseDB identifiers.
+
+**Live results**:
+
+| Check | Result |
+|---|---|
+| Phase 2 policy coverage | 4 authenticated ownership policies on each of 7 tables |
+| two-user isolation | passed owned access and denied cross-user access/linkage; test rows rolled back |
+| exercise catalog | 1,369 rows; 1,318 IDs backfilled; indexed identifier column present |
+| avatar bucket | public delivery retained; JPEG-only, 2 MiB, 4 owner policies |
+| historical avatar objects | 19 total; 3 referenced and 16 unreferenced; future accumulation fixed, deletion awaits explicit confirmation |
+| post-test Phase 2 rows | zero on all 7 tables |
+| `npm run lint` | 0 errors; 17 pre-existing warnings |
+
+**Authority record**: See
+`dev-doc/reports/FABLE-5-LIVE-SUPABASE-AUDIT-2026-08-03.md` for migration drift,
+the Supabase CLI normalization prerequisite, and the Free-plan backup gate.
+
+---

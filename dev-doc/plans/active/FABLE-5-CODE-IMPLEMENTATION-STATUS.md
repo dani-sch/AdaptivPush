@@ -94,17 +94,17 @@ Snapshot baseline:
 | Data surface | Repository state | Runtime use | Security/verification state |
 |---|---|---|---|
 | `user_profile` | Existing schema plus migration 007 additions | Broadly used | Live columns and policies must be verified. |
-| `user_adaptation_preferences` | Migration and TypeScript types exist | Onboarding/profile read/write compatibility | Migrations shown in the repo do not enable RLS or define policies. Release blocker until live posture is proven and migration coverage is added. |
-| `evidence_display_preferences` | Migration and TypeScript types exist | Onboarding seeds defaults only | No consumer UI; repo migration has no RLS/policies. |
+| `user_adaptation_preferences` | Migration, TypeScript types, and deployed ownership policies exist | Onboarding/profile read/write compatibility | Four authenticated ownership policies verified live; application smoke remains. |
+| `evidence_display_preferences` | Migration, TypeScript types, and deployed ownership policies exist | Onboarding seeds defaults only | Four authenticated ownership policies verified live; no consumer UI yet. |
 | `readiness_logs` | Legacy table in schema reference | Active Home and Next Workout source | Must remain during compatibility window. |
-| `readiness_checkins` | Migration and types exist | Unused | Repo migration has no RLS/policies. |
-| `cycle_symptom_logs` | Migration and types exist | Unused | Sensitive data; repo migration has no RLS/policies. |
-| `program_generation_context` | Migration, types, and required save writer exist | Active for generated programs | Live insert and ownership policy must be verified. Repo migration has no RLS/policies. |
-| `adaptation_events` | Migration and types exist | Unused | Repo migration has no RLS/policies. |
-| `deload_recommendations` | Migration and types exist | Unused | Repo migration has no RLS/policies. |
+| `readiness_checkins` | Migration, types, and deployed ownership policies exist | Unused | Four authenticated ownership policies and cross-user denial verified live. |
+| `cycle_symptom_logs` | Migration, types, and deployed ownership policies exist | Unused | Sensitive rows are isolated by four authenticated ownership policies verified live. |
+| `program_generation_context` | Migration, types, required save writer, and deployed linked-ownership policies exist | Active for generated programs | Valid owned insert and cross-user program denial verified in a rolled-back live test; full app smoke remains. |
+| `adaptation_events` | Migration, types, and deployed linked-ownership policies exist | Unused | Four policies plus linked-record ownership checks verified live. |
+| `deload_recommendations` | Migration, types, and deployed linked-ownership policies exist | Unused | Four policies plus program ownership checks verified live. |
 | `programs`, `program_days`, `program_day_exercises` | Existing schema and active code | Core program flow | Multi-table operations are client-orchestrated and not fully transactional. |
 | `workout_sessions`, `workout_exercise_sets`, `personal_records` | Existing schema and active code | Core workout/history flow | Finish flow uses multiple client writes; retry/idempotency needs hardening. |
-| `avatars` storage | Active upload/public URL flow | Profile avatar | Bucket access and public-data expectations require production review. |
+| `avatars` storage | Active upload/public URL flow with stable owner path | Profile avatar | Intentionally public JPEG bucket; 2 MiB limit and complete owner policies deployed. |
 
 ## Confirmed code defects or misleading behavior
 
@@ -121,7 +121,7 @@ These are implementation facts, not optional redesign ideas:
 9. Notification scheduling uses a fixed 08:00 reminder; selected time and quiet-hour preferences are not applied.
 10. Privacy and support actions only update auth metadata; no export, deletion, or support delivery process exists.
 11. `app.json` still contains temporary application identity.
-12. Phase 2 migration files do not contain RLS enablement or ownership policies for their new tables.
+12. Resolved 2026-08-03: migration 015 adds and live verification proves Phase 2 RLS ownership policies.
 
 ## Planned file map
 
