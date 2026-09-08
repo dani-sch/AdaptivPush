@@ -24,7 +24,7 @@ decision sequence.
 | D-04 Consistency model | Approved | Weekly schedule adherence with a subordinate “weeks on plan” streak; planned rest is respected and accepted pauses preserve without incrementing the streak. |
 | D-05 Readiness and day-of adaptation | Approved | Contextual, explained proposals require explicit acceptance; rejection persists and high readiness never silently increases difficulty. |
 | D-06 Health display and synchronization | Approved | Display-only first; data stays device-local by default, with cloud synchronization requiring separate explicit consent. |
-| D-07 Review eligibility | Open | Pending review. |
+| D-07 Review eligibility | Approved | Installation plus two completed prescribed sessions on separate days and seven elapsed days; launch heuristic subject to validation. |
 | D-08 Theme scope and commerce | Open | Pending review. |
 | D-09 Public operations and content policy | Open | Will be decomposed into separately reviewable decisions. |
 | D-10 Numerical-rule validation | Open | Pending review. |
@@ -315,3 +315,35 @@ default, optional separately consented cloud synchronization.
 - Treat health summaries as highly sensitive and include source deduplication,
   freshness, revocation, deletion, partial permission, offline, and conflicting-data
   fixtures.
+
+## D-07 — Review eligibility
+
+**Status:** Approved on 2026-09-08. Selected option: installation plus two
+completed prescribed sessions on separate days and seven elapsed days.
+
+### Approved behavior
+
+- A user becomes eligible to review a program after installing it, completing at
+  least two prescribed sessions on separate calendar days, and reaching seven
+  elapsed days from installation.
+- This threshold is a transparent launch heuristic intended to reduce drive-by and
+  uninformed ratings. It does not prove expertise, program effectiveness, safety, or
+  meaningful long-term exposure.
+- Allow one active review per user per program identity and record the exact program
+  version reviewed.
+- Users can edit or delete their review. Authors cannot review their own programs.
+- A verified-use indicator means only that the eligibility rule was met; user-facing
+  copy must not imply endorsement or verified results.
+- Installation and training never require a rating or review.
+- Review text, rating, moderation state, and private eligibility evidence remain
+  distinct. Public aggregates are derived server-side from eligible visible reviews.
+- Offline review edits remain drafts until eligibility and moderation checks succeed.
+
+### Planning consequences
+
+- Make the threshold policy-versioned and configurable so testing can revise it
+  without reinterpreting prior eligibility snapshots.
+- Preserve raw rating counts and distributions even if a later ranking algorithm
+  uses confidence adjustment.
+- Test duplicate accounts/requests, replay, author exclusion, deletion, version
+  context, edited eligibility, moderated reviews, and aggregate recomputation.
