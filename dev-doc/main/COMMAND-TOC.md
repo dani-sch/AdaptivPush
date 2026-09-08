@@ -23,5 +23,4 @@
 
 ## Current execution lane
 
-Use bounded Expo/TypeScript/Supabase slices identified by `F5-S*`. The active lane is `F5-S1`; no v2 behavior should be exposed until schema ownership and compatibility gates close.
-
+Use bounded Expo/TypeScript/Supabase AP slices from the [execution register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md). First future packet is AP-01.1 after consolidation review. Planning documents do not authorize application or database implementation. Source/status and compatibility gates precede new exposed behavior.

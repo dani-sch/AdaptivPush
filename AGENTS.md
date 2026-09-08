@@ -55,8 +55,8 @@ files and the `dev-doc/main/*` living-document spine as the readable fallback.
 | Semantic workflow manifests and client adapters | `.chaos/README.md` and `.chaos/manifests/*` when present; otherwise validated `.github/*` surfaces |
 | Canonical command behavior | `.github/skills/<command>/SKILL.md` |
 | Hook and workflow-policy behavior | `.github/hooks/hooks.json` and `.github/hooks/*` |
-| Active AdaptivPush execution map | `dev-doc/plans/active/FABLE-5-EXECUTION-REGISTER.md` |
-| Code-backed product status | `dev-doc/plans/active/FABLE-5-CODE-IMPLEMENTATION-STATUS.md` |
+| Active AdaptivPush execution map | `dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md` |
+| Code-backed product status | `dev-doc/plans/active/ADAPTIVPUSH-IMPLEMENTATION-STATUS.md` |
 
 ## High-value commands
 

@@ -5,6 +5,18 @@
 
 ---
 
+### 2026-09-08 AdaptivPush planning consolidation
+
+**Scope:** Documentation and planning only. Replaced current product-planning authority with neutral master/register/status/database/traceability/inventory documents and a research translation; approved decisions remain authoritative. Preserved 12 stale authorities and 12 operational snapshots with an explicit 61-source map. Mapped 142 requirements, all 28 packet tables plus equipment candidates, and 16 bounded AP slices.
+
+**Verification:** Source hashes, application-file equality, canonical links/anchors/tables, authority search, supported TOC regeneration and focused diffs passed within the limits recorded in [the verification report](/dev-doc/reports/ADAPTIVPUSH-PLAN-CONSOLIDATION-VERIFICATION-2026-09-08.md). Repository freshness is 2/3: the version check cannot run because `version.txt` is absent. Historical archive formatting and embedded obsolete locators remain unchanged for provenance.
+
+**Preservation:** Pre-existing save-code/audit/log edits remain at their original paths. Old register/status and three living-document edits remain unstaged at archived source/snapshot paths. No unrelated user modifications were included in documentation commits. No application code, SQL, database, deployment, external message or push action occurred; no runtime/device/security/integration verification claimed.
+
+**Next:** Final review of [the consolidated plan index](/dev-doc/plans/active/PLAN-INDEX.md); subsequent authorized execution starts with AP-01.1 catalog/grant/migration/restore inspection. Do not begin implementation from this log entry.
+
+---
+
 ### 2026-08-03 FABLE-5 execution-authority and code-status audit {#2026-08-03-fable-5-execution-authority-code-status-audit}
 
 **Summary**: Rebuilt the active planning lane around one FABLE-5 product contract, stable `F5-S*` execution identifiers, and a code-backed capability inventory. Marked older evidence-backed plans as source references and documented production gaps found directly in the repository.

@@ -1,36 +1,33 @@
-# Active plan index
+# AdaptivPush active plan index
 
-## Execution authority
+## Authority
 
-| Document | Status | Owns |
-|---|---|---|
-| `reports/plans/FABLE-5-MASTER-IMPLEMENTATION-EXECUTION-PLAN.md` | active canonical driver | Complete app definition, architecture direction, domain rules, build contract, QA, and completion criteria |
-| `dev-doc/plans/active/FABLE-5-EXECUTION-REGISTER.md` | active execution ledger | Stable `F5-S*` IDs, status, dependencies, bounded slices, decisions, and gates |
-| `dev-doc/plans/active/FABLE-5-CODE-IMPLEMENTATION-STATUS.md` | active code snapshot | Working/partial/scaffolded/missing status with current and planned file evidence |
-| `dev-doc/main/TODO.md` | active task board | Immediate and next actionable work only |
+The [approved decision record](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECORD-2026-09-08.md) owns D-01–D-14 product decisions. The current consolidation request executes its documentation-restructuring decision; older pending-language in the saved handoff is historical. No application implementation or migration is authorized by this documentation review.
 
-## Execution handoff
+| Document | Owns |
+|---|---|
+| [Master implementation plan](/dev-doc/plans/active/ADAPTIVPUSH-MASTER-PLAN.md) | Complete implementation behavior, domain contracts, capability boundaries, architecture and definition of done |
+| [Modular execution register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) | Stable AP slice IDs, status, owner routes, true dependencies, bounded packets and gates |
+| [Code-backed implementation status](/dev-doc/plans/active/ADAPTIVPUSH-IMPLEMENTATION-STATUS.md) | Current source-observed working/partial/scaffolded/missing facts and unresolved defects |
+| [Database and migration plan](/dev-doc/plans/active/ADAPTIVPUSH-DATABASE-PLAN.md) | Schema evidence, all 28 proposal dispositions plus equipment, ownership, additive evolution, verification and rollback |
+| [Requirement/decision traceability](/dev-doc/plans/active/ADAPTIVPUSH-TRACEABILITY.md) | Individual legacy/new requirement dispositions, D decisions, contracts, code/data, AP slices, acceptance and expected evidence |
+| [Document inventory/archive map](/dev-doc/plans/active/ADAPTIVPUSH-DOCUMENT-INVENTORY.md) | 61-source classification, old-to-new paths, source hashes, conflicts and preservation |
+| [Research translation](/dev-doc/plans/active/ADAPTIVPUSH-RESEARCH-TRANSLATION.md) | Supporting research scope, caveats, provisional policies and source/calibration review |
 
-`dev-doc/plans/active/EXECUTION-PROMPT.md` is the paste-ready operational handoff for a fresh executor. It summarizes verified context and execution safeguards, but it does not override the authority or live status of the documents above. The executor must re-read current state before selecting a bounded slice.
-
-## Source references
-
-| Document | Status | Retained value |
-|---|---|---|
-| `reports/plans/EVIDENCE-BACKED-EXECUTION-PLAN.md` | source-reference | Detailed historical schema, rule, rollout, and phase rationale |
-| `reports/plans/EVIDENCE-BACKED-UI-REDESIGN-PLAN.md` | source-reference | UI intent, candidate primitives, and screen decomposition |
-| `reports/plans/EVIDENCE-BACKED-IMPLEMENTATION-PLAN.md` | source-reference | Approved product answers and research-to-feature translation |
-| `research/deep-research-report.md` | research source | Evidence framing and research constraints |
-
-Source references may inform a bounded implementation decision, but they cannot change active stage status or sequence. If a source conflicts with current code or the FABLE-5 contract, record the conflict and follow current authority.
+The living spine summarizes these owners. Historical source plans never override an approved decision or a current evidence boundary. Each rule has one owner; this index does not create a competing roadmap.
 
 ## Current lane
 
-- completed: `F5-S0`
-- active: `F5-S1`
-- next: `F5-S2`
-- pending: `F5-S3` through `F5-S8`
+[TODO](/dev-doc/main/TODO.md) routes the immediate work. Planning consolidation is ready for final review once documentation verification closes. First future executable packet: **AP-01.1**, read-only catalog/grant/migration-ledger and restore evidence inspection. Application slices remain unimplemented by this task; existing useful code and historical gates remain recorded as inputs, not blanket AP completion.
 
-## Archival rule
+Approved release sequence: authority/provenance -> durable workouts/programs -> free schedules/progression -> advanced generation/equipment precision -> contextual coaching/recovery -> unlisted publishing/install -> optional health/themes -> operationally gated discovery/community. AP-16 operational obligations close with each relevant consumer.
 
-Move an executed plan to `dev-doc/plans/legacy/` only when it no longer provides active execution or source-reference value. Update this index in the same change.
+[Execution handoff](/dev-doc/plans/active/EXECUTION-PROMPT.md) is a neutral intake router, not automatic permission to implement.
+
+## Retained provenance and archive
+
+- [Archived/superseded source README](/dev-doc/plans/legacy/2026-09-08-superseded/README.md): old authorities and exact prior operational snapshots, with replacements and retained value.
+- [Original request](/reports/plans/ADAPTIVPUSH-ORIGINAL-REVIEW-REQUEST-2026-09-08.txt), [verbatim decision packet](/reports/plans/ADAPTIVPUSH-DECISION-PACKET-2026-09-08.md), [continuation handoff](/reports/plans/ADAPTIVPUSH-CONTINUATION-PROMPT.md), [consolidation prompt](/reports/plans/ADAPTIVPUSH-PLAN-CONSOLIDATION-PROMPT.md): unchanged request/proposal provenance, not new implementation authority.
+- [Research source](/research/deep-research-report.md), [schema reference](/lib/adaptivpush_database_schema.md), [migrations](/reports/migrations/) and [development evidence](/dev-doc/reports/DEV-LOG.md) stay discoverable in place. The historically titled August audit remains dated evidence linked by the database plan.
+
+All moved historical source bodies remain intact, including obsolete internal locators resolved through the inventory map. Active links point to current owners or explicit archive destinations.

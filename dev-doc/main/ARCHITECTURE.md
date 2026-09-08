@@ -1,44 +1,26 @@
-# Active architecture summary
+# AdaptivPush architecture summary
 
-## Runtime shape
+## Current source-observed runtime
 
-AdaptivPush is a client-heavy Expo Router mobile application backed by Supabase. Most routing, orchestration, program generation, adaptation overlays, workout logging, settings, and presentation logic currently run in the React Native client.
-
-| Layer | Current implementation | Direction |
+| Layer | Existing source | Current limitation / owning future slice |
 |---|---|---|
-| App shell | `app/_layout.tsx`, route groups under `app/(auth)`, `app/(qsetup)`, and `app/(tabs)` | Preserve route shell; add explicit evidence/reset routes as needed. |
-| Authentication | Supabase Auth in auth screens and root session gate | Complete password-reset/deep-link flow and production error states. |
-| UI | Screen files in `app/`; reusable pieces in `components/` | Extract shared mobile primitives without replacing theme behavior. |
-| Theme | `contexts/ThemeContext.tsx`, `constants/themes.ts`, `constants/palettes.ts` | Preserve dark/light/system and user palette selection. |
-| Active program | `hooks/useCurrentProgram.ts` | Split data access and domain actions as v2 behavior lands. |
-| Generator | `utils/programGenerator.ts`, `constants/programDefaults.ts`, `lib/exerciseDatabase.ts` | Add split/volume recommendation modules and a canonical catalog-sync path. |
-| Program persistence | `utils/saveProgramToDb.ts` | Preserve output compatibility; improve transaction/retry behavior. |
-| Readiness/progression | Home, Next Workout, `utils/progressionEngine.ts`, `utils/cyclePhase.ts` | Move decisions into tested readiness, cycle, progression, and deload engines. |
-| Workout/history | `app/next-workout.tsx`, `app/(tabs)/history.tsx`, workout tables | Add idempotency, adaptation events, and interpreted analytics. |
-| Preferences | `utils/profilePreferences.ts`, profile subroutes, auth metadata, Phase 2 tables | Migrate coaching-critical state into owned tables while retaining compatibility. |
-| Evidence | `types/evidence.ts`, evidence/policy constants, generator metadata | Add keyed evidence route and shared trust components. |
-| Notifications | `utils/notifications.ts`, profile notification screen | Make selected schedule/quiet hours real; do not imply unsupported delivery channels. |
-| Backend | Supabase Auth, Postgres, Storage through `utils/supabase.ts` | Verify RLS, isolate user data, and use RPC/transaction patterns where needed. |
+| Expo shell/auth | `app/_layout.tsx`, `app/(auth)/login.tsx`, `join.tsx`, `forgot-password.tsx` | Reset/deep-link/session production flow incomplete; AP-16 |
+| Core screens | `app/(tabs)/home.tsx`, `plan.tsx`, `history.tsx`, `app/next-workout.tsx` | Direct data and domain orchestration, no capsule/outbox boundary; AP-02–08 |
+| Active program | `hooks/useCurrentProgram.ts` | Loads and mutates progression/swaps/date advancement; highest-risk shared seam; AP-03–05 |
+| Generator | `utils/programGenerator.ts`, `constants/programDefaults.ts`, `lib/exerciseDatabase.ts` | Local fixed splits/random choices and heuristic loads; AP-06/07 |
+| Program persistence | `utils/saveProgramToDb.ts`, `app/create-program.tsx` | Client multiwrites; existing user fix protects context failure only; AP-01/03 |
+| Capture/history | `app/next-workout.tsx`, `utils/fetchExerciseHistory.ts`, history UI | Session precedes sets; mixed-history fallback and identity gaps; AP-02/05 |
+| Readiness/cycle | Home/Workout, `utils/progressionEngine.ts`, `utils/cyclePhase.ts` | Independent hidden overlay and calendar effects; AP-08/09 |
+| Preferences | `utils/profilePreferences.ts`, `types/database.ts` | Table/metadata compatibility, richer event scaffold not a workflow; AP-01/08 |
+| Theme/evidence | `contexts/ThemeContext.tsx`, theme/palette constants, `types/evidence.ts`, `constants/evidenceRegistry.ts` | Local themes work; evidence consumer/paid package workflow incomplete; AP-05/13 |
+| Backend/platform | `utils/supabase.ts`, `utils/notifications.ts`, schema/migrations | Supabase Auth/Postgres/Storage, local reminders; no health/purchase/privacy processor proven; AP-01/12/16 |
 
-## Important current seams
+The [implementation status](/dev-doc/plans/active/ADAPTIVPUSH-IMPLEMENTATION-STATUS.md) owns exact paths/symbols and CODE versus HIST labels.
 
-1. `hooks/useCurrentProgram.ts` is the central active-program mutation seam and the highest-risk refactor point.
-2. `app/(tabs)/home.tsx`, `app/next-workout.tsx`, and `app/(tabs)/profile/index.tsx` are oversized feature surfaces with embedded data and domain logic.
-3. `utils/programGenerator.ts` is pure enough to test but uses randomness and the 55-entry local exercise catalog.
-4. Readiness is stored in legacy `readiness_logs`; `readiness_checkins` is scaffolded but unused.
-5. Day-of readiness/cycle behavior is a display-only overlay and has no durable recommendation event.
-6. Generated-program saves require `program_generation_context`; other Phase 2 event tables are not yet active.
-7. Multi-table program and workout writes are client-orchestrated and require stronger recovery/idempotency guarantees.
+## Target and boundaries
 
-## Data ownership boundary
+Preserve Expo and Supabase; incrementally extract a modular monolith under proposed `features/<capsule>/` paths with each vertical consumer. Routes compose feature commands/view models; pure policies depend only on domain contracts and a small identity/date/unit/revision/provenance/error kernel. Repositories/platform adapters implement ports. Coaching returns proposals to core commands; health starts display-only; public projections and cosmetics cannot mutate private training.
 
-User-owned Supabase tables must enforce `auth.uid() = user_id` or an equally strict ownership relationship. Migrations 008-014 in the repository do not include RLS enablement or policies, so live verification and an additive policy migration are part of `F5-S1`.
+Atomic program installation/workout finalization, catalog curation, publication, moderation, purchase verification and privacy fulfillment use narrow backend authority. Check ownership and parent lineage, operation IDs and expected revisions. Durable local drafts/outbox and immutable accepted snapshots are target work, not existing infrastructure.
 
-Sensitive domains include profile data, readiness, cycle symptoms, injury considerations, adaptation events, workouts, and program context. HealthKit remains outside the active architecture until a real, optional, flag-gated adapter is selected.
-
-## Canonical product references
-
-- product/technical contract: `reports/plans/FABLE-5-MASTER-IMPLEMENTATION-EXECUTION-PLAN.md`
-- stable stage ledger: `dev-doc/plans/active/FABLE-5-EXECUTION-REGISTER.md`
-- code-backed capability status: `dev-doc/plans/active/FABLE-5-CODE-IMPLEMENTATION-STATUS.md`
-- detailed database reference: `lib/adaptivpush_database_schema.md`, subject to live verification
+Detailed ownership, allowed dependencies and state contracts: [master architecture](/dev-doc/plans/active/ADAPTIVPUSH-MASTER-PLAN.md#mp-03-architecture). Physical data/security/compatibility: [database plan](/dev-doc/plans/active/ADAPTIVPUSH-DATABASE-PLAN.md). Effective catalog grants and migration/restore posture require inspection; RLS enablement alone does not close authority.

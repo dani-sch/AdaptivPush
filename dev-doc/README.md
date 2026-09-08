@@ -1,18 +1,10 @@
-# Dev Documentation
+# AdaptivPush development documentation
 
-This directory is the active documentation spine for current planning and execution work.
+Read [overview](/dev-doc/main/OVERVIEW.md) first, then [plan index](/dev-doc/plans/active/PLAN-INDEX.md).
 
-## Structure
+- `main/`: concise current architecture/state/roadmap/task/routing summaries.
+- `plans/active/`: neutral canonical planning owners and execution intake.
+- `plans/legacy/`: visibly superseded or executed historical plans, with preserved originals, replacements and provenance map.
+- `reports/`: dated execution/audit evidence and development logs.
 
-- `main/` - living project docs used during active work
-- `reports/` - durable reports and logs that should not live in `main/`
-- `plans/active/` - index of active plans currently driving execution
-- `plans/legacy/` - archive for executed plan files after the work they describe has been carried out
-
-## Working rules
-
-- Read `main/OVERVIEW.md` first for current project shape.
-- Keep living docs in `main/` concise and current.
-- Keep dev logs, retrospectives, and other narrative reports in `reports/`.
-- When a plan has been executed and is no longer the active source for implementation, move the plan file into `plans/legacy/`.
-
+Archive stale authority even when its implementation was never completed. Retain research/audits/logs as evidence rather than labeling them stale simply for age. Keep each behavior rule with its owning canonical document and update active links when moving sources.

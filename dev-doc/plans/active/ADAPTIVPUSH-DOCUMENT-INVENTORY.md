@@ -125,7 +125,7 @@ Eight pre-existing modified paths were recorded at intake. Application save code
 
 ## Source-byte manifest
 
-SHA-256 values refer to intake working-tree bytes, including the pre-existing user changes. For moved files resolve the destination above; for replaced operational surfaces resolve snapshots. For DEV-LOG the initial content remains an unchanged suffix after the new entry. Other retained evidence remains in place.
+SHA-256 values refer to intake working-tree bytes, including the pre-existing user changes. For moved files resolve the destination above; for replaced operational surfaces resolve snapshots. For DEV-LOG removing only the inserted consolidation entry recovers the exact initial bytes. Other retained evidence remains in place.
 
 | Intake path | SHA-256 |
 |---|---|
@@ -190,3 +190,7 @@ SHA-256 values refer to intake working-tree bytes, including the pre-existing us
 | `README.md` | `24a70da3d84132564ad3a719f3370749d63c852ebdafddd758fd0b69034b422c` |
 | `SETUP.md` | `0e0a2ef5c16b4112b1c5064fe2a129a800c2b9d3acf78a4dac85e1995ea398b1` |
 | `TABLE-OF-CONTENTS.md` | `e030ee70d192d19bbefc2027c52d68a9477c02da50657cc877b9c0f64455e86e` |
+
+## Consolidation evidence
+
+[Verification report](/dev-doc/reports/ADAPTIVPUSH-PLAN-CONSOLIDATION-VERIFICATION-2026-09-08.md) records checks, limitations, local commits and the unchanged-source/working-tree preservation boundary. It is new historical evidence, not an additional implementation authority.
