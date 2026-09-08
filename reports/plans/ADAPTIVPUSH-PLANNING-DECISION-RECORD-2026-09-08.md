@@ -21,7 +21,7 @@ decision sequence.
 | D-01 Free/premium boundary | Approved | Free remains a complete usable training product; premium sells advanced customization, equipment precision, automation, and convenience. |
 | D-02 Schedule semantics | Approved | Dated hybrid model: preserve original placement and program-cycle identity; all moves, skips, carries, and recovery choices are explicit. |
 | D-03 Publishing and installed-version updates | Approved | Start with unlisted links/codes, immutable published versions, pinned private installations, and explicit separate installation or replacement of updates. |
-| D-04 Consistency model | Open | Pending review. |
+| D-04 Consistency model | Approved | Weekly schedule adherence with a subordinate “weeks on plan” streak; planned rest is respected and accepted pauses preserve without incrementing the streak. |
 | D-05 Readiness and day-of adaptation | Open | Pending review. |
 | D-06 Health display and synchronization | Open | Pending review. |
 | D-07 Review eligibility | Open | Pending review. |
@@ -191,3 +191,53 @@ controls, or continued use of a program the user already owns.
   missing-version link states in implementation fixtures.
 - Keep selective version merging out of the initial implementation plan except as a
   deferred capability with explicit prerequisites.
+
+## D-04 — Consistency model
+
+**Status:** Approved on 2026-09-08. Selected option: weekly adherence plus
+“weeks on plan.”
+
+### Approved behavior
+
+- The primary consistency display is a weekly schedule-adherence card rather than a
+  consecutive workout-day streak.
+- Report eligible scheduled workouts completed or explicitly fulfilled by an
+  accepted reduced variant against eligible planned workout occurrences.
+- Recognize programmed rest separately as successful schedule adherence. Do not add
+  rest days to the workout numerator or use them to inflate a low-frequency plan.
+- Show an optional, subordinate “weeks on plan” streak when a week satisfies the
+  declared adherence policy.
+- Accepted illness, recovery, travel, and other explicit pauses preserve an existing
+  streak without incrementing it.
+- Accepted schedule moves and swaps are evaluated against the resulting approved
+  schedule while retaining the original schedule and change provenance.
+- A rest or deload week may be classified as successful adherence without being
+  presented as a new training-volume achievement.
+- Partial workouts remain visible and use an explicit fulfillment classification;
+  they are not silently counted as complete or discarded.
+- Offline or otherwise unconfirmed activity remains pending rather than being marked
+  as failure.
+- Users may hide consistency and streak displays.
+- Consistency calculations remain free, local-capable, and independent of premium
+  coaching or health integrations.
+- Do not attach public leaderboards, shame-oriented messaging, or rewards to medical
+  exemptions, rest, or pause classifications.
+
+### Required user experience
+
+- Explain the weekly target, completed planned sessions, respected rest, accepted
+  changes, partial work, and unresolved occurrences without collapsing them into an
+  opaque score.
+- Clearly distinguish “streak preserved” from “week added to streak.”
+- When the schedule changes retrospectively, display that the result was calculated
+  against an approved revision and retain the original placement for audit.
+
+### Planning consequences
+
+- Consistency depends on the approved dated occurrence and fulfillment model in
+  D-02, not merely on counts of workout-session rows.
+- Store or derive calculation policy version, schedule revision, source watermark,
+  and explicit pause/fulfillment classifications.
+- Include programmed rest, variable weekly frequency, deload weeks, pauses, partial
+  sessions, retrospective corrections, offline activity, and timezone boundaries in
+  implementation fixtures.
