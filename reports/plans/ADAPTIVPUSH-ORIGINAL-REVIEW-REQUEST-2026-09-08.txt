@@ -1,0 +1,647 @@
+I want to conduct a comprehensive product, fitness-logic, architecture, and database planning pass for AdaptivPush before implementing anything or changing the canonical implementation plan.
+
+First read `AGENTS.md` completely and follow its documentation routing. Begin with:
+
+- `dev-doc/main/OVERVIEW.md`
+- `dev-doc/main/CURRENT-STATE.md`
+- `dev-doc/main/ARCHITECTURE.md`
+- `dev-doc/main/TODO.md`
+- `dev-doc/main/ROADMAP.md`
+- `reports/plans/FABLE-5-MASTER-IMPLEMENTATION-EXECUTION-PLAN.md`
+- `dev-doc/plans/active/FABLE-5-EXECUTION-REGISTER.md`
+- `dev-doc/plans/active/FABLE-5-CODE-IMPLEMENTATION-STATUS.md`
+- `dev-doc/plans/active/PLAN-INDEX.md`
+- `research/deep-research-report.md`
+- The current database schema, migrations, TypeScript database types, and live-database audit
+- Any retained evidence-backed implementation, execution, or UI plans that still contain useful decisions
+
+Read `research/deep-research-report.md` completely. The new plan must incorporate the deep workout, progressive-overload, readiness, fatigue, recovery, deload, physiology, and fitness-programming research already conducted there. Do not reduce it to a superficial reference.
+
+Inspect the repository, Git status, and current working tree before drawing conclusions. Preserve all existing user changes.
+
+Use subagents where helpful to parallelize:
+
+- Product and feature-plan reconstruction
+- Fitness and evidence review
+- Code and file-dependency analysis
+- Database and RLS assessment
+
+Keep the first pass read-only. Do not modify application code, database migrations, or canonical planning documents until I have reviewed and approved the proposed restructuring.
+
+## Product north star
+
+AdaptivPush helps people make measurable progress through progressive overload while adapting training to their goals, schedule, equipment, performance, body, and subjective readiness.
+
+User input and scientifically supported training methods are the initial adaptive signals. Health and wearable data may become optional enrichment later.
+
+The app must:
+
+- Preserve user agency.
+- Explain its recommendations.
+- Distinguish research evidence from product decisions and implementation heuristics.
+- Avoid overreacting to one readiness score or one poor workout.
+- Remain fully functional without wearables, social features, or premium features.
+- Prioritize long-term training progress rather than novelty, engagement tricks, or arbitrary daily changes.
+
+## Proposed new capabilities
+
+Evaluate the following additions alongside the complete existing FABLE-5 scope.
+
+### 1. Public and shareable workout programs
+
+- Users can publish a workout program and share it through a link, code, or both.
+- A shared link should open the program in the app when installed and otherwise lead to an appropriate web preview and app-download experience.
+- Recipients can preview and install or clone the program into their account.
+- Preserve exercises, schedule, progression model, programmed rest days, rationale, and relevant instructions.
+- Separate a public program template from the author’s private workout history, health data, readiness records, and personal progression.
+- Determine how published programs are versioned.
+- Decide whether installed copies remain pinned to the installed version, can accept updates, or can selectively merge changes.
+- Consider authorship, attribution, visibility, unpublishing, deletion, reporting, moderation, and abuse prevention.
+
+### 2. Optional social and community features
+
+- Explore an in-app program-discovery and workout-sharing experience.
+- Assess public profiles, follows, feeds, reactions, saves, comments, and activity sharing as separate modules.
+- Allow social scope to be introduced incrementally.
+- Do not make core training depend on social functionality.
+- Distinguish sharing a reusable program from sharing a completed workout, milestone, PR, streak, or personal achievement.
+- Define privacy defaults and granular sharing controls.
+
+### 3. Program ratings and reviews
+
+- If public discovery is implemented, users may rate and review programs.
+- Assess eligibility, one-review-per-user rules, editing, deletion, moderation, reporting, aggregate scoring, verified-use indicators, and manipulation resistance.
+- Determine what qualifies someone to review a program.
+- Ratings and reviews must remain optional and must not be required for program installation or training.
+
+### 4. Health and activity display
+
+- Display steps, distance, and logged Apple Watch or Apple Health workouts.
+- Treat HealthKit as an optional adapter behind explicit consent and feature gates.
+- Maintain full manual parity for users without Apple devices or permissions.
+- Determine which health data is display-only and which signals may safely contribute to readiness.
+- Include permission revocation, stale or missing data, privacy, source attribution, duplicate activity handling, and conflicting-data behavior.
+- Do not imply HealthKit currently exists if the repository only contains placeholders.
+
+### 5. Streaks and consistency
+
+- Add a streak or consistency feature that supports sustainable training rather than encouraging unsafe daily exercise.
+- Compare workout-day streaks, weekly-target streaks, check-in streaks, scheduled-adherence streaks, and broader consistency scores.
+- Recommend a model that treats programmed rest days as successful adherence.
+- Avoid punishing users for recovery, illness, deloads, schedule adjustments, or a program that calls for fewer weekly sessions.
+- Keep streak calculation independent from premium adaptive engines.
+
+### 6. Programmed rest days
+
+- Model rest days explicitly within program schedules.
+- The app must recognize a rest day instead of automatically moving to the next workout.
+- Home should explain that rest is planned and offer appropriate optional actions without pressuring the user to train.
+- Rest days must behave correctly in adherence, streaks, schedule changes, notifications, history, analytics, and adaptive recommendations.
+- Distinguish programmed rest from an unplanned missed workout.
+
+### 7. Workout-day swapping and schedule recovery
+
+- Users can perform a different program day than originally scheduled.
+- Users can intentionally reorder or swap upcoming workout days.
+- The system records:
+  - the original schedule;
+  - the user’s change;
+  - what was recommended;
+  - what was actually completed;
+  - any subsequent recovery plan.
+- After a deviation, AdaptivPush recommends how to get back on track while considering:
+  - muscle-group overlap;
+  - minimum recovery spacing;
+  - primary-movement overlap;
+  - recent workload;
+  - programmed rest days;
+  - completed and missed work;
+  - the user’s future availability;
+  - readiness;
+  - deload state;
+  - program priorities.
+- Users retain final control and can accept, modify, reject, or manually replace the proposed schedule.
+- Separate simple manual reordering from premium automated schedule-recovery intelligence.
+
+### 8. Purchasable themes
+
+- Support a theme marketplace similar in spirit to VS Code themes.
+- Separate base appearance infrastructure from catalog browsing, theme ownership, purchase processing, downloads, and application.
+- Preserve accessible default themes.
+- Assess platform purchase requirements, entitlement restoration, cross-device ownership, refunds, revocation, previews, version compatibility, and offline availability.
+- Determine whether third-party theme creation is in scope, deferred, or explicitly out of scope.
+- Cosmetic purchases must never affect training data or core behavior.
+
+## Detailed feature-behavior specification
+
+Do not stop at naming features. Define how the major fitness and adaptive features should actually behave.
+
+For each major feature, provide:
+
+- Inputs
+- Preconditions
+- Decision rules
+- State transitions
+- Outputs
+- User-visible explanations
+- Override behavior
+- Persistence behavior
+- Missing-data fallback
+- Conflicting-data behavior
+- Offline behavior
+- Error recovery
+- Entitlement behavior
+- Downgrade behavior
+- Edge cases
+- Acceptance criteria
+- Representative user scenarios
+
+Clearly label every rule as one of:
+
+- Evidence-backed
+- Product decision
+- Transparent heuristic
+- Unresolved decision requiring validation
+
+### Program generation behavior
+
+Explicitly separate these stages:
+
+1. User goal and constraint interpretation
+2. Training-frequency recommendation
+3. Split-family recommendation
+4. Weekly muscle-group volume targeting
+5. Workout-day structure
+6. Exercise-category and movement-pattern selection
+7. Selection of specific exercises
+8. Sets, repetitions, intensity, rest, and progression prescription
+9. Programmed rest-day placement
+10. Session-duration trimming
+11. Exercise-stability and variation rules
+12. Program explanation and confidence
+13. User overrides
+14. Persistence and program versioning
+
+Clarify the difference between:
+
+- Generating the structure of a complete program
+- Selecting specific exercises within that structure
+- Substituting an exercise during generation
+- Swapping an exercise during an active program
+- Replacing an exercise because of equipment, discomfort, progression, preference, or schedule
+- Regenerating an entire program
+
+Program planning should respond meaningfully to:
+
+- Strength goals
+- Hypertrophy goals
+- General fitness goals
+- Mixed strength and hypertrophy goals
+- Focus-muscle goals
+- Training experience
+- Days available
+- Session-duration constraints
+- Equipment access
+- Exercise preferences
+- Injury or movement considerations
+- Recovery capacity
+- Goal horizon
+- RPE familiarity
+- Adherence history
+- Current performance data
+
+Determine which inputs affect:
+
+- Split selection
+- Frequency
+- Weekly sets
+- Rep ranges
+- Exercise order
+- Exercise stability
+- Progression model
+- Rest periods
+- Deload policy
+- Optional work
+- Confidence level
+
+Provide concrete examples showing how otherwise similar users receive different plans because their goals or constraints differ.
+
+### Readiness and day-of adaptation behavior
+
+Define exactly what happens when a user logs different readiness scores.
+
+Cover:
+
+- No check-in
+- Low readiness
+- Normal or moderate readiness
+- High readiness
+- Pain signals
+- Illness signals
+- Poor sleep alone
+- High soreness alone
+- High stress or life load
+- Several low-readiness days
+- Subjective readiness conflicting with recent performance
+- Health data conflicting with user input
+- A deload or recovery session already being scheduled
+
+Explain how each state can affect:
+
+- Optional exercises
+- Total volume
+- Exercise complexity
+- Exercise selection
+- Load
+- Rep targets
+- RPE targets
+- Rest periods
+- Workout ordering
+- Recovery alternatives
+- Whether the workout should proceed normally
+
+Preserve the principle that volume is generally reduced before complexity, and complexity before load, unless a safety condition requires a different response.
+
+High readiness must not silently increase difficulty. Any harder option must be presented as an explicit choice.
+
+Specify how recommendations are accepted, modified, rejected, recorded, and explained.
+
+### Exercise selection and substitution behavior
+
+Define an evidence-informed exercise-selection model based on:
+
+- Movement pattern
+- Primary and secondary muscles
+- Equipment
+- Stability requirements
+- Skill complexity
+- Fatigue cost
+- Joint or discomfort considerations
+- Training experience
+- Program goal
+- Current program phase
+- Recent exposure
+- Progression continuity
+- Available load increments
+- User preferences
+- Session-time constraints
+
+Explain when the system should preserve an exercise for measurable progression and when substitution is appropriate.
+
+Avoid random exercise replacement that destroys progression continuity.
+
+### Progression behavior
+
+Specify how progressive overload works for:
+
+- Primary compound exercises
+- Secondary compound exercises
+- Accessories
+- Isolation exercises
+- Bodyweight movements
+- Machines
+- Dumbbells
+- Barbells
+- Cable stacks
+- Exercises with large minimum load jumps
+
+Cover:
+
+- Rep progression
+- Load progression
+- Set progression
+- Range-of-motion or execution progression where appropriate
+- RPE or reserve-based evaluation
+- Missed targets
+- Partial completions
+- Regression
+- Plateaus
+- Exercise substitution
+- Deload recovery
+- Low adherence
+- Sparse history
+
+Define when progression should increase, hold, reduce, or request more data.
+
+### Workout-day swapping and recovery behavior
+
+Create a detailed schedule state machine covering:
+
+- Planned workout completed on its scheduled day
+- Planned rest day followed
+- Workout performed early
+- Workout performed late
+- Different program day completed
+- Workout skipped
+- Multiple workouts missed
+- Rest day converted to a workout
+- Workout day converted to rest
+- Manual permanent reordering
+- One-time swapping
+- Schedule changes near the end of a week
+- Muscle-overlap or recovery conflict
+- Deload-week changes
+- Travel or reduced-availability periods
+
+For each case, define:
+
+- What remains fixed
+- What moves
+- Whether the program week changes
+- How rest days are recalculated
+- How duplicate or skipped training is prevented
+- How muscle recovery is protected
+- How progression history remains attached to the correct workout
+- What the user is shown
+- What options the user receives
+- How the decision is persisted
+
+Provide examples such as:
+
+- Push workout performed on the planned pull day
+- Leg day moved one day earlier
+- Two missed workouts in the same week
+- Three-day program temporarily compressed into fewer days
+- User intentionally changes the recurring weekday order
+- Readiness makes the recommended catch-up schedule inappropriate
+
+### Goal-specific workout planning
+
+Use the research report to develop more detailed planning behavior for different goals.
+
+Assess:
+
+- Training frequency
+- Volume allocation
+- Intensity
+- Rep ranges
+- Exercise selection
+- Exercise order
+- Rest periods
+- Progression speed
+- Exercise stability
+- Variation cadence
+- Deload triggers
+- Recovery expectations
+- Session-duration compromises
+
+The system should not merely change a goal label while producing nearly identical programs.
+
+## Required product and architecture analysis
+
+1. Reconstruct the complete current feature plan and implementation status.
+2. Walk through the end-to-end experience for:
+   - a new user;
+   - an established free user;
+   - a premium adaptive-coaching user;
+   - a program author or publisher;
+   - a recipient installing a shared program;
+   - a user changing workout order;
+   - a user recovering from missed workouts;
+   - a user with HealthKit enabled;
+   - a user who cancels or downgrades.
+3. Identify current architectural hotspots and exact files that interact, including imports, data flow, persistence, navigation, and shared types. Pay particular attention to:
+   - `hooks/useCurrentProgram.ts`
+   - `app/(tabs)/home.tsx`
+   - `app/next-workout.tsx`
+   - `app/(tabs)/plan.tsx`
+   - `app/(tabs)/history.tsx`
+   - `components/GenerateProgramModal.tsx`
+   - `utils/programGenerator.ts`
+   - `utils/saveProgramToDb.ts`
+   - Profile, preferences, theme, and notification surfaces
+4. Produce:
+   - A current-state file/dependency map
+   - A proposed modular architecture map
+5. Restructure the product around a small shared kernel and independent feature capsules. Do not allow the current sequential F5 stages to become hard software dependencies.
+6. Define stable contracts such as:
+   - `ProfileSnapshot`
+   - `TrainingGoalProfile`
+   - `ProgramTemplate`
+   - `PublishedProgramVersion`
+   - `UserProgramInstance`
+   - `ProgramSchedule`
+   - `ScheduledDay`
+   - `RestDay`
+   - `WorkoutPrescription`
+   - `CompletedWorkout`
+   - `ExerciseSelectionContext`
+   - `ReadinessSnapshot`
+   - `Recommendation`
+   - `ScheduleDeviation`
+   - `ScheduleRecoveryProposal`
+   - `AdaptationEvent`
+   - `HealthActivitySnapshot`
+   - `Entitlement`
+   - `Insight`
+7. Separate these concepts explicitly:
+   - Feature flags from paid entitlements
+   - Essential/Guided/Advanced presentation depth from subscription tiers
+   - Public program templates from private user instances
+   - Planned schedules from completed activity
+   - Neutral data capture from premium interpretation
+   - Program generation from specific-exercise selection
+   - One-time day swaps from permanent schedule changes
+   - Manual schedule control from automated schedule recovery
+   - Core theme support from paid theme ownership
+8. Assess the database’s ability to support every current and proposed feature.
+9. Inspect migrations, schema references, RLS, types, indexes, constraints, storage, ownership relationships, and existing tables.
+10. If live access is available, use read-only inspection only and clearly distinguish verified facts from assumptions.
+
+## Potential database additions
+
+Propose additive schema changes where needed for:
+
+- Public program templates
+- Immutable published-program versions
+- Program installation or cloning
+- Public profiles and visibility
+- Social relationships and activity items
+- Reviews, ratings, reactions, saves, comments, and reports
+- Explicit scheduled workout and rest-day records
+- Workout-day swaps
+- Schedule deviations
+- Schedule-recovery recommendations
+- Health activity summaries and consent state
+- Streak and consistency aggregates
+- Theme catalog and theme versions
+- Theme ownership and purchase entitlements
+
+For every proposed table specify:
+
+- Purpose
+- Ownership
+- Visibility
+- Foreign keys
+- RLS expectations
+- Insert/update/delete authority
+- Deletion and retention behavior
+- Important constraints
+- Required indexes
+- Whether it contains sensitive data
+- Offline synchronization implications
+- Whether it is foundational or optional
+
+## Research traceability
+
+Create a research-to-product traceability matrix containing:
+
+- Research claim or finding
+- Source or section in `research/deep-research-report.md`
+- Evidence strength
+- Relevant caveats
+- Resulting product behavior
+- Whether it is a default, guardrail, option, or explanation
+- Owning feature/module
+- User-visible copy implications
+- Required test or validation scenario
+
+Do not present a product heuristic as settled science.
+
+Where the existing plans conflict with the research report:
+
+1. Identify the conflict.
+2. Explain the practical impact.
+3. Recommend a resolution.
+4. Preserve the conflict in the decision record.
+
+Where the research does not answer a required implementation question, propose a transparent and conservative heuristic.
+
+## Entitlements and paywalls
+
+Classify features as:
+
+- Free core
+- Premium coaching
+- Cosmetic purchase
+- Optional integration
+- Social/community
+- Deferred
+
+Apply these rules:
+
+- Paywall capabilities, not essential routes or user-owned data.
+- Existing plans and history remain usable after downgrade.
+- Safety guidance, privacy controls, export/deletion, and explanations for previously applied decisions are never withheld.
+- Core training must not depend on social features, HealthKit, ratings, advanced analytics, or paid themes.
+- Premium engines may enrich neutral data but must not own the only usable representation of that data.
+- A saved program should remain trainable if the subscription changes.
+- Cosmetic purchases must remain independent from training entitlements.
+
+## Dependency assessment
+
+Produce a dependency matrix for every major feature showing:
+
+- Required shared contracts
+- Optional inputs
+- Database dependencies
+- UI entry points
+- Other feature dependencies
+- Entitlement behavior
+- Downgrade behavior
+- Offline behavior
+- Failure fallback
+- Privacy sensitivity
+- Test requirements
+
+Clearly distinguish:
+
+- True technical dependency
+- Product sequencing preference
+- Optional enrichment
+- Shared infrastructure
+- Accidental coupling that should be removed
+
+## Risks
+
+Identify and assess:
+
+- Privacy
+- Security
+- RLS and public/private data boundaries
+- Social moderation
+- Abuse and spam
+- Deep linking
+- Public-web previews
+- App Store and Play Store purchases
+- HealthKit permissions and platform restrictions
+- Offline behavior
+- Data synchronization
+- Program versioning
+- Algorithmic safety
+- Misleading fitness claims
+- Recommendation confidence
+- Operational support requirements
+
+## Revised implementation structure
+
+Recommend a new execution sequence using small, independently releasable vertical slices.
+
+The roadmap must clearly distinguish:
+
+- Prerequisites
+- Shared kernel work
+- Free-core behavior
+- Independent feature capsules
+- Optional enrichment
+- Rollout order
+- True technical dependencies
+- Premium boundaries
+- Deferred work
+
+Preserve compatibility with existing programs and legacy profile/readiness rows.
+
+## First deliverable: decision packet
+
+Before editing planning documents, deliver:
+
+- Executive summary
+- Current product and implementation status
+- Complete revised feature inventory
+- Detailed fitness-behavior specification
+- Program-generation decision pipeline
+- Readiness state machine
+- Progression and plateau rules
+- Workout-day swapping and recovery state machine
+- Goal-specific planning behavior
+- End-to-end user-flow walkthroughs
+- Current and proposed architecture maps
+- File interaction and dependency analysis
+- Database readiness and schema-gap assessment
+- Research-to-product traceability matrix
+- Free, premium, social, integration, and cosmetic boundary recommendation
+- Revised modular execution roadmap
+- Risks and unresolved product decisions
+- Prioritized questions for me
+
+Do not update the canonical FABLE-5 plan during this first pass. Stop after presenting the decision packet so I can review the product behavior, module boundaries, paywall decisions, and architecture.
+
+## Second phase after my approval
+
+After I approve the decision packet:
+
+1. Inventory every active and retained planning document.
+2. Classify each as:
+   - superseded and stale;
+   - historical reference;
+   - research source;
+   - still-active operational documentation.
+3. Archive superseded implementation plans according to the repository’s archival rules.
+4. Preserve research and provenance documents that still have evidentiary value.
+5. Create a new canonical master implementation plan rather than continuing to layer major new scope onto stale plans.
+6. Create a corresponding modular execution register with stable identifiers and independently releasable slices.
+7. Update:
+   - `dev-doc/plans/active/PLAN-INDEX.md`
+   - `dev-doc/main/OVERVIEW.md`
+   - `dev-doc/main/ARCHITECTURE.md`
+   - `dev-doc/main/CURRENT-STATE.md`
+   - `dev-doc/main/ROADMAP.md`
+   - `dev-doc/main/TODO.md`
+   - The code-backed implementation-status document
+   - The schema/database plan
+   - `dev-doc/reports/DEV-LOG.md`
+8. Repair links and references so no active document continues treating an archived plan as current authority.
+9. Record which FABLE-5 requirements were retained, revised, replaced, deferred, or rejected.
+10. Validate the new documentation structure and present the resulting canonical plan for final review before implementation begins.
+
+Do not delete historical planning evidence. Archive it with clear supersession notes and preserve traceability into the new canonical plan.
