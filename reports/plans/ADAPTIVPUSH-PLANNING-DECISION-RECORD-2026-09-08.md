@@ -20,7 +20,7 @@ decision sequence.
 |---|---|---|
 | D-01 Free/premium boundary | Approved | Free remains a complete usable training product; premium sells advanced customization, equipment precision, automation, and convenience. |
 | D-02 Schedule semantics | Approved | Dated hybrid model: preserve original placement and program-cycle identity; all moves, skips, carries, and recovery choices are explicit. |
-| D-03 Publishing and installed-version updates | Open | Pending review. |
+| D-03 Publishing and installed-version updates | Approved | Start with unlisted links/codes, immutable published versions, pinned private installations, and explicit separate installation or replacement of updates. |
 | D-04 Consistency model | Open | Pending review. |
 | D-05 Readiness and day-of adaptation | Open | Pending review. |
 | D-06 Health display and synchronization | Open | Pending review. |
@@ -142,3 +142,52 @@ controls, or continued use of a program the user already owns.
 - Include timezone changes, daylight-saving transitions, cross-device revision
   conflicts, partial workouts, and replayed completion requests in implementation
   fixtures.
+
+## D-03 — Publishing and installed-version updates
+
+**Status:** Approved on 2026-09-08. Selected option: versioned and pinned.
+
+### Approved behavior
+
+- Initial publishing uses unlisted HTTPS links and opaque lookup codes. Public
+  discovery is a separate later capability and rollout decision.
+- Each published version is an immutable, sanitized program artifact with a stable
+  version identity and content hash.
+- Publishing exposes only the reusable program: exercises, relative prescriptions,
+  workout/rest structure, progression policy, rationale, instructions, attribution,
+  and compatibility metadata.
+- Publishing never includes the author's personal loads, workout history, readiness,
+  health data, symptoms, private notes, or private generation snapshot.
+- Installing creates a private program instance pinned to the exact published
+  version. The recipient selects schedule placement and calibrates starting loads.
+- Author changes create a new published version and never mutate an installed copy.
+- When a newer version exists, the user can preview its differences and then install
+  it separately or explicitly replace future planning with it.
+- Existing history and completed prescriptions remain attached to the version and
+  private instance under which they occurred.
+- Selective merging is deferred until stable slot identities, user-customization
+  ownership, and conflict semantics have been implemented and validated.
+- Unpublishing stops new resolution and installation while existing private copies
+  remain trainable. Safety, legal, or infringement takedowns may separately
+  quarantine distribution under the later public-operations policy.
+- Previously installed programs remain available offline; resolving links,
+  publishing, and installing new versions require connectivity.
+
+### Required user experience
+
+- The publication preview must show exactly which content will become shareable.
+- The recipient preview identifies the author, exact version, goals, equipment,
+  expected schedule/time, programmed rest, progression model, and compatibility.
+- Update notices must never imply that the installed program changed automatically.
+- Replacing future planning requires an explicit preview and confirmation, with the
+  prior program and history preserved.
+
+### Planning consequences
+
+- Separate reusable templates, immutable published versions, share-link resolution,
+  private installations, and private program instances in contracts and storage.
+- Define a strict allow-list serializer and adversarial privacy-boundary tests.
+- Include invalid, expired, revoked, unpublished, quarantined, incompatible, and
+  missing-version link states in implementation fixtures.
+- Keep selective version merging out of the initial implementation plan except as a
+  deferred capability with explicit prerequisites.
