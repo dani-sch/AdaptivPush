@@ -25,7 +25,7 @@ decision sequence.
 | D-05 Readiness and day-of adaptation | Approved | Contextual, explained proposals require explicit acceptance; rejection persists and high readiness never silently increases difficulty. |
 | D-06 Health display and synchronization | Approved | Display-only first; data stays device-local by default, with cloud synchronization requiring separate explicit consent. |
 | D-07 Review eligibility | Approved | Installation plus two completed prescribed sessions on separate days and seven elapsed days; launch heuristic subject to validation. |
-| D-08 Theme scope and commerce | Open | Pending review. |
+| D-08 Theme scope and commerce | Approved | First-party declarative token packages may be sold; third-party authoring and creator commerce are deferred. |
 | D-09 Public operations and content policy | Open | Will be decomposed into separately reviewable decisions. |
 | D-10 Numerical-rule validation | Open | Pending review. |
 
@@ -347,3 +347,37 @@ completed prescribed sessions on separate days and seven elapsed days.
   uses confidence adjustment.
 - Test duplicate accounts/requests, replay, author exclusion, deletion, version
   context, edited eligibility, moderated reviews, and aggregate recomputation.
+
+## D-08 — Theme scope and commerce
+
+**Status:** Approved on 2026-09-08. Selected option: first-party token-only paid
+themes with the creator marketplace deferred.
+
+### Approved behavior
+
+- Initial paid themes are first-party declarative packages containing validated
+  semantic tokens and approved assets only.
+- Theme packages cannot contain executable code, arbitrary remote styling logic, or
+  permissions affecting training data.
+- Accessible light, dark, and system-following defaults remain free.
+- Preview, purchase verification, ownership, download validation, and application
+  are distinct states. Preview does not change the saved theme until Apply.
+- Validate contrast, font scaling, token completeness, asset integrity, and app/theme
+  compatibility before a theme can be applied.
+- Verified cosmetic ownership is independent of coaching subscriptions. Coaching
+  downgrade does not remove purchased themes.
+- Compatible owned themes remain cached for offline use. Restore, refund, revocation,
+  and failed-update behavior use verified store/account state and a calm fallback to
+  an accessible default.
+- Third-party creation, submissions, moderation, creator payouts, and creator
+  commerce are deferred until a separately approved marketplace plan exists.
+
+### Planning consequences
+
+- Keep the existing local theme runtime separate from catalog, package, entitlement,
+  billing, and download adapters.
+- Use native platform billing as the initial assumption, subject to storefront and
+  regional policy review before release.
+- Include purchase replay, restore, refund, revocation, cross-device ownership,
+  incompatible package, invalid tokens, accessibility failure, offline use, and
+  interrupted workout scenarios in implementation fixtures.
