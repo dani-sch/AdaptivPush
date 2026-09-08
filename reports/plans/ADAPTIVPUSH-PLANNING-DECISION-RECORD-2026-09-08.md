@@ -26,8 +26,12 @@ decision sequence.
 | D-06 Health display and synchronization | Approved | Display-only first; data stays device-local by default, with cloud synchronization requiring separate explicit consent. |
 | D-07 Review eligibility | Approved | Installation plus two completed prescribed sessions on separate days and seven elapsed days; launch heuristic subject to validation. |
 | D-08 Theme scope and commerce | Approved | First-party declarative token packages may be sold; third-party authoring and creator commerce are deferred. |
-| D-09 Public operations and content policy | Partially approved | D-09A approves unlisted sharing first and defers discovery/social until moderation operations exist; D-09B through D-09E remain open. |
-| D-10 Numerical-rule validation | Open | Pending review. |
+| D-09 Public operations and content policy | Approved | No platform ownership claim; phased public rollout, privacy-preserving deletion/provenance, named moderation ownership, and verified purchase restoration. |
+| D-10 Numerical-rule validation | Approved | Exact thresholds remain policy-versioned provisional heuristics requiring fixtures, user testing, outcome review, and appropriate expert review. |
+| D-11 Architecture | Approved | Incrementally extracted modular Expo/Supabase monolith with narrow privileged backend commands. |
+| D-12 Database rollout | Approved | Establish migration/backup baseline, then add only the schema required by each approved vertical slice. |
+| D-13 Release order | Approved | Trustworthy persistence and free training foundations first; monetizable advanced generation/equipment precision early; optional public/integration modules later. |
+| D-14 Documentation restructuring | Approved for a later planning-consolidation pass | Preserve every stale/superseded document in a clearly archived location and replace current authority with unambiguous neutral AdaptivPush source-of-truth documents. |
 
 ## D-01 — Free/premium boundary
 
@@ -410,3 +414,171 @@ exist.
   every public discovery or interaction slice.
 - Include link leakage, revoked/unpublished versions, abusive shared content,
   quarantine, invalid reports, and existing-install continuity in fixtures.
+
+## D-09B — Published-program rights and service permission
+
+**Status:** Approved on 2026-09-08 with user clarification: AdaptivPush claims no
+ownership over published programs and does not characterize functional workout
+methods or routines as platform intellectual property.
+
+### Approved behavior
+
+- AdaptivPush claims no ownership over user-submitted programs or content.
+- Functional workout ideas, methods, exercise selections, and routines are not
+  treated as proprietary platform content merely because they are published through
+  AdaptivPush.
+- Original prose, images, videos, branding, or other expressive material may still
+  carry third-party or publisher rights. Publishers must submit only material they
+  are permitted to share.
+- Publishing grants AdaptivPush only the limited operational permission required to
+  store, display, transmit, preview, and install the submitted version through the
+  service. It is not a transfer of ownership.
+- Unpublishing stops new distribution. A previously installed functional program
+  remains usable under D-03 unless a legal, safety, or platform-policy requirement
+  requires quarantine or removal.
+- Final public terms and jurisdiction-specific wording require qualified legal
+  review before launch.
+
+### Evidence note
+
+The U.S. Copyright Office distinguishes unprotected ideas, methods, systems, and
+functional exercise routines from potentially protected original expression. This
+planning distinction is not a substitute for legal advice.
+
+- `https://www.copyright.gov/what-is-copyright/`
+- `https://copyright.gov/title17/92chap1.html`
+- `https://www.copyright.gov/circs/circ52.pdf`
+
+## D-09C — Account deletion, provenance, and takedowns
+
+**Status:** Approved on 2026-09-08.
+
+- Delete the public profile and private account data within the approved privacy
+  workflow.
+- Stop new distribution of the deleted account's published versions.
+- Remove direct account identifiers and retain only the minimum anonymized provenance
+  necessary for lawful existing installations, integrity, abuse auditing, or legal
+  obligations.
+- Preserve existing private installed copies where lawful and safe; do not expose
+  deleted-account identity through them.
+- Legal, infringement, or material safety cases may quarantine distribution and
+  require user notice without rewriting private workout history.
+- Exact retention and takedown terms require legal review before public launch.
+
+## D-09D — Moderation ownership
+
+**Status:** Approved on 2026-09-08.
+
+- Assign a named internal operational owner before enabling public discovery or
+  user-generated interactions.
+- Provide severity-based queues, urgent quarantine capability, response targets,
+  audit logs, blocking/reporting where applicable, and an appeal or contact path.
+- Delay or disable public capabilities whose moderation volume exceeds operational
+  capacity.
+- Automation and external services may assist but do not replace accountable
+  internal ownership.
+
+## D-09E — Purchase restoration and support
+
+**Status:** Approved on 2026-09-08.
+
+- Verify purchases, renewals, refunds, revocations, and restoration using trusted
+  provider events and backend state rather than editable client metadata.
+- Provide self-service restoration and a named internal exception/support queue.
+- Preserve unique provider-event and idempotency identities to prevent replay or
+  duplicate entitlement grants.
+- Storefront support does not replace an AdaptivPush path for product-specific access
+  and account reconciliation.
+
+## D-10 — Numerical fitness-rule validation
+
+**Status:** Approved on 2026-09-08.
+
+- Treat readiness bands, progression-success counts, plateau windows, deload
+  triggers, set reductions, and recovery-spacing flags as provisional transparent
+  heuristics rather than settled scientific thresholds.
+- Version every released policy and preserve the policy/input provenance behind each
+  recommendation.
+- Require deterministic fixtures, boundary and counterexample tests, user testing,
+  observed-outcome review, and calibration before widening rollout.
+- Obtain appropriate qualified review of safety-sensitive symptom and return-to-
+  training wording before release.
+- Keep evidence strength separate from recommendation confidence and disclose
+  material uncertainty without making the interface unusable.
+
+## D-11 — Architecture
+
+**Status:** Approved on 2026-09-08.
+
+- Preserve Expo and Supabase and incrementally extract a modular monolith.
+- Use a small shared kernel for identities, dates/timezones, units, revisions,
+  operation IDs, provenance, and errors.
+- Keep programs, scheduling, workout capture/history, readiness, coaching,
+  publishing, community, health, cosmetics, and entitlements behind explicit narrow
+  contracts.
+- Use narrowly privileged backend operations for atomic finalization/installation,
+  publication validation, moderation, entitlement verification, and privacy
+  fulfillment.
+- Do not plan a wholesale rewrite or microservice migration.
+
+## D-12 — Database rollout
+
+**Status:** Approved on 2026-09-08.
+
+- Establish a supported migration ledger/baseline and verified backup/restore process
+  before production schema changes.
+- Add schema per approved vertical slice and create only the tables and columns that
+  slice requires.
+- Treat the packet's 28-table inventory as a gap/design catalog, not an approved
+  migration batch.
+- Prefer additive compatibility changes, explicit schema versions, recoverable
+  backfills, revision checks, idempotent commands, and bounded legacy coexistence.
+- Verify ownership, relational consistency, indexes, effective grants, and RLS for
+  each slice before rollout.
+- Include equipment locations, equipment instances, selectable loads/increments, and
+  loading semantics in the detailed schema design supporting D-01; exact tables
+  remain implementation-plan outputs rather than preapproved migrations.
+
+## D-13 — Release order
+
+**Status:** Approved on 2026-09-08.
+
+1. Close catalog authority, migration provenance, backup/restore, and compatibility
+   evidence.
+2. Establish shared identities/revisions and durable atomic workout/program records.
+3. Deliver dated schedules, programmed rest, manual schedule control, history, and
+   trustworthy free basic progression.
+4. Deliver advanced generation/customization and detailed multi-location equipment
+   profiles as early monetizable convenience and precision.
+5. Consolidate neutral readiness capture, explicit day-of proposals, longitudinal
+   coaching, plateau/deload interpretation, and automated schedule recovery.
+6. Release unlisted immutable publishing and private pinned installation.
+7. Add optional health display and first-party cosmetic commerce through independent
+   capsules when their platform gates are ready.
+8. Add discovery, reviews, profiles, feeds, and interactions only after public
+   operations and moderation gates are demonstrably ready.
+
+Cross-cutting accessibility, privacy, security, offline behavior, compatibility,
+observability, rollback, and release validation belong within every slice.
+
+## D-14 — Documentation restructuring
+
+**Status:** Approved on 2026-09-08 for execution by a separate planning-
+consolidation task.
+
+- Inventory every active, retained, historical, research, and stale planning
+  document before moving anything.
+- Preserve all stale and superseded documents intact in a folder whose name and
+  README clearly identify them as archived/stale and non-authoritative.
+- Do not delete historical planning evidence or rewrite verbatim source packets to
+  disguise their provenance.
+- Create neutral, descriptive AdaptivPush documents with no retired execution-
+  framework branding in new titles, filenames, headings, identifiers, or plans.
+- Make the new master implementation plan, modular execution register, code-backed
+  status, schema plan, and decision/traceability records unambiguous sources of truth.
+- Repair every active living-document link and authority statement so archived plans
+  cannot be mistaken for current instructions.
+- Preserve an explicit mapping from every retained/revised/replaced/deferred/rejected
+  legacy requirement into the new source of truth.
+- Complete and review the consolidated planning corpus before implementing
+  application changes or database migrations.
