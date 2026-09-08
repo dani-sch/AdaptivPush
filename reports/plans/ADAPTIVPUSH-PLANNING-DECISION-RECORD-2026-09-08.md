@@ -22,7 +22,7 @@ decision sequence.
 | D-02 Schedule semantics | Approved | Dated hybrid model: preserve original placement and program-cycle identity; all moves, skips, carries, and recovery choices are explicit. |
 | D-03 Publishing and installed-version updates | Approved | Start with unlisted links/codes, immutable published versions, pinned private installations, and explicit separate installation or replacement of updates. |
 | D-04 Consistency model | Approved | Weekly schedule adherence with a subordinate “weeks on plan” streak; planned rest is respected and accepted pauses preserve without incrementing the streak. |
-| D-05 Readiness and day-of adaptation | Open | Pending review. |
+| D-05 Readiness and day-of adaptation | Approved | Contextual, explained proposals require explicit acceptance; rejection persists and high readiness never silently increases difficulty. |
 | D-06 Health display and synchronization | Open | Pending review. |
 | D-07 Review eligibility | Open | Pending review. |
 | D-08 Theme scope and commerce | Open | Pending review. |
@@ -241,3 +241,39 @@ controls, or continued use of a program the user already owns.
 - Include programmed rest, variable weekly frequency, deload weeks, pauses, partial
   sessions, retrospective corrections, offline activity, and timezone boundaries in
   implementation fixtures.
+
+## D-05 — Readiness and day-of adaptation
+
+**Status:** Approved on 2026-09-08. Selected option: explicit contextual proposals.
+
+### Approved behavior
+
+- Preserve the planned prescription until the user explicitly accepts or modifies
+  an explained proposal.
+- Use current readiness, symptoms, recent comparable performance, schedule phase,
+  and declared context rather than a score-to-load multiplier.
+- Persist acceptance, modification, rejection, deferral, expiry, and application so
+  Home and Workout share one decision state. Dismissing UI is not acceptance.
+- High readiness never silently increases load, sets, repetitions, or effort. Any
+  eligible challenge is a bounded opt-in choice.
+- Pain, illness, and concerning function or systemic symptoms use a distinct safety
+  pathway rather than being hidden inside a readiness score.
+- Starting a workout freezes the accepted prescription. Later input may create an
+  explicit amendment but cannot overwrite entered sets.
+- Prefer reducing optional volume, then complexity, then load, except when safety or
+  actual performance requires another order.
+- Neutral capture, manual adjustment, and safety guidance remain free. Richer
+  longitudinal interpretation and automated proposal generation may be premium;
+  accepted outputs and their explanations survive downgrade.
+- Missing or conflicting signals remain visible with provenance. Imported health
+  data cannot override reported pain, illness, or the user's current assessment.
+
+### Planning consequences
+
+- Replace independent screen overlays with one revision-aware recommendation and
+  decision lifecycle.
+- Preserve legacy readiness scores with their original scale and provenance; do not
+  silently reinterpret them as the new policy.
+- Test rejection across screens, late responses during logging, deload/high-readiness
+  conflicts, missing symptom details, failed persistence, stale proposals, and
+  conflicting subjective/performance/health signals.
