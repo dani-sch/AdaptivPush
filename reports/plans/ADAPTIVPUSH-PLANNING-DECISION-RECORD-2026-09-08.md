@@ -19,7 +19,7 @@ decision sequence.
 | Decision | Status | Outcome |
 |---|---|---|
 | D-01 Free/premium boundary | Approved | Free remains a complete usable training product; premium sells advanced customization, equipment precision, automation, and convenience. |
-| D-02 Schedule semantics | Open | Pending review. |
+| D-02 Schedule semantics | Approved | Dated hybrid model: preserve original placement and program-cycle identity; all moves, skips, carries, and recovery choices are explicit. |
 | D-03 Publishing and installed-version updates | Open | Pending review. |
 | D-04 Consistency model | Open | Pending review. |
 | D-05 Readiness and day-of adaptation | Open | Pending review. |
@@ -94,3 +94,51 @@ controls, or continued use of a program the user already owns.
   contracts to the schema review; exact tables remain subject to the later database
   design decision and are not approved for migration by this record.
 
+## D-02 — Schedule semantics
+
+**Status:** Approved on 2026-09-08. Selected option: dated hybrid model.
+
+### Approved behavior
+
+- Model workout and rest occurrences on explicit local calendar dates in the user's
+  schedule timezone.
+- Preserve each occurrence's original date and its program-cycle identity. Moving
+  “Cycle 2, Pull A” to another date does not change which prescription or progression
+  history it represents.
+- Store current placement and resolution separately from the original schedule so
+  schedule changes remain explainable and auditable.
+- Treat programmed rest as a real schedule occurrence, not an empty workout or an
+  invitation to advance automatically to the next session.
+- A missed workout creates an unresolved choice, not automatic catch-up debt. The
+  user can move, carry, skip, replace, or leave the occurrence unresolved.
+- Manual one-time moves, two-way swaps, recurring schedule changes, and temporary
+  availability changes remain free capabilities.
+- Automated recovery may recommend a bounded rearrangement as a premium convenience,
+  but it cannot silently move work, compress missed volume, remove rest, or schedule
+  outside declared availability.
+- Completed and in-progress work is fixed. Future schedule changes use explicit
+  revisions and prevent the same occurrence from being fulfilled twice.
+- Calendar-week reporting may change when a workout moves across a week boundary;
+  the workout's program-cycle identity and associated progression context do not.
+- Accepted illness, recovery, travel, pause, or deload changes do not create a
+  punitive backlog.
+
+### Required user experience
+
+- Today resolves the dated occurrence first and clearly distinguishes workout,
+  programmed rest, unresolved missed work, and program completion.
+- When work is missed or performed out of order, show what remains fixed, what may
+  move, recovery or overlap concerns, and any work that would remain unplaced.
+- The user must explicitly accept, modify, or reject a recovery proposal.
+- An infeasible schedule produces an explanation and alternatives instead of a
+  falsely “safe” arrangement.
+
+### Planning consequences
+
+- Introduce stable occurrence identities, local-date and timezone semantics,
+  schedule revisions, explicit rest kinds, fulfillment links, and deviation records.
+- Treat `programs.start_date` as historical context rather than an advancement
+  control.
+- Include timezone changes, daylight-saving transitions, cross-device revision
+  conflicts, partial workouts, and replayed completion requests in implementation
+  fixtures.
