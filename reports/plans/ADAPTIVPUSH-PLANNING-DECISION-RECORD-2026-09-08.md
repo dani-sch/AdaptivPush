@@ -23,7 +23,7 @@ decision sequence.
 | D-03 Publishing and installed-version updates | Approved | Start with unlisted links/codes, immutable published versions, pinned private installations, and explicit separate installation or replacement of updates. |
 | D-04 Consistency model | Approved | Weekly schedule adherence with a subordinate “weeks on plan” streak; planned rest is respected and accepted pauses preserve without incrementing the streak. |
 | D-05 Readiness and day-of adaptation | Approved | Contextual, explained proposals require explicit acceptance; rejection persists and high readiness never silently increases difficulty. |
-| D-06 Health display and synchronization | Open | Pending review. |
+| D-06 Health display and synchronization | Approved | Display-only first; data stays device-local by default, with cloud synchronization requiring separate explicit consent. |
 | D-07 Review eligibility | Open | Pending review. |
 | D-08 Theme scope and commerce | Open | Pending review. |
 | D-09 Public operations and content policy | Open | Will be decomposed into separately reviewable decisions. |
@@ -277,3 +277,41 @@ controls, or continued use of a program the user already owns.
 - Test rejection across screens, late responses during logging, deload/high-readiness
   conflicts, missing symptom details, failed persistence, stale proposals, and
   conflicting subjective/performance/health signals.
+
+## D-06 — Health display and synchronization
+
+**Status:** Approved on 2026-09-08. Selected option: display-only, local by
+default, optional separately consented cloud synchronization.
+
+### Approved behavior
+
+- The first health integration displays attributed steps, relevant distance, and
+  workout summaries; it does not alter readiness, prescriptions, progression, or
+  schedules.
+- Imported health summaries remain on the device by default.
+- Cloud synchronization is an independent opt-in requiring clear disclosure of the
+  data types, purpose, retention, deletion behavior, and affected account/devices.
+- Enabling the platform health adapter does not imply consent to cloud storage or
+  later coaching interpretation.
+- Missing, stale, partially authorized, revoked, or unavailable data is labeled as
+  such; zero is not substituted for unknown data.
+- Preserve source attribution and deduplicate overlapping phone/watch samples and
+  imported workouts where reliable. Ask the user when matching is ambiguous.
+- Imported strength workouts do not invent exercise-level sets or progression
+  success.
+- Manual training remains fully functional without a supported device, permission,
+  cloud consent, health data, or premium access.
+- Disconnecting stops future reads and interpretation and provides a clear way to
+  delete synchronized or cached imported data within platform constraints.
+- Any later use of health trends for coaching requires a separately reviewed policy
+  and consent. User-reported pain, illness, and current experience retain authority.
+
+### Planning consequences
+
+- Separate OS authorization, in-app display consent, cloud-storage consent, and any
+  future interpretation consent in contracts and UI.
+- Design local storage first; keep proposed cloud health tables optional and unused
+  unless cloud consent is active.
+- Treat health summaries as highly sensitive and include source deduplication,
+  freshness, revocation, deletion, partial permission, offline, and conflicting-data
+  fixtures.
