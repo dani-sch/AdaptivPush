@@ -26,7 +26,7 @@ decision sequence.
 | D-06 Health display and synchronization | Approved | Display-only first; data stays device-local by default, with cloud synchronization requiring separate explicit consent. |
 | D-07 Review eligibility | Approved | Installation plus two completed prescribed sessions on separate days and seven elapsed days; launch heuristic subject to validation. |
 | D-08 Theme scope and commerce | Approved | First-party declarative token packages may be sold; third-party authoring and creator commerce are deferred. |
-| D-09 Public operations and content policy | Open | Will be decomposed into separately reviewable decisions. |
+| D-09 Public operations and content policy | Partially approved | D-09A approves unlisted sharing first and defers discovery/social until moderation operations exist; D-09B through D-09E remain open. |
 | D-10 Numerical-rule validation | Open | Pending review. |
 
 ## D-01 — Free/premium boundary
@@ -381,3 +381,32 @@ themes with the creator marketplace deferred.
 - Include purchase replay, restore, refund, revocation, cross-device ownership,
   incompatible package, invalid tokens, accessibility failure, offline use, and
   interrupted workout scenarios in implementation fixtures.
+
+## D-09A — Public-feature rollout
+
+**Status:** Approved on 2026-09-08. Selected option: unlisted program sharing
+first; public discovery and social interactions deferred until moderation operations
+exist.
+
+### Approved behavior
+
+- The first publishing release supports unlisted program links/codes and private
+  installation under D-03.
+- Unlisted does not mean private: anyone with a valid link or code may be able to
+  access the sanitized published artifact, and publication UI must disclose this.
+- Public discovery, feeds, follows, activity sharing, ratings/reviews, comments,
+  reactions, and other user-generated-content surfaces are separate later releases.
+- Do not enable a public-content or interaction surface until its reporting,
+  blocking where applicable, moderation queue, takedown, audit, support ownership,
+  and appeal/contact path are operational.
+- Core training and existing private installations remain independent of public
+  feature availability or moderation-system outages.
+
+### Planning consequences
+
+- Sequence the unlisted publishing/install capsule before discovery and social
+  capsules.
+- Treat moderation operations as a release gate, not a post-launch enhancement, for
+  every public discovery or interaction slice.
+- Include link leakage, revoked/unpublished versions, abusive shared content,
+  quarantine, invalid reports, and existing-install continuity in fixtures.
