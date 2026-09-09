@@ -1,35 +1,15 @@
-# AdaptivPush Overview
+# AdaptivPush overview
 
-AdaptivPush is an Expo Router mobile app for generating, running, and adapting strength-training programs. The app is currently a client-heavy TypeScript codebase backed by Supabase for auth, data storage, and assets.
+AdaptivPush is an Expo Router strength-training application backed by Supabase. Its product direction combines useful planning, accurate workout records and explained adaptive proposals while preserving user agency. Free training remains complete; premium sells advanced customization, equipment precision and automation.
 
-## Current documentation spine
+## Read next
 
-- active file index: `dev-doc/main/TOC.md`
-- active task board: `dev-doc/main/TODO.md`
-- durable architecture summary: `dev-doc/main/ARCHITECTURE.md`
-- operational snapshot: `dev-doc/main/CURRENT-STATE.md`
-- milestone and sequencing view: `dev-doc/main/ROADMAP.md`
-- command and routing reference: `dev-doc/main/COMMAND-TOC.md`
+- [Plan index](/dev-doc/plans/active/PLAN-INDEX.md): canonical ownership and provenance.
+- [Master plan](/dev-doc/plans/active/ADAPTIVPUSH-MASTER-PLAN.md): implementation contract under approved decisions.
+- [Execution register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md): neutral AP slices and release gates.
+- [Implementation status](/dev-doc/plans/active/ADAPTIVPUSH-IMPLEMENTATION-STATUS.md): code facts and defects.
+- [Architecture](/dev-doc/main/ARCHITECTURE.md), [current state](/dev-doc/main/CURRENT-STATE.md), [roadmap](/dev-doc/main/ROADMAP.md), [TODO](/dev-doc/main/TODO.md), [file index](/dev-doc/main/TOC.md), [command routing](/dev-doc/main/COMMAND-TOC.md).
 
-## Active implementation lane
+## Current planning boundary
 
-The current execution lane is now driven by:
-
-- `reports/plans/FABLE-5-MASTER-IMPLEMENTATION-EXECUTION-PLAN.md`
-- `dev-doc/plans/active/FABLE-5-EXECUTION-REGISTER.md`
-- `dev-doc/plans/active/FABLE-5-CODE-IMPLEMENTATION-STATUS.md`
-- `dev-doc/plans/active/PLAN-INDEX.md`
-
-The prior evidence-backed execution, implementation, UI, and research documents are explicitly marked source references, not independent execution drivers.
-
-## Current planning model
-
-- FABLE-5 defines the complete app and technical contract.
-- The execution register assigns stable `F5-S*` identifiers and gates.
-- The code status snapshot records what actually works, what is partial, and what is missing.
-- Living docs summarize current architecture, state, roadmap, and immediate work.
-- `dev-doc/reports/DEV-LOG.md` records executed evidence and external validation.
-
-## Current product direction
-
-The approved direction is a hybrid adaptive coach, evidence-based planner, and transparent decision-support product. The first wave should balance visible readiness improvements, transparent explanations, and stronger planning/generation surfaces rather than ship architecture-only work.
+The approved decision record supersedes earlier planning proposals. The neutral canonical set replaces old execution authorities, which remain intact in a dated archive. Dated research/audits/logs remain sources, not fresh verification. This consolidation is documentation only and stops at final user review. The first subsequent bounded packet is AP-01.1: inspect catalog authority, migration provenance and restore evidence before application/data changes.

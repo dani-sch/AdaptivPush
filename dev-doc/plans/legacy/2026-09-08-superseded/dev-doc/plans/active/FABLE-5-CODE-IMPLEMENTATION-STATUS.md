@@ -21,6 +21,8 @@ Snapshot baseline:
 - automated tests present: none
 - live Supabase state: not directly verified during this code audit
 
+Post-snapshot execution evidence: an authenticated synthetic-user integration run against the live project on 2026-08-03 verified the Phase 2 write/read contract and actual generated-program save coordinator. Device/UI behavior remains separately unverified.
+
 ## Status vocabulary
 
 | Status | Meaning |
@@ -40,7 +42,7 @@ Snapshot baseline:
 | Password recovery | `[MISSING]` | The screen validates an email but never calls Supabase password recovery. | `app/(auth)/forgot-password.tsx` | Call `supabase.auth.resetPasswordForEmail`, add callback/deep-link handling, and verify reset completion. |
 | First-run onboarding | `[PARTIAL]` | Demographics, weight, experience, a placeholder HealthKit choice, Phase 2 defaults, and first program generation exist. Approved goal, schedule, equipment, time, depth, and explanation controls are not first-class onboarding inputs. | `app/(qsetup)/quick-setup.tsx`, `components/GenerateProgramModal.tsx` | Replace demographic-first flow with staged personalization while preserving compatibility writes. |
 | Program generation | `[WORKING-CODE]` | Generates multi-week programs from goal, days, duration, focus muscles, session target, experience, cycle phase, and a 55-exercise local catalog. Emits explanation metadata. | `utils/programGenerator.ts`, `constants/programDefaults.ts`, `lib/exerciseDatabase.ts` | Add split recommendation/override, weekly set targets, equipment-aware selection, deterministic test seams, stability windows, and reactive rather than baked-in deload policy. |
-| Program persistence | `[WORKING-CODE]` | Saves programs, days, exercises, and a required generation-context snapshot; rolls back the program row if context insertion fails. | `utils/saveProgramToDb.ts` | Verify live schema/RLS and make the multi-table save atomic or recoverable beyond the first row. |
+| Program persistence | `[WORKING-CODE]` | Saves programs, days, exercises, and a required generation-context snapshot; deletes the failed replacement and restores the prior active program if required context preparation or insertion fails. | `utils/saveProgramToDb.ts` | Make the remaining multi-table save atomic or recoverable beyond context creation and complete device/UI regression. |
 | Manual program editor | `[WORKING-CODE]` | A full manual program creation flow persists custom programs and exercise prescriptions. | `app/create-program.tsx` | Retain as an Advanced path, add feature gating, context/version semantics, and validation tests. |
 | Active program orchestration | `[PARTIAL]` | Loads active week, sorts completed workouts, swaps exercises, archives programs, applies progression, and advances weeks. It is a large client-side orchestration seam with date manipulation and development helpers. | `hooks/useCurrentProgram.ts` | Split data access/domain orchestration, replace the start-date advancement hack, remove dev-only paths, and add tests. |
 | Workout execution | `[WORKING-CODE]` | Displays prescribed sets, accepts set logging, writes sessions and sets, detects PRs, and triggers progression refresh. | `app/next-workout.tsx`, `components/ExerciseCard.tsx` | Add offline/retry safety, transactional persistence, adaptation-event linkage, accessibility regression, and explicit adjustment controls. |
@@ -99,7 +101,7 @@ Snapshot baseline:
 | `readiness_logs` | Legacy table in schema reference | Active Home and Next Workout source | Must remain during compatibility window. |
 | `readiness_checkins` | Migration, types, and deployed ownership policies exist | Unused | Four authenticated ownership policies and cross-user denial verified live. |
 | `cycle_symptom_logs` | Migration, types, and deployed ownership policies exist | Unused | Sensitive rows are isolated by four authenticated ownership policies verified live. |
-| `program_generation_context` | Migration, types, required save writer, and deployed linked-ownership policies exist | Active for generated programs | Valid owned insert and cross-user program denial verified in a rolled-back live test; full app smoke remains. |
+| `program_generation_context` | Migration, types, required save writer, and deployed linked-ownership policies exist | Active for generated programs | Valid owned insert and cross-user program denial were verified previously; an authenticated actual generator/save run plus injected failure cleanup passed on 2026-08-03. Device/UI smoke remains. |
 | `adaptation_events` | Migration, types, and deployed linked-ownership policies exist | Unused | Four policies plus linked-record ownership checks verified live. |
 | `deload_recommendations` | Migration, types, and deployed linked-ownership policies exist | Unused | Four policies plus program ownership checks verified live. |
 | `programs`, `program_days`, `program_day_exercises` | Existing schema and active code | Core program flow | Multi-table operations are client-orchestrated and not fully transactional. |
@@ -122,6 +124,7 @@ These are implementation facts, not optional redesign ideas:
 10. Privacy and support actions only update auth metadata; no export, deletion, or support delivery process exists.
 11. `app.json` still contains temporary application identity.
 12. Resolved 2026-08-03: migration 015 adds and live verification proves Phase 2 RLS ownership policies.
+13. Resolved in the current working tree: failed required generation-context preparation or insertion now restores the previously active program after deleting the failed replacement.
 
 ## Planned file map
 

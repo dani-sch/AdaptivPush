@@ -96,6 +96,8 @@ Gate: one user cannot read or mutate another user's rows.
 
 Gate: results recorded in `dev-doc/reports/DEV-LOG.md`.
 
+Current evidence, 2026-08-03: authenticated live tests passed for the three Quick Setup persistence surfaces, missing-row preference resolution, readiness/cycle dual-writes, actual generator context creation, and injected context-write failure cleanup. The failure test found and verified a fix that restores the previously active program. The gate remains open for the actual mobile UI paths and a runtime missing-relation/column fallback scenario; no Expo-capable simulator or physical device was available, and the Expo web fallback failed during AsyncStorage server rendering.
+
 ### `F5-S1.4` Repository authority repair
 
 - mark evidence-backed execution and UI plans as source references;

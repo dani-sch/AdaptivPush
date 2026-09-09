@@ -14,6 +14,23 @@ import { isMissingRelationOrColumnError } from '@/utils/profilePreferences';
 const DEFAULT_POLICY_VERSION = 'phase2-baseline';
 const DEFAULT_EVIDENCE_VERSION = 'phase1-evidence-baseline';
 
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error &&
+    typeof error.message === 'string'
+  ) {
+    return error.message;
+  }
+
+  return 'Program save failed';
+};
+
 interface SaveProgramToDbOptions {
   programGenerationContextMode?: ProgramGenerationContextMode;
 }
@@ -213,11 +230,25 @@ export async function saveProgramToDb(
 ): Promise<string> {
   const programGenerationContextMode = options.programGenerationContextMode ?? 'create';
 
-  await supabase
+  const { data: previouslyActivePrograms, error: activeProgramLookupError } = await supabase
+    .from('programs')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('is_active', true);
+
+  if (activeProgramLookupError) throw activeProgramLookupError;
+
+  const previouslyActiveProgramIds = (previouslyActivePrograms ?? []).map(
+    (program) => program.id as string,
+  );
+
+  const { error: deactivateProgramsError } = await supabase
     .from('programs')
     .update({ is_active: false })
     .eq('user_id', userId)
     .eq('is_active', true);
+
+  if (deactivateProgramsError) throw deactivateProgramsError;
 
   const todayISO = new Date().toISOString().split('T')[0];
 
@@ -239,26 +270,57 @@ export async function saveProgramToDb(
   if (progErr) throw progErr;
   const programId = prog.id as string;
 
-  await persistSessionLengthPreference(userId, params.targetSessionMinutes);
+  const recoverFailedReplacement = async (saveError: unknown): Promise<never> => {
+    const { error: cleanupError } = await supabase
+      .from('programs')
+      .delete()
+      .eq('id', programId)
+      .eq('user_id', userId);
+    const restorationResult =
+      previouslyActiveProgramIds.length > 0
+        ? await supabase
+            .from('programs')
+            .update({ is_active: true })
+            .eq('user_id', userId)
+            .in('id', previouslyActiveProgramIds)
+        : null;
+    const restorationError = restorationResult?.error ?? null;
 
-  if (programGenerationContextMode === 'create') {
-    const profile = await loadProgramContextProfile(userId);
-    const programGenerationContext = buildProgramGenerationContext({
-      userId,
-      programId,
-      params,
-      generated,
-      profile,
-    });
+    if (cleanupError || restorationError) {
+      const recoveryFailures = [
+        cleanupError ? `failed-program cleanup: ${cleanupError.message}` : null,
+        restorationError ? `prior-program restoration: ${restorationError.message}` : null,
+      ].filter((message): message is string => Boolean(message));
 
-    const { error: contextError } = await supabase
-      .from('program_generation_context')
-      .insert(programGenerationContext);
-
-    if (contextError) {
-      await supabase.from('programs').delete().eq('id', programId);
-      throw contextError;
+      throw new Error(
+        `${getErrorMessage(saveError)} Recovery failed (${recoveryFailures.join('; ')}).`,
+      );
     }
+
+    throw saveError;
+  };
+
+  try {
+    await persistSessionLengthPreference(userId, params.targetSessionMinutes);
+
+    if (programGenerationContextMode === 'create') {
+      const profile = await loadProgramContextProfile(userId);
+      const programGenerationContext = buildProgramGenerationContext({
+        userId,
+        programId,
+        params,
+        generated,
+        profile,
+      });
+
+      const { error: contextError } = await supabase
+        .from('program_generation_context')
+        .insert(programGenerationContext);
+
+      if (contextError) throw contextError;
+    }
+  } catch (saveError: unknown) {
+    await recoverFailedReplacement(saveError);
   }
 
   const uniqueExercises = [...new Set(

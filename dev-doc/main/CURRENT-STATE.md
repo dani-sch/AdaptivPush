@@ -1,43 +1,28 @@
-# Current state
+# AdaptivPush current state
 
-## Active execution state
+## Planning and code posture
 
-- canonical driver: `reports/plans/FABLE-5-MASTER-IMPLEMENTATION-EXECUTION-PLAN.md`
-- stable execution stage: `F5-S1` - schema truth, RLS, compatibility, and authority closeout
-- `F5-S0` evidence/policy foundation: complete
-- Phase 2 schema/type/compatibility code: merged
-- Phase 2 live schema and two-user RLS isolation: verified 2026-08-03
-- Phase 2 complete manual app compatibility matrix: not closed
-- feature flags: missing
-- readiness-v2 engine: missing
-- automated application tests: missing
+- Neutral [plan index](/dev-doc/plans/active/PLAN-INDEX.md) routes the approved product contract and supporting owners.
+- Consolidation is documentation only. No AP application slice was implemented, deployed or runtime-verified here.
+- First future packet: AP-01.1 catalog authority, migration ledger and backup/restore evidence inspection.
+- Working source paths exist for auth, program creation/loading, set logging/history/PRs, archive UI, local notifications and theme/palette. End-to-end durability, dated schedules, progression authority and adaptation remain partial or missing.
+- Evidence/policy constants and additive preference/context/event schema are existing foundations. Feature flags, application test script, durable outbox, explicit proposal lifecycle, precise equipment profiles and optional public/health/commerce workflows are missing.
+- Exact facts/defects: [implementation status](/dev-doc/plans/active/ADAPTIVPUSH-IMPLEMENTATION-STATUS.md).
 
-## Code-backed product posture
+## Historical evidence retained
 
-Working core paths include authentication, onboarding/profile seeding, generated and manual programs, active-plan loading, exercise swaps, workout logging, personal records, raw history, local notifications, archive/restore, and theme/palette switching.
+August 3 records describe schema/constraints/indexes/storage/external exercise-ID remediation and two-user isolation for the additive preference/event tables. A later authenticated synthetic-user run on that date records Quick Setup three-surface writes, missing-row preference resolution, readiness/cycle dual-writes, actual generated-context creation, injected context-failure cleanup and restoration of the prior active program. Those user-added results are retained in the development log and archive snapshots. They are not new measurements or proof of the full save transaction.
 
-Partial or scaffolded paths include readiness, day-of adaptation, progression, scheduled deloads, cycle support, analytics, evidence UI, notifications, privacy requests, and support requests.
+The September 8 read-only packet records RLS enabled on all 16 public tables and permissive catalog INSERT/UPDATE/DELETE policy expressions. Effective SQL grants/exploitability were not verified and no write probes were performed. The database plan owns that evidence distinction.
 
-Missing production paths include real password reset, feature gates, reactive deload lifecycle, keyed evidence route, real HealthKit, real support/export/deletion processing, automated tests, and production application identity.
+## Open gates
 
-The detailed status and file evidence live in `dev-doc/plans/active/FABLE-5-CODE-IMPLEMENTATION-STATUS.md`.
+Actual Quick Setup/Profile/Generate Program UI on an Expo-capable simulator/device and runtime missing-relation/column fallback remain open. The attempted historical web fallback failed on AsyncStorage `window` access before browser authentication and is not device evidence. Catalog effective grants, core parent consistency, migration-history normalization, backup capability and successful restore require inspection. Pre-015 dashboard changes are not a reconciled managed ledger.
 
-## Verification posture
+`git worktree list` at consolidation shows this checkout only; the documented `integrator` actor is not configured here. Integration needs configuration or an explicitly approved alternative. Historical lack of automated backups/CLI credentials must be rechecked, not assumed current. Historical unreferenced avatar objects are not authorized for deletion.
 
-- available static app gate: `npm run lint`
-- tests configured: none
-- last recorded generator closeout: lint, seeded output comparison, and in-app Generate Program smoke passed
-- live schema, constraints, indexes, storage policy, exercise metadata, and two-user RLS isolation were verified on 2026-08-03
-- Phase 2 manual application validation still required: new-user onboarding, legacy fallback reads, profile dual-write, and full generated-program save/cleanup UX
-- remote schema changes before migration 015 were made through the Dashboard; Supabase CLI baseline/pull and migration-history normalization remain a release-process prerequisite
-- no claim about live Supabase or device behavior is complete until recorded in `dev-doc/reports/DEV-LOG.md`
-- the documented `integrator` clone/actor was not present in the audited Git worktree list and must be configured or explicitly bypassed by the approved workflow before integration automation is assumed
+## Verification limits and controls
 
-## Immediate constraints
+Available app static gate is `npm run lint`; no application test script exists. This task runs documentation/path/diff checks only. No runtime/device/database/security/fitness/legal/purchase/moderation gate closes from documentation. Keep new behavior off until its deterministic flags and compatibility gates exist. Rollback must not restore known unsafe catalog writes, hidden high-readiness escalation or false completion. Preserve legacy records, accepted artifacts, free manual parity, dark/light/system/palettes and opt-in symptom privacy.
 
-- keep rollout-sensitive behavior off until deterministic feature gates exist;
-- preserve legacy `readiness_logs` during the compatibility window;
-- preserve dark/light/system and palette behavior;
-- keep cycle/symptom support opt-in and hidden by default;
-- do not expose HealthKit, support, export, deletion, email, or SMS as operational unless a real backend/device path exists;
-- do not advance to `F5-S2` until the remaining application compatibility smoke matrix is recorded.
+[DEV-LOG](/dev-doc/reports/DEV-LOG.md) records executed evidence; [database plan](/dev-doc/plans/active/ADAPTIVPUSH-DATABASE-PLAN.md) and [register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) own future gates.

@@ -1,34 +1,28 @@
-# Active TODO
+# AdaptivPush active task board
 
-## [ACTIVE] `F5-S1`
+## [REVIEW] Documentation consolidation
 
-- [COMPLETE] Compare live Supabase tables, columns, constraints, and indexes with migrations 001-014 and `lib/adaptivpush_database_schema.md`; drift is recorded in the 2026-08-03 live audit.
-- [COMPLETE] Add and deploy migration 015 and prove two-user RLS ownership isolation for every Phase 2 table with a rolled-back verification script.
-- [COMPLETE] Harden the avatar bucket contract and repair the deployed `exercises.exercisedb_id` column/index.
-- [ACTIVE] Run new-user onboarding writes for `user_profile`, `user_adaptation_preferences`, and `evidence_display_preferences`.
-- [ACTIVE] Run legacy/missing-row profile read and dual-write compatibility checks.
-- [ACTIVE] Verify generated-program save creates `program_generation_context` and failure cleanup behaves as documented.
-- [ACTIVE] Keep the FABLE-5 master, execution register, code status snapshot, and living docs synchronized.
+- [COMPLETE] Inventory 61 source documents and preserve 12 superseded authorities plus 12 prior operational snapshots.
+- [COMPLETE] Create neutral master/register/code status/database/traceability/inventory and research translation owners.
+- [REVIEW] Review the consolidated corpus and documentation verification before authorizing application implementation.
 
-## [NEXT] `F5-S2`
+## [NEXT] AP-01.1 — Read-only foundation inspection
 
-- [NEXT] Add deterministic in-repo feature flags with all behavioral v2 flags off by default.
-- [NEXT] Add a minimal pure TypeScript test runner and initial feature-gate tests.
-- [NEXT] Implement shared screen, surface, section, metric, bottom-action, loading, empty, and error primitives.
-- [NEXT] Verify Home, Plan, and Profile with flags off across dark/light/system modes.
+- [NEXT] Re-read git state and preserve pre-existing save-code/evidence changes.
+- [NEXT] Inspect effective catalog grants, role/function/API exposure and every shared-catalog writer; pair any future client/policy change.
+- [NEXT] Reconcile supported migration ledger/baseline and backup/restore method; do not replay historical migrations or infer a managed ledger from dashboard SQL.
+- [NEXT] Close actual Expo Quick Setup/Profile/Generate Program UI and missing-schema fallback evidence in the applicable future packet.
+- [NEXT] Confirm `integrator` availability or obtain explicit workflow alternative before integration claims.
 
-## [QUEUED]
+## [QUEUED] Bounded implementation
 
-- [QUEUED] Execute `F5-S3` onboarding/profile completion.
-- [QUEUED] Execute `F5-S4` generator-v2 and plan transparency.
-- [QUEUED] Execute `F5-S5` readiness-v2 and explicit day-of coaching.
-- [QUEUED] Execute `F5-S6` workout durability, progression, plateau, and deload.
-- [QUEUED] Execute `F5-S7` analytics, evidence, FAQ, and Recovery Library integration.
-- [QUEUED] Execute `F5-S8` password reset, real privacy/support operations, production identity, accessibility, release, and optional HealthKit.
+AP-02/03 durable records -> AP-04/05 schedules/free progression -> AP-06/07 advanced generation/equipment -> AP-08/09/10 coaching -> AP-11 unlisted -> optional AP-12/13 -> operationally gated AP-14/15. Relevant AP-16 privacy/purchase/support/accessibility gates are embedded throughout. [Register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) owns details.
 
-## [BLOCKED]
+## [REQUIRES INSPECTION]
 
-- [BLOCKED] Supabase CLI history normalization requires a project access token and a deliberate `db pull`/`migration repair` baseline; do not fabricate the internal migration ledger from Dashboard SQL.
-- [BLOCKED] Automated Supabase backups are unavailable on the current Free plan; production release requires a paid backup capability or an approved external backup job.
-- [BLOCKED] Deleting 16 historical unreferenced avatar objects requires explicit destructive-action confirmation; stable-path uploads prevent new accumulation.
-- [BLOCKED] HealthKit library selection requires a focused Expo 54 native compatibility spike and is intentionally deferred.
+- Effective grants, parent lineage, migration tool credentials/ledger, present backup capability and restore proof.
+- Native device availability, health adapter compatibility, store/provider integration and source bibliography verification.
+- Fitness-policy calibration/qualified safety review, legal terms/retention and named moderation/support owners.
+- Historical unreferenced avatar cleanup remains outside authorized scope; no deletion performed.
+
+Historical completed schema/isolation and authenticated compatibility work remains in [DEV-LOG](/dev-doc/reports/DEV-LOG.md); it is not an instruction to repeat writes or synthetic-account operations during planning.

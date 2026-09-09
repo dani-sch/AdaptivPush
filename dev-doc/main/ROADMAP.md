@@ -1,27 +1,18 @@
-# Active roadmap
+# AdaptivPush roadmap
 
-## Stable execution sequence
+Release order follows approved D-13. The [execution register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) owns precise prerequisites and independently reviewable packets; slice numbering is stable, not a mandatory serial dependency chain.
 
-| Stage | State | Primary outcome |
+| Wave | Slices | User-visible result |
 |---|---|---|
-| `F5-S0` Evidence/policy foundation | complete | Shared evidence and explanation metadata foundation |
-| `F5-S1` Schema truth, RLS, compatibility, authority | active | Verified safe data foundation and one execution authority |
-| `F5-S2` Feature gates and shared UX/state | pending | Safe rollout controls and reusable mobile UI primitives |
-| `F5-S3` Onboarding/profile/preferences | pending | Meaningful personalization and honest optional settings |
-| `F5-S4` Generator-v2 and plan transparency | pending | Explainable split/volume recommendations and overrides |
-| `F5-S5` Readiness-v2 and day-of coaching | pending | Conservative explicit recommendations with user control |
-| `F5-S6` Progression, plateau, deload, workout durability | pending | Explainable long-term adaptation and safer persistence |
-| `F5-S7` History, analytics, evidence, education | pending | Interpreted trends and shared trust surfaces |
-| `F5-S8` Production hardening, privacy, release, integration | pending | Production-real support paths, identity, accessibility, and rollout |
+| Authority and provenance | AP-01 | Trusted catalog and evidenced migration/restore/compatibility baseline |
+| Durable records | AP-02, AP-03 | Recoverable workouts and atomic program installs with preserved history |
+| Complete free training | AP-04, AP-05 | Dated workouts/rest, manual control, weekly adherence and trustworthy progression/history |
+| Early paid convenience | AP-06, AP-07 | Advanced goal/customization controls and precise multiple-location equipment automation |
+| Contextual coaching | AP-08, AP-09, AP-10 | Explicit readiness decisions, longitudinal/deload interpretation and optional recovery proposals |
+| Unlisted distribution | AP-11 | Sanitized immutable programs, link/code previews and pinned private installations |
+| Independent optional adapters | AP-12, AP-13 | Consented local health display and accessible first-party cosmetic commerce |
+| Operationally gated public features | AP-14, AP-15 | Discovery/reviews and separate social interactions only with staffed moderation/support |
 
-## Milestone packaging
+AP-16 account/privacy/purchase/accessibility/support/release obligations close with each relevant wave. They are not postponed until final polish. Safe parallel work includes draft/program contracts, history/schedule selectors, generation/equipment UI and independent health/theme adapters after their own gates; the register names shared-file coordination risks.
 
-| Milestone | Included stages | User-visible outcome |
-|---|---|---|
-| Foundation closeout | `F5-S1` | Safe compatibility baseline; no new behavior exposure |
-| Visible adaptive foundation | `F5-S2`, `F5-S3`, first `F5-S5` trust/readiness slice | Better check-in framing, visible adjustment reason, first evidence entry |
-| Transparent planning | `F5-S4` and relevant `F5-S7` trust slice | Explainable generation, set targets, plan rationale, safe override |
-| Adaptive workload intelligence | remainder of `F5-S5`, `F5-S6`, analytics slice of `F5-S7` | Durable adaptation, plateau/deload guidance, interpreted history |
-| Production completion | `F5-S8` | Honest operational support paths, release identity, accessibility, privacy, and controlled rollout |
-
-HealthKit is an optional enrichment after core manual parity; it is not on the critical path to the first four product milestones.
+Historical authenticated compatibility evidence is retained, including context-failure recovery. Actual device UI and missing-schema fallback remain required before foundation release. The immediate packet is AP-01.1 after final review of this planning corpus. Health/social never block the fully usable manual core.
