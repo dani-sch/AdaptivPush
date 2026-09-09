@@ -31,6 +31,15 @@ target, device access, and the configured `integrator` are unavailable. These
 facts replace the corresponding `REQUIRES INSPECTION` items with specific open
 gates; they do not satisfy restore, role-write, device, or integration proof.
 
+AP-01.2a then implemented the compatible client-first portion locally: generated
+save and developer fixtures now use lookup-only catalog resolution before their
+first program mutation; swap writes require a validated UUID; the two unresolved
+local-only entries are excluded from persisted candidate pools; and the seed
+command uses only the administrator client. All 52 persistable local entries and
+six fixture names resolved in a current read-only check. Production grants and
+policies were not changed. Baseline/backup/isolated-target evidence remains a
+prerequisite to the slice-owned enforcement migration.
+
 ## Current schema and security posture
 
 | Existing table/surface | Source and actual application use | Important current limits / owning slices |

@@ -76,11 +76,13 @@ Database cells use actual existing table names or proposed DB-01…DB-28 / EQ-01
 [The current read-only AP-01 evidence artifact](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-09.md)
 links AC-TR-001 through AC-TR-007 to the inspected commit, production metadata,
 catalog writer/resolver inventory, retained migration hashes, and exact remaining
-gates. It partially satisfies AC-TR-001/003, establishes the current exposure for
-AC-TR-002, preserves the legacy check-in interpretation for AC-TR-005, quantifies
-the AC-TR-006 identity gaps, and satisfies only the documentation distinction in
-AC-TR-007. It does not claim restore, ordinary-role write denial, trusted
-curation, two-owner write isolation, missing-schema runtime, Expo device,
+gates. Commits `e371348` and `cd0908e` add local AP-01.2a evidence: lookup-only
+generated/dev saves, source/exact identity resolution, explicit unresolved
+candidates, UUID-guarded swaps, and administrator-only seed code. It partially
+satisfies AC-TR-001/002/003/006, preserves the legacy check-in interpretation for
+AC-TR-005, and satisfies only the documentation distinction in AC-TR-007. It
+does not claim restore, live ordinary-role write denial, trusted-curation
+execution, two-owner write isolation, missing-schema runtime, Expo device,
 integration, deployment, or release evidence.
 
 ## AP-02 — Durable workout records

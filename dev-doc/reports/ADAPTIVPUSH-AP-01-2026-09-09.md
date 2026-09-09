@@ -225,6 +225,42 @@ change remains gated.
    result; policy rollback must never restore unconditional writes. Safe fallback
    is read-only cached/manual selection with an unsaved draft.
 
+## AP-01.2a local implementation result
+
+The compatible client-first portion of the transition was implemented locally
+after AP-01.1, without changing the database:
+
+- `features/catalog/contracts.ts`, `resolveCatalogExercises.ts`, and
+  `repository.ts` now distinguish local snapshot identity, optional ExerciseDB
+  source identity, validated database UUID, exact-name compatibility, and
+  structured unresolved reasons;
+- generated program save resolves the complete catalog before deactivating or
+  creating a program, performs no shared-catalog upsert, and cannot silently
+  omit an unresolved prescription;
+- the developer program fixture performs the same lookup before its first
+  program mutation;
+- four non-exact local names have explicit live source-ID mappings; the two
+  local-only entries without an unambiguous catalog row (`barbell-clean` and
+  `dumbbell-thruster`) are excluded from persisted generator and swap pools;
+- swap UI can show local fallback previews, but disables apply until a validated
+  catalog UUID exists; the hook independently rejects a non-UUID replacement;
+- `scripts/seedExercises.ts` now requires the service-role administrator client
+  for both catalog and storage writes instead of using the public client for
+  shared rows; the command was not executed; and
+- `npm run test:catalog` is the first focused TypeScript harness, covering nine
+  exact/source/missing/ambiguous/invalid/conflict/candidate-boundary cases.
+
+Read-only current-project compatibility checks resolved all 52 persistable local
+entries and all six developer-fixture names. The two unresolved entries above
+remain explicit catalog-curation work rather than guessed aliases or client-created
+rows. Commits: `e371348` and `cd0908e`.
+
+Local verification passed: nine catalog tests, `npx tsc --noEmit`, `npm run lint`
+with zero errors and the same 17 pre-existing warnings, static confirmation that
+the only remaining `exercises` upserts are in the trusted seed command, and
+`git diff --check`. Authenticated save, offline cache, device UI, old-client
+behavior, ordinary-role denial, and trusted-curation execution remain unverified.
+
 ## Reviewable AP-01.3 migration-baseline and restore plan
 
 1. Select the supported Supabase CLI version and credential owner; install and
@@ -255,25 +291,25 @@ change remains gated.
 | Row/gate | AP-01.1 result and remaining evidence |
 |---|---|
 | AC-TR-001 | **Partial.** Fresh metadata, grants, current ledger absence, retained SQL hashes, and drift are recorded. Backup creation and isolated restore rehearsal remain open. |
-| AC-TR-002 | **Open with exposure proved.** Effective ordinary-role catalog mutation authority is established from grants plus unconditional policies. No write probe was run. Lookup-only save, denied mutation, and trusted curation must be implemented/tested in AP-01.2/01.3. |
+| AC-TR-002 | **Partial.** Effective ordinary-role exposure is proved. Lookup-only generated save/dev fixtures, UUID-guarded swaps, and trusted seed code are locally implemented. Live denial, authenticated normal save, and trusted-curation execution remain for AP-01.3. |
 | AC-TR-003 | **Partial structural evidence.** Current FKs and policy parent lineage were read. The August rolled-back test remains historical; fresh isolated two-owner/storage negative tests remain open. |
 | AC-TR-004 | **Open.** Compatibility helpers and historical service checks exist; actual new/legacy/missing-relation/missing-column Expo paths lack device evidence. |
 | AC-TR-005 | **Inspection complete, implementation open.** The legacy FK still points to `readiness_logs`; no reinterpretation occurred. Any additive v2 link belongs to its consuming slice. |
-| AC-TR-006 | **Open with quantified blockers.** The local snapshot lacks canonical mapping/version, 51 rows lack external IDs, 17 normalized-name groups collide, and swap/save fallbacks can misuse or drop identity. |
+| AC-TR-006 | **Partial.** Local snapshot version, exact/source resolution, four source aliases, explicit exclusions, and current online resolution for 52 persistable entries are proved. Fifty-one catalog rows still lack external IDs, 17 normalized-name groups still collide, and offline cached-ID/device evidence remains open. |
 | AC-TR-007 | **Satisfied for this documentation-only packet.** Existing, retained historical, proposed, and optional objects are distinguished; no schema was added. Each future consumer still owes its slice-specific proof. |
 | G-01–G-06 | Scope/ownership/contracts and product/privacy/offline/UI implications are recorded; runtime behavior was not changed or claimed. |
-| G-07 | Documentation/path checks plus current lint/type baselines are recorded in the development log after execution. No application test script exists. |
+| G-07 | Documentation/path checks, nine focused catalog tests, lint with zero errors/17 pre-existing warnings, and strict TypeScript pass. The repository now exposes `npm run test:catalog`; broader application tests remain absent. |
 | G-08 | **Blocked for integration, not local inspection:** configured `integrator`, isolated target, restore proof, two-user tests, and Expo device are unavailable. No release claim. |
 | G-09 | No rollout occurred. Safe sequence and non-permissive rollback are specified. |
 | G-10 | This artifact and linked register/status/database/traceability/log updates provide the AP-01.1 evidence record. Final commit is added to the development log after commit. |
 
 ## Exact next executable packet
 
-**AP-01.2a — lookup-only catalog contract and resolver** is locally executable
-without a database mutation. Its owned initial surface is
-`features/catalog/contracts.ts`, `features/catalog/repository.ts`, focused
-resolver fixtures/harness, and the generated-save/swap call sites required to
-prevent catalog writes and slug-as-UUID writes. The server catalog-policy
-migration, managed-ledger repair, authenticated integration fixtures, restore
-drill, and production deployment remain gated behind AP-01.3 evidence and
-specific authorization.
+**AP-01.3a — supported baseline/backup/isolated-target enablement** is the exact
+next AP-01 packet. It requires a concrete credential/tool owner, a backup choice
+(managed physical backups or approved encrypted external dump), and an isolated
+Supabase target. The configured `integrator` and an Expo-capable device are also
+required before later integration/device claims. The server catalog-policy
+migration, managed-ledger repair, authenticated role fixtures, restore drill,
+production deployment, and release remain gated and require their stated
+authorization.

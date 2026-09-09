@@ -10,6 +10,7 @@
 | Category | Files |
 |----------|-------|
 | Project Root | 4 |
+| Tests | 1 |
 | Top-level Scripts | 23 |
 | Automation Scripts | 24 |
 | Tool Scripts | 27 |
@@ -20,7 +21,7 @@
 | Skills | 62 |
 | Agents | 17 |
 | Commands | 8 |
-| **Total** | **222** |
+| **Total** | **223** |
 
 ---
 
@@ -33,6 +34,18 @@ _Root-level documentation and license files_
 ├── README.md — AdaptivPush
 ├── SETUP.md — AdaptivPush Senior Project
 └── TABLE-OF-CONTENTS.md — AdaptivPush documentation navigation
+```
+
+---
+
+## Tests (`tests/`)
+
+_Test suite_
+
+```
+└── tests/
+    └── catalog/
+        └── resolveCatalogExercises.test.ts — import assert from 'node:assert/strict';
 ```
 
 ---

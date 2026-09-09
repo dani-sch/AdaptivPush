@@ -5,6 +5,54 @@
 
 ---
 
+### 2026-09-09 AP-01.2a lookup-only catalog client {#2026-09-09-ap-01-2a-catalog-client}
+
+**Summary**: Implemented and locally verified the compatible client-first
+catalog boundary. Generated saves and developer fixtures resolve existing rows
+before program mutation; swaps cannot write local slugs to UUID foreign keys;
+shared seeding uses only the administrator client. No database write, seed run,
+policy/grant change, migration, deployment, integration, or release occurred.
+
+**Changes**:
+
+| Component | Change |
+|---|---|
+| catalog contract | Added snapshot/source/exact-name identity, validated catalog UUID, structured unresolved reasons, and actionable resolution errors. |
+| generated save | Resolve all slots before reading/deactivating programs; removed shared-catalog upsert and silent unresolved-prescription filtering. |
+| local catalog | Added four explicit ExerciseDB mappings; excluded `barbell-clean` and `dumbbell-thruster` from persisted candidate pools because no unambiguous live row exists. |
+| developer fixture | Replaced six catalog upserts with pre-mutation lookup. |
+| swap | Local fallback remains previewable but apply is disabled without a resolved UUID; the hook independently rejects non-UUID replacements. |
+| trusted import | Seed DB and Storage operations now share the service-role administrator client; command not executed. |
+| test harness | Added `npm run test:catalog` and nine deterministic cases. |
+
+**Verification**:
+
+| Check | Result |
+|---|---|
+| `npm run test:catalog` | 9 passed, 0 failed. |
+| `npx tsc --noEmit` | passed. |
+| `npm run lint` | passed with 0 errors and 17 unchanged pre-existing warnings. |
+| current public catalog read | 52 persistable local entries resolved; two explicit unresolved entries excluded; 0 missing among the persistable set. |
+| current developer-fixture read | 6 requested names resolved; 0 missing. |
+| writer scan | Remaining `exercises` upserts occur only in `scripts/seedExercises.ts` through `supabaseAdmin`. |
+| `git diff --check` | passed. |
+| Ruff | not applicable; no Python file changed. |
+| authenticated/device/integration/restore/write-isolation | not run and not claimed. |
+
+**Commits**:
+
+- `e371348` `feat(catalog): resolve program exercises without client writes`
+- `cd0908e` `fix(catalog): guard swaps and require trusted seeding`
+
+**Remaining gates**: Live grants and unconditional policies are unchanged.
+AP-01.3a requires a credential/tool owner, supported baseline, chosen backup
+mechanism, isolated restore/role-test target, configured integration workflow,
+and later Expo device evidence. Policy/ledger/deployment actions remain gated.
+
+**Next**: AP-01.3a supported baseline/backup/isolated-target enablement.
+
+---
+
 ### 2026-09-09 AP-01.1 catalog authority and restore-readiness inspection {#2026-09-09-ap-01-1-foundation-inspection}
 
 **Summary**: Completed the bounded AP-01.1 read-only inspection against the

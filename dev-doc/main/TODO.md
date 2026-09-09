@@ -15,13 +15,21 @@
 - [OPEN] Close actual Expo Quick Setup/Profile/Generate Program UI and missing-schema fallback evidence in AP-01.3.
 - [BLOCKED] Configure `integrator` or approve an alternative before integration claims.
 
-## [NEXT] AP-01.2a — Lookup-only catalog contract and resolver
+## [LOCAL VERIFIED] AP-01.2a — Lookup-only catalog contract and resolver
 
-- [NEXT] Add explicit database UUID, source ID, local snapshot/version, alias, resolved, and unresolved identity contracts.
-- [NEXT] Remove ordinary-client shared-catalog upserts from generated save and developer fixtures; never silently omit unresolved prescriptions.
-- [NEXT] Prevent local swap slugs from entering UUID FK writes; preserve offline choices as explicit drafts until resolution.
-- [NEXT] Add the first deterministic TypeScript resolver harness and run lint/type checks.
+- [COMPLETE] Added explicit database UUID, source ID, local snapshot/version, resolved, and unresolved identity contracts.
+- [COMPLETE] Removed ordinary-client shared-catalog upserts from generated save and developer fixtures; resolution occurs before program mutation and unresolved prescriptions are not omitted.
+- [COMPLETE] Prevented local swap slugs from entering UUID FK writes; local fallbacks are preview-only until resolution.
+- [COMPLETE] Moved seed database writes to the administrator client; the seed command was not executed.
+- [COMPLETE] Added nine deterministic catalog cases; lint and strict TypeScript pass.
 - [GATED] Do not apply catalog policy/grant changes until the compatible client is verified and AP-01.3 baseline/backup/isolated-target prerequisites exist.
+
+## [BLOCKED] AP-01.3a — Baseline, backup, and isolated target
+
+- [BLOCKED] Name the credential/tool owner and provision a supported pinned Supabase CLI plus PostgreSQL dump/restore tooling.
+- [BLOCKED] Choose managed physical backups or authorize an encrypted external dump workflow with retention/access ownership.
+- [BLOCKED] Provide an isolated Supabase restore/role-test target; never use production for the drill.
+- [BLOCKED] Configure `integrator` or explicitly approve an alternative, and provide an Expo-capable device for the later compatibility matrix.
 
 ## [QUEUED] Bounded implementation
 

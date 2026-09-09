@@ -3,8 +3,8 @@
 ## Planning and code posture
 
 - Neutral [plan index](/dev-doc/plans/active/PLAN-INDEX.md) routes the approved product contract and supporting owners.
-- Consolidation remained documentation only. AP-01.1 has now captured current read-only database and repository evidence; no AP application slice, migration, deployment, or release was completed.
-- Next executable packet: AP-01.2a lookup-only catalog contract/resolver, paired with but preceding the gated production policy change.
+- AP-01.1 captured current read-only database/repository evidence. AP-01.2a locally implements lookup-only generated/dev saves, explicit source/exact identity, UUID-guarded swaps, and administrator-only seed code. No database migration, deployment, integration, or release occurred.
+- Exact next packet: AP-01.3a supported baseline/backup/isolated-target enablement. It requires the recorded access/capability decisions before server policy work.
 - Working source paths exist for auth, program creation/loading, set logging/history/PRs, archive UI, local notifications and theme/palette. End-to-end durability, dated schedules, progression authority and adaptation remain partial or missing.
 - Evidence/policy constants and additive preference/context/event schema are existing foundations. Feature flags, application test script, durable outbox, explicit proposal lifecycle, precise equipment profiles and optional public/health/commerce workflows are missing.
 - Exact facts/defects: [implementation status](/dev-doc/plans/active/ADAPTIVPUSH-IMPLEMENTATION-STATUS.md).
@@ -21,8 +21,15 @@ Actual Quick Setup/Profile/Generate Program UI on an Expo-capable simulator/devi
 
 `git worktree list` still shows this checkout only; the documented `integrator` actor is not configured here. Integration needs configuration or an explicitly approved alternative. Supabase CLI, `psql`, `pg_dump`, and `pg_restore` are not installed, and no isolated project or Expo device is available. Historical unreferenced avatar objects remain outside scope and were not deleted.
 
+Current read-only compatibility checks resolved 52 of 52 persistable local
+catalog entries and all six developer-fixture names. `barbell-clean` and
+`dumbbell-thruster` have no unambiguous current catalog identity and are excluded
+from persisted generator/swap candidates rather than guessed or client-created.
+Live catalog grants/policies remain permissive until the compatible client and
+AP-01.3 gates are independently verified.
+
 ## Verification limits and controls
 
-Available app static gate is `npm run lint`; no application test script exists. AP-01.1 runs documentation/path/diff checks plus the existing lint/type baselines, but no application behavior changed. No write-isolation/device/integration/release/fitness/legal/purchase/moderation gate closes from the inspection. Keep new behavior off until its deterministic flags and compatibility gates exist. Rollback must not restore known unsafe catalog writes, hidden high-readiness escalation or false completion. Preserve legacy records, accepted artifacts, free manual parity, dark/light/system/palettes and opt-in symptom privacy.
+Available app static gate is `npm run lint`; broader application tests remain absent. AP-01.2a adds `npm run test:catalog` with nine passing deterministic cases; strict types and lint also pass. No write-isolation/device/integration/release/fitness/legal/purchase/moderation gate closes from local verification. Keep new behavior off until its deterministic flags and compatibility gates exist. Rollback must not restore known unsafe catalog writes, hidden high-readiness escalation or false completion. Preserve legacy records, accepted artifacts, free manual parity, dark/light/system/palettes and opt-in symptom privacy.
 
 [DEV-LOG](/dev-doc/reports/DEV-LOG.md) records executed evidence; [database plan](/dev-doc/plans/active/ADAPTIVPUSH-DATABASE-PLAN.md) and [register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) own future gates.
