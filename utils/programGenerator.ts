@@ -120,7 +120,9 @@ function selectExercises(
   usedIds: Set<string>,
   allowRepeat: boolean,
 ): LocalExercise[] {
-  const all = exercisesByMuscleGroup[muscleGroup] ?? [];
+  const all = (exercisesByMuscleGroup[muscleGroup] ?? []).filter(
+    (exercise) => exercise.catalogAvailability !== 'unresolved',
+  );
   if (all.length === 0) return [];
 
   // Partition into preferred (compound) and secondary (isolation)
@@ -283,6 +285,7 @@ function buildSlot(
   return {
     localExerciseId: exercise.id,
     exerciseName: exercise.name,
+    exerciseDbId: exercise.catalogExerciseDbId,
     position,
     setCount: slotParams.sets,
     repRangeMin: slotParams.repMin,

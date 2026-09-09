@@ -8,6 +8,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
+    "test:catalog": "tsx --test tests/catalog/*.test.ts",
     "seed:exercises": "tsx scripts/seedExercises.ts"
   },
   "dependencies": {

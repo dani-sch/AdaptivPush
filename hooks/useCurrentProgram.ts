@@ -6,6 +6,8 @@ import { computeProgression } from '@/utils/progressionEngine';
 import type { ProgressionContext, LoggedSet } from '@/types/progression';
 import type { TrainingExperience } from '@/types/database';
 import { computeCyclePhase } from '@/utils/cyclePhase';
+import { isCatalogExerciseId } from '@/features/catalog/contracts';
+import { resolveCatalogExerciseRequests } from '@/features/catalog/repository';
 
 type SwapArgs = { exerciseId: string; replacement: WorkoutExercise; applyToProgram: boolean };
 
@@ -445,7 +447,12 @@ export function useCurrentProgram() {
             if (!program) return;
 
             const pdeId = exerciseId;
-            const newExerciseId = replacement.id;
+            const newExerciseId = replacement.exerciseId ?? replacement.id;
+            if (!isCatalogExerciseId(newExerciseId)) {
+                throw new Error(
+                    'This exercise is only available in the local preview. Reconnect and resolve its catalog ID before applying the swap.',
+                );
+            }
 
             // find the PDE row to know the “original exercise” and parent program_day_id
             const { data: pdeRow, error: pdeErr } = await supabase
@@ -559,6 +566,29 @@ export function useCurrentProgram() {
     const createDevTestProgram = useCallback(async () => {
         const userId = await requireUserId();
 
+        const exerciseSeeds = [
+            { name: 'Goblet Squat' },
+            { name: 'Romanian Deadlift' },
+            { name: 'Bench Press' },
+            { name: 'Overhead Press' },
+            { name: 'Lat Pulldown' },
+            { name: 'Plank' },
+        ] as const;
+        const resolvedExercises = await resolveCatalogExerciseRequests(
+            exerciseSeeds.map(({ name }) => ({
+                localExerciseId: name,
+                displayName: name,
+                source: 'dev_fixture' as const,
+                snapshotVersion: 'dev-default-program-v1',
+            })),
+        );
+        const exIdByName = new Map(
+            [...resolvedExercises.values()].map((exercise) => [
+                exercise.request.displayName,
+                exercise.catalogExerciseId,
+            ]),
+        );
+
         // end any existing active programs
         // TODO: add archivability
         await supabase
@@ -582,27 +612,6 @@ export function useCurrentProgram() {
             .single<{ id: string }>();
 
         if (progErr) throw progErr;
-
-        // upsert exercises by name so this is repeatable
-        // TODO: either add new exercise or choose existing instead of upsert after exercise DB incorporated
-        const exerciseSeeds = [
-            { name: 'Goblet Squat', primary_muscle: 'Legs', equipment: 'Dumbbell' },
-            { name: 'Romanian Deadlift', primary_muscle: 'Back', equipment: 'Barbell' },
-            { name: 'Bench Press', primary_muscle: 'Chest', equipment: 'Barbell' },
-            { name: 'Overhead Press', primary_muscle: 'Shoulders', equipment: 'Dumbbell' },
-            { name: 'Lat Pulldown', primary_muscle: 'Back', equipment: 'Machine' },
-            { name: 'Plank', primary_muscle: 'Core', equipment: 'Bodyweight' },
-        ] as const;
-
-        const { data: exRows, error: exErr } = await supabase
-            .from('exercises')
-            .upsert(exerciseSeeds, { onConflict: 'name' })
-            .select('id,name')
-            .returns<Array<{ id: string; name: string }>>();
-
-        if (exErr) throw exErr;
-
-        const exIdByName = new Map(exRows.map((r) => [r.name, r.id]));
 
         // create program_days for Week 1 (3 days)
         const week1Days = [

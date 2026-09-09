@@ -7,6 +7,11 @@ import type {
   TrainingExperience,
 } from '@/types/database';
 import type { ProgramGenParams, GeneratedProgram } from '@/types/program';
+import {
+  LOCAL_CATALOG_SNAPSHOT_VERSION,
+  type CatalogExerciseRequest,
+} from '@/features/catalog/contracts';
+import { resolveCatalogExerciseRequests } from '@/features/catalog/repository';
 
 import { supabase } from '@/utils/supabase';
 import { isMissingRelationOrColumnError } from '@/utils/profilePreferences';
@@ -230,6 +235,17 @@ export async function saveProgramToDb(
 ): Promise<string> {
   const programGenerationContextMode = options.programGenerationContextMode ?? 'create';
 
+  const catalogRequests: CatalogExerciseRequest[] = generated.days.flatMap((day) =>
+    day.exercises.map((exercise) => ({
+      localExerciseId: exercise.localExerciseId,
+      displayName: exercise.exerciseName,
+      exerciseDbId: exercise.exerciseDbId,
+      source: 'local_snapshot',
+      snapshotVersion: LOCAL_CATALOG_SNAPSHOT_VERSION,
+    })),
+  );
+  const catalogExerciseByLocalId = await resolveCatalogExerciseRequests(catalogRequests);
+
   const { data: previouslyActivePrograms, error: activeProgramLookupError } = await supabase
     .from('programs')
     .select('id')
@@ -323,41 +339,6 @@ export async function saveProgramToDb(
     await recoverFailedReplacement(saveError);
   }
 
-  const uniqueExercises = [...new Set(
-    generated.days.flatMap(day => day.exercises.map(exercise => exercise.exerciseName)),
-  )];
-
-  const exerciseRows = uniqueExercises.map(name => ({ name }));
-
-  const { data: exData, error: exErr } = await supabase
-    .from('exercises')
-    .upsert(exerciseRows, { onConflict: 'name', ignoreDuplicates: true })
-    .select('id, name');
-
-  if (exErr) throw exErr;
-
-  const exIdByName = new Map<string, string>();
-
-  if (exData) {
-    for (const exercise of exData) {
-      exIdByName.set(exercise.name as string, exercise.id as string);
-    }
-  }
-
-  const missingNames = uniqueExercises.filter(name => !exIdByName.has(name));
-  if (missingNames.length > 0) {
-    const { data: fetchedEx, error: fetchErr } = await supabase
-      .from('exercises')
-      .select('id, name')
-      .in('name', missingNames);
-
-    if (fetchErr) throw fetchErr;
-
-    for (const exercise of fetchedEx ?? []) {
-      exIdByName.set(exercise.name as string, exercise.id as string);
-    }
-  }
-
   const dayInserts = generated.days.map(day => ({
     program_id:             programId,
     week_number:            day.weekNumber,
@@ -385,8 +366,15 @@ export async function saveProgramToDb(
 
     return day.exercises
       .map(exercise => {
-        const exerciseId = exIdByName.get(exercise.exerciseName);
-        if (!exerciseId) return null;
+        const exerciseId = catalogExerciseByLocalId.get(
+          exercise.localExerciseId,
+        )?.catalogExerciseId;
+        if (!exerciseId) {
+          throw new Error(
+            `Resolved catalog identity disappeared for ${exercise.exerciseName}. ` +
+              'The program was not saved completely.',
+          );
+        }
 
         return {
           program_day_id:      dayId,
@@ -399,8 +387,7 @@ export async function saveProgramToDb(
           suggested_weight_lb: exercise.suggestedWeightLb,
           notes:               null,
         };
-      })
-      .filter(Boolean);
+      });
   });
 
   const { error: pdeErr } = await supabase

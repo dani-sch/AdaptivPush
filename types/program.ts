@@ -95,7 +95,8 @@ export interface ProgramGenParams {
 
 export interface GeneratedExerciseSlot {
   localExerciseId: string;       // matches LocalExercise.id
-  exerciseName: string;          // denormalized for DB upsert
+  exerciseName: string;          // display name used by the compatibility resolver; never a write authority
+  exerciseDbId?: string;         // stable source ID when display name is not an exact catalog identity
   position: number;
   setCount: number;
   repRangeMin: number;
