@@ -6,6 +6,13 @@ This document owns delivery decomposition, dependencies, status, owner routes, a
 
 Baseline: 2026-09-08, feature branch `refactor-1`, starting commit `093c567`. This consolidation changes documentation only. No AP slice is newly implemented or verified. Existing evidence/policy code and historical compatibility results are reusable inputs, not completion of an entire new slice. AP-01 is the next executable slice after review of this corpus. All other implementation work is queued or explicitly gated. Names below are accountable repository routes, not claims that a human owner has accepted an assignment.
 
+Execution update: AP-01.1 was performed on 2026-09-09 from feature branch
+`adaptivpush-refactor` at base `20a95e5`. The current read-only database,
+catalog-writer, migration, backup, tool, device, and integration observations are
+recorded in [the AP-01 evidence artifact](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-09.md).
+This advances only the inspection packet; AP-01.2, AP-01.3, integration, and
+release remain open.
+
 ## Register mechanics and universal slice contract
 
 AP identifiers never encode release order or change when work moves. Bounded tasks use `AP-01.1`, etc.; do not re-use an ID for another outcome. Status progresses `QUEUED -> INSPECTION -> IN PROGRESS -> LOCAL VERIFIED -> INTEGRATION VERIFIED -> RELEASED`; use `BLOCKED` with a concrete missing prerequisite. A planning document is not evidence of any later state. Each slice may be delivered as the independently reviewable packets below; shared foundations are added only with their first consumer.
@@ -45,17 +52,17 @@ Critical path for trustworthy free training: `AP-01 -> AP-02 + AP-03 -> AP-04 + 
 
 ## AP-01 — Catalog authority, migration provenance, and compatibility
 
-**Status:** INSPECTION NEXT; no current live/database verification performed. **Owner:** security-agent for authority; typescript-agent for client compatibility; review-agent for the combined boundary. **Outcome:** generating and saving a plan uses a trusted catalog and a recoverable, evidenced database baseline.
+**Status:** IN PROGRESS; AP-01.1 read-only evidence captured 2026-09-09, with AP-01.2/01.3 open. **Owner:** security-agent for authority; typescript-agent for client compatibility; review-agent for the combined boundary. **Outcome:** generating and saving a plan uses a trusted catalog and a recoverable, evidenced database baseline.
 
 - **Scope:** reconcile schema/ledger/grants, inventory every catalog writer, pair removal of ordinary-client shared-catalog writes with canonical ID resolution, backup/restore proof, and close historical mobile compatibility rows. Excludes deleting historical avatar objects, enabling new coaching, and applying all proposed tables.
 - **Current files:** `utils/saveProgramToDb.ts`, `app/create-program.tsx`, `hooks/useCurrentProgram.ts`, `lib/exerciseDatabase.ts`, `utils/profilePreferences.ts`, `components/GenerateProgramModal.tsx`, `app/(qsetup)/quick-setup.tsx`, `app/(tabs)/profile/index.tsx`, `lib/adaptivpush_database_schema.md`, `reports/migrations/001_workout_session_exercises.sql` through `017_exercises_exercisedb_id_repair.sql`, `reports/migrations/verification/015_phase2_rls_isolation_test.sql`.
 - **Planned files/contracts:** `features/catalog/contracts.ts`, `features/catalog/repository.ts`; migration-baseline evidence and a next-number catalog authority migration only after ledger inspection. Catalog IDs, source/version, aliases and retired IDs are explicit; exact migration filename is selected from the reconciled ledger.
-- **Data/security:** `exercises` read authority vs privileged curation, source IDs/name ambiguity, schema grants and all user-owned relationships; database plan owns exact constraints. RLS enabled on 16 public tables was recorded September 8; permissive catalog policies were observed, effective grants and exploitability were not verified.
-- **Dependencies:** access to read effective grants, an isolated verification target, supported migration tooling, approved backup/restore method. CLI credentials/backup capability and device availability require inspection. Historical August results are inputs, not fresh proof.
+- **Data/security:** `exercises` read authority vs privileged curation, source IDs/name ambiguity, schema grants and all user-owned relationships; database plan owns exact constraints. Current read-only evidence shows RLS on all 16 public tables, unconditional `TO public` catalog policies, and full catalog table privileges for both `anon` and `authenticated`. No write probe was performed or needed to establish the exposure.
+- **Dependencies:** read access to effective grants was available. An isolated verification target, supported migration/dump tooling, approved backup/restore method, configured `integrator`, and Expo device remain unavailable. Historical August results remain inputs, not fresh proof.
 - **Compatibility/commercial/error:** free generation must survive catalog hardening. Known canonical cached IDs work offline; unresolved local slugs remain a visible unsaved draft, never a fabricated UUID. Unknown exercise cannot silently drop a set or trigger an ordinary-client upsert. No premium boundary here. Safety-sensitive logs exclude credentials and private records.
 - **Acceptance:** denied ordinary-role catalog mutation with successful authorized curation and normal program save; duplicate names resolve deterministically or ask; old app missing relation/column fallback; new Quick Setup/profile/generation UI on device; restore a verified backup into an isolated target and compare integrity. Policy denial alone without grant evidence does not close the gate.
 - **Verify/rollout:** G-07 plus isolated anon/two-user/catalog-role tests and actual Expo compatibility. Ship client catalog resolver and backend policy as a compatible sequence; reject old shared-catalog writes with actionable recovery. Observe unresolved IDs and denied attempts. Fallback is cached read-only catalog/manual draft, never reopening permissive writes.
-- **Packets/next:** AP-01.1 read-only ledger/grant/catalog-writer comparison and restore plan; AP-01.2 reviewed client/policy boundary; AP-01.3 compatibility/restore proof. Immediate action after user review: execute AP-01.1 and record exact open gates. Exit only when all three have evidence.
+- **Packets/next:** AP-01.1 read-only ledger/grant/catalog-writer comparison and restore plan is captured in [the 2026-09-09 evidence](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-09.md). Next executable packet is AP-01.2a lookup-only catalog contracts/resolver and client compatibility; policy enforcement remains paired but production-gated. AP-01.3 still owns supported baseline, restore, isolated role tests, missing-schema/device compatibility, and integration evidence. Exit only when all three have evidence.
 
 ## AP-02 — Durable workout capture and finalization
 

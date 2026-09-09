@@ -1,18 +1,27 @@
 # AdaptivPush active task board
 
-## [REVIEW] Documentation consolidation
+## [COMPLETE] Documentation consolidation
 
 - [COMPLETE] Inventory 61 source documents and preserve 12 superseded authorities plus 12 prior operational snapshots.
 - [COMPLETE] Create neutral master/register/code status/database/traceability/inventory and research translation owners.
-- [REVIEW] Review the consolidated corpus and documentation verification before authorizing application implementation.
+- [COMPLETE] Review completed; bounded execution authorized on 2026-09-09.
 
-## [NEXT] AP-01.1 — Read-only foundation inspection
+## [LOCAL VERIFIED] AP-01.1 — Read-only foundation inspection
 
-- [NEXT] Re-read git state and preserve pre-existing save-code/evidence changes.
-- [NEXT] Inspect effective catalog grants, role/function/API exposure and every shared-catalog writer; pair any future client/policy change.
-- [NEXT] Reconcile supported migration ledger/baseline and backup/restore method; do not replay historical migrations or infer a managed ledger from dashboard SQL.
-- [NEXT] Close actual Expo Quick Setup/Profile/Generate Program UI and missing-schema fallback evidence in the applicable future packet.
-- [NEXT] Confirm `integrator` availability or obtain explicit workflow alternative before integration claims.
+- [COMPLETE] Re-read git state and preserved the clean base and all existing source/evidence files.
+- [COMPLETE] Inspected effective catalog grants, role/function/API exposure, ownership lineage, and every shared-catalog writer without a database mutation.
+- [COMPLETE] Reconciled current end state to retained SQL 001–017 and confirmed that a supported application ledger is absent; no historical migration was replayed or manually registered.
+- [COMPLETE] Confirmed current Free-plan backup limitations and produced a managed-or-external isolated restore plan; no backup/restore proof exists yet.
+- [OPEN] Close actual Expo Quick Setup/Profile/Generate Program UI and missing-schema fallback evidence in AP-01.3.
+- [BLOCKED] Configure `integrator` or approve an alternative before integration claims.
+
+## [NEXT] AP-01.2a — Lookup-only catalog contract and resolver
+
+- [NEXT] Add explicit database UUID, source ID, local snapshot/version, alias, resolved, and unresolved identity contracts.
+- [NEXT] Remove ordinary-client shared-catalog upserts from generated save and developer fixtures; never silently omit unresolved prescriptions.
+- [NEXT] Prevent local swap slugs from entering UUID FK writes; preserve offline choices as explicit drafts until resolution.
+- [NEXT] Add the first deterministic TypeScript resolver harness and run lint/type checks.
+- [GATED] Do not apply catalog policy/grant changes until the compatible client is verified and AP-01.3 baseline/backup/isolated-target prerequisites exist.
 
 ## [QUEUED] Bounded implementation
 
@@ -20,7 +29,8 @@ AP-02/03 durable records -> AP-04/05 schedules/free progression -> AP-06/07 adva
 
 ## [REQUIRES INSPECTION]
 
-- Effective grants, parent lineage, migration tool credentials/ledger, present backup capability and restore proof.
+- Supported migration tooling/credentials and ledger normalization; chosen backup mechanism/owner, isolated target, and successful restore proof.
+- Ordinary-role catalog denial, trusted curation success, fresh two-owner/storage isolation, and current-client authenticated save in isolation.
 - Native device availability, health adapter compatibility, store/provider integration and source bibliography verification.
 - Fitness-policy calibration/qualified safety review, legal terms/retention and named moderation/support owners.
 - Historical unreferenced avatar cleanup remains outside authorized scope; no deletion performed.

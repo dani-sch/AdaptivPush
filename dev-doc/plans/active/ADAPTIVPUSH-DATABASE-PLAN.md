@@ -1,6 +1,6 @@
 # AdaptivPush database and migration plan
 
-Status: approved planning direction; no new migration authorized or applied by this document. Snapshot: 2026-09-08. This document owns physical-data planning, compatibility, authority and database verification. The [master plan](/dev-doc/plans/active/ADAPTIVPUSH-MASTER-PLAN.md) owns domain behavior, the [register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) owns slice gates, and the [implementation status](/dev-doc/plans/active/ADAPTIVPUSH-IMPLEMENTATION-STATUS.md) owns code facts. [D-12](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECORD-2026-09-08.md#d-12--database-rollout) requires additive, slice-owned work. The 28-table packet is a design inventory, not a batch of approved migrations.
+Status: approved planning direction with AP-01.1 read-only inspection recorded; no new migration authorized or applied by this document. Snapshot: 2026-09-09. This document owns physical-data planning, compatibility, authority and database verification. The [master plan](/dev-doc/plans/active/ADAPTIVPUSH-MASTER-PLAN.md) owns domain behavior, the [register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) owns slice gates, and the [implementation status](/dev-doc/plans/active/ADAPTIVPUSH-IMPLEMENTATION-STATUS.md) owns code facts. [D-12](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECORD-2026-09-08.md#d-12--database-rollout) requires additive, slice-owned work. The 28-table packet is a design inventory, not a batch of approved migrations.
 
 ## Evidence and baseline rules
 
@@ -9,6 +9,27 @@ This pass statically read the [schema reference](/lib/adaptivpush_database_schem
 The schema reference lists 16 public tables. The September 8 packet reports a read-only UI inspection showing those tables with RLS enabled and four authenticated policies for each of seven additive adaptation tables. It also reports `exercises_insert TO public WITH CHECK (true)` and update/delete policies `TO public USING (true)`. **Effective SQL grants and anonymous/authenticated write access were not verified.** Permissive RLS is a release-priority authority defect; it is not proof from this pass that an anonymous write succeeds. RLS and grants are separate gates, and linked ownership alone does not enforce coherent program/day/session lineage.
 
 The August audit records 1,369 catalog rows, 1,318 parseable external IDs and 51 unresolved mappings; intentionally public JPEG avatars with 2 MiB limit and four owner lifecycle policies; and seven-table rolled-back isolation tests. These are historical measurements, not September counts. Its backup/Free-plan statement likewise requires fresh inspection. The September packet still showed the initial managed-migration UI prompt; no reconciled supported ledger is demonstrated by the retained evidence.
+
+## AP-01.1 current read-only evidence
+
+[The 2026-09-09 AP-01 artifact](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-09.md)
+records fresh live metadata without a database mutation. The 16 public table
+shapes match the schema reference; all have RLS enabled without force. Both
+`anon` and `authenticated` have all table privileges on `exercises`, whose four
+`TO public` policies are unconditional. The current catalog remains 1,369 rows,
+with 51 missing external IDs, no duplicate non-null exact external IDs, and 17
+normalized-name collision groups. Public trigger function `handle_new_user()`
+is SECURITY DEFINER without a function-local search path and has broad EXECUTE
+grants; it is not present as a PostgREST RPC.
+
+The Dashboard still reports “Run your first migration,” and no
+`supabase_migrations` namespace is present. Service-internal auth/realtime/storage
+migration relations are not the application ledger. The production Free plan
+currently provides no scheduled backup; PITR and restore-to-new-project are not
+available at this plan level. Supported CLI/dump tools, an isolated restore
+target, device access, and the configured `integrator` are unavailable. These
+facts replace the corresponding `REQUIRES INSPECTION` items with specific open
+gates; they do not satisfy restore, role-write, device, or integration proof.
 
 ## Current schema and security posture
 
@@ -62,9 +83,9 @@ Original files remain evidence; do not rewrite their historical contents or use 
 
 The first executable database slice is inspection and a reviewable baseline/repair design, coupled with current-client catalog compatibility. It must produce an inventory of schemas, columns/defaults/nullability, constraints/FK actions, indexes, RLS enablement/force state/policy roles/expressions, table/sequence/function/schema grants, inherited roles, exposed RPCs/search paths, storage policies and managed migration state. Check owner/anon/authenticated/service identities separately; `TO public` applies broadly but cannot independently grant SQL privileges. Never infer a security boundary from a policy name.
 
-Follow the supported CLI baseline path documented by the historical audit: authenticated project link, schema pull to `supabase/migrations/`, comparison against the current server and 001–017, and supported migration repair only after equivalence is reviewed. Do not manually populate Supabase's internal ledger. No credential creation, project mutation or migration is part of this consolidation. Record baseline hashes, project/environment, tool version, drift exceptions and reviewer. Existing managed history, tooling and current backup capability are `REQUIRES INSPECTION`.
+Follow the supported CLI baseline path documented by the historical audit and refined in the AP-01 artifact: authenticated project link, schema pull to `supabase/migrations/`, comparison against the current server and 001–017, and supported migration repair only after equivalence is reviewed. Do not manually populate Supabase's internal ledger. Record baseline hashes, project/environment, tool version, command effects, drift exceptions and reviewer. Any CLI operation that changes the remote ledger requires separate authorization. The managed application ledger is currently absent; CLI tooling and credentials remain unavailable.
 
-Before subsequent production schema change, require a chosen backup owner/mechanism, encryption/access/retention, a completed restore drill into isolation and a measured recovery procedure. Historical absence of managed backups is unresolved until replaced by current evidence. A plan to back up is not a passing restore gate.
+Before subsequent production schema change, require a chosen backup owner/mechanism, encryption/access/retention, a completed restore drill into isolation and a measured recovery procedure. Current dashboard evidence confirms the Free project has no managed scheduled backup, PITR, or restore-to-new-project capability. Choose managed physical backups or an encrypted external dump workflow, then prove an isolated restore. A plan to back up is not a passing restore gate.
 
 Catalog transition: inventory all caller writes (`utils/saveProgramToDb.ts:339`, `hooks/useCurrentProgram.ts:598`, `scripts/seedExercises.ts:164` and :216), pin catalog identities, replace ordinary-client upserts with lookup/validated trusted import, and decide a separate private custom-exercise owner model if needed. Then restrict shared catalog writes and verify old/new app behavior. Never keep a permissive write policy as a rollback strategy. Rollback to safe catalog reads/manual selection and a disabled generation path if compatibility cannot be restored securely.
 

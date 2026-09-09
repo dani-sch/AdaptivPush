@@ -71,6 +71,18 @@ Database cells use actual existing table names or proposed DB-01…DB-28 / EQ-01
 | TR-006 · PF 8A/B; IP 1A; LR S4 catalog refresh | revised · D-12 | Catalog IDs, normalization, image/instruction coverage, local snapshot version and trusted reseed provenance; exercises, CAT. Current image_url supersedes gif_url proposal. | AC-TR-006: each intended muscle/category resolves IDs online/offline; stale snapshot or missing image has explicit fallback; no name-based silent duplicate. P/I/U |
 | TR-007 · LM E schema sufficiency claim; DP 28-table inventory | replaced · D-12 | Slice-owned migrations with constraints/indexes/backfill/rollback design; no blanket schema approval. SCHEMA and DB inventory below. | AC-TR-007: a proposed slice includes only its needed schema; existing vs proposed vs optional objects clearly distinguished. DOC/S |
 
+### AP-01.1 evidence linkage — 2026-09-09
+
+[The current read-only AP-01 evidence artifact](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-09.md)
+links AC-TR-001 through AC-TR-007 to the inspected commit, production metadata,
+catalog writer/resolver inventory, retained migration hashes, and exact remaining
+gates. It partially satisfies AC-TR-001/003, establishes the current exposure for
+AC-TR-002, preserves the legacy check-in interpretation for AC-TR-005, quantifies
+the AC-TR-006 identity gaps, and satisfies only the documentation distinction in
+AC-TR-007. It does not claim restore, ordinary-role write denial, trusted
+curation, two-owner write isolation, missing-schema runtime, Expo device,
+integration, deployment, or release evidence.
+
 ## AP-02 — Durable workout records
 
 | Requirement / legacy locator | Disposition and decision | Behavior / contract; database authority; code | Acceptance scenario and expected evidence |
