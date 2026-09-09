@@ -5,10 +5,12 @@
 - [COMPLETE] Compare live Supabase tables, columns, constraints, and indexes with migrations 001-014 and `lib/adaptivpush_database_schema.md`; drift is recorded in the 2026-08-03 live audit.
 - [COMPLETE] Add and deploy migration 015 and prove two-user RLS ownership isolation for every Phase 2 table with a rolled-back verification script.
 - [COMPLETE] Harden the avatar bucket contract and repair the deployed `exercises.exercisedb_id` column/index.
-- [ACTIVE] Run new-user onboarding writes for `user_profile`, `user_adaptation_preferences`, and `evidence_display_preferences`.
-- [ACTIVE] Run legacy/missing-row profile read and dual-write compatibility checks.
-- [ACTIVE] Verify generated-program save creates `program_generation_context` and failure cleanup behaves as documented.
-- [ACTIVE] Keep the FABLE-5 master, execution register, code status snapshot, and living docs synchronized.
+- [COMPLETE] Verify the authenticated live Quick Setup write contract for `user_profile`, `user_adaptation_preferences`, and `evidence_display_preferences` with a synthetic user and complete cleanup.
+- [COMPLETE] Verify live missing-row preference resolution and readiness/cycle dual-writes to Phase 2 rows plus legacy storage.
+- [COMPLETE] Verify actual `generateProgram`/`saveProgramToDb` context creation and injected context-failure cleanup; restore the previously active program on failure.
+- [ACTIVE] Run the actual Quick Setup, Profile, and Generate Program UI paths on an Expo-capable simulator or physical device.
+- [ACTIVE] Exercise missing Phase 2 relation/column responses through the application fallback paths; current live schema cannot produce this legacy state.
+- [COMPLETE] Synchronize the FABLE-5 execution register, code status snapshot, living docs, live audit, and development log for the authenticated compatibility run.
 
 ## [NEXT] `F5-S2`
 

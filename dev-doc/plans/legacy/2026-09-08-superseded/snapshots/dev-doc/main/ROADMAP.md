@@ -25,3 +25,5 @@
 | Production completion | `F5-S8` | Honest operational support paths, release identity, accessibility, privacy, and controlled rollout |
 
 HealthKit is an optional enrichment after core manual parity; it is not on the critical path to the first four product milestones.
+
+`F5-S1` remains active. The authenticated live compatibility contract passed on 2026-08-03, including generated-context failure recovery, but the actual mobile UI paths and a runtime missing-schema fallback scenario still require an Expo-capable test target before the stage can advance.

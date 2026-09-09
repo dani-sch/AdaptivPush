@@ -87,12 +87,19 @@ release blocker.
 
 ## Remaining `F5-S1` work
 
-Database structure and ownership isolation are closed. The remaining stage work
-is application-level compatibility validation:
+Database structure and ownership isolation are closed. A later authenticated
+synthetic-user run recorded in `dev-doc/reports/DEV-LOG.md` verified:
 
-- new-user Quick Setup writes all three preference/profile surfaces;
-- legacy users without Phase 2 rows remain usable;
-- profile dual-read/dual-write behavior works;
-- full generated-program save creates its context row and cleanup handles a
-  failed context save;
-- results are recorded in `dev-doc/reports/DEV-LOG.md`.
+- the Quick Setup three-surface persistence contract;
+- missing-row preference resolution;
+- profile readiness and cycle dual-writes;
+- actual generator/save context creation;
+- injected context-write failure cleanup and restoration of the prior active
+  program;
+- complete deletion of the synthetic identity and cascaded test rows.
+
+`F5-S1` still requires the actual Quick Setup, Profile, and Generate Program UI
+paths on an Expo-capable simulator or physical device, plus a runtime
+missing-relation/column fallback scenario. The current live schema cannot
+produce the legacy missing-schema state, and the Expo web fallback failed during
+AsyncStorage server rendering.
