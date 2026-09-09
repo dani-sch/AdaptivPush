@@ -18,8 +18,10 @@ import { getAlternativesFor, exercisesByMuscleGroup } from '@/lib/exerciseDataba
 import { supabase } from '@/utils/supabase';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
+import { isCatalogExerciseId, type CatalogExerciseId } from '@/features/catalog/contracts';
 
 interface SwapOption extends WorkoutExercise {
+    catalogExerciseId?: CatalogExerciseId;
     imageUrl?: string;
     description?: string;
 }
@@ -59,6 +61,7 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
     const [alternatives, setAlternatives] = useState<SwapOption[]>([]);
     const [loadingExercises, setLoadingExercises] = useState(false);
     const [resolvedMuscleGroup, setResolvedMuscleGroup] = useState<MuscleGroup | undefined>(undefined);
+    const [catalogUnavailable, setCatalogUnavailable] = useState(false);
 
     useEffect(() => {
         if (!currentExercise) return;
@@ -78,6 +81,9 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
 
     async function loadAlternatives(muscleGroup: MuscleGroup | undefined, excludedExerciseId?: string) {
         setLoadingExercises(true);
+        setSelectedExercise(null);
+        setAlternatives([]);
+        setCatalogUnavailable(false);
         try {
             let query = supabase
                 .from('exercises')
@@ -91,17 +97,39 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
             const { data, error } = await query;
 
             if (!error && data && data.length > 0) {
-                setAlternatives(data.map(ex => ({
-                    id:          ex.id,
-                    name:        ex.name,
-                    muscleGroup: ex.primary_muscle as MuscleGroup,
-                    equipment:   ex.equipment as Equipment,
-                    sets:        3,
-                    reps:        '8–12',
-                    imageUrl:    ex.image_url ?? undefined,
-                    description: (ex.instructions as string[] | null)?.[0] ?? undefined,
-                })));
+                const resolvedAlternatives = data.flatMap(ex => {
+                    if (!isCatalogExerciseId(ex.id)) return [];
+                    return [{
+                        id:          ex.id,
+                        catalogExerciseId: ex.id,
+                        name:        ex.name,
+                        muscleGroup: ex.primary_muscle as MuscleGroup,
+                        equipment:   ex.equipment as Equipment,
+                        sets:        3,
+                        reps:        '8–12',
+                        imageUrl:    ex.image_url ?? undefined,
+                        description: (ex.instructions as string[] | null)?.[0] ?? undefined,
+                    }];
+                });
+                if (resolvedAlternatives.length > 0) {
+                    setAlternatives(resolvedAlternatives);
+                } else if (muscleGroup) {
+                    setCatalogUnavailable(true);
+                    const local = getAlternativesFor(
+                        muscleGroup,
+                        excludedExerciseId ? [excludedExerciseId] : [],
+                    );
+                    setAlternatives(local.map(ex => ({
+                        id:          ex.id,
+                        name:        ex.name,
+                        muscleGroup: ex.muscleGroup,
+                        equipment:   ex.equipment,
+                        sets:        ex.defaultSets,
+                        reps:        `${ex.defaultRepMin}–${ex.defaultRepMax}`,
+                    })));
+                }
             } else if (muscleGroup) {
+                setCatalogUnavailable(true);
                 const local = getAlternativesFor(muscleGroup, excludedExerciseId ? [excludedExerciseId] : []);
                 setAlternatives(local.map(ex => ({
                     id:          ex.id,
@@ -128,12 +156,13 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
     }, [alternatives, searchQuery, currentExercise]);
 
     const handleSwap = () => {
-        if (!selectedExercise) return;
+        const catalogExerciseId = selectedExercise?.catalogExerciseId;
+        if (!selectedExercise || !isCatalogExerciseId(catalogExerciseId)) return;
         onSwap({
             exerciseId,
             replacement: {
-                id:          selectedExercise.id,
-                exerciseId:  selectedExercise.id,
+                id:          catalogExerciseId,
+                exerciseId:  catalogExerciseId,
                 name:        selectedExercise.name,
                 muscleGroup: selectedExercise.muscleGroup,
                 equipment:   selectedExercise.equipment,
@@ -146,6 +175,8 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
         });
         onClose();
     };
+
+    const canApplySelectedExercise = isCatalogExerciseId(selectedExercise?.catalogExerciseId);
 
     if (!currentExercise) return null;
 
@@ -182,6 +213,11 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
             {/* List */}
             <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
                 <Text style={styles.sectionLabel}>{(resolvedMuscleGroup ?? 'General').toUpperCase()} EXERCISES</Text>
+                {catalogUnavailable ? (
+                    <Text style={styles.catalogUnavailableText}>
+                        Showing local previews. Reconnect to resolve a catalog ID before applying a swap.
+                    </Text>
+                ) : null}
                 {loadingExercises ? (
                     <ActivityIndicator color={theme.primary} style={{ marginTop: 20 }} />
                 ) : filteredAlternatives.length === 0 ? (
@@ -272,14 +308,20 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
 
                 <Pressable
                     onPress={handleSwap}
-                    disabled={!selectedExercise}
+                    disabled={!canApplySelectedExercise}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: !canApplySelectedExercise }}
                     style={({ pressed }) => [
                         styles.swapBtn,
-                        !selectedExercise && styles.swapBtnDisabled,
-                        pressed && selectedExercise && { opacity: 0.92 },
+                        !canApplySelectedExercise && styles.swapBtnDisabled,
+                        pressed && canApplySelectedExercise && { opacity: 0.92 },
                     ]}
                 >
-                    <Text style={styles.swapBtnText}>Swap Exercise</Text>
+                    <Text style={styles.swapBtnText}>
+                        {selectedExercise && !canApplySelectedExercise
+                            ? 'Reconnect to Apply'
+                            : 'Swap Exercise'}
+                    </Text>
                 </Pressable>
             </View>
         </>
@@ -385,6 +427,12 @@ function createStyles(theme: Theme) {
             fontWeight: '700',
             letterSpacing: 1,
             marginBottom: 10,
+        },
+        catalogUnavailableText: {
+            color: theme.text,
+            fontSize: 12,
+            lineHeight: 17,
+            marginBottom: 12,
         },
 
         exerciseCard: {

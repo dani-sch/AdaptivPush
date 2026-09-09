@@ -2,28 +2,18 @@ import { createClient } from "@supabase/supabase-js";
 import "dotenv/config";
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_KEY;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
 
-if (!SUPABASE_URL || !SUPABASE_KEY || !RAPIDAPI_KEY) {
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !RAPIDAPI_KEY) {
   console.error(
-    "[Fatal] Missing environment variables. Check .env for EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_KEY, and RAPIDAPI_KEY.",
+    "[Fatal] Missing environment variables. Check .env for EXPO_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_KEY, and RAPIDAPI_KEY.",
   );
   process.exit(1);
 }
 
-if (!SUPABASE_SERVICE_KEY) {
-  console.error(
-    "[Fatal] SUPABASE_SERVICE_KEY is required for Storage uploads (bypasses RLS).\n" +
-    "        Find it in Supabase Dashboard → Settings → API → service_role key.\n" +
-    "        Add SUPABASE_SERVICE_KEY=<key> to your .env file.",
-  );
-  process.exit(1);
-}
-
-// Use anon key for DB writes, service role key for Storage uploads (needs RLS bypass).
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+// Catalog curation is an explicit administrator operation. The mobile/public
+// client must never be used for shared-catalog writes.
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 const PAGE_SIZE = 10;
@@ -161,7 +151,7 @@ async function seed() {
 
   // Phase 1: Upsert exercise data (fast)
   console.log(`[Upserting] ${unique.length} exercise rows...`);
-  const { error: upsertErr } = await supabase
+  const { error: upsertErr } = await supabaseAdmin
     .from("exercises")
     .upsert(unique.map(mapExercise), { onConflict: "name", ignoreDuplicates: false });
   if (upsertErr) {
@@ -212,7 +202,7 @@ async function seed() {
     const CHUNK = 100;
     for (let i = 0; i < imageResults.length; i += CHUNK) {
       const chunk = imageResults.slice(i, i + CHUNK);
-      const { error } = await supabase
+      const { error } = await supabaseAdmin
         .from("exercises")
         .upsert(chunk, { onConflict: "name", ignoreDuplicates: false });
       if (error) console.error("[Error] URL write failed:", error.message);
