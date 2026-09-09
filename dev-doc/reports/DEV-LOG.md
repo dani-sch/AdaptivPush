@@ -5,6 +5,86 @@
 
 ---
 
+### 2026-09-09 AP-01.1 catalog authority and restore-readiness inspection {#2026-09-09-ap-01-1-foundation-inspection}
+
+**Summary**: Completed the bounded AP-01.1 read-only inspection against the
+production AdaptivPush Supabase project and repository base `20a95e5`. No
+database mutation, migration replay/repair, backup, restore, deployment,
+credential creation, write-based isolation test, or push occurred. The exact
+environment, SQL-file hashes, writer/resolver inventory, live metadata, evidence
+limits, and AP-01.2/AP-01.3 transition are recorded in
+[the AP-01 evidence artifact](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-09.md).
+
+**Current live observation**:
+
+| Surface | Result |
+|---|---|
+| Schema/API | 16 exposed public tables matched the retained schema-reference columns; no PostgREST RPC path was present. |
+| RLS/ownership | All 16 public tables have RLS enabled without force; core child policies and FKs traverse the expected program/session ownership lineage. This was metadata inspection, not a two-owner write test. |
+| Catalog authority | `anon` and `authenticated` each have all table privileges on `exercises`; its SELECT/INSERT/UPDATE/DELETE policies are unconditional `TO public`. |
+| Catalog integrity | 1,369 rows; 51 missing external IDs; zero duplicate non-null exact external IDs; 17 normalized-name collision groups. |
+| Functions | `handle_new_user()` is a broadly executable SECURITY DEFINER trigger function without function-local `search_path`; it was not exposed as RPC. |
+| Migration history | Dashboard reports “Run your first migration”; no `supabase_migrations` namespace exists. Internal auth/realtime/storage histories are not the application ledger. |
+| Backup/restore | Free plan has no scheduled backups; PITR and restore-to-new-project are unavailable. No successful isolated restore exists. |
+| Storage | `avatars` retains the public JPEG/2 MiB contract; `exercise-images` is public without bucket MIME/size limits. No objects were changed or deleted. |
+
+**Repository findings**:
+
+| Component | Current result |
+|---|---|
+| generated save | Ordinary client upserts catalog names, ignores generated local IDs, and silently omits unresolved prescriptions. |
+| developer fixture | `createDevTestProgram` also performs ordinary-client shared-catalog upserts. |
+| seed command | Catalog rows are written with the anonymous client while a service credential is used only for image objects. |
+| manual authoring | Retains selected database UUIDs and is the compatible read-only catalog model. |
+| swap fallback | Local slug IDs can flow toward a UUID FK update after catalog read failure/empty state. |
+| migration provenance | Retained SQL 001–017 was hashed and reconciled to current end state; 001 remains superseded and 005 remains skipped/superseded by 017. No historical file was replayed or registered. |
+| workflow/tooling | Feature branch was clean and equal to `origin/main` at entry. No configured `integrator`, Supabase CLI, `psql`, `pg_dump`, `pg_restore`, isolated project, emulator, simulator, or attached device was available. |
+
+**Files added/modified**:
+
+| File | Purpose |
+|---|---|
+| `dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-09.md` | Durable AP-01.1 evidence, AC-TR-001–007 disposition, catalog transition, and baseline/restore plan. |
+| `dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md` | Advance AP-01 to in progress and route AP-01.2a next. |
+| `dev-doc/plans/active/ADAPTIVPUSH-IMPLEMENTATION-STATUS.md` | Record current live boundary and exact catalog/save/swap defects. |
+| `dev-doc/plans/active/ADAPTIVPUSH-DATABASE-PLAN.md` | Replace inspected unknowns with current grants/ledger/backup facts and remaining gates. |
+| `dev-doc/plans/active/ADAPTIVPUSH-TRACEABILITY.md` | Link the evidence limits to AC-TR-001–007. |
+| `dev-doc/main/CURRENT-STATE.md`, `dev-doc/main/TODO.md`, `dev-doc/main/TOC.md` | Update living execution posture, next work, and generated date. |
+
+**Verification**:
+
+| Gate | Exact command/result |
+|---|---|
+| Application lint baseline | `npm run lint` — pass, 0 errors and 17 pre-existing warnings. |
+| Contract/type baseline | `npx tsc --noEmit` — pass. |
+| Documentation inventory | `python scripts/tools/generators/toc_generate.py --output dev-doc/main/TOC.md` — pass; generated date updated. |
+| Documentation paths | Balanced Markdown-link target check across the eight evidence/status files — pass, all targets exist. |
+| Acceptance linkage | AC-TR-001 through AC-TR-007 present in the AP-01 artifact — pass. |
+| Diff hygiene | `git diff --check` — pass. Credential-value pattern scan — no value found. |
+| Python gate | Not applicable; no Python file changed. |
+| Integration/device/restore/security writes | Not run and not claimed; prerequisites are absent. |
+
+**Commit**:
+
+- `614a8ea` `docs(adaptivpush): record AP-01.1 foundation inspection`
+
+**Remaining gates**:
+
+- configure the documented `integrator` or obtain an explicitly approved
+  alternative before integration verification;
+- provision supported baseline/dump tooling, credential ownership, a backup
+  mechanism, and an isolated target, then complete a successful restore drill;
+- implement and locally verify lookup-only catalog identity before reviewing or
+  applying catalog grant/policy restriction;
+- run isolated ordinary-role denial, trusted-curation, two-owner/storage,
+  old/new/missing-schema, and actual Expo device matrices.
+
+**Next**: AP-01.2a — lookup-only catalog contracts/resolver and the smallest
+deterministic TypeScript harness. Production policy changes remain gated behind
+the compatible client and AP-01.3 evidence.
+
+---
+
 ### 2026-09-08 AdaptivPush planning consolidation
 
 **Scope:** Documentation and planning only. Replaced current product-planning authority with neutral master/register/status/database/traceability/inventory documents and a research translation; approved decisions remain authoritative. Preserved 12 stale authorities and 12 operational snapshots with an explicit 61-source map. Mapped 142 requirements, all 28 packet tables plus equipment candidates, and 16 bounded AP slices.
