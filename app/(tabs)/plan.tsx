@@ -1,10 +1,8 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { useFocusEffect } from 'expo-router';
-import { Platform, ScrollView, StyleSheet, Text, View, Pressable, Modal } from 'react-native';
-import { Link, router } from 'expo-router';
+import { Link, router, useFocusEffect } from 'expo-router';
+import { Alert, ScrollView, StyleSheet, Text, View, Pressable, Modal } from 'react-native';
 import { Plus, ChevronRight, MoreVertical, LayoutList, Archive } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Alert } from 'react-native';
 
 import { useCurrentProgram } from '@/hooks/useCurrentProgram';
 import { WorkoutTemplateModal } from '@/components/WorkoutTemplateModal';
@@ -23,7 +21,6 @@ function LoadingState({ styles }: { styles: ReturnType<typeof createStyles> }) {
 
 function EmptyState({
                         onCreateProgram,
-                        onCreateDevProgram,
                         onGenerateProgram,
                         onOpenArchived,
                         busy,
@@ -31,7 +28,6 @@ function EmptyState({
                         theme,
                     }: {
     onCreateProgram: () => void;
-    onCreateDevProgram: () => void;
     onGenerateProgram: () => void;
     onOpenArchived: () => void;
     busy: boolean;
@@ -90,27 +86,6 @@ function EmptyState({
 
             <Pressable
                 disabled={busy}
-                onPress={onCreateDevProgram}
-                style={({ pressed }) => [
-                    {
-                        width: '100%',
-                        maxWidth: 420,
-                        backgroundColor: theme.mutedBg,
-                        borderWidth: 1,
-                        borderColor: theme.border,
-                        borderRadius: 16,
-                        paddingVertical: 14,
-                        paddingHorizontal: 14,
-                        alignItems: 'center',
-                        opacity: busy ? 0.6 : pressed ? 0.85 : 1,
-                    },
-                ]}
-            >
-                <Text style={{ color: theme.white, fontWeight: '700' }}>{busy ? 'Working…' : 'Dev: Create Default Program'}</Text>
-            </Pressable>
-
-            <Pressable
-                disabled={busy}
                 onPress={onOpenArchived}
                 style={({ pressed }) => [
                     {
@@ -146,10 +121,9 @@ export default function PlanScreen() {
     const [showMenu, setShowMenu] = useState(false);
     const [showGenModal, setShowGenModal] = useState(false);
 
-    const { program, loading, refresh, swapExercise, endCurrentProgram, createBlankProgram, createDevTestProgram } = useCurrentProgram();
+    const { program, loading, refresh, swapExercise, endCurrentProgram } = useCurrentProgram();
 
     useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
-    const [creating, setCreating] = useState(false);
 
     const completedCount = program?.workouts.filter((w) => w.isCompleted).length ?? 0;
     const totalCount = program?.workouts.length ?? 0;
@@ -174,17 +148,9 @@ export default function PlanScreen() {
         return (
             <>
                 <EmptyState
-                    busy={creating}
+                    busy={false}
                     onGenerateProgram={() => setShowGenModal(true)}
                     onCreateProgram={() => router.push('/create-program')}
-                    onCreateDevProgram={async () => {
-                        try {
-                            setCreating(true);
-                            await createDevTestProgram();
-                        } finally {
-                            setCreating(false);
-                        }
-                    }}
                     onOpenArchived={() => router.push('/archived-programs')}
                     styles={styles}
                     theme={theme}

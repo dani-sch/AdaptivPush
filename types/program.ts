@@ -23,6 +23,7 @@ export type Equipment =
 
 export type WorkoutExercise = {
     id: string;         // program_day_exercises.id (used for swap targeting)
+    stableSlotId?: string; // immutable prescription slot identity
     exerciseId?: string; // exercises.id (used for DB set writes)
     name: string;
 
@@ -57,6 +58,7 @@ export interface GeneratedProgramExplanation extends ExplanationMetadata {
 
 export type ProgramWorkout = {
     id: string;
+    prescriptionRevisionId?: string;
     name: string;
     day: string;            // e.g. "Monday"
     estimatedTime: number;  // minutes
@@ -66,6 +68,8 @@ export type ProgramWorkout = {
 
 export type CurrentProgram = {
     id: string;
+    currentRevision: number;
+    currentRevisionId?: string;
     name: string;
     goal: string;
     currentWeek: number;
@@ -95,7 +99,8 @@ export interface ProgramGenParams {
 
 export interface GeneratedExerciseSlot {
   localExerciseId: string;       // matches LocalExercise.id
-  exerciseName: string;          // denormalized for DB upsert
+  exerciseName: string;          // display name used by the compatibility resolver; never a write authority
+  exerciseDbId?: string;         // stable source ID when display name is not an exact catalog identity
   position: number;
   setCount: number;
   repRangeMin: number;

@@ -139,7 +139,7 @@ function createStyles(theme: Theme) {
       elevation: 8,
     },
     gradientLayer: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       backgroundColor: theme.primary,
       opacity: 0.95,
     },

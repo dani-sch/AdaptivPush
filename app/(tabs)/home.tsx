@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
 import { router, useFocusEffect } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   Dimensions,
   Modal,
@@ -335,17 +335,6 @@ const ReadinessCheckInModal: React.FC<{
   const [soreness, setSoreness] = useState<number>(initialSoreness);
   const [motivation, setMotivation] = useState<number>(initialMotivation);
   const [cyclePhase, setCyclePhase] = useState<CyclePhase>(initialCyclePhase);
-
-  // Sync initial values when modal opens with pre-filled data
-  useEffect(() => {
-    if (visible) {
-      setSleepHours(initialSleepHours);
-      setStressLevel(initialStressLevel);
-      setSoreness(initialSoreness);
-      setMotivation(initialMotivation);
-      setCyclePhase(initialCyclePhase);
-    }
-  }, [visible, initialSleepHours, initialStressLevel, initialSoreness, initialMotivation, initialCyclePhase]);
 
   const handleContinue = async () => {
     try {
@@ -832,18 +821,20 @@ export default function HomeScreen() {
         </Pressable>
       </ScrollView>
 
-      <ReadinessCheckInModal
-        visible={isModalVisible}
-        initialSleepHours={todaySleepHours}
-        initialStressLevel={todayStressLevel}
-        initialSoreness={todaySoreness}
-        initialMotivation={todayMotivation}
-        initialCyclePhase={todayCyclePhase}
-        onClose={handleCloseReadinessModal}
-        onSaved={handleReadinessSaved}
-        styles={styles}
-        theme={theme}
-      />
+      {isModalVisible && (
+        <ReadinessCheckInModal
+          visible
+          initialSleepHours={todaySleepHours}
+          initialStressLevel={todayStressLevel}
+          initialSoreness={todaySoreness}
+          initialMotivation={todayMotivation}
+          initialCyclePhase={todayCyclePhase}
+          onClose={handleCloseReadinessModal}
+          onSaved={handleReadinessSaved}
+          styles={styles}
+          theme={theme}
+        />
+      )}
 
       {pendingAdjustmentScore !== null && (
         <ReadinessAdjustmentModal

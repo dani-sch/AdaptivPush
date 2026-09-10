@@ -71,7 +71,39 @@ Database cells use actual existing table names or proposed DB-01…DB-28 / EQ-01
 | TR-006 · PF 8A/B; IP 1A; LR S4 catalog refresh | revised · D-12 | Catalog IDs, normalization, image/instruction coverage, local snapshot version and trusted reseed provenance; exercises, CAT. Current image_url supersedes gif_url proposal. | AC-TR-006: each intended muscle/category resolves IDs online/offline; stale snapshot or missing image has explicit fallback; no name-based silent duplicate. P/I/U |
 | TR-007 · LM E schema sufficiency claim; DP 28-table inventory | replaced · D-12 | Slice-owned migrations with constraints/indexes/backfill/rollback design; no blanket schema approval. SCHEMA and DB inventory below. | AC-TR-007: a proposed slice includes only its needed schema; existing vs proposed vs optional objects clearly distinguished. DOC/S |
 
+### AP-01.1 evidence linkage — 2026-09-09
+
+[The current read-only AP-01 evidence artifact](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-09.md)
+links AC-TR-001 through AC-TR-007 to the inspected commit, production metadata,
+catalog writer/resolver inventory, retained migration hashes, and exact remaining
+gates. Commits `e371348` and `cd0908e` add local AP-01.2a evidence: lookup-only
+generated/dev saves, source/exact identity resolution, explicit unresolved
+candidates, UUID-guarded swaps, and administrator-only seed code. It partially
+satisfies AC-TR-001/002/003/006, preserves the legacy check-in interpretation for
+AC-TR-005, and satisfies only the documentation distinction in AC-TR-007. It
+does not claim restore, live ordinary-role write denial, trusted-curation
+execution, two-owner write isolation, missing-schema runtime, Expo device,
+integration, deployment, or release evidence.
+
+[The September 10 AP-01.3 artifact](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-10.md)
+closes the database portions of AC-TR-001/002/003/006/007: pinned PostgreSQL 17
+tooling, hashed production baseline, explicit drift/provenance reconciliation,
+aligned managed ledger, encrypted backup/decryption, local restore with matching
+safe aggregates, cross-schema trigger representation, catalog-authority
+migration, fresh synthetic two-owner/Storage role suite, production dry-run and
+deployment, and rolled-back production ordinary/trusted role probes. The nine
+catalog tests retain deterministic unresolved/ambiguous behavior before program
+mutation. AC-TR-004 remains open only for actual Expo/runtime missing-schema UI
+evidence; AC-TR-005's legacy FK interpretation remains preserved. Integrator and
+device evidence are not inferred from the database release.
+
 ## AP-02 — Durable workout records
+
+2026-09-10 evidence status: contract, client, local persistence, atomic command,
+fault/replay/RLS and clean integration checks pass behind a default-off flag.
+AC-TR-008/010/011/012 are locally satisfied; AC-TR-009/013/014 retain their
+physical-device portions. Production backup/restore, migration rollout and
+authenticated old/new-client smoke remain open. See [AP-02 evidence](/dev-doc/reports/ADAPTIVPUSH-AP-02-2026-09-10.md).
 
 | Requirement / legacy locator | Disposition and decision | Behavior / contract; database authority; code | Acceptance scenario and expected evidence |
 |---|---|---|---|
@@ -85,6 +117,12 @@ Database cells use actual existing table names or proposed DB-01…DB-28 / EQ-01
 | TR-015 · PF 10 rest timer; IP 3D note | deferred · D-13 | Rest timer and background expiry feedback are later AP-02 enhancement, separate from existing elapsed timer; local. | AC-TR-015: current release never labels elapsed timer as rest timer; future timer must handle background expiry, permission denial, mute, and duplicate alerts. DOC/U |
 
 ## AP-03 — Durable programs, identity, and free onboarding
+
+2026-09-10 evidence status: immutable revision/identity, common generated/manual
+installer, atomic failure/concurrency/replay, one-active-owner, checkpoint and
+clean integration checks pass behind a default-off flag. Device portions of the
+onboarding/archive/overview/offline acceptance rows and production rollout remain
+open. See [AP-03 evidence](/dev-doc/reports/ADAPTIVPUSH-AP-03-2026-09-10.md).
 
 | Requirement / legacy locator | Disposition and decision | Behavior / contract; database authority; code | Acceptance scenario and expected evidence |
 |---|---|---|---|
@@ -406,7 +444,7 @@ These identifiers are quoted historical locators only. No old phase name is a cu
 | D-13 release order | TR-015/038/103…126/133…140/142 |
 | D-14 neutral consolidation | TR-141/142 |
 
-**REQUIRES INSPECTION** remains a release gate, not missing product approval: effective SQL grants/catalog mutation exposure; reconciled migration ledger and backup/restore rehearsal; actual mobile and missing-schema compatibility; foreign-key/slot identity and precise offline conflict handling; equipment configuration/load model fixtures; policy thresholds and safety wording review; verified primary research links behind imported citation tokens; HealthKit/Expo native compatibility and permission scope; native billing/storefront rules; named moderation/support capacity; legal retention/takedown/terms; export/deletion processors; signed build/device accessibility.
+**REQUIRES INSPECTION** remains a release gate, not missing product approval: actual mobile and missing-schema compatibility; foreign-key/slot identity and precise offline conflict handling; equipment configuration/load model fixtures; policy thresholds and safety wording review; verified primary research links behind imported citation tokens; HealthKit/Expo native compatibility and permission scope; native billing/storefront rules; named moderation/support capacity; legal retention/takedown/terms; export/deletion processors; signed build/device accessibility. Effective catalog grants, managed migration ledger, and backup/restore rehearsal were closed by AP-01.3 on 2026-09-10.
 
 The historical research report contains unresolved citation tokens and population/generalization limits. The [research translation](/dev-doc/plans/active/ADAPTIVPUSH-RESEARCH-TRANSLATION.md) owns research-to-product interpretation and evidence caveats; the master owns implementation behavior. AC-TR-047/048/049/052…061/071…077/081/084…092 require source and policy review; this traceability map does not turn the report's exact ranges, older packet thresholds, or competitor claims into newly verified facts.
 

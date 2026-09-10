@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import { type Href, router } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router/react-navigation';
 import {
   Bell,
   Camera,
@@ -462,10 +462,6 @@ export default function ProfileScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    void fetchProfileData();
-  }, [fetchProfileData]);
-
   useFocusEffect(
     useCallback(() => {
       void fetchProfileData();
@@ -722,7 +718,7 @@ export default function ProfileScreen() {
     } finally {
       setAvatarUploading(false);
     }
-  }, [profile?.id, avatarUploading]);
+  }, [profile, avatarUploading]);
 
   if (loading && !profile) {
     return (

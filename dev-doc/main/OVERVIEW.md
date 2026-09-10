@@ -10,6 +10,6 @@ AdaptivPush is an Expo Router strength-training application backed by Supabase. 
 - [Implementation status](/dev-doc/plans/active/ADAPTIVPUSH-IMPLEMENTATION-STATUS.md): code facts and defects.
 - [Architecture](/dev-doc/main/ARCHITECTURE.md), [current state](/dev-doc/main/CURRENT-STATE.md), [roadmap](/dev-doc/main/ROADMAP.md), [TODO](/dev-doc/main/TODO.md), [file index](/dev-doc/main/TOC.md), [command routing](/dev-doc/main/COMMAND-TOC.md).
 
-## Current planning boundary
+## Current execution boundary
 
-The approved decision record supersedes earlier planning proposals. The neutral canonical set replaces old execution authorities, which remain intact in a dated archive. Dated research/audits/logs remain sources, not fresh verification. This consolidation is documentation only and stops at final user review. The first subsequent bounded packet is AP-01.1: inspect catalog authority, migration provenance and restore evidence before application/data changes.
+The approved decision record supersedes earlier planning proposals. The neutral canonical set replaces old execution authorities, which remain intact in a dated archive. AP-01.1 and AP-01.2a are locally verified. AP-01.3 released the supported production baseline/ledger, encrypted logical recovery proof, local PostgreSQL 17 restore, isolated role suite, and production catalog authority on 2026-09-10. AP-02 and AP-03 database implementation is now unblocked. AP-01 still requires separately classified integrator, Expo-device UI, and runtime missing-schema application evidence.

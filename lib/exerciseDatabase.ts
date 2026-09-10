@@ -3,6 +3,10 @@ import { Equipment, MuscleGroup } from '@/types/program';
 export interface LocalExercise {
   id: string;
   name: string;
+  /** Stable ExerciseDB identity when the local display name is not an exact catalog name. */
+  catalogExerciseDbId?: string;
+  /** Excludes an unresolved local entry from persisted generation/swap candidates. */
+  catalogAvailability?: 'unresolved';
   muscleGroup: MuscleGroup;
   equipment: Equipment;
   defaultSets: number;
@@ -640,6 +644,7 @@ const fullBodyExercises: LocalExercise[] = [
   {
     id: 'deadlift',
     name: 'Deadlift',
+    catalogExerciseDbId: '0032',
     muscleGroup: 'Full Body',
     equipment: 'Barbell',
     defaultSets: 4,
@@ -652,6 +657,7 @@ const fullBodyExercises: LocalExercise[] = [
   {
     id: 'barbell-clean',
     name: 'Barbell Clean',
+    catalogAvailability: 'unresolved',
     muscleGroup: 'Full Body',
     equipment: 'Barbell',
     defaultSets: 4,
@@ -664,6 +670,7 @@ const fullBodyExercises: LocalExercise[] = [
   {
     id: 'kettlebell-swing',
     name: 'Kettlebell Swing',
+    catalogExerciseDbId: '0549',
     muscleGroup: 'Full Body',
     equipment: 'Kettlebell',
     defaultSets: 3,
@@ -676,6 +683,7 @@ const fullBodyExercises: LocalExercise[] = [
   {
     id: 'burpee',
     name: 'Burpee',
+    catalogExerciseDbId: '1160',
     muscleGroup: 'Full Body',
     equipment: 'Bodyweight',
     defaultSets: 3,
@@ -688,6 +696,7 @@ const fullBodyExercises: LocalExercise[] = [
   {
     id: 'dumbbell-thruster',
     name: 'Dumbbell Thruster',
+    catalogAvailability: 'unresolved',
     muscleGroup: 'Full Body',
     equipment: 'Dumbbell',
     defaultSets: 3,
@@ -700,6 +709,7 @@ const fullBodyExercises: LocalExercise[] = [
   {
     id: 'barbell-power-clean',
     name: 'Barbell Power Clean',
+    catalogExerciseDbId: '0648',
     muscleGroup: 'Full Body',
     equipment: 'Barbell',
     defaultSets: 4,
@@ -735,7 +745,9 @@ export function getAlternativesFor(
   muscleGroup: MuscleGroup,
   excludeIds: string[] = [],
 ): LocalExercise[] {
-  const exercises = exercisesByMuscleGroup[muscleGroup] ?? [];
+  const exercises = (exercisesByMuscleGroup[muscleGroup] ?? []).filter(
+    (exercise) => exercise.catalogAvailability !== 'unresolved',
+  );
   if (excludeIds.length === 0) return exercises;
   const excluded = new Set(excludeIds);
   return exercises.filter((ex) => !excluded.has(ex.id));

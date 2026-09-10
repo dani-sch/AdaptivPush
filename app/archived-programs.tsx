@@ -1,12 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { ChevronLeft, Archive } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { supabase } from '@/utils/supabase';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
+import { restoreProgram } from '@/features/programs/commands';
+import { programRepository } from '@/features/programs/repository';
 
 type ArchivedProgram = {
     id: string;
@@ -17,6 +19,8 @@ type ArchivedProgram = {
     created_at: string;
     updated_at: string;
     last_active_week: number | null;
+    current_revision: number;
+    archive_checkpoint_provenance: 'exact_revision' | 'legacy_approximate' | null;
 };
 
 function formatDate(value: string | null) {
@@ -33,10 +37,12 @@ export default function ArchivedProgramsScreen() {
 
     const [programs, setPrograms] = useState<ArchivedProgram[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
 
     const loadArchivedPrograms = useCallback(async () => {
         try {
             setLoading(true);
+            setLoadError(null);
 
             const {
                 data: { user },
@@ -51,7 +57,7 @@ export default function ArchivedProgramsScreen() {
 
             const { data, error } = await supabase
                 .from('programs')
-                .select('id,name,goal,duration_weeks,start_date,created_at,updated_at,last_active_week')
+                .select('id,name,goal,duration_weeks,start_date,created_at,updated_at,last_active_week,current_revision,archive_checkpoint_provenance')
                 .eq('user_id', user.id)
                 .eq('is_active', false)
                 .order('updated_at', { ascending: false })
@@ -62,68 +68,66 @@ export default function ArchivedProgramsScreen() {
         } catch (e) {
             console.error('loadArchivedPrograms error', e);
             setPrograms([]);
+            setLoadError('Archived programs are unavailable. Check your connection and try again.');
         } finally {
             setLoading(false);
         }
     }, []);
 
-    useEffect(() => {
-        loadArchivedPrograms();
-    }, [loadArchivedPrograms]);
+    useFocusEffect(
+        useCallback(() => {
+            void loadArchivedPrograms();
+        }, [loadArchivedPrograms]),
+    );
 
-    const unarchiveProgram = async (programId: string, resumeWeek: number) => {
+    const unarchiveProgram = async (
+        programId: string,
+        mode: 'exact' | 'restart' | 'legacy_approximate',
+    ) => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
-
-            // Compute start_date so that computeWeekNumber returns resumeWeek
-            const daysToSubtract = (resumeWeek - 1) * 7;
-            const newStart = new Date();
-            newStart.setDate(newStart.getDate() - daysToSubtract);
-            const y = newStart.getFullYear();
-            const m = String(newStart.getMonth() + 1).padStart(2, '0');
-            const d = String(newStart.getDate()).padStart(2, '0');
-            const startDate = `${y}-${m}-${d}`;
-
-            // Deactivate any currently active program
-            await supabase
+            const { data: active, error: activeError } = await supabase
                 .from('programs')
-                .update({ is_active: false, updated_at: new Date().toISOString() })
+                .select('id')
                 .eq('user_id', user.id)
-                .eq('is_active', true);
-
-            // Restore this program at the desired week
-            await supabase
-                .from('programs')
-                .update({
-                    is_active: true,
-                    start_date: startDate,
-                    last_active_week: null,
-                    updated_at: new Date().toISOString(),
-                })
-                .eq('id', programId);
+                .eq('is_active', true)
+                .maybeSingle<{ id: string }>();
+            if (activeError) throw activeError;
+            await restoreProgram(programRepository, programId, mode, active?.id ?? null);
 
             await loadArchivedPrograms();
             router.back();
         } catch (e) {
             console.error('unarchiveProgram error', e);
+            Alert.alert(
+                'Could not restore program',
+                e instanceof Error ? e.message : 'The program was not changed. Please try again.',
+            );
         }
     };
 
     const handleUnarchive = (prog: ArchivedProgram) => {
-        const hasSnapshot = prog.last_active_week != null && prog.last_active_week > 1;
+        const hasExactCheckpoint = prog.archive_checkpoint_provenance === 'exact_revision';
+        const hasLegacyApproximation = prog.archive_checkpoint_provenance === 'legacy_approximate';
         Alert.alert(
             `Restore "${prog.name}"?`,
-            'This will make it your active program. Any currently running program will be archived.',
+            hasLegacyApproximation
+                ? 'The saved legacy week is approximate. Restoring it will not invent an exact historical date.'
+                : 'This will make it your active program. Any currently running program will be archived.',
             [
                 { text: 'Cancel', style: 'cancel' },
-                ...(hasSnapshot ? [{
-                    text: `Resume — Week ${prog.last_active_week}`,
-                    onPress: () => unarchiveProgram(prog.id, prog.last_active_week!),
+                ...(hasExactCheckpoint ? [{
+                    text: 'Resume exact checkpoint',
+                    onPress: () => unarchiveProgram(prog.id, 'exact'),
+                }] : []),
+                ...(hasLegacyApproximation ? [{
+                    text: `Resume near week ${prog.last_active_week ?? 1}`,
+                    onPress: () => unarchiveProgram(prog.id, 'legacy_approximate'),
                 }] : []),
                 {
                     text: 'Restart from Week 1',
-                    onPress: () => unarchiveProgram(prog.id, 1),
+                    onPress: () => unarchiveProgram(prog.id, 'restart'),
                 },
             ],
         );
@@ -154,6 +158,14 @@ export default function ArchivedProgramsScreen() {
                     <View style={styles.emptyState}>
                         <ActivityIndicator color={theme.textPrimary} />
                         <Text style={styles.emptyText}>Loading archived programs...</Text>
+                    </View>
+                ) : loadError ? (
+                    <View style={styles.emptyState}>
+                        <Text style={styles.emptyTitle}>Archived programs unavailable</Text>
+                        <Text style={styles.emptyText}>{loadError}</Text>
+                        <Pressable onPress={loadArchivedPrograms} style={styles.refreshButton}>
+                            <Text style={styles.refreshText}>Retry</Text>
+                        </Pressable>
                     </View>
                 ) : programs.length === 0 ? (
                     <View style={styles.emptyState}>

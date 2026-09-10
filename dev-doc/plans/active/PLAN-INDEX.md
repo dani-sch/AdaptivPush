@@ -2,7 +2,7 @@
 
 ## Authority
 
-The [approved decision record](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECORD-2026-09-08.md) owns D-01–D-14 product decisions. The current consolidation request executes its documentation-restructuring decision; older pending-language in the saved handoff is historical. No application implementation or migration is authorized by this documentation review.
+The [approved decision record](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECORD-2026-09-08.md) owns D-01–D-14 product decisions. The planning consolidation is complete; older pending-language in saved handoffs is historical. Bounded AP execution is active, but no document alone authorizes a database mutation, deployment, or release.
 
 | Document | Owns |
 |---|---|
@@ -18,7 +18,7 @@ The living spine summarizes these owners. Historical source plans never override
 
 ## Current lane
 
-[TODO](/dev-doc/main/TODO.md) routes the immediate work. Planning consolidation is ready for final review once documentation verification closes. First future executable packet: **AP-01.1**, read-only catalog/grant/migration-ledger and restore evidence inspection. Application slices remain unimplemented by this task; existing useful code and historical gates remain recorded as inputs, not blanket AP completion.
+[TODO](/dev-doc/main/TODO.md) routes the immediate work. AP-01.1 read-only inspection and AP-01.2a lookup-only catalog compatibility are locally verified. AP-01.3 completed the production baseline/ledger, encrypted backup and local restore, cross-schema trigger reconciliation, isolated security suite, and production catalog enforcement on 2026-09-10. AP-02 and AP-03 are integration-verified behind default-off flags; their production release is blocked on a fresh encrypted backup/restore, secure CLI reauthentication, Expo-device evidence and production deployment verification. AP-04/AP-05 remain next only after that boundary.
 
 Approved release sequence: authority/provenance -> durable workouts/programs -> free schedules/progression -> advanced generation/equipment precision -> contextual coaching/recovery -> unlisted publishing/install -> optional health/themes -> operationally gated discovery/community. AP-16 operational obligations close with each relevant consumer.
 

@@ -5,6 +5,281 @@
 
 ---
 
+### 2026-09-10 AP-02/AP-03 durable-record integration {#2026-09-10-ap-02-ap-03}
+
+**Summary**: Implemented and integration-verified versioned workout/program
+contracts, owner-scoped durable pending state, transactional replay-safe
+database commands, immutable program revisions and exact V2 checkpoints. The
+generated and free manual program paths share one installer; workout completion
+now requires an explicit finalized outcome. Writer flags default off.
+
+**Evidence**: focused suites pass (`catalog` 9, `workouts` 5, `programs` 4);
+fresh local PostgreSQL 17 reset, AP-01 regression SQL, AP-02/AP-03 atomicity and
+isolation SQL, database lint, local dry-run, strict TypeScript and application
+lint all pass in the clean integrator worktree. Migration SHA-256 is
+`B0CD723D7D00F31B604168F7FC842CB1DB4117ACD9AE2407E1549029534877F2`.
+The nine lint warnings are in three paths unchanged from base `93e9f7b`.
+
+**Production boundary**: authenticated dashboard inspection reconfirmed healthy
+project `thfxcvxcsfvrzdysdnkq`, only the two AP-01 ledger versions, and no Free
+plan managed backups. CLI platform authentication is absent. No production
+backup, migration, schema/data write, ledger update or flag enablement occurred.
+
+**Disposition**: AP-02 and AP-03 are **INTEGRATION VERIFIED; RELEASE BLOCKED**.
+Required release gates are a fresh encrypted logical backup/decrypt/PostgreSQL 17
+restore comparison, secure CLI reauthentication, real Expo-device matrix, then
+production dry-run/apply and authenticated old/new-client verification. Full
+evidence: [AP-02](/dev-doc/reports/ADAPTIVPUSH-AP-02-2026-09-10.md) and
+[AP-03](/dev-doc/reports/ADAPTIVPUSH-AP-03-2026-09-10.md).
+
+**Commits**: `932f983`, `d21bf62`, `3a71ff7`, `f5e6775`, `9b5bf78`,
+`8e93352`; integration merges `c6bc219`, `8884d5f`, `7acc28f` before evidence
+closeout.
+
+---
+
+### 2026-09-10 AP-01.3 database foundation and production enforcement {#2026-09-10-ap-01-3-database-foundation}
+
+**Summary**: Completed the database work that blocked AP-02/AP-03. Captured and
+hashed the production baseline, reconciled the managed ledger and cross-schema
+signup trigger, created and restored an encrypted backup, enforced lookup-only
+catalog access in isolation, and deployed the single reviewed authority migration
+to production. Credentials and private row payloads were not recorded.
+
+**Executed evidence**:
+
+| Gate | Result |
+|---|---|
+| Source/target | Production `thfxcvxcsfvrzdysdnkq` reconfirmed; destructive restore and synthetic writes used only local Docker PostgreSQL 17.6. |
+| Baseline/ledger | `20260910175317_adaptivpush_baseline_20260910.sql`, SHA-256 `A871A75DA4DC062F79F591FB493BC8EC6E3271B02795E6C87C372EBFB56016A7`. CLI `db pull` automatically registered the version without the expected prompt; equivalence was proved and no extra manual repair was performed. |
+| Drift | Retained 001–017 hashes/provenance preserved. Fresh baseline replay collapsed one redundant readiness-log unique index; the uniqueness invariant remained. The omitted `auth.users` signup trigger was represented explicitly in the next migration. |
+| Backup | AES-256-GCM logical roles/schema/data archive outside the repository, key protected with DPAPI CurrentUser, all custody roles `dani-sch`, retention 30 days after rollout. Plaintext was deleted only after authenticated decryption and restore proof. Storage metadata is included; object bodies are not. |
+| Restore | Twenty Auth/public/Storage relation counts matched exactly. Aggregate 16 tables, 215 columns, 72 constraints, 40 indexes, 2 functions, 16 RLS tables, 66 public/Storage policies, and 448 table grants matched. Local reserved `supabase_admin` role alteration was the only managed-platform exception. |
+| Enforcement | `20260910190000_reconcile_auth_trigger_and_enforce_catalog_authority.sql` preserves catalog SELECT, removes ordinary mutation policies/grants, retains trusted curation, restores the auth trigger, and fixes `handle_new_user()` search path/EXECUTE authority. |
+| Isolation | Self-contained rolled-back SQL passed on restored and fresh-reset databases: signup trigger, anon/auth catalog read, ordinary mutation denial, trusted curation, catalog-backed program save, two-owner child isolation, avatar-folder isolation, duplicate-name rejection, and repeat migration safety. |
+| Production | Dry-run listed only `20260910190000`; push succeeded. Ledger aligned, ordinary roles are SELECT-only, one read policy remains, function/trigger posture is correct, and a transaction-scoped role probe passed. Catalog remained 1,369 rows with zero probe rows. |
+| Repository gates | `npm run test:catalog`: 9/9; `npx tsc --noEmit`: pass; `npm run lint`: 0 errors/17 unchanged warnings; `npx supabase db lint --local --level warning`: no schema errors; fresh `db reset --local`: both migrations applied. |
+
+**Files**: added the two timestamped migrations and
+`supabase/tests/ap_01_3_catalog_authority_isolation.sql`; updated the dated AP-01
+evidence and living execution/status/database/traceability documents. Core
+database commit: `5f5ee0a` (`feat(database): establish catalog authority baseline`).
+
+**Disposition**: AP-01.3 database foundation is released and AP-02/AP-03
+database implementation is unblocked. AP-01 remains open only for unavailable
+integrator, Expo-device UI, and runtime missing-schema application evidence.
+
+---
+
+### 2026-09-10 AP-01.3b authorization-boundary preflight {#2026-09-10-ap-01-3b-preflight}
+
+**Summary**: Re-entered AP-01.3 at expected HEAD `19e2747`, verified the local
+CLI/tool/link state, and stopped at the first remote boundary because the
+execution prompt supplied no completed authorization, operator, backup, target,
+or credential fields. No remote database action or migration file was created.
+
+**Evidence**:
+
+| Check | Result |
+|---|---|
+| Git | `adaptivpush-refactor` at `19e2747`; locally known `origin/main` is `20a95e5`, zero behind/eight ahead. One unrelated untracked user file under `tools/` was present at entry and absent by staging; no task command targeted it and it was excluded. |
+| Supabase | CLI `2.117.0`; no `supabase/.temp/project-ref`; no link, pull, ledger query/repair, dump, restore, SQL, or write. |
+| Credentials | No CLI access-token, database-password, isolated-target, or encryption-key variable name was present. Existing public app/service key names were not read and are not substitutes. |
+| PostgreSQL 17 runtime | Docker CLI `29.4.3` exists, but the Linux engine is unavailable; Desktop/CLI startup did not become ready and service start was denied. Standalone PostgreSQL clients remain absent. |
+| Authorization | All nine execution-authorization/operator fields remain incomplete placeholders; backup method/owners and isolated target remain unset. |
+
+**Result**: AP-01.3 remains blocked before production link/baseline capture.
+Baseline hashing, drift reconciliation, backup/restore, catalog migration
+preparation, isolated role tests, and production rollout were not performed or
+claimed. Full redacted evidence is appended to
+[the AP-01 report](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-10.md).
+
+---
+
+### 2026-09-10 AP-01.3a baseline and restore enablement {#2026-09-10-ap-01-3a-enablement}
+
+**Summary**: Completed the safe local portion of AP-01.3a. Pinned the supported
+Supabase CLI, initialized the PostgreSQL 17 local project configuration, rechecked
+the production project/backup/migration identity, and prepared the exact
+credential, command-effect, baseline, backup, restore, and isolated security
+checklists. No remote database or migration-history action occurred.
+
+**Changes**:
+
+| Component | Change |
+|---|---|
+| tooling | Added exact dev dependency `supabase@2.117.0`; Node 24 satisfies the CLI requirement. |
+| local database config | Added generated `supabase/config.toml` and `.gitignore`; local PostgreSQL major 17 matches production `17.6.1.063`. |
+| command review | Recorded that passwordless `link` can initialize a temporary remote CLI role; migration-mode `db pull` requires Docker, writes a local timestamped migration, and may update remote history; repair applied/reverted inserts/deletes history rows without applying schema SQL. |
+| production reinspection | Confirmed AdaptivPush `thfxcvxcsfvrzdysdnkq`, `main` Production, Free, `us-east-1`, empty managed migration UI, and no scheduled backups. |
+| recovery decision | Prepared managed-physical versus encrypted-external logical backup choices and the isolated restore/security matrix. |
+
+**Files Added/Modified**:
+
+| File | Action | Purpose |
+|---|---|---|
+| `package.json`, `package-lock.json` | modified | Pin the project-local Supabase CLI. |
+| `supabase/config.toml`, `supabase/.gitignore` | added | Establish the supported local PostgreSQL 17 Supabase structure without linking. |
+| `dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-10.md` | added | Durable AP-01.3a command-effect, authorization, backup, restore, and gate evidence. |
+| AP-01 register/status/database/traceability owners | modified | Record partial AP-01.3 progress and exact remaining gates. |
+| living docs and TOC | modified | Route the next executable packet as AP-01.3b and refresh inventory. |
+
+**Verification**:
+
+| Check | Result |
+|---|---|
+| `npm run test:catalog` | 9 passed, 0 failed. |
+| `npm run lint` | passed with 0 errors and 17 unchanged pre-existing warnings. |
+| `npx tsc --noEmit` | passed. |
+| `npx supabase --version` | `2.117.0`. |
+| `git diff --check` | passed for the tooling commit; repeated for documentation closeout. |
+| database/backup/restore/integration/device | not run and not claimed. |
+
+**Commits**:
+
+- `96ba874` `chore(database): pin supabase baseline tooling`
+- `e426766` `docs(adaptivpush): prepare AP-01.3 baseline gates`
+
+**Remaining gates**: Name the credential operator; provide an existing access
+token/database password securely; run or provision PostgreSQL 17 tooling; choose
+the backup mechanism and owners; name a distinct isolated target; and authorize
+the no-history-update baseline pull. Integrator and Expo device remain later
+AP-01.3 gates. Ledger repair, catalog enforcement, production deployment, and
+release require separate authorization.
+
+**Next**: AP-01.3b authorized baseline capture plus backup/isolated-target
+decision.
+
+---
+
+### 2026-09-09 AP-01.2a lookup-only catalog client {#2026-09-09-ap-01-2a-catalog-client}
+
+**Summary**: Implemented and locally verified the compatible client-first
+catalog boundary. Generated saves and developer fixtures resolve existing rows
+before program mutation; swaps cannot write local slugs to UUID foreign keys;
+shared seeding uses only the administrator client. No database write, seed run,
+policy/grant change, migration, deployment, integration, or release occurred.
+
+**Changes**:
+
+| Component | Change |
+|---|---|
+| catalog contract | Added snapshot/source/exact-name identity, validated catalog UUID, structured unresolved reasons, and actionable resolution errors. |
+| generated save | Resolve all slots before reading/deactivating programs; removed shared-catalog upsert and silent unresolved-prescription filtering. |
+| local catalog | Added four explicit ExerciseDB mappings; excluded `barbell-clean` and `dumbbell-thruster` from persisted candidate pools because no unambiguous live row exists. |
+| developer fixture | Replaced six catalog upserts with pre-mutation lookup. |
+| swap | Local fallback remains previewable but apply is disabled without a resolved UUID; the hook independently rejects non-UUID replacements. |
+| trusted import | Seed DB and Storage operations now share the service-role administrator client; command not executed. |
+| test harness | Added `npm run test:catalog` and nine deterministic cases. |
+
+**Verification**:
+
+| Check | Result |
+|---|---|
+| `npm run test:catalog` | 9 passed, 0 failed. |
+| `npx tsc --noEmit` | passed. |
+| `npm run lint` | passed with 0 errors and 17 unchanged pre-existing warnings. |
+| current public catalog read | 52 persistable local entries resolved; two explicit unresolved entries excluded; 0 missing among the persistable set. |
+| current developer-fixture read | 6 requested names resolved; 0 missing. |
+| writer scan | Remaining `exercises` upserts occur only in `scripts/seedExercises.ts` through `supabaseAdmin`. |
+| `git diff --check` | passed. |
+| Ruff | not applicable; no Python file changed. |
+| authenticated/device/integration/restore/write-isolation | not run and not claimed. |
+
+**Commits**:
+
+- `e371348` `feat(catalog): resolve program exercises without client writes`
+- `cd0908e` `fix(catalog): guard swaps and require trusted seeding`
+
+**Remaining gates**: Live grants and unconditional policies are unchanged.
+AP-01.3a requires a credential/tool owner, supported baseline, chosen backup
+mechanism, isolated restore/role-test target, configured integration workflow,
+and later Expo device evidence. Policy/ledger/deployment actions remain gated.
+
+**Next**: AP-01.3a supported baseline/backup/isolated-target enablement.
+
+---
+
+### 2026-09-09 AP-01.1 catalog authority and restore-readiness inspection {#2026-09-09-ap-01-1-foundation-inspection}
+
+**Summary**: Completed the bounded AP-01.1 read-only inspection against the
+production AdaptivPush Supabase project and repository base `20a95e5`. No
+database mutation, migration replay/repair, backup, restore, deployment,
+credential creation, write-based isolation test, or push occurred. The exact
+environment, SQL-file hashes, writer/resolver inventory, live metadata, evidence
+limits, and AP-01.2/AP-01.3 transition are recorded in
+[the AP-01 evidence artifact](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-09.md).
+
+**Current live observation**:
+
+| Surface | Result |
+|---|---|
+| Schema/API | 16 exposed public tables matched the retained schema-reference columns; no PostgREST RPC path was present. |
+| RLS/ownership | All 16 public tables have RLS enabled without force; core child policies and FKs traverse the expected program/session ownership lineage. This was metadata inspection, not a two-owner write test. |
+| Catalog authority | `anon` and `authenticated` each have all table privileges on `exercises`; its SELECT/INSERT/UPDATE/DELETE policies are unconditional `TO public`. |
+| Catalog integrity | 1,369 rows; 51 missing external IDs; zero duplicate non-null exact external IDs; 17 normalized-name collision groups. |
+| Functions | `handle_new_user()` is a broadly executable SECURITY DEFINER trigger function without function-local `search_path`; it was not exposed as RPC. |
+| Migration history | Dashboard reports “Run your first migration”; no `supabase_migrations` namespace exists. Internal auth/realtime/storage histories are not the application ledger. |
+| Backup/restore | Free plan has no scheduled backups; PITR and restore-to-new-project are unavailable. No successful isolated restore exists. |
+| Storage | `avatars` retains the public JPEG/2 MiB contract; `exercise-images` is public without bucket MIME/size limits. No objects were changed or deleted. |
+
+**Repository findings**:
+
+| Component | Current result |
+|---|---|
+| generated save | Ordinary client upserts catalog names, ignores generated local IDs, and silently omits unresolved prescriptions. |
+| developer fixture | `createDevTestProgram` also performs ordinary-client shared-catalog upserts. |
+| seed command | Catalog rows are written with the anonymous client while a service credential is used only for image objects. |
+| manual authoring | Retains selected database UUIDs and is the compatible read-only catalog model. |
+| swap fallback | Local slug IDs can flow toward a UUID FK update after catalog read failure/empty state. |
+| migration provenance | Retained SQL 001–017 was hashed and reconciled to current end state; 001 remains superseded and 005 remains skipped/superseded by 017. No historical file was replayed or registered. |
+| workflow/tooling | Feature branch was clean and equal to `origin/main` at entry. No configured `integrator`, Supabase CLI, `psql`, `pg_dump`, `pg_restore`, isolated project, emulator, simulator, or attached device was available. |
+
+**Files added/modified**:
+
+| File | Purpose |
+|---|---|
+| `dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-09.md` | Durable AP-01.1 evidence, AC-TR-001–007 disposition, catalog transition, and baseline/restore plan. |
+| `dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md` | Advance AP-01 to in progress and route AP-01.2a next. |
+| `dev-doc/plans/active/ADAPTIVPUSH-IMPLEMENTATION-STATUS.md` | Record current live boundary and exact catalog/save/swap defects. |
+| `dev-doc/plans/active/ADAPTIVPUSH-DATABASE-PLAN.md` | Replace inspected unknowns with current grants/ledger/backup facts and remaining gates. |
+| `dev-doc/plans/active/ADAPTIVPUSH-TRACEABILITY.md` | Link the evidence limits to AC-TR-001–007. |
+| `dev-doc/main/CURRENT-STATE.md`, `dev-doc/main/TODO.md`, `dev-doc/main/TOC.md` | Update living execution posture, next work, and generated date. |
+
+**Verification**:
+
+| Gate | Exact command/result |
+|---|---|
+| Application lint baseline | `npm run lint` — pass, 0 errors and 17 pre-existing warnings. |
+| Contract/type baseline | `npx tsc --noEmit` — pass. |
+| Documentation inventory | `python scripts/tools/generators/toc_generate.py --output dev-doc/main/TOC.md` — pass; generated date updated. |
+| Documentation paths | Balanced Markdown-link target check across the eight evidence/status files — pass, all targets exist. |
+| Acceptance linkage | AC-TR-001 through AC-TR-007 present in the AP-01 artifact — pass. |
+| Diff hygiene | `git diff --check` — pass. Credential-value pattern scan — no value found. |
+| Python gate | Not applicable; no Python file changed. |
+| Integration/device/restore/security writes | Not run and not claimed; prerequisites are absent. |
+
+**Commit**:
+
+- `614a8ea` `docs(adaptivpush): record AP-01.1 foundation inspection`
+
+**Remaining gates**:
+
+- configure the documented `integrator` or obtain an explicitly approved
+  alternative before integration verification;
+- provision supported baseline/dump tooling, credential ownership, a backup
+  mechanism, and an isolated target, then complete a successful restore drill;
+- implement and locally verify lookup-only catalog identity before reviewing or
+  applying catalog grant/policy restriction;
+- run isolated ordinary-role denial, trusted-curation, two-owner/storage,
+  old/new/missing-schema, and actual Expo device matrices.
+
+**Next**: AP-01.2a — lookup-only catalog contracts/resolver and the smallest
+deterministic TypeScript harness. Production policy changes remain gated behind
+the compatible client and AP-01.3 evidence.
+
+---
+
 ### 2026-09-08 AdaptivPush planning consolidation
 
 **Scope:** Documentation and planning only. Replaced current product-planning authority with neutral master/register/status/database/traceability/inventory documents and a research translation; approved decisions remain authoritative. Preserved 12 stale authorities and 12 operational snapshots with an explicit 61-source map. Mapped 142 requirements, all 28 packet tables plus equipment candidates, and 16 bounded AP slices.

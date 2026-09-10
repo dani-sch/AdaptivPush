@@ -7,6 +7,19 @@ import type {
   TrainingExperience,
 } from '@/types/database';
 import type { ProgramGenParams, GeneratedProgram } from '@/types/program';
+import {
+  LOCAL_CATALOG_SNAPSHOT_VERSION,
+  type CatalogExerciseRequest,
+} from '@/features/catalog/contracts';
+import { resolveCatalogExerciseRequests } from '@/features/catalog/repository';
+import { createOperationId } from '@/features/kernel/operationId';
+import { installProgram } from '@/features/programs/commands';
+import {
+  PROGRAM_POLICY_VERSION,
+  PROGRAM_SCHEMA_VERSION,
+  type ProgramArtifact,
+} from '@/features/programs/contracts';
+import { programRepository } from '@/features/programs/repository';
 
 import { supabase } from '@/utils/supabase';
 import { isMissingRelationOrColumnError } from '@/utils/profilePreferences';
@@ -230,184 +243,94 @@ export async function saveProgramToDb(
 ): Promise<string> {
   const programGenerationContextMode = options.programGenerationContextMode ?? 'create';
 
-  const { data: previouslyActivePrograms, error: activeProgramLookupError } = await supabase
-    .from('programs')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('is_active', true);
-
-  if (activeProgramLookupError) throw activeProgramLookupError;
-
-  const previouslyActiveProgramIds = (previouslyActivePrograms ?? []).map(
-    (program) => program.id as string,
+  const catalogRequests: CatalogExerciseRequest[] = generated.days.flatMap((day) =>
+    day.exercises.map((exercise) => ({
+      localExerciseId: exercise.localExerciseId,
+      displayName: exercise.exerciseName,
+      exerciseDbId: exercise.exerciseDbId,
+      source: 'local_snapshot',
+      snapshotVersion: LOCAL_CATALOG_SNAPSHOT_VERSION,
+    })),
   );
+  const catalogExerciseByLocalId = await resolveCatalogExerciseRequests(catalogRequests);
+  await persistSessionLengthPreference(userId, params.targetSessionMinutes);
 
-  const { error: deactivateProgramsError } = await supabase
-    .from('programs')
-    .update({ is_active: false })
-    .eq('user_id', userId)
-    .eq('is_active', true);
+  let context: Record<string, unknown> | null = null;
+  if (programGenerationContextMode === 'create') {
+    const profile = await loadProgramContextProfile(userId);
+    const built = buildProgramGenerationContext({
+      userId,
+      programId: '00000000-0000-4000-8000-000000000000',
+      params,
+      generated,
+      profile,
+    });
+    const { program_id: _programId, user_id: _userId, ...revisionContext } = built;
+    context = revisionContext as unknown as Record<string, unknown>;
+  }
 
-  if (deactivateProgramsError) throw deactivateProgramsError;
-
-  const todayISO = new Date().toISOString().split('T')[0];
-
-  const { data: prog, error: progErr } = await supabase
-    .from('programs')
-    .insert({
-      user_id:        userId,
-      name:           generated.name,
-      goal:           generated.goal,
-      duration_weeks: generated.durationWeeks,
-      days_per_week:  generated.daysPerWeek,
-      start_date:     todayISO,
-      is_active:      true,
-      swap_interval_weeks: params.swapIntervalWeeks ?? 4,
-    })
-    .select('id')
-    .single();
-
-  if (progErr) throw progErr;
-  const programId = prog.id as string;
-
-  const recoverFailedReplacement = async (saveError: unknown): Promise<never> => {
-    const { error: cleanupError } = await supabase
-      .from('programs')
-      .delete()
-      .eq('id', programId)
-      .eq('user_id', userId);
-    const restorationResult =
-      previouslyActiveProgramIds.length > 0
-        ? await supabase
-            .from('programs')
-            .update({ is_active: true })
-            .eq('user_id', userId)
-            .in('id', previouslyActiveProgramIds)
-        : null;
-    const restorationError = restorationResult?.error ?? null;
-
-    if (cleanupError || restorationError) {
-      const recoveryFailures = [
-        cleanupError ? `failed-program cleanup: ${cleanupError.message}` : null,
-        restorationError ? `prior-program restoration: ${restorationError.message}` : null,
-      ].filter((message): message is string => Boolean(message));
-
-      throw new Error(
-        `${getErrorMessage(saveError)} Recovery failed (${recoveryFailures.join('; ')}).`,
-      );
-    }
-
-    throw saveError;
+  const artifact: ProgramArtifact = {
+    name: generated.name,
+    goal: generated.goal,
+    durationWeeks: generated.durationWeeks,
+    daysPerWeek: generated.daysPerWeek,
+    source: 'generated',
+    schemaVersion: PROGRAM_SCHEMA_VERSION,
+    catalogVersion: LOCAL_CATALOG_SNAPSHOT_VERSION,
+    policyVersion: PROGRAM_POLICY_VERSION,
+    swapIntervalWeeks: params.swapIntervalWeeks ?? 4,
+    context,
+    days: generated.days.map((day) => ({
+      dayId: createOperationId(),
+      weekNumber: day.weekNumber,
+      dayIndex: day.dayIndex,
+      orderInWeek: day.orderInWeek,
+      workoutName: day.workoutName,
+      estimatedDurationMin: day.estimatedDurationMin,
+      isRestDay: false,
+      isDeloadWeek: day.explanation?.isDeloadWeek ?? false,
+      exercises: day.exercises.map((exercise) => {
+        const exerciseId = catalogExerciseByLocalId.get(exercise.localExerciseId)?.catalogExerciseId;
+        if (!exerciseId) {
+          throw new Error(
+            `Resolved catalog identity disappeared for ${exercise.exerciseName}. The program was not installed.`,
+          );
+        }
+        return {
+          slotId: createOperationId(),
+          exerciseId,
+          position: exercise.position,
+          setCount: exercise.setCount,
+          repRangeMin: exercise.repRangeMin,
+          repRangeMax: exercise.repRangeMax,
+          targetRpe: exercise.targetRPE,
+          suggestedLoad: exercise.suggestedWeightLb,
+          loadUnit: 'lb' as const,
+          loadKind: exercise.suggestedWeightLb > 0 ? 'external' as const : 'unknown' as const,
+          loadSide: 'unknown' as const,
+          notes: null,
+        };
+      }),
+    })),
   };
 
-  try {
-    await persistSessionLengthPreference(userId, params.targetSessionMinutes);
+  const { data: active, error: activeError } = await supabase
+    .from('programs')
+    .select('id,current_revision')
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .maybeSingle<{ id: string; current_revision: number }>();
+  if (activeError) throw activeError;
 
-    if (programGenerationContextMode === 'create') {
-      const profile = await loadProgramContextProfile(userId);
-      const programGenerationContext = buildProgramGenerationContext({
-        userId,
-        programId,
-        params,
-        generated,
-        profile,
-      });
-
-      const { error: contextError } = await supabase
-        .from('program_generation_context')
-        .insert(programGenerationContext);
-
-      if (contextError) throw contextError;
-    }
-  } catch (saveError: unknown) {
-    await recoverFailedReplacement(saveError);
-  }
-
-  const uniqueExercises = [...new Set(
-    generated.days.flatMap(day => day.exercises.map(exercise => exercise.exerciseName)),
-  )];
-
-  const exerciseRows = uniqueExercises.map(name => ({ name }));
-
-  const { data: exData, error: exErr } = await supabase
-    .from('exercises')
-    .upsert(exerciseRows, { onConflict: 'name', ignoreDuplicates: true })
-    .select('id, name');
-
-  if (exErr) throw exErr;
-
-  const exIdByName = new Map<string, string>();
-
-  if (exData) {
-    for (const exercise of exData) {
-      exIdByName.set(exercise.name as string, exercise.id as string);
-    }
-  }
-
-  const missingNames = uniqueExercises.filter(name => !exIdByName.has(name));
-  if (missingNames.length > 0) {
-    const { data: fetchedEx, error: fetchErr } = await supabase
-      .from('exercises')
-      .select('id, name')
-      .in('name', missingNames);
-
-    if (fetchErr) throw fetchErr;
-
-    for (const exercise of fetchedEx ?? []) {
-      exIdByName.set(exercise.name as string, exercise.id as string);
-    }
-  }
-
-  const dayInserts = generated.days.map(day => ({
-    program_id:             programId,
-    week_number:            day.weekNumber,
-    day_index:              day.dayIndex,
-    order_in_week:          day.orderInWeek,
-    workout_name:           day.workoutName,
-    estimated_duration_min: day.estimatedDurationMin,
-  }));
-
-  const { data: dayData, error: dayErr } = await supabase
-    .from('program_days')
-    .insert(dayInserts)
-    .select('id, week_number, day_index');
-
-  if (dayErr) throw dayErr;
-
-  const dayIdByKey = new Map<string, string>();
-  for (const day of dayData ?? []) {
-    dayIdByKey.set(`${day.week_number}_${day.day_index}`, day.id as string);
-  }
-
-  const pdeInserts = generated.days.flatMap(day => {
-    const dayId = dayIdByKey.get(`${day.weekNumber}_${day.dayIndex}`);
-    if (!dayId) return [];
-
-    return day.exercises
-      .map(exercise => {
-        const exerciseId = exIdByName.get(exercise.exerciseName);
-        if (!exerciseId) return null;
-
-        return {
-          program_day_id:      dayId,
-          exercise_id:         exerciseId,
-          position:            exercise.position,
-          set_count:           exercise.setCount,
-          rep_range_min:       exercise.repRangeMin,
-          rep_range_max:       exercise.repRangeMax,
-          target_rpe:          exercise.targetRPE,
-          suggested_weight_lb: exercise.suggestedWeightLb,
-          notes:               null,
-        };
-      })
-      .filter(Boolean);
-  });
-
-  const { error: pdeErr } = await supabase
-    .from('program_day_exercises')
-    .insert(pdeInserts);
-
-  if (pdeErr) throw pdeErr;
-
-  return programId;
+  const outcome = await installProgram(
+    programRepository,
+    userId,
+    artifact,
+    active?.id ?? null,
+    active?.current_revision ?? null,
+  );
+  if (outcome.status === 'validation') throw new Error(outcome.errors.join(' '));
+  if (outcome.status === 'conflict') throw new Error(`Program changed on another device. ${outcome.message}`);
+  if (outcome.status === 'unavailable') throw new Error(getErrorMessage(outcome.message));
+  return outcome.receipt.programId;
 }

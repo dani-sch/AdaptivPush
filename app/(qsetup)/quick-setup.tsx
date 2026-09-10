@@ -77,20 +77,19 @@ export default function QSetupPage() {
     const handleContinue = async () => {
         setFormError('');
 
-        // Validate required fields
-        if (!dateOfBirth || !sexAssigned || !experienceLevel) {
-            setFormError('Please complete your date of birth, sex assigned at birth, and training experience.');
+        // Training experience affects the free plan; demographic fields remain optional.
+        if (!experienceLevel) {
+            setFormError('Please choose your training experience.');
             return;
         }
 
-        // Parse and validate date
-        const parsedDate = parseDateInput(dateOfBirth);
-        if (!parsedDate) {
+        const parsedDate = dateOfBirth.trim() ? parseDateInput(dateOfBirth) : null;
+        if (dateOfBirth.trim() && !parsedDate) {
             setFormError('Enter a valid date of birth in mm/dd/yyyy format.');
             return;
         }
 
-        if (!isOldEnough(parsedDate, 13)) {
+        if (parsedDate && !isOldEnough(parsedDate, 13)) {
             setFormError('You must be at least 13 years old to continue.');
             return;
         }
@@ -127,8 +126,8 @@ export default function QSetupPage() {
 
             const legacyPayload: UserProfileUpdate & { user_id: string } = {
                 user_id: user.id,
-                date_of_birth: parsedDate,
-                sex_assigned_at_birth: sexAssigned,
+                ...(parsedDate ? { date_of_birth: parsedDate } : {}),
+                ...(sexAssigned ? { sex_assigned_at_birth: sexAssigned } : {}),
                 gender_identity: genderIdentity || null,
                 weight_lb: weightLb,
                 weight_unit_preference: weightUnit,
@@ -277,7 +276,7 @@ export default function QSetupPage() {
                         </View>
 
                         {/* Date of Birth */}
-                        <Text style={styles.label}>Date of Birth</Text>
+                        <Text style={styles.label}>Date of Birth <Text style={styles.optional}>(optional)</Text></Text>
                         <View style={styles.inputWithIcon}>
                             <TextInput
                                 value={dateOfBirth}
@@ -291,7 +290,7 @@ export default function QSetupPage() {
                         </View>
 
                         {/* Sex assigned at birth */}
-                        <Text style={styles.label}>Sex assigned at birth</Text>
+                        <Text style={styles.label}>Sex assigned at birth <Text style={styles.optional}>(optional)</Text></Text>
                         <Dropdown
                             data={sexOptions}
                             labelField="label"
