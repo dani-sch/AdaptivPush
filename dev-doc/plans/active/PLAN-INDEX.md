@@ -18,7 +18,7 @@ The living spine summarizes these owners. Historical source plans never override
 
 ## Current lane
 
-[TODO](/dev-doc/main/TODO.md) routes the immediate work. AP-01.1 read-only inspection and AP-01.2a lookup-only catalog compatibility are locally verified. AP-01.3a local enablement pinned Supabase CLI `2.117.0`, initialized the supported PostgreSQL 17 project structure, and documented command effects without linking or mutating production. Exact next packet: **AP-01.3b**, authorized baseline capture plus the backup/isolated-target decision. AP-02 and later slices remain gated.
+[TODO](/dev-doc/main/TODO.md) routes the immediate work. AP-01.1 read-only inspection and AP-01.2a lookup-only catalog compatibility are locally verified. AP-01.3a local enablement pinned Supabase CLI `2.117.0`, initialized the supported PostgreSQL 17 project structure, and documented command effects without linking or mutating production. AP-01.3b preflight at expected HEAD `19e2747` confirmed the unlinked state, then stopped before remote action because no completed authorization/operator fields, required credentials, backup decision, or isolated target were supplied and the Docker Linux engine was unavailable. Exact next packet: **AP-01.3b**, authorized baseline capture plus the backup/isolated-target decision. AP-02 and later slices remain gated.
 
 Approved release sequence: authority/provenance -> durable workouts/programs -> free schedules/progression -> advanced generation/equipment precision -> contextual coaching/recovery -> unlisted publishing/install -> optional health/themes -> operationally gated discovery/community. AP-16 operational obligations close with each relevant consumer.
 

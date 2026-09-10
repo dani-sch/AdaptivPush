@@ -5,6 +5,31 @@
 
 ---
 
+### 2026-09-10 AP-01.3b authorization-boundary preflight {#2026-09-10-ap-01-3b-preflight}
+
+**Summary**: Re-entered AP-01.3 at expected HEAD `19e2747`, verified the local
+CLI/tool/link state, and stopped at the first remote boundary because the
+execution prompt supplied no completed authorization, operator, backup, target,
+or credential fields. No remote database action or migration file was created.
+
+**Evidence**:
+
+| Check | Result |
+|---|---|
+| Git | `adaptivpush-refactor` at `19e2747`; locally known `origin/main` is `20a95e5`, zero behind/eight ahead. One unrelated untracked user file under `tools/` was present at entry and absent by staging; no task command targeted it and it was excluded. |
+| Supabase | CLI `2.117.0`; no `supabase/.temp/project-ref`; no link, pull, ledger query/repair, dump, restore, SQL, or write. |
+| Credentials | No CLI access-token, database-password, isolated-target, or encryption-key variable name was present. Existing public app/service key names were not read and are not substitutes. |
+| PostgreSQL 17 runtime | Docker CLI `29.4.3` exists, but the Linux engine is unavailable; Desktop/CLI startup did not become ready and service start was denied. Standalone PostgreSQL clients remain absent. |
+| Authorization | All nine execution-authorization/operator fields remain incomplete placeholders; backup method/owners and isolated target remain unset. |
+
+**Result**: AP-01.3 remains blocked before production link/baseline capture.
+Baseline hashing, drift reconciliation, backup/restore, catalog migration
+preparation, isolated role tests, and production rollout were not performed or
+claimed. Full redacted evidence is appended to
+[the AP-01 report](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-10.md).
+
+---
+
 ### 2026-09-10 AP-01.3a baseline and restore enablement {#2026-09-10-ap-01-3a-enablement}
 
 **Summary**: Completed the safe local portion of AP-01.3a. Pinned the supported

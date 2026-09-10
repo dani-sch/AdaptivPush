@@ -232,3 +232,55 @@ Integrator configuration and an Expo-capable device remain later AP-01.3
 integration/compatibility gates. Migration repair, catalog enforcement, production
 deployment, and release still require separate concrete authorization after the
 baseline and restore evidence pass.
+
+## AP-01.3b preflight attempt — 2026-09-10
+
+At `2026-09-10T16:51:33Z`, execution resumed on feature branch
+`adaptivpush-refactor` at expected HEAD `19e2747`. The locally known comparison
+is `origin/main` at `20a95e5`, with the feature branch eight commits ahead and
+zero behind. The checkout contained one unrelated untracked user file at entry,
+`tools/build_adaptivpush_business_plan.py`. No task command targeted, staged,
+edited, or deleted it; the file was absent when the packet was staged and is not
+included in this packet.
+
+The project-local CLI still reports `2.117.0`, Node reports `24.14.0`, npm
+reports `11.9.0`, and the Docker CLI reports `29.4.3` with context
+`desktop-linux`. No `psql`, `pg_dump`, or `pg_restore` executable is available.
+The Docker Linux engine was not running. Both a hidden Docker Desktop launch and
+`docker desktop start` failed to produce a ready engine, and direct start of the
+stopped `com.docker.service` was denied by the local service manager. No image,
+container, database, or network target was reached.
+
+The checkout is not linked: `supabase/.temp/project-ref` is absent. Environment
+and ignored `.env` key-name inspection found only the existing public app URL/key
+and service-key names. It found no Supabase CLI access token, production database
+password, isolated-target credential, or backup encryption key. Values were not
+read or printed, and the service-role key was not treated as a substitute for a
+CLI token or database password.
+
+### Authorization and ownership gate
+
+The execution prompt left every authorization/operator field as bracketed
+placeholder text. Per its own rule, none of those fields grants authority. The
+following remain unsatisfied:
+
+| Required field | 2026-09-10 evidence state |
+|---|---|
+| Production link and read-only baseline capture | Not supplied; no link or remote read performed. |
+| Backup method | Not selected. |
+| Backup storage and retention owner | Not named; no location supplied. |
+| Isolated non-production Supabase target | Not named; no project ref supplied. |
+| Destructive isolated restore/setup | Not authorized. |
+| Synthetic multi-user isolated writes | Not authorized. |
+| Migration-ledger repair | Not authorized. |
+| Production catalog-enforcement migration | Not authorized. |
+| Production rollback/forward-fix operator | Not named. |
+| Credential operator and required credentials | Not supplied through a secure channel. |
+
+Because source/target identity and authorization cannot be reverified from the
+supplied fields, the run stopped before `supabase link`, `db pull`, migration
+history access, backup, restore, synthetic writes, migration preparation, or
+production enforcement. The timestamped baseline name and catalog-authority
+migration filename cannot be selected safely before the supported baseline and
+ledger are captured and reconciled. AP-01.3 and AP-01 remain open; AP-02 and
+AP-03 are still database-gated.

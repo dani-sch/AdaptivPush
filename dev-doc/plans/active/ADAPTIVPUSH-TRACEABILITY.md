@@ -93,6 +93,12 @@ It adds no database evidence for AC-TR-002–006 and does not claim a project li
 baseline, ledger repair, backup, restore, isolated role test, device test,
 integration, deployment, or release.
 
+The same artifact now records an AP-01.3b preflight at expected HEAD `19e2747`.
+Because the supplied execution intake left every authorization/operator field
+incomplete and supplied no required credentials, backup ownership, or isolated
+target, the run stopped before remote action. This adds environment/blocker
+evidence only and does not advance AC-TR-001–007.
+
 ## AP-02 — Durable workout records
 
 | Requirement / legacy locator | Disposition and decision | Behavior / contract; database authority; code | Acceptance scenario and expected evidence |

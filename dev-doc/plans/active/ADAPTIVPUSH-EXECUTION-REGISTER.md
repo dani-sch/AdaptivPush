@@ -18,6 +18,14 @@ No project link, baseline pull, ledger change, backup, restore, or database writ
 occurred. AP-01.2 server enforcement, AP-01.3 remote/isolated evidence,
 integration, and release remain open.
 
+AP-01.3b preflight was re-entered at expected HEAD `19e2747` on 2026-09-10.
+The pinned CLI remains available and the checkout is not linked, but every
+authorization/operator field in the execution intake remains incomplete, the
+required CLI/database/isolated credentials are absent, no backup method or
+isolated target is named, and the Docker Linux engine could not be started from
+the current session. The run stopped before any remote action or speculative
+migration preparation; the same baseline/restore/enforcement gates remain open.
+
 ## Register mechanics and universal slice contract
 
 AP identifiers never encode release order or change when work moves. Bounded tasks use `AP-01.1`, etc.; do not re-use an ID for another outcome. Status progresses `QUEUED -> INSPECTION -> IN PROGRESS -> LOCAL VERIFIED -> INTEGRATION VERIFIED -> RELEASED`; use `BLOCKED` with a concrete missing prerequisite. A planning document is not evidence of any later state. Each slice may be delivered as the independently reviewable packets below; shared foundations are added only with their first consumer.

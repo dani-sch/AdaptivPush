@@ -51,6 +51,14 @@ SQL, migration, or production write occurred. Exact command effects and the
 managed-versus-encrypted backup decision are in
 [the September 10 AP-01 artifact](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-10.md).
 
+AP-01.3b preflight later resumed at expected HEAD `19e2747` and stopped at the
+same safety boundary. The execution intake did not complete any authorization or
+operator field; no CLI/database/isolated credential, backup method/owner, or
+isolated target was supplied. The project remains unlinked. Docker Desktop could
+not provide a ready Linux engine from this session, and standalone PostgreSQL 17
+clients remain absent. No remote read/write, baseline, repair, backup, restore,
+or migration preparation occurred.
+
 ## Current schema and security posture
 
 | Existing table/surface | Source and actual application use | Important current limits / owning slices |

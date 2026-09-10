@@ -28,6 +28,7 @@
 
 - [COMPLETE] Pin Supabase CLI `2.117.0`, initialize the supported `supabase/` structure, and match local PostgreSQL major 17 to production `17.6.1.063`.
 - [COMPLETE] Reinspect project identity, Free backup state, empty managed migration UI, exact `link`/`db pull`/`migration repair` effects, and prepare the baseline/restore/security checklists without a remote action.
+- [COMPLETE] Re-enter AP-01.3b preflight at expected HEAD `19e2747`; confirm the checkout remains unlinked, exclude the unrelated untracked `tools/` file observed at entry, verify CLI `2.117.0`, and stop before remote action because the intake contains no completed authorization/operator fields.
 - [BLOCKED] Name the credential owner and provide an existing Supabase access token/database password through an approved non-repository channel. Provision executable PostgreSQL 17 restore tooling by starting the reviewed Docker engine or installing the pinned client.
 - [BLOCKED] Choose managed physical backups or authorize an encrypted external dump workflow with retention/access ownership.
 - [BLOCKED] Provide an isolated Supabase restore/role-test target; never use production for the drill.

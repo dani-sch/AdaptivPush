@@ -24,6 +24,14 @@ ledger update, dump, restore, policy change, or other database action occurred.
 [The dated enablement artifact](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-10.md)
 owns command effects and remaining credential/backup/target gates.
 
+A same-day AP-01.3b preflight at expected HEAD `19e2747` confirmed that the
+checkout is still unlinked and the CLI remains pinned, but found no completed
+authorization/operator fields, CLI access token, database password, backup
+selection/owners, isolated target, or executable PostgreSQL 17 runtime. Docker
+Desktop did not become ready and its stopped service could not be started from
+the current session. No baseline, migration, backup, restore, or remote query was
+performed; detailed redacted evidence is appended to the same dated artifact.
+
 | Label | Meaning |
 |---|---|
 | Working code | An implemented source path performs the stated bounded behavior. This is not a claim of release or fresh runtime verification. |

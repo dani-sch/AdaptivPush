@@ -16,3 +16,8 @@ Release order follows approved D-13. The [execution register](/dev-doc/plans/act
 AP-16 account/privacy/purchase/accessibility/support/release obligations close with each relevant wave. They are not postponed until final polish. Safe parallel work includes draft/program contracts, history/schedule selectors, generation/equipment UI and independent health/theme adapters after their own gates; the register names shared-file coordination risks.
 
 Historical authenticated compatibility evidence is retained, including context-failure recovery. AP-01.1 and AP-01.2a are locally verified; AP-01.3a has established the pinned local CLI/config path. Actual baseline/restore, isolated role tests, device UI, and missing-schema fallback remain required before foundation release. The immediate packet is AP-01.3b after credential, backup, and target authorization. Health/social never block the fully usable manual core.
+
+The 2026-09-10 AP-01.3b preflight did not advance that gate: authorization and
+operator fields, credentials, backup ownership, and the isolated target remain
+unsupplied, while the Docker Linux engine is unavailable in the current session.
+No remote action or migration preparation occurred.
