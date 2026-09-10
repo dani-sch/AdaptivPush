@@ -13,6 +13,7 @@ import {
 } from '@/features/catalog/contracts';
 import { resolveCatalogExerciseRequests } from '@/features/catalog/repository';
 import { createOperationId } from '@/features/kernel/operationId';
+import { requireRollout, rollout } from '@/features/kernel/rollout';
 import { installProgram } from '@/features/programs/commands';
 import {
   PROGRAM_POLICY_VERSION,
@@ -241,6 +242,8 @@ export async function saveProgramToDb(
   generated: GeneratedProgram,
   options: SaveProgramToDbOptions = {},
 ): Promise<string> {
+  requireRollout(rollout.atomicProgramWriter, 'Atomic program installation');
+
   const programGenerationContextMode = options.programGenerationContextMode ?? 'create';
 
   const catalogRequests: CatalogExerciseRequest[] = generated.days.flatMap((day) =>
@@ -331,6 +334,6 @@ export async function saveProgramToDb(
   );
   if (outcome.status === 'validation') throw new Error(outcome.errors.join(' '));
   if (outcome.status === 'conflict') throw new Error(`Program changed on another device. ${outcome.message}`);
-  if (outcome.status === 'unavailable') throw new Error(getErrorMessage(outcome.message));
+  if (outcome.status === 'unavailable') throw new Error(outcome.message);
   return outcome.receipt.programId;
 }
