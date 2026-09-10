@@ -5,6 +5,39 @@
 
 ---
 
+### 2026-09-10 AP-02/AP-03 durable-record integration {#2026-09-10-ap-02-ap-03}
+
+**Summary**: Implemented and integration-verified versioned workout/program
+contracts, owner-scoped durable pending state, transactional replay-safe
+database commands, immutable program revisions and exact V2 checkpoints. The
+generated and free manual program paths share one installer; workout completion
+now requires an explicit finalized outcome. Writer flags default off.
+
+**Evidence**: focused suites pass (`catalog` 9, `workouts` 5, `programs` 4);
+fresh local PostgreSQL 17 reset, AP-01 regression SQL, AP-02/AP-03 atomicity and
+isolation SQL, database lint, local dry-run, strict TypeScript and application
+lint all pass in the clean integrator worktree. Migration SHA-256 is
+`B0CD723D7D00F31B604168F7FC842CB1DB4117ACD9AE2407E1549029534877F2`.
+The nine lint warnings are in three paths unchanged from base `93e9f7b`.
+
+**Production boundary**: authenticated dashboard inspection reconfirmed healthy
+project `thfxcvxcsfvrzdysdnkq`, only the two AP-01 ledger versions, and no Free
+plan managed backups. CLI platform authentication is absent. No production
+backup, migration, schema/data write, ledger update or flag enablement occurred.
+
+**Disposition**: AP-02 and AP-03 are **INTEGRATION VERIFIED; RELEASE BLOCKED**.
+Required release gates are a fresh encrypted logical backup/decrypt/PostgreSQL 17
+restore comparison, secure CLI reauthentication, real Expo-device matrix, then
+production dry-run/apply and authenticated old/new-client verification. Full
+evidence: [AP-02](/dev-doc/reports/ADAPTIVPUSH-AP-02-2026-09-10.md) and
+[AP-03](/dev-doc/reports/ADAPTIVPUSH-AP-03-2026-09-10.md).
+
+**Commits**: `932f983`, `d21bf62`, `3a71ff7`, `f5e6775`, `9b5bf78`,
+`8e93352`; integration merges `c6bc219`, `8884d5f`, `7acc28f` before evidence
+closeout.
+
+---
+
 ### 2026-09-10 AP-01.3 database foundation and production enforcement {#2026-09-10-ap-01-3-database-foundation}
 
 **Summary**: Completed the database work that blocked AP-02/AP-03. Captured and

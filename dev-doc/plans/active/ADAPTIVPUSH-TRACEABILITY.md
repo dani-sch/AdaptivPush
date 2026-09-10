@@ -99,6 +99,12 @@ device evidence are not inferred from the database release.
 
 ## AP-02 — Durable workout records
 
+2026-09-10 evidence status: contract, client, local persistence, atomic command,
+fault/replay/RLS and clean integration checks pass behind a default-off flag.
+AC-TR-008/010/011/012 are locally satisfied; AC-TR-009/013/014 retain their
+physical-device portions. Production backup/restore, migration rollout and
+authenticated old/new-client smoke remain open. See [AP-02 evidence](/dev-doc/reports/ADAPTIVPUSH-AP-02-2026-09-10.md).
+
 | Requirement / legacy locator | Disposition and decision | Behavior / contract; database authority; code | Acceptance scenario and expected evidence |
 |---|---|---|---|
 | TR-008 · LM G Next Workout; LR S6 completion; DP session-before-sets finding | revised · D-11/12 | CompletedWorkout: draft/finalizing/finalized distinction; atomic finalization of accepted prescription, sets and occurrence fulfillment. workout_sessions, workout_exercise_sets; command; WORK. | AC-TR-008: fail after session creation/before sets; no finalized completion or progression appears; retry same operation creates one result. I |
@@ -111,6 +117,12 @@ device evidence are not inferred from the database release.
 | TR-015 · PF 10 rest timer; IP 3D note | deferred · D-13 | Rest timer and background expiry feedback are later AP-02 enhancement, separate from existing elapsed timer; local. | AC-TR-015: current release never labels elapsed timer as rest timer; future timer must handle background expiry, permission denial, mute, and duplicate alerts. DOC/U |
 
 ## AP-03 — Durable programs, identity, and free onboarding
+
+2026-09-10 evidence status: immutable revision/identity, common generated/manual
+installer, atomic failure/concurrency/replay, one-active-owner, checkpoint and
+clean integration checks pass behind a default-off flag. Device portions of the
+onboarding/archive/overview/offline acceptance rows and production rollout remain
+open. See [AP-03 evidence](/dev-doc/reports/ADAPTIVPUSH-AP-03-2026-09-10.md).
 
 | Requirement / legacy locator | Disposition and decision | Behavior / contract; database authority; code | Acceptance scenario and expected evidence |
 |---|---|---|---|
