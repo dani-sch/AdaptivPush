@@ -1,6 +1,6 @@
 # AdaptivPush database and migration plan
 
-Status: approved planning direction with AP-01.1 read-only inspection recorded; no new migration authorized or applied by this document. Snapshot: 2026-09-09. This document owns physical-data planning, compatibility, authority and database verification. The [master plan](/dev-doc/plans/active/ADAPTIVPUSH-MASTER-PLAN.md) owns domain behavior, the [register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) owns slice gates, and the [implementation status](/dev-doc/plans/active/ADAPTIVPUSH-IMPLEMENTATION-STATUS.md) owns code facts. [D-12](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECORD-2026-09-08.md#d-12--database-rollout) requires additive, slice-owned work. The 28-table packet is a design inventory, not a batch of approved migrations.
+Status: approved planning direction with AP-01.1 read-only inspection and AP-01.3a local tooling preparation recorded; no new migration authorized or applied by this document. Snapshot: 2026-09-10. This document owns physical-data planning, compatibility, authority and database verification. The [master plan](/dev-doc/plans/active/ADAPTIVPUSH-MASTER-PLAN.md) owns domain behavior, the [register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) owns slice gates, and the [implementation status](/dev-doc/plans/active/ADAPTIVPUSH-IMPLEMENTATION-STATUS.md) owns code facts. [D-12](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECORD-2026-09-08.md#d-12--database-rollout) requires additive, slice-owned work. The 28-table packet is a design inventory, not a batch of approved migrations.
 
 ## Evidence and baseline rules
 
@@ -39,6 +39,17 @@ command uses only the administrator client. All 52 persistable local entries and
 six fixture names resolved in a current read-only check. Production grants and
 policies were not changed. Baseline/backup/isolated-target evidence remains a
 prerequisite to the slice-owned enforcement migration.
+
+AP-01.3a local enablement on 2026-09-10 pinned Supabase CLI `2.117.0`,
+initialized the supported `supabase/` project configuration, and set the local
+database major to 17, matching production PostgreSQL `17.6.1.063`. The current
+dashboard still identifies `thfxcvxcsfvrzdysdnkq` as AdaptivPush Production on
+Free, still offers no scheduled backup, and still shows “Run your first
+migration.” The Docker CLI is installed but its engine is not running; PostgreSQL
+17 client binaries are absent. No link, pull, ledger query/change, dump, restore,
+SQL, migration, or production write occurred. Exact command effects and the
+managed-versus-encrypted backup decision are in
+[the September 10 AP-01 artifact](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-10.md).
 
 ## Current schema and security posture
 
@@ -90,9 +101,9 @@ Original files remain evidence; do not rewrite their historical contents or use 
 
 ## AP-01 migration provenance and authority gate
 
-The first executable database slice is inspection and a reviewable baseline/repair design, coupled with current-client catalog compatibility. It must produce an inventory of schemas, columns/defaults/nullability, constraints/FK actions, indexes, RLS enablement/force state/policy roles/expressions, table/sequence/function/schema grants, inherited roles, exposed RPCs/search paths, storage policies and managed migration state. Check owner/anon/authenticated/service identities separately; `TO public` applies broadly but cannot independently grant SQL privileges. Never infer a security boundary from a policy name.
+AP-01 database execution began with inspection and a reviewable baseline/repair design, coupled with current-client catalog compatibility. The remaining baseline must produce an inventory of schemas, columns/defaults/nullability, constraints/FK actions, indexes, RLS enablement/force state/policy roles/expressions, table/sequence/function/schema grants, inherited roles, exposed RPCs/search paths, storage policies and managed migration state. Check owner/anon/authenticated/service identities separately; `TO public` applies broadly but cannot independently grant SQL privileges. Never infer a security boundary from a policy name.
 
-Follow the supported CLI baseline path documented by the historical audit and refined in the AP-01 artifact: authenticated project link, schema pull to `supabase/migrations/`, comparison against the current server and 001–017, and supported migration repair only after equivalence is reviewed. Do not manually populate Supabase's internal ledger. Record baseline hashes, project/environment, tool version, command effects, drift exceptions and reviewer. Any CLI operation that changes the remote ledger requires separate authorization. The managed application ledger is currently absent; CLI tooling and credentials remain unavailable.
+Follow the supported CLI baseline path documented by the historical audit and refined in the AP-01 artifacts: use pinned CLI `2.117.0`, authenticate as the named credential operator, supply the existing database password through `SUPABASE_DB_PASSWORD`, link to the reverified project under explicit authorization, pull a named schema baseline to `supabase/migrations/` while answering `n` to the remote-history prompt, compare it against the current server and 001–017, and review supported migration repair only after equivalence is approved. The passwordless link flow can initialize/rotate a temporary `cli_login_postgres` role, so link is not classified as purely local; record and authorize any observed role effect. Migration-mode `db pull` requires Docker, writes the local baseline, and may insert its version into remote history when accepted. `migration repair --status applied` inserts a history row; `--status reverted` deletes one; neither applies or reverts schema SQL. Do not use `--yes`, manually populate the ledger, or run `db reset --linked`. Record baseline hashes, project/environment, tool/server versions, command effects, drift exceptions and reviewer. Any remote role/history change requires separate authorization. The managed application ledger and required credentials are currently absent; the CLI/config path is now locally available.
 
 Before subsequent production schema change, require a chosen backup owner/mechanism, encryption/access/retention, a completed restore drill into isolation and a measured recovery procedure. Current dashboard evidence confirms the Free project has no managed scheduled backup, PITR, or restore-to-new-project capability. Choose managed physical backups or an encrypted external dump workflow, then prove an isolated restore. A plan to back up is not a passing restore gate.
 

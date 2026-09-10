@@ -24,9 +24,11 @@
 - [COMPLETE] Added nine deterministic catalog cases; lint and strict TypeScript pass.
 - [GATED] Do not apply catalog policy/grant changes until the compatible client is verified and AP-01.3 baseline/backup/isolated-target prerequisites exist.
 
-## [BLOCKED] AP-01.3a — Baseline, backup, and isolated target
+## [IN PROGRESS] AP-01.3 — Baseline, backup, and isolated target
 
-- [BLOCKED] Name the credential/tool owner and provision a supported pinned Supabase CLI plus PostgreSQL dump/restore tooling.
+- [COMPLETE] Pin Supabase CLI `2.117.0`, initialize the supported `supabase/` structure, and match local PostgreSQL major 17 to production `17.6.1.063`.
+- [COMPLETE] Reinspect project identity, Free backup state, empty managed migration UI, exact `link`/`db pull`/`migration repair` effects, and prepare the baseline/restore/security checklists without a remote action.
+- [BLOCKED] Name the credential owner and provide an existing Supabase access token/database password through an approved non-repository channel. Provision executable PostgreSQL 17 restore tooling by starting the reviewed Docker engine or installing the pinned client.
 - [BLOCKED] Choose managed physical backups or authorize an encrypted external dump workflow with retention/access ownership.
 - [BLOCKED] Provide an isolated Supabase restore/role-test target; never use production for the drill.
 - [BLOCKED] Configure `integrator` or explicitly approve an alternative, and provide an Expo-capable device for the later compatibility matrix.

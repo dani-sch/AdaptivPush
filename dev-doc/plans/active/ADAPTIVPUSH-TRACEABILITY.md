@@ -85,6 +85,14 @@ does not claim restore, live ordinary-role write denial, trusted-curation
 execution, two-owner write isolation, missing-schema runtime, Expo device,
 integration, deployment, or release evidence.
 
+[The September 10 AP-01.3a artifact](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-10.md)
+adds partial AC-TR-001/007 evidence: pinned CLI `2.117.0`, PostgreSQL 17 local
+configuration matching production `17.6.1.063`, current project/backup/migration
+UI reinspection, and an exact command-effect/baseline/backup/restore checklist.
+It adds no database evidence for AC-TR-002–006 and does not claim a project link,
+baseline, ledger repair, backup, restore, isolated role test, device test,
+integration, deployment, or release.
+
 ## AP-02 — Durable workout records
 
 | Requirement / legacy locator | Disposition and decision | Behavior / contract; database authority; code | Acceptance scenario and expected evidence |

@@ -2,7 +2,7 @@
 
 ## Authority
 
-The [approved decision record](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECORD-2026-09-08.md) owns D-01–D-14 product decisions. The current consolidation request executes its documentation-restructuring decision; older pending-language in the saved handoff is historical. No application implementation or migration is authorized by this documentation review.
+The [approved decision record](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECORD-2026-09-08.md) owns D-01–D-14 product decisions. The planning consolidation is complete; older pending-language in saved handoffs is historical. Bounded AP execution is active, but no document alone authorizes a database mutation, deployment, or release.
 
 | Document | Owns |
 |---|---|
@@ -18,7 +18,7 @@ The living spine summarizes these owners. Historical source plans never override
 
 ## Current lane
 
-[TODO](/dev-doc/main/TODO.md) routes the immediate work. Planning consolidation is ready for final review once documentation verification closes. First future executable packet: **AP-01.1**, read-only catalog/grant/migration-ledger and restore evidence inspection. Application slices remain unimplemented by this task; existing useful code and historical gates remain recorded as inputs, not blanket AP completion.
+[TODO](/dev-doc/main/TODO.md) routes the immediate work. AP-01.1 read-only inspection and AP-01.2a lookup-only catalog compatibility are locally verified. AP-01.3a local enablement pinned Supabase CLI `2.117.0`, initialized the supported PostgreSQL 17 project structure, and documented command effects without linking or mutating production. Exact next packet: **AP-01.3b**, authorized baseline capture plus the backup/isolated-target decision. AP-02 and later slices remain gated.
 
 Approved release sequence: authority/provenance -> durable workouts/programs -> free schedules/progression -> advanced generation/equipment precision -> contextual coaching/recovery -> unlisted publishing/install -> optional health/themes -> operationally gated discovery/community. AP-16 operational obligations close with each relevant consumer.
 

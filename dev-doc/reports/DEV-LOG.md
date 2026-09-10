@@ -5,6 +5,62 @@
 
 ---
 
+### 2026-09-10 AP-01.3a baseline and restore enablement {#2026-09-10-ap-01-3a-enablement}
+
+**Summary**: Completed the safe local portion of AP-01.3a. Pinned the supported
+Supabase CLI, initialized the PostgreSQL 17 local project configuration, rechecked
+the production project/backup/migration identity, and prepared the exact
+credential, command-effect, baseline, backup, restore, and isolated security
+checklists. No remote database or migration-history action occurred.
+
+**Changes**:
+
+| Component | Change |
+|---|---|
+| tooling | Added exact dev dependency `supabase@2.117.0`; Node 24 satisfies the CLI requirement. |
+| local database config | Added generated `supabase/config.toml` and `.gitignore`; local PostgreSQL major 17 matches production `17.6.1.063`. |
+| command review | Recorded that passwordless `link` can initialize a temporary remote CLI role; migration-mode `db pull` requires Docker, writes a local timestamped migration, and may update remote history; repair applied/reverted inserts/deletes history rows without applying schema SQL. |
+| production reinspection | Confirmed AdaptivPush `thfxcvxcsfvrzdysdnkq`, `main` Production, Free, `us-east-1`, empty managed migration UI, and no scheduled backups. |
+| recovery decision | Prepared managed-physical versus encrypted-external logical backup choices and the isolated restore/security matrix. |
+
+**Files Added/Modified**:
+
+| File | Action | Purpose |
+|---|---|---|
+| `package.json`, `package-lock.json` | modified | Pin the project-local Supabase CLI. |
+| `supabase/config.toml`, `supabase/.gitignore` | added | Establish the supported local PostgreSQL 17 Supabase structure without linking. |
+| `dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-10.md` | added | Durable AP-01.3a command-effect, authorization, backup, restore, and gate evidence. |
+| AP-01 register/status/database/traceability owners | modified | Record partial AP-01.3 progress and exact remaining gates. |
+| living docs and TOC | modified | Route the next executable packet as AP-01.3b and refresh inventory. |
+
+**Verification**:
+
+| Check | Result |
+|---|---|
+| `npm run test:catalog` | 9 passed, 0 failed. |
+| `npm run lint` | passed with 0 errors and 17 unchanged pre-existing warnings. |
+| `npx tsc --noEmit` | passed. |
+| `npx supabase --version` | `2.117.0`. |
+| `git diff --check` | passed for the tooling commit; repeated for documentation closeout. |
+| database/backup/restore/integration/device | not run and not claimed. |
+
+**Commits**:
+
+- `96ba874` `chore(database): pin supabase baseline tooling`
+- documentation closeout commit follows this entry
+
+**Remaining gates**: Name the credential operator; provide an existing access
+token/database password securely; run or provision PostgreSQL 17 tooling; choose
+the backup mechanism and owners; name a distinct isolated target; and authorize
+the no-history-update baseline pull. Integrator and Expo device remain later
+AP-01.3 gates. Ledger repair, catalog enforcement, production deployment, and
+release require separate authorization.
+
+**Next**: AP-01.3b authorized baseline capture plus backup/isolated-target
+decision.
+
+---
+
 ### 2026-09-09 AP-01.2a lookup-only catalog client {#2026-09-09-ap-01-2a-catalog-client}
 
 **Summary**: Implemented and locally verified the compatible client-first

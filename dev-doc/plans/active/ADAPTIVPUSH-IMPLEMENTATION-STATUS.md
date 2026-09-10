@@ -1,6 +1,6 @@
 # AdaptivPush code-backed implementation status
 
-Snapshot: 2026-09-09. This document owns implementation facts and unresolved code defects. The [master plan](/dev-doc/plans/active/ADAPTIVPUSH-MASTER-PLAN.md) owns target product behavior; the [execution register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) owns delivery status and gates; the [database plan](/dev-doc/plans/active/ADAPTIVPUSH-DATABASE-PLAN.md) owns schema evolution. Approved decisions override historical product proposals, but do not make target behavior implemented.
+Snapshot: 2026-09-10. This document owns implementation facts and unresolved code defects. The [master plan](/dev-doc/plans/active/ADAPTIVPUSH-MASTER-PLAN.md) owns target product behavior; the [execution register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) owns delivery status and gates; the [database plan](/dev-doc/plans/active/ADAPTIVPUSH-DATABASE-PLAN.md) owns schema evolution. Approved decisions override historical product proposals, but do not make target behavior implemented.
 
 ## Evidence boundaries
 
@@ -14,6 +14,15 @@ enabled without force on all 16, full `exercises` privileges for `anon` and
 ledger, no Free-plan managed backup, 1,369 exercises, 51 missing external IDs,
 and 17 normalized-name collision groups. Exact methods and limitations are in
 [the AP-01 evidence artifact](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-09.md).
+
+AP-01.3a local enablement on 2026-09-10 pinned Supabase CLI `2.117.0` as
+a dev dependency and created the supported local `supabase/config.toml` with
+PostgreSQL major 17, matching the current production service version
+`17.6.1.063`. Dashboard identity, Free-plan backup absence, and empty managed
+migration UI were rechecked. No CLI authentication/link, SQL, schema pull,
+ledger update, dump, restore, policy change, or other database action occurred.
+[The dated enablement artifact](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-10.md)
+owns command effects and remaining credential/backup/target gates.
 
 | Label | Meaning |
 |---|---|
@@ -59,7 +68,7 @@ The application is Expo Router/React Native with screen-level Supabase access, s
 | Shared UI and accessibility / all slices | Scaffolded: shared colors/tokens and a small generic UI set; bespoke screen styles dominate. | [UI directory](/components/ui/), [theme context](/contexts/ThemeContext.tsx). | No measured device accessibility, dynamic-type/contrast/screen-reader pass or complete shared component system was established here. |
 | Privacy/export/deletion / AP-16 | Scaffolded metadata request UI. | [`handleDataRequest`](/app/(tabs)/profile/privacy-data.tsx#L223), metadata request timestamp :249. | No secure request processor, downloadable export, deletion saga, status/audit or retention fulfillment. A metadata update is not an export or deletion. |
 | Support / AP-16 | Scaffolded metadata request action and unsupported delivery promises. | [Help & Support](/app/(tabs)/profile/help-support.tsx), `handleSupportAction`. | No issue body delivery/ticket lifecycle or proven response SLA. Requests need server acknowledgment and named operational ownership. |
-| Flags, tests and release / AP-01, AP-16 and each slice | Missing target gate infrastructure. | [package scripts](/package.json#L5), [temporary app identity](/app.json#L3), inspected route/utility inventory. | No application test script, feature-flag implementation, durable outbox, production bundle/package identity or complete release configuration. Existing lint/type tools can support future gates. |
+| Flags, tests and release / AP-01, AP-16 and each slice | Partial local gate infrastructure. | [package scripts](/package.json#L5), [catalog tests](/tests/catalog/resolveCatalogExercises.test.ts), [Supabase config](/supabase/config.toml), [temporary app identity](/app.json#L3). | Focused catalog tests and pinned database CLI exist; broader application tests, feature flags, durable outbox, production bundle/package identity, isolated database target, and complete release configuration remain missing. |
 
 ## Unresolved defect ledger
 
@@ -67,7 +76,7 @@ These items are actionable source findings, not a claim that a new runtime failu
 
 | ID | Defect / impact | Evidence and minimum correction gate |
 |---|---|---|
-| DEF-01 / AP-01 | Catalog RLS policy detail is permissive in the September packet; effective grants and API exposure remain unverified. Client catalog writes make tightening the boundary a compatibility change. | Packet database evidence; `saveProgramToDb` :339, hook dev seeding :598 and `scripts/seedExercises.ts` :164. Verify grants and anonymous/authenticated effective denial; replace ordinary client writes with trusted lookup/import or a separate owner-only custom model. |
+| DEF-01 / AP-01 | Catalog policies are unconditional and `anon`/`authenticated` have all table privileges. Lookup-only generated/dev saves are locally implemented, but tightening the boundary remains a compatibility and deployment change. | September 9 database evidence and catalog commits; verify authenticated normal save, ordinary-role denial, trusted curation, old-client handling, backup/restore, and safe rollout in isolation before production enforcement. |
 | DEF-02 / AP-02 | Session insert precedes set insert; set failure navigates away after partial-save alert. There is no transactional outcome or operation token. | `handleFinish` :374/:410/:415; fixture must recover entered sets after a failure, replay finalization once and preserve an explicit partial state. |
 | DEF-03 / AP-02 | Missing exercise IDs silently drop sets; filtered sets are renumbered; `parseFloat(weight) \|\| null` collapses valid zero to null. | `handleFinish` :390–405. Validate before completion; preserve stable set identity and distinguish zero/bodyweight/unknown/assistance. |
 | DEF-04 / AP-02, AP-04 | Any session linked to a day is treated as completion, regardless of missing sets/partial outcome. | `refresh` :164–173. Require explicit fulfillment rather than row existence; pending sync is neither failure nor completion. |
@@ -90,12 +99,12 @@ The progression helper still supports readiness increases, but the current hook 
 
 ## Database-use status
 
-The [database plan](/dev-doc/plans/active/ADAPTIVPUSH-DATABASE-PLAN.md#current-schema-and-security-posture) gives authoritative per-table status, policy caveats and migration mapping. Active runtime data is `programs`, `program_days`, `program_day_exercises`, `exercises`, `workout_sessions`, `workout_exercise_sets`, `personal_records`, `readiness_logs` and `user_profile`. Preference compatibility uses `user_adaptation_preferences`; onboarding seeds `evidence_display_preferences`; generated saves write `program_generation_context`. Richer readiness/symptom/adaptation/deload tables exist in the schema/migrations but their approved runtime lifecycle is not implemented. Proposed schedule/public/commerce/health/equipment tables are not existing infrastructure.
+The [database plan](/dev-doc/plans/active/ADAPTIVPUSH-DATABASE-PLAN.md#current-schema-and-security-posture) gives authoritative per-table status, policy caveats and migration mapping. Active runtime data is `programs`, `program_days`, `program_day_exercises`, `exercises`, `workout_sessions`, `workout_exercise_sets`, `personal_records`, `readiness_logs` and `user_profile`. Preference compatibility uses `user_adaptation_preferences`; onboarding seeds `evidence_display_preferences`; generated saves write `program_generation_context`. Richer readiness/symptom/adaptation/deload tables exist in the schema/migrations but their approved runtime lifecycle is not implemented. Proposed schedule/public/commerce/health/equipment tables are not existing infrastructure. The committed `supabase/config.toml` is local tooling configuration, not a pulled baseline or deployed schema fact.
 
 ## Historical verification and remaining inspection
 
 The [August live audit](/dev-doc/reports/FABLE-5-LIVE-SUPABASE-AUDIT-2026-08-03.md) records seven-table ownership isolation, avatar policy repair and exercise external-ID remediation. The [development log](/dev-doc/reports/DEV-LOG.md) records authenticated synthetic-user profile/default/context checks, injected context failure cleanup, lint/type checks and cleanup of the synthetic identity. These results retain their original dates and scope. They do not prove current catalog grants, the full current save coordinator, atomic workouts, mobile accessibility, durable offline state, migrations/backup normalization or any proposed feature.
 
-Before AP-01 exit: inspect effective grants and role inheritance for catalog/API/function access, supported migration ledger reconciliation, current backup and successful restoration evidence, actual Quick Setup/Profile/Generate Program device flows, and runtime missing-schema fallback. Before later slice completion: establish the relevant deterministic unit fixtures and local SQL/command tests, run `npm run lint` and `npx tsc --noEmit` when application code changes, then execute the slice's real integration/device gates. The repository currently has no application test script; test-runner setup is required implementation work, not verification completed by this document.
+Before AP-01 exit: capture and review the supported baseline, reconcile the migration ledger only after approval, create and restore the selected backup in isolation, run catalog/two-owner/storage role tests, and exercise actual Quick Setup/Profile/Generate Program plus missing-schema behavior on an Expo device. Before later slice completion: establish the relevant deterministic unit fixtures and local SQL/command tests, run `npm run lint` and `npx tsc --noEmit` when application code changes, then execute the slice's real integration/device gates. The focused catalog harness exists; broader application test-runner coverage remains required implementation work.
 
-No application code or database mutation was performed to produce this snapshot.
+No application code or database mutation was performed to produce this snapshot. Local package and Supabase configuration changed only.
