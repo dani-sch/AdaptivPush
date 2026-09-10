@@ -5,6 +5,34 @@
 
 ---
 
+### 2026-09-10 AP-03 flag-off recovery and Android generated-save smoke {#2026-09-10-ap-03-flag-off-recovery}
+
+**Summary**: Reproduced a generic generated-program save failure with the
+default-off AP-03 writer in an Android 16 development build. Added a public
+save-entry guard before catalog/profile/database work and retained actionable
+repository errors instead of collapsing them to `Program save failed`.
+
+**Device/local evidence**: With the writer off, the UI displayed the explicit
+disabled-install recovery message, a sentinel profile preference stayed at 45,
+and the synthetic owner retained zero program/context rows. With AP-02/AP-03
+writers on against local Supabase, the same flow installed one active schema-v2
+program, one immutable revision, 24 days, 112 slots and one generation context.
+Quick Setup reached generation with optional demographic and weight fields
+omitted. The local catalog fixture came only from the repository snapshot; no
+production credential or mutation was used.
+
+**Verification**: `npm run test:programs` 6/6, `npx tsc --noEmit` pass,
+`npm run lint` pass with zero errors and three unrelated warnings, and native
+Android build/install pass on API 36 with JDK 17. The full kill/offline,
+background, manual/archive, account-switch, old-client and accessibility/theme
+matrix remains open.
+
+**Disposition**: AP-03 remains **INTEGRATION VERIFIED; RELEASE BLOCKED**. This
+is bounded release hardening and partial device evidence, not LOCAL VERIFIED,
+RELEASED, production deployment or rollout enablement. Code commit: `dec5170`.
+
+---
+
 ### 2026-09-10 AP-02/AP-03 durable-record integration {#2026-09-10-ap-02-ap-03}
 
 **Summary**: Implemented and integration-verified versioned workout/program
