@@ -13,7 +13,7 @@
 - [COMPLETE] Reconciled current end state to retained SQL 001–017 and confirmed that a supported application ledger is absent; no historical migration was replayed or manually registered.
 - [COMPLETE] Confirmed current Free-plan backup limitations and produced the restore plan later executed by AP-01.3.
 - [OPEN] Close actual Expo Quick Setup/Profile/Generate Program UI and missing-schema fallback evidence in AP-01.3.
-- [BLOCKED] Configure `integrator` or approve an alternative before integration claims.
+- [COMPLETE] Configure and verify the `integrator` worktree for AP-02/AP-03 integration claims.
 
 ## [LOCAL VERIFIED] AP-01.2a — Lookup-only catalog contract and resolver
 
@@ -33,11 +33,25 @@
 - [COMPLETE] Restore roles/schema/data into local PostgreSQL 17 isolation; match 20 relation counts and aggregate schema/security inventory, recording the reserved managed-role and Storage-body caveats.
 - [COMPLETE] Add and fresh-reset migration `20260910190000`; preserve the auth signup trigger, harden its SECURITY DEFINER boundary, remove ordinary catalog mutations, preserve reads/trusted curation, and pass the self-contained two-owner/Storage suite.
 - [COMPLETE] Dry-run and apply only the catalog-authority migration to production; verify aligned ledger, grants/policies/function/trigger, ordinary denial, trusted rolled-back curation, and unchanged catalog count.
-- [OPEN] Configure `integrator` or explicitly approve an alternative, and provide an Expo-capable device for the remaining AP-01 application compatibility matrix. These do not block AP-02/AP-03 database implementation.
+- [COMPLETE] Configure the `integrator` worktree and pass the later AP-02/AP-03 clean integration gates.
+- [OPEN] Provide an Expo-capable device for the remaining AP-01 application compatibility matrix.
 
-## [NEXT] Bounded implementation
+## [INTEGRATION VERIFIED — RELEASE BLOCKED] AP-02/AP-03 — Durable records
 
-AP-02/03 durable records are now unblocked -> AP-04/05 schedules/free progression -> AP-06/07 advanced generation/equipment -> AP-08/09/10 coaching -> AP-11 unlisted -> optional AP-12/13 -> operationally gated AP-14/15. Relevant AP-16 privacy/purchase/support/accessibility gates are embedded throughout. [Register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) owns details.
+- [COMPLETE] Add versioned workout/program contracts, stable identities, frozen prescriptions and actual-versus-planned/load semantics.
+- [COMPLETE] Add owner-scoped durable pending stores and replay-safe common repositories/commands.
+- [COMPLETE] Add one additive migration with immutable program revisions, one-active-per-owner, exact V2 checkpoints, transactional program install and workout finalize RPCs, direct-write denial and durable receipt effects.
+- [COMPLETE] Route generated/manual program saves and Next Workout through the common commands; remove false completion and visible development-program behavior.
+- [COMPLETE] Pass focused contract tests, AP-01 regression SQL, AP-02/AP-03 atomicity/isolation SQL, fresh reset, database lint, strict types, lint and clean integrator verification.
+- [BLOCKED] Supply an Expo-capable device/emulator for the authenticated kill/offline/reconnect, route, background, account-switch and accessibility/theme matrix.
+- [BLOCKED] Securely reauthenticate the Supabase CLI, create a fresh encrypted production logical backup, prove PostgreSQL 17 decrypt/restore equivalence, then dry-run/apply/verify the production migration. Dashboard confirms Free has no managed backup.
+- [OPEN] Enable `EXPO_PUBLIC_AP02_DURABLE_WRITER` and `EXPO_PUBLIC_AP03_ATOMIC_WRITER` only after all release gates pass; monitor conflicts/replays/outcome coverage without sensitive payloads.
+
+Evidence: [AP-02](/dev-doc/reports/ADAPTIVPUSH-AP-02-2026-09-10.md) and [AP-03](/dev-doc/reports/ADAPTIVPUSH-AP-03-2026-09-10.md).
+
+## [NEXT AFTER RELEASE] Bounded implementation
+
+Release AP-02/03 durable records -> AP-04/05 schedules/free progression -> AP-06/07 advanced generation/equipment -> AP-08/09/10 coaching -> AP-11 unlisted -> optional AP-12/13 -> operationally gated AP-14/15. Relevant AP-16 privacy/purchase/support/accessibility gates are embedded throughout. [Register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) owns details.
 
 ## [REQUIRES INSPECTION]
 

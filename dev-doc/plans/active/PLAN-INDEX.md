@@ -18,7 +18,7 @@ The living spine summarizes these owners. Historical source plans never override
 
 ## Current lane
 
-[TODO](/dev-doc/main/TODO.md) routes the immediate work. AP-01.1 read-only inspection and AP-01.2a lookup-only catalog compatibility are locally verified. AP-01.3 completed the production baseline/ledger, encrypted backup and local restore, cross-schema trigger reconciliation, isolated security suite, and production catalog enforcement on 2026-09-10. Database blockers for AP-02 and AP-03 are closed; those durable-record slices are now the next implementation lanes. AP-01 remains open only for separately classified integrator, Expo-device UI, and runtime missing-schema evidence.
+[TODO](/dev-doc/main/TODO.md) routes the immediate work. AP-01.1 read-only inspection and AP-01.2a lookup-only catalog compatibility are locally verified. AP-01.3 completed the production baseline/ledger, encrypted backup and local restore, cross-schema trigger reconciliation, isolated security suite, and production catalog enforcement on 2026-09-10. AP-02 and AP-03 are integration-verified behind default-off flags; their production release is blocked on a fresh encrypted backup/restore, secure CLI reauthentication, Expo-device evidence and production deployment verification. AP-04/AP-05 remain next only after that boundary.
 
 Approved release sequence: authority/provenance -> durable workouts/programs -> free schedules/progression -> advanced generation/equipment precision -> contextual coaching/recovery -> unlisted publishing/install -> optional health/themes -> operationally gated discovery/community. AP-16 operational obligations close with each relevant consumer.
 

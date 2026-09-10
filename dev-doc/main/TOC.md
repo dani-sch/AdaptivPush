@@ -10,7 +10,7 @@
 | Category | Files |
 |----------|-------|
 | Project Root | 4 |
-| Tests | 1 |
+| Tests | 3 |
 | Top-level Scripts | 23 |
 | Automation Scripts | 24 |
 | Tool Scripts | 27 |
@@ -21,7 +21,7 @@
 | Skills | 62 |
 | Agents | 17 |
 | Commands | 8 |
-| **Total** | **223** |
+| **Total** | **225** |
 
 ---
 
@@ -44,8 +44,12 @@ _Test suite_
 
 ```
 └── tests/
-    └── catalog/
-        └── resolveCatalogExercises.test.ts — import assert from 'node:assert/strict';
+    ├── catalog/
+    │   └── resolveCatalogExercises.test.ts — import assert from 'node:assert/strict';
+    ├── programs/
+    │   └── installation.test.ts — import assert from 'node:assert/strict';
+    └── workouts/
+        └── finalization.test.ts — import assert from 'node:assert/strict';
 ```
 
 ---

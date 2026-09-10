@@ -356,6 +356,6 @@ Every slice is done only when its user-visible outcome, failure/retry/rejection 
 | Equipment exact schema/load comparisons | AP-07 observed payload/workflow design and roundtrip fixtures; no assumed cross-machine equivalence |
 | Store/platform/HealthKit/deep links | AP-11–13/16 current official-policy and native build verification during implementation |
 | Legal terms, deletion/retention/takedown and staffing | AP-11/14–16 qualified review and named operations/capacity drill before relevant launch |
-| Integration workflow | `integrator` absent from current worktree inventory; configure or explicitly approve alternative before integration claims |
+| Integration workflow | `integrator` was configured and clean AP-02/AP-03 integration gates passed on 2026-09-10; each later slice still requires its own integration proof |
 
-Immediate next implementation slice after review: AP-01.1 inspect current catalog writers/effective grants/migration ledger/restore capability and record evidence gaps. Stop this consolidation at user review; do not begin implementation, deploy, migrate, or publish from this document.
+Current execution position: AP-01.3 database authority is released; AP-02/AP-03 are integration-verified behind default-off flags and await their fresh production recovery, device and rollout gates. AP-04/AP-05 follow only after that release boundary. This plan remains behavioral authority, not permission to deploy, migrate or publish.
