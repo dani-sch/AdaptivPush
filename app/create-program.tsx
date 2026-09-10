@@ -125,10 +125,6 @@ export default function CreateProgramScreen() {
     const [keyboardVisible, setKeyboardVisible] = useState(false);
 
     useEffect(() => {
-        setDays((prev) => generateDays(daysPerWeek, prev));
-    }, [daysPerWeek]);
-
-    useEffect(() => {
         const showSub = Keyboard.addListener('keyboardDidShow', () => {
             setKeyboardVisible(true);
         });
@@ -390,7 +386,10 @@ export default function CreateProgramScreen() {
                                             return (
                                                 <Pressable
                                                     key={num}
-                                                    onPress={() => setDaysPerWeek(num)}
+                                                    onPress={() => {
+                                                        setDaysPerWeek(num);
+                                                        setDays((prev) => generateDays(num, prev));
+                                                    }}
                                                     style={[
                                                         styles.dayNumberButton,
                                                         selected

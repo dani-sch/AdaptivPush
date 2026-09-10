@@ -399,13 +399,7 @@ export default function HistoryScreen() {
     }
   };
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchWorkoutHistory();
-    }, [])
-  );
-
-  const fetchWorkoutHistory = async () => {
+  const fetchWorkoutHistory = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -475,7 +469,13 @@ export default function HistoryScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void fetchWorkoutHistory();
+    }, [fetchWorkoutHistory]),
+  );
 
   const summary = useMemo(() => {
     const totalWorkouts = workouts.length;
