@@ -1,14 +1,14 @@
-# AdaptivPush AP-01.3a enablement evidence — 2026-09-10
+# AdaptivPush AP-01.3 database-foundation evidence — 2026-09-10
 
 ## Packet and evidence boundary
 
-This artifact records the bounded AP-01.3a local enablement packet at repository
+This opening section records the bounded AP-01.3a local enablement packet at repository
 base `b04f366` on feature branch `adaptivpush-refactor`. It establishes the
 supported local Supabase project structure, pins the CLI, rechecks the hosted
 project identity/capability state, documents exact command effects, and prepares
 the authorization, backup, restore, and isolated-test checklists.
 
-No Supabase login, token creation, database-password reset, project link, schema
+During that initial packet, no Supabase login, token creation, database-password reset, project link, schema
 pull, migration-list query, migration repair, dump, backup, restore, SQL query,
 seed, policy/grant change, isolated write test, production write, deployment,
 plan upgrade, or integration action was performed. AP-01.3a remains in progress;
@@ -284,3 +284,122 @@ production enforcement. The timestamped baseline name and catalog-authority
 migration filename cannot be selected safely before the supported baseline and
 ledger are captured and reconciled. AP-01.3 and AP-01 remain open; AP-02 and
 AP-03 are still database-gated.
+
+## AP-01.3b authorized execution — baseline through isolated enforcement
+
+The sole developer subsequently authorized production baseline access, encrypted
+external backup, local isolated destructive restore/setup, synthetic role tests,
+ledger repair if proven necessary, production catalog enforcement, and
+forward-fix operation. The authenticated Supabase account and all custody roles
+are `dani-sch`. Credentials were created/reset in the authenticated dashboard,
+loaded only into an ephemeral operator shell, removed from the clipboard, and
+never written to the repository or this report.
+
+### Reconfirmed identities and runtime
+
+| Surface | Executed evidence |
+|---|---|
+| Production source | `AdaptivPush`, ref `thfxcvxcsfvrzdysdnkq`, `main` / `PRODUCTION`, `us-east-1`, Free plan. |
+| Isolated target | Local Docker Supabase project `AdaptivPush`, loopback PostgreSQL endpoint, PostgreSQL `17.6`; no hosted ref and no route to production. Destructive work and synthetic writes were explicitly authorized. |
+| CLI/runtime | Supabase CLI `2.117.0`; Docker Desktop server `29.4.3`; local Supabase PostgreSQL image `17.6.1.167`. Core database/Auth/REST/Storage containers were healthy. The optional Vector log collector remained unhealthy because its Docker log endpoint was unavailable; database validation did not depend on it. |
+| Credential path | A 30-day account token named `AdaptivPush AP-01.3` was created with expiry 2026-10-10. The production database password was reset by the user and the CLI linked through the existing-password path. Values were not recorded. |
+
+### Supported baseline and managed-ledger effect
+
+`npx supabase db pull adaptivpush_baseline_20260910` produced
+`supabase/migrations/20260910175317_adaptivpush_baseline_20260910.sql`.
+Its SHA-256 is
+`A871A75DA4DC062F79F591FB493BC8EC6E3271B02795E6C87C372EBFB56016A7`.
+
+CLI `2.117.0` did not present the documented migration-history confirmation. It
+automatically registered version `20260910175317` as applied and reported
+`Repaired migration history: [20260910175317] => applied`. Read-only evidence
+immediately before the pull showed an empty application ledger; afterward,
+`npx supabase migration list` showed the same single version locally and
+remotely. This unprompted write was disclosed immediately and was not hidden or
+blindly reversed. Semantic validation below demonstrates that the registered
+baseline represents production, so no additional manual repair was necessary.
+
+The retained SQL hashes for 001–017 still match the 2026-09-09 provenance
+report. Migration 001 remains superseded, 005 remains skipped/superseded, and no
+historical SQL file was replayed or falsely registered.
+
+### Semantic drift result
+
+The baseline represents the 16 public tables, 215 columns, 72 constraints, 2
+public functions, 16 RLS-enabled tables, 66 public/Storage policies, and 448
+public table-grant rows observed in production. A fresh baseline replay produced
+39 rather than 40 public indexes because PostgreSQL collapsed one of two
+identical unique constraints on `readiness_logs(user_id, log_date)`. The logical
+schema dump/restore retained both names and all 40 indexes. The duplicate adds
+no distinct invariant; uniqueness remains enforced.
+
+One material cross-schema omission was identified. The public-schema baseline
+contains `public.handle_new_user()` but cannot contain the production trigger
+`auth.users.on_auth_user_created`, because the trigger belongs to Supabase's
+managed `auth` schema. Migration
+`20260910190000_reconcile_auth_trigger_and_enforce_catalog_authority.sql`
+therefore recreates that trigger explicitly, fixes the SECURITY DEFINER
+function-local search path to `''`, removes ordinary EXECUTE authority, and
+retains the trusted trigger/service path.
+
+### Encrypted backup and restore proof
+
+The PostgreSQL 17 logical backup captured roles, schema, and data with the
+reviewed vector-table exclusions. It was compressed only as an intermediate,
+then encrypted using AES-256-GCM. The random encryption key is protected with
+Windows DPAPI `CurrentUser`; plaintext dumps, the intermediate archive, and the
+restore work directory were deleted after authenticated decryption and restore
+verification.
+
+| Field | Recorded value |
+|---|---|
+| Secure location | `C:\Users\dani2\AdaptivPush-secure-backups\AP-01.3\20260910T181500Z` (outside the repository) |
+| Encrypted artifact | `adaptivpush-production-backup.apbak`, 382,577 bytes, SHA-256 `C78618BD07FEB5BCAADB3E69997CE7C9C6C3AB47BC0252B9F89170CFDE387AFC` |
+| Protected key artifact | `adaptivpush-production-backup.key.dpapi`, 262 bytes, SHA-256 `B13A2C12D807BB00949E41EDC4DB1EED9581315DB056195BE96B68FFCEB9B174` |
+| Owners | credential, access, key custody, retention/deletion, recovery, and forward-fix: `dani-sch` |
+| Retention | 30 days after verified production rollout |
+| RPO | logical snapshot at 2026-09-10T18:15:00Z |
+| Restore exercise | authenticated decrypt/extract plus schema/data restore and aggregate comparison completed locally within five minutes; not a hosted RTO guarantee |
+
+`manifest.json` beside the encrypted artifacts records the plaintext hashes,
+format, custody, restore result, and recovery caveats. Database backup includes
+Storage metadata, not Storage object bodies. The local platform rejected only
+the dump's attempt to alter reserved role `supabase_admin`; the ordinary role
+settings, schema, and data restored. Hosted recovery must use the target
+platform's managed-role procedure.
+
+All 20 compared Auth/public/Storage row counts matched production exactly. The
+restored aggregate inventory also matched exactly: 16 tables, 215 columns, 72
+constraints, 40 indexes, 2 public functions, 16 RLS-enabled tables, 66
+public/Storage policies, and 448 public table-grant rows. No private row payload
+was printed or recorded.
+
+### Catalog authority migration and isolated role proof
+
+Migration `20260910190000_reconcile_auth_trigger_and_enforce_catalog_authority`
+removes `exercises_insert`, `exercises_update`, and `exercises_delete`; revokes
+`INSERT`, `UPDATE`, `DELETE`, `TRUNCATE`, `TRIGGER`, `REFERENCES`, and `MAINTAIN`
+from `anon` and `authenticated`; and preserves `SELECT`. Existing
+`postgres`/`service_role` curation authority remains, and `service_role` retains
+`BYPASSRLS`.
+
+The transaction-scoped
+`supabase/tests/ap_01_3_catalog_authority_isolation.sql` suite passed twice on
+the restored local target, including after direct re-execution of the exact
+migration. It proved signup-trigger profile creation, anonymous and
+authenticated catalog reads, ordinary catalog mutation denial, trusted
+insert/update/delete curation, a catalog-UUID-backed program/day/prescription
+save, two-owner program/child isolation, avatar-folder read/update/insert
+isolation, duplicate-name rejection, rollback of all synthetic rows, and safe
+repeat execution. The first test run exposed the platform's deliberate
+statement-level ban on direct SQL deletion from Storage tables; the final test
+uses cross-owner update denial and leaves deletion to the supported Storage API.
+
+The nine deterministic catalog resolver tests remain the evidence that an
+unresolved or ambiguous catalog request fails before the first program mutation;
+the generated-save coordinator performs resolution before its first program
+read/deactivation/write. The previously completed compatibility evidence remains
+valid; no regression was observed in the static gates. Production rollout and
+its post-apply checks are recorded in the next section when executed. Expo-device
+and integrator evidence remain separate non-database gates.
