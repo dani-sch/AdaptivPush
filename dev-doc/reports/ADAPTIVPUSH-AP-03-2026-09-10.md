@@ -69,6 +69,7 @@ or fabricating a precise checkpoint.
 | Native build | Android 16 API 36 x86_64 emulator; Expo SDK 57 native development build compiled and installed with JDK 17.0.20.1. Expo Go was not used because SDK 57 `expo-notifications` requires a development build. |
 | Flag-off generated save | Reproduced the pre-fix generic `Program save failed`. After the fix the UI showed `Atomic program installation is not enabled for this build. Your existing data has not been changed.` A sentinel profile value remained 45 and the authenticated owner retained zero program and generation-context rows. |
 | Flag-on generated save | Against local Supabase and a local catalog fixture sourced from the repository snapshot, the same authenticated flow installed one active schema-v2 program with one revision, 24 day rows, 112 prescription slots and one generation context. No production credential or mutation was used. |
+| Hardening integration | Integrator merge `91ceb50` is clean: catalog 9/9, workouts 5/5, programs 6/6, strict TypeScript pass, and lint pass with zero errors/three unrelated warnings. No SQL changed, so the previously recorded fresh-reset and SQL integration evidence remains the applicable database gate. |
 | Production preflight | Dashboard shows production still at the two AP-01 migrations and no managed backups. No install, archive, schema or ledger mutation occurred. |
 
 ## Acceptance disposition
@@ -109,5 +110,6 @@ artifact. No production deployment or release claim was made.
 AP-03 is delivered by the same six focused implementation commits listed in the
 AP-02 artifact plus release-hardening commit `dec5170`. Integration merge
 commits before the original evidence closeout are `c6bc219`, `8884d5f` and
-`7acc28f`; the hardening branch requires a fresh integrator merge and gate run.
+`7acc28f`; hardening integration merge `91ceb50` passed the changed-surface
+gates recorded above.
 
