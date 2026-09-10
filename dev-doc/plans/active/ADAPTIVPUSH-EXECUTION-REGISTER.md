@@ -11,20 +11,16 @@ Execution update: AP-01.1 was performed on 2026-09-09 from feature branch
 catalog-writer, migration, backup, tool, device, and integration observations are
 recorded in [the AP-01 evidence artifact](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-09.md).
 AP-01.2a subsequently implemented the lookup-only client contract in commits
-`e371348` and `cd0908e`. AP-01.3a local enablement pinned Supabase CLI `2.117.0`,
-initialized `supabase/config.toml` for PostgreSQL 17, and documented the exact
-link/pull/repair/backup effects in [the September 10 evidence artifact](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-10.md).
-No project link, baseline pull, ledger change, backup, restore, or database write
-occurred. AP-01.2 server enforcement, AP-01.3 remote/isolated evidence,
-integration, and release remain open.
-
-AP-01.3b preflight was re-entered at expected HEAD `19e2747` on 2026-09-10.
-The pinned CLI remains available and the checkout is not linked, but every
-authorization/operator field in the execution intake remains incomplete, the
-required CLI/database/isolated credentials are absent, no backup method or
-isolated target is named, and the Docker Linux engine could not be started from
-the current session. The run stopped before any remote action or speculative
-migration preparation; the same baseline/restore/enforcement gates remain open.
+`e371348` and `cd0908e`. AP-01.3 then completed the supported production
+baseline, semantic drift review, encrypted logical backup, local PostgreSQL 17
+restore, self-contained role suite, catalog-authority migration, and authorized
+production rollout. The remote ledger now contains the verified baseline and
+enforcement versions. Exact commands, hashes, automatic baseline-ledger effect,
+restore caveats, synthetic rollback probes, and post-rollout checks are in [the
+September 10 evidence artifact](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-10.md).
+Database prerequisites for AP-02/AP-03 are closed; AP-01 remains open only for
+the separately classified integrator, Expo-device UI, and runtime missing-schema
+evidence.
 
 ## Register mechanics and universal slice contract
 
@@ -65,17 +61,17 @@ Critical path for trustworthy free training: `AP-01 -> AP-02 + AP-03 -> AP-04 + 
 
 ## AP-01 — Catalog authority, migration provenance, and compatibility
 
-**Status:** IN PROGRESS; AP-01.1 and AP-01.2a LOCAL VERIFIED 2026-09-09, AP-01.3a local tooling preparation verified 2026-09-10, with baseline/restore and server enforcement gated. **Owner:** security-agent for authority; typescript-agent for client compatibility; review-agent for the combined boundary. **Outcome:** generating and saving a plan uses a trusted catalog and a recoverable, evidenced database baseline.
+**Status:** IN PROGRESS; AP-01.1/AP-01.2a LOCAL VERIFIED and AP-01.3 database foundation RELEASED 2026-09-10; only integrator/Expo-device/missing-schema application evidence remains. **Owner:** security-agent for authority; typescript-agent for client compatibility; review-agent for the combined boundary. **Outcome:** generating and saving a plan uses a trusted catalog and a recoverable, evidenced database baseline.
 
 - **Scope:** reconcile schema/ledger/grants, inventory every catalog writer, pair removal of ordinary-client shared-catalog writes with canonical ID resolution, backup/restore proof, and close historical mobile compatibility rows. Excludes deleting historical avatar objects, enabling new coaching, and applying all proposed tables.
 - **Current files:** `utils/saveProgramToDb.ts`, `app/create-program.tsx`, `hooks/useCurrentProgram.ts`, `lib/exerciseDatabase.ts`, `utils/profilePreferences.ts`, `components/GenerateProgramModal.tsx`, `app/(qsetup)/quick-setup.tsx`, `app/(tabs)/profile/index.tsx`, `lib/adaptivpush_database_schema.md`, `reports/migrations/001_workout_session_exercises.sql` through `017_exercises_exercisedb_id_repair.sql`, `reports/migrations/verification/015_phase2_rls_isolation_test.sql`.
 - **Planned files/contracts:** `features/catalog/contracts.ts`, `features/catalog/repository.ts`; migration-baseline evidence and a next-number catalog authority migration only after ledger inspection. Catalog IDs, source/version, aliases and retired IDs are explicit; exact migration filename is selected from the reconciled ledger.
-- **Data/security:** `exercises` read authority vs privileged curation, source IDs/name ambiguity, schema grants and all user-owned relationships; database plan owns exact constraints. Current read-only evidence shows RLS on all 16 public tables, unconditional `TO public` catalog policies, and full catalog table privileges for both `anon` and `authenticated`. No write probe was performed or needed to establish the exposure.
-- **Dependencies:** read access to effective grants was available. The project now pins Supabase CLI `2.117.0` and a PostgreSQL 17 local config. PostgreSQL 17 client execution still needs a running Docker engine or provisioned binaries. A named credential operator, approved backup/restore method and owners, isolated verification target, configured `integrator`, and Expo device remain unavailable. Historical August results remain inputs, not fresh proof.
+- **Data/security:** `exercises` is SELECT-only for `anon`/`authenticated`; trusted curation remains `service_role`/`postgres`. The signup trigger is represented across the public/auth schema boundary, and isolated plus rolled-back production role probes passed. Database plan owns exact constraints and future lineage work.
+- **Dependencies:** database tooling, operator custody, baseline, encrypted backup, isolated restore, role checks, and server enforcement are satisfied. A configured `integrator` and Expo-capable device remain unavailable for application integration/UI claims. Historical August results remain inputs where not freshly rerun.
 - **Compatibility/commercial/error:** free generation must survive catalog hardening. Known canonical cached IDs work offline; unresolved local slugs remain a visible unsaved draft, never a fabricated UUID. Unknown exercise cannot silently drop a set or trigger an ordinary-client upsert. No premium boundary here. Safety-sensitive logs exclude credentials and private records.
 - **Acceptance:** denied ordinary-role catalog mutation with successful authorized curation and normal program save; duplicate names resolve deterministically or ask; old app missing relation/column fallback; new Quick Setup/profile/generation UI on device; restore a verified backup into an isolated target and compare integrity. Policy denial alone without grant evidence does not close the gate.
 - **Verify/rollout:** G-07 plus isolated anon/two-user/catalog-role tests and actual Expo compatibility. Ship client catalog resolver and backend policy as a compatible sequence; reject old shared-catalog writes with actionable recovery. Observe unresolved IDs and denied attempts. Fallback is cached read-only catalog/manual draft, never reopening permissive writes.
-- **Packets/next:** AP-01.1 read-only inspection and AP-01.2a lookup-only catalog client are locally verified in [the 2026-09-09 evidence](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-09.md). AP-01.3a local tooling and command-effect preparation is recorded in [the 2026-09-10 evidence](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-10.md). Exact next packet is AP-01.3b authorized baseline capture plus the backup/isolated-target decision. Catalog grant/policy enforcement remains paired but production-gated. AP-01.3 also owns restore, isolated role tests, missing-schema/device compatibility, and integration evidence. Exit only when all three have evidence.
+- **Packets/next:** AP-01.1 read-only inspection and AP-01.2a lookup-only catalog client are locally verified in [the 2026-09-09 evidence](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-09.md). [The 2026-09-10 evidence](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-10.md) closes AP-01.3 database baseline, recovery, isolated security, and production enforcement. AP-02/AP-03 database work may begin. Close AP-01 itself only after the remaining integrator, Expo-device, and missing-schema application evidence.
 
 ## AP-02 — Durable workout capture and finalization
 

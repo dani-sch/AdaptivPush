@@ -5,6 +5,39 @@
 
 ---
 
+### 2026-09-10 AP-01.3 database foundation and production enforcement {#2026-09-10-ap-01-3-database-foundation}
+
+**Summary**: Completed the database work that blocked AP-02/AP-03. Captured and
+hashed the production baseline, reconciled the managed ledger and cross-schema
+signup trigger, created and restored an encrypted backup, enforced lookup-only
+catalog access in isolation, and deployed the single reviewed authority migration
+to production. Credentials and private row payloads were not recorded.
+
+**Executed evidence**:
+
+| Gate | Result |
+|---|---|
+| Source/target | Production `thfxcvxcsfvrzdysdnkq` reconfirmed; destructive restore and synthetic writes used only local Docker PostgreSQL 17.6. |
+| Baseline/ledger | `20260910175317_adaptivpush_baseline_20260910.sql`, SHA-256 `A871A75DA4DC062F79F591FB493BC8EC6E3271B02795E6C87C372EBFB56016A7`. CLI `db pull` automatically registered the version without the expected prompt; equivalence was proved and no extra manual repair was performed. |
+| Drift | Retained 001–017 hashes/provenance preserved. Fresh baseline replay collapsed one redundant readiness-log unique index; the uniqueness invariant remained. The omitted `auth.users` signup trigger was represented explicitly in the next migration. |
+| Backup | AES-256-GCM logical roles/schema/data archive outside the repository, key protected with DPAPI CurrentUser, all custody roles `dani-sch`, retention 30 days after rollout. Plaintext was deleted only after authenticated decryption and restore proof. Storage metadata is included; object bodies are not. |
+| Restore | Twenty Auth/public/Storage relation counts matched exactly. Aggregate 16 tables, 215 columns, 72 constraints, 40 indexes, 2 functions, 16 RLS tables, 66 public/Storage policies, and 448 table grants matched. Local reserved `supabase_admin` role alteration was the only managed-platform exception. |
+| Enforcement | `20260910190000_reconcile_auth_trigger_and_enforce_catalog_authority.sql` preserves catalog SELECT, removes ordinary mutation policies/grants, retains trusted curation, restores the auth trigger, and fixes `handle_new_user()` search path/EXECUTE authority. |
+| Isolation | Self-contained rolled-back SQL passed on restored and fresh-reset databases: signup trigger, anon/auth catalog read, ordinary mutation denial, trusted curation, catalog-backed program save, two-owner child isolation, avatar-folder isolation, duplicate-name rejection, and repeat migration safety. |
+| Production | Dry-run listed only `20260910190000`; push succeeded. Ledger aligned, ordinary roles are SELECT-only, one read policy remains, function/trigger posture is correct, and a transaction-scoped role probe passed. Catalog remained 1,369 rows with zero probe rows. |
+| Repository gates | `npm run test:catalog`: 9/9; `npx tsc --noEmit`: pass; `npm run lint`: 0 errors/17 unchanged warnings; `npx supabase db lint --local --level warning`: no schema errors; fresh `db reset --local`: both migrations applied. |
+
+**Files**: added the two timestamped migrations and
+`supabase/tests/ap_01_3_catalog_authority_isolation.sql`; updated the dated AP-01
+evidence and living execution/status/database/traceability documents. Core
+database commit: `5f5ee0a` (`feat(database): establish catalog authority baseline`).
+
+**Disposition**: AP-01.3 database foundation is released and AP-02/AP-03
+database implementation is unblocked. AP-01 remains open only for unavailable
+integrator, Expo-device UI, and runtime missing-schema application evidence.
+
+---
+
 ### 2026-09-10 AP-01.3b authorization-boundary preflight {#2026-09-10-ap-01-3b-preflight}
 
 **Summary**: Re-entered AP-01.3 at expected HEAD `19e2747`, verified the local

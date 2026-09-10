@@ -1,10 +1,10 @@
 # AdaptivPush database and migration plan
 
-Status: approved planning direction with AP-01.1 read-only inspection and AP-01.3a local tooling preparation recorded; no new migration authorized or applied by this document. Snapshot: 2026-09-10. This document owns physical-data planning, compatibility, authority and database verification. The [master plan](/dev-doc/plans/active/ADAPTIVPUSH-MASTER-PLAN.md) owns domain behavior, the [register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) owns slice gates, and the [implementation status](/dev-doc/plans/active/ADAPTIVPUSH-IMPLEMENTATION-STATUS.md) owns code facts. [D-12](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECORD-2026-09-08.md#d-12--database-rollout) requires additive, slice-owned work. The 28-table packet is a design inventory, not a batch of approved migrations.
+Status: approved planning direction with AP-01 production baseline, encrypted restore proof, catalog authority, and production enforcement recorded on 2026-09-10. This document owns physical-data planning, compatibility, authority and database verification. The [master plan](/dev-doc/plans/active/ADAPTIVPUSH-MASTER-PLAN.md) owns domain behavior, the [register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) owns slice gates, and the [implementation status](/dev-doc/plans/active/ADAPTIVPUSH-IMPLEMENTATION-STATUS.md) owns code facts. [D-12](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECORD-2026-09-08.md#d-12--database-rollout) requires additive, slice-owned work. The 28-table packet is a design inventory, not a batch of approved migrations.
 
 ## Evidence and baseline rules
 
-This pass statically read the [schema reference](/lib/adaptivpush_database_schema.md), all 17 numbered SQL files, the retained [isolation verification SQL](/reports/migrations/verification/015_phase2_rls_isolation_test.sql), the September packet's database section and the [August live audit](/dev-doc/reports/FABLE-5-LIVE-SUPABASE-AUDIT-2026-08-03.md). No fresh database metadata, grants, row counts, role tests, backup checks or runtime write results were obtained. Existing schema is documented/reported evidence; future schema below is a proposed implementation contract subject to AP-01 inspection and each slice's review.
+The original consolidation pass statically read the [schema reference](/lib/adaptivpush_database_schema.md), all 17 numbered SQL files, the retained [isolation verification SQL](/reports/migrations/verification/015_phase2_rls_isolation_test.sql), the September packet's database section and the [August live audit](/dev-doc/reports/FABLE-5-LIVE-SUPABASE-AUDIT-2026-08-03.md). AP-01.1 and AP-01.3 subsequently replaced its unknown database-authority/recovery items with the dated live evidence below. Future schema remains a proposed implementation contract subject to each slice's review.
 
 The schema reference lists 16 public tables. The September 8 packet reports a read-only UI inspection showing those tables with RLS enabled and four authenticated policies for each of seven additive adaptation tables. It also reports `exercises_insert TO public WITH CHECK (true)` and update/delete policies `TO public USING (true)`. **Effective SQL grants and anonymous/authenticated write access were not verified.** Permissive RLS is a release-priority authority defect; it is not proof from this pass that an anonymous write succeeds. RLS and grants are separate gates, and linked ownership alone does not enforce coherent program/day/session lineage.
 
@@ -40,24 +40,23 @@ six fixture names resolved in a current read-only check. Production grants and
 policies were not changed. Baseline/backup/isolated-target evidence remains a
 prerequisite to the slice-owned enforcement migration.
 
-AP-01.3a local enablement on 2026-09-10 pinned Supabase CLI `2.117.0`,
-initialized the supported `supabase/` project configuration, and set the local
-database major to 17, matching production PostgreSQL `17.6.1.063`. The current
-dashboard still identifies `thfxcvxcsfvrzdysdnkq` as AdaptivPush Production on
-Free, still offers no scheduled backup, and still shows “Run your first
-migration.” The Docker CLI is installed but its engine is not running; PostgreSQL
-17 client binaries are absent. No link, pull, ledger query/change, dump, restore,
-SQL, migration, or production write occurred. Exact command effects and the
-managed-versus-encrypted backup decision are in
-[the September 10 AP-01 artifact](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-10.md).
+AP-01.3 completed the supported path on 2026-09-10. Supabase CLI `2.117.0`
+captured baseline `20260910175317` from production PostgreSQL 17.6. The CLI
+automatically registered that baseline without presenting the expected history
+prompt; equivalence was then demonstrated rather than hidden or manually
+rewritten. The external roles/schema/data dump was encrypted with AES-256-GCM,
+its key protected by Windows DPAPI, and restored into local Docker PostgreSQL
+17.6. Twenty safe Auth/public/Storage relation counts and the aggregate schema,
+constraint, index, function, grant, RLS, and policy inventory matched production.
 
-AP-01.3b preflight later resumed at expected HEAD `19e2747` and stopped at the
-same safety boundary. The execution intake did not complete any authorization or
-operator field; no CLI/database/isolated credential, backup method/owner, or
-isolated target was supplied. The project remains unlinked. Docker Desktop could
-not provide a ready Linux engine from this session, and standalone PostgreSQL 17
-clients remain absent. No remote read/write, baseline, repair, backup, restore,
-or migration preparation occurred.
+Migration `20260910190000` represents the otherwise omitted `auth.users` signup
+trigger, fixes `handle_new_user()` search-path/EXECUTE authority, removes the
+three ordinary catalog mutation policies, revokes ordinary mutation/table-
+maintenance privileges, and preserves catalog SELECT plus trusted curation. It
+passed restored/fresh-reset role tests and was the only file in the production
+dry-run. Production rollout and a rolled-back role probe passed; both ledger
+versions now align. Exact hashes, owners, retention, restore caveats, and command
+evidence are in [the September 10 AP-01 artifact](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-10.md).
 
 ## Current schema and security posture
 
@@ -67,7 +66,7 @@ or migration preparation occurred.
 | `programs` | Core active mutable root; migration 003 adds `last_active_week`. | No immutable revision/checkpoint/occurrence/installation model. One-active-per-user invariant is not established by this schema reference. Client deactivation and activation race. AP-03/04/11. |
 | `program_days` | Week/day/order, `is_rest_day`, `is_deload_week` exist in reference. | Main generated-save/load paths omit rest/deload fields. Relative days are not dated scheduled occurrences. AP-03/04. |
 | `program_day_exercises` | Mutable prescriptions; suggested pounds and optional per-set JSON. | No stable prescription-slot revision/equipment comparison identity; numeric/order/set uniqueness and relational lineage need audit. AP-02/03/05/07. |
-| `exercises` | Shared catalog, unique name; image/external-ID changes 002/004/005/017. | Permissive policy definitions reported September; effective grants unverified. Ordinary generated saves and development seeding upsert shared rows. Trusted catalog authority and stable source identity must be coordinated. AP-01/03/06. |
+| `exercises` | Shared catalog, unique name; image/external-ID changes 002/004/005/017; timestamped baseline plus authority migration. | Production ordinary roles are SELECT-only with one public read policy; service-role/postgres curation remains. Generated/dev saves resolve before mutation and seeding uses admin authority. Fifty-one existing rows still lack external IDs and normalized-name collisions remain explicit resolver concerns. AP-03/06. |
 | `workout_sessions` | Actual finish/history table. | No durable operation/finalization/partial/occurrence contract. Existing `checkin_id` references **legacy `readiness_logs`**, per audit; never repoint in place. AP-02/04/08. |
 | `workout_exercise_sets` | Actual per-set history table. | Pound-only numeric values, no stable slot or explicit zero/unknown/assistance/side semantics; parent owner access and indexes need baseline capture. AP-02/05/07. |
 | `personal_records` | Actual PR read/write surface. | `exercise_id` is text in reference; map and validate without assuming every value is a valid catalog UUID. Current finish writer omits `session_id`; legacy attribution cannot be invented. AP-05. |
@@ -109,13 +108,28 @@ Original files remain evidence; do not rewrite their historical contents or use 
 
 ## AP-01 migration provenance and authority gate
 
-AP-01 database execution began with inspection and a reviewable baseline/repair design, coupled with current-client catalog compatibility. The remaining baseline must produce an inventory of schemas, columns/defaults/nullability, constraints/FK actions, indexes, RLS enablement/force state/policy roles/expressions, table/sequence/function/schema grants, inherited roles, exposed RPCs/search paths, storage policies and managed migration state. Check owner/anon/authenticated/service identities separately; `TO public` applies broadly but cannot independently grant SQL privileges. Never infer a security boundary from a policy name.
+AP-01 database execution now has a supported, hashed baseline and aligned managed
+ledger. Keep `20260910175317` as the production end-state baseline; do not replay
+or register retained SQL 001–017. The one observed replay normalization—two
+identical readiness-log unique constraints collapsing to one physical index—does
+not remove the uniqueness invariant. Preserve migration `20260910190000` as the
+cross-schema trigger and catalog-authority reconciliation.
 
-Follow the supported CLI baseline path documented by the historical audit and refined in the AP-01 artifacts: use pinned CLI `2.117.0`, authenticate as the named credential operator, supply the existing database password through `SUPABASE_DB_PASSWORD`, link to the reverified project under explicit authorization, pull a named schema baseline to `supabase/migrations/` while answering `n` to the remote-history prompt, compare it against the current server and 001–017, and review supported migration repair only after equivalence is approved. The passwordless link flow can initialize/rotate a temporary `cli_login_postgres` role, so link is not classified as purely local; record and authorize any observed role effect. Migration-mode `db pull` requires Docker, writes the local baseline, and may insert its version into remote history when accepted. `migration repair --status applied` inserts a history row; `--status reverted` deletes one; neither applies or reverts schema SQL. Do not use `--yes`, manually populate the ledger, or run `db reset --linked`. Record baseline hashes, project/environment, tool/server versions, command effects, drift exceptions and reviewer. Any remote role/history change requires separate authorization. The managed application ledger and required credentials are currently absent; the CLI/config path is now locally available.
+The Free project still has no managed scheduled backup/PITR. Before every future
+production schema change, refresh or explicitly accept the encrypted logical
+recovery point, verify its hash/decryption and custody, and ensure the forward-fix
+operator can use PostgreSQL 17 tooling. Database dumps include Storage metadata,
+not object bodies. Local restores must account for the platform-reserved
+`supabase_admin` role line; hosted recovery follows the target platform's
+managed-role procedure. Never run `db reset --linked`.
 
-Before subsequent production schema change, require a chosen backup owner/mechanism, encryption/access/retention, a completed restore drill into isolation and a measured recovery procedure. Current dashboard evidence confirms the Free project has no managed scheduled backup, PITR, or restore-to-new-project capability. Choose managed physical backups or an encrypted external dump workflow, then prove an isolated restore. A plan to back up is not a passing restore gate.
-
-Catalog transition: inventory all caller writes (`utils/saveProgramToDb.ts:339`, `hooks/useCurrentProgram.ts:598`, `scripts/seedExercises.ts:164` and :216), pin catalog identities, replace ordinary-client upserts with lookup/validated trusted import, and decide a separate private custom-exercise owner model if needed. Then restrict shared catalog writes and verify old/new app behavior. Never keep a permissive write policy as a rollback strategy. Rollback to safe catalog reads/manual selection and a disabled generation path if compatibility cannot be restored securely.
+Catalog transition is complete: ordinary-client upserts were replaced with
+lookup/validated trusted import, policy and table authority are enforced in
+production, and isolated plus production rollback probes passed. Never restore
+permissive catalog writes as rollback. Disable the affected producer, retain
+safe reads/manual selection, and forward-fix through the trusted path if a later
+compatibility defect appears. A separate private custom-exercise model remains a
+future slice decision rather than a reason to weaken the shared catalog.
 
 ## Common new-data contract
 

@@ -85,19 +85,17 @@ does not claim restore, live ordinary-role write denial, trusted-curation
 execution, two-owner write isolation, missing-schema runtime, Expo device,
 integration, deployment, or release evidence.
 
-[The September 10 AP-01.3a artifact](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-10.md)
-adds partial AC-TR-001/007 evidence: pinned CLI `2.117.0`, PostgreSQL 17 local
-configuration matching production `17.6.1.063`, current project/backup/migration
-UI reinspection, and an exact command-effect/baseline/backup/restore checklist.
-It adds no database evidence for AC-TR-002–006 and does not claim a project link,
-baseline, ledger repair, backup, restore, isolated role test, device test,
-integration, deployment, or release.
-
-The same artifact now records an AP-01.3b preflight at expected HEAD `19e2747`.
-Because the supplied execution intake left every authorization/operator field
-incomplete and supplied no required credentials, backup ownership, or isolated
-target, the run stopped before remote action. This adds environment/blocker
-evidence only and does not advance AC-TR-001–007.
+[The September 10 AP-01.3 artifact](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-10.md)
+closes the database portions of AC-TR-001/002/003/006/007: pinned PostgreSQL 17
+tooling, hashed production baseline, explicit drift/provenance reconciliation,
+aligned managed ledger, encrypted backup/decryption, local restore with matching
+safe aggregates, cross-schema trigger representation, catalog-authority
+migration, fresh synthetic two-owner/Storage role suite, production dry-run and
+deployment, and rolled-back production ordinary/trusted role probes. The nine
+catalog tests retain deterministic unresolved/ambiguous behavior before program
+mutation. AC-TR-004 remains open only for actual Expo/runtime missing-schema UI
+evidence; AC-TR-005's legacy FK interpretation remains preserved. Integrator and
+device evidence are not inferred from the database release.
 
 ## AP-02 — Durable workout records
 
@@ -434,7 +432,7 @@ These identifiers are quoted historical locators only. No old phase name is a cu
 | D-13 release order | TR-015/038/103…126/133…140/142 |
 | D-14 neutral consolidation | TR-141/142 |
 
-**REQUIRES INSPECTION** remains a release gate, not missing product approval: effective SQL grants/catalog mutation exposure; reconciled migration ledger and backup/restore rehearsal; actual mobile and missing-schema compatibility; foreign-key/slot identity and precise offline conflict handling; equipment configuration/load model fixtures; policy thresholds and safety wording review; verified primary research links behind imported citation tokens; HealthKit/Expo native compatibility and permission scope; native billing/storefront rules; named moderation/support capacity; legal retention/takedown/terms; export/deletion processors; signed build/device accessibility.
+**REQUIRES INSPECTION** remains a release gate, not missing product approval: actual mobile and missing-schema compatibility; foreign-key/slot identity and precise offline conflict handling; equipment configuration/load model fixtures; policy thresholds and safety wording review; verified primary research links behind imported citation tokens; HealthKit/Expo native compatibility and permission scope; native billing/storefront rules; named moderation/support capacity; legal retention/takedown/terms; export/deletion processors; signed build/device accessibility. Effective catalog grants, managed migration ledger, and backup/restore rehearsal were closed by AP-01.3 on 2026-09-10.
 
 The historical research report contains unresolved citation tokens and population/generalization limits. The [research translation](/dev-doc/plans/active/ADAPTIVPUSH-RESEARCH-TRANSLATION.md) owns research-to-product interpretation and evidence caveats; the master owns implementation behavior. AC-TR-047/048/049/052…061/071…077/081/084…092 require source and policy review; this traceability map does not turn the report's exact ranges, older packet thresholds, or competitor claims into newly verified facts.
 

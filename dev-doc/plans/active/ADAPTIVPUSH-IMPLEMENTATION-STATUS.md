@@ -15,22 +15,17 @@ ledger, no Free-plan managed backup, 1,369 exercises, 51 missing external IDs,
 and 17 normalized-name collision groups. Exact methods and limitations are in
 [the AP-01 evidence artifact](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-09.md).
 
-AP-01.3a local enablement on 2026-09-10 pinned Supabase CLI `2.117.0` as
-a dev dependency and created the supported local `supabase/config.toml` with
-PostgreSQL major 17, matching the current production service version
-`17.6.1.063`. Dashboard identity, Free-plan backup absence, and empty managed
-migration UI were rechecked. No CLI authentication/link, SQL, schema pull,
-ledger update, dump, restore, policy change, or other database action occurred.
-[The dated enablement artifact](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-10.md)
-owns command effects and remaining credential/backup/target gates.
-
-A same-day AP-01.3b preflight at expected HEAD `19e2747` confirmed that the
-checkout is still unlinked and the CLI remains pinned, but found no completed
-authorization/operator fields, CLI access token, database password, backup
-selection/owners, isolated target, or executable PostgreSQL 17 runtime. Docker
-Desktop did not become ready and its stopped service could not be started from
-the current session. No baseline, migration, backup, restore, or remote query was
-performed; detailed redacted evidence is appended to the same dated artifact.
+AP-01.3 completed on 2026-09-10 with Supabase CLI `2.117.0` and PostgreSQL 17.
+It captured and hashed the production baseline, reconciled retained migration
+provenance, created and decrypted an external AES-256-GCM backup, restored roles,
+schema, data, and safe aggregates locally, and added a cross-schema signup-trigger
+reconciliation plus catalog-authority migration. The self-contained isolation
+suite passed on restored and fresh-reset targets. Production now has aligned
+baseline/enforcement ledger versions, SELECT-only ordinary catalog grants, one
+read policy, restricted SECURITY DEFINER execution/search path, and preserved
+trusted curation. A rolled-back production role probe passed without changing
+catalog count. [The dated evidence artifact](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-10.md)
+owns exact commands, hashes, caveats, and redacted results.
 
 | Label | Meaning |
 |---|---|
@@ -51,7 +46,7 @@ The application is Expo Router/React Native with screen-level Supabase access, s
 | Password recovery / AP-16 | Scaffolded form; reset delivery is missing. | [Forgot Password `handleSubmit`](/app/(auth)/forgot-password.tsx#L37) only sets `submitted` after a TODO. | Implement reset request and callback; show delivery truth and retry safely. |
 | Onboarding / AP-03, AP-06 | Partial: demographic/weight/experience capture, additive profile/default writes and generation launch. | [Quick Setup `handleContinue`](/app/(qsetup)/quick-setup.tsx#L77), profile write :145, adaptation write :171, evidence defaults :193. | Goal, schedule, time, broad equipment and practical training constraints must lead the free path; retain compatibility without fictitious health consent. |
 | Preference compatibility / AP-01, AP-08 | Working code helpers with partial UI adoption. Missing relation/column fallback and precedence are explicit. | [preference resolution](/utils/profilePreferences.ts#L247), [missing-schema classifier](/utils/profilePreferences.ts#L341), [Profile readiness/cycle writes](/app/(tabs)/profile/index.tsx#L550). | Actual Expo UI and missing-schema runtime matrix remain open despite historical service-level checks. |
-| Shared catalog authority / AP-01 | Partial local implementation: generated save and developer fixtures resolve read-only catalog identities before program mutation; swaps require a catalog UUID; the seed command uses only the administrator client. | [catalog contracts](/features/catalog/contracts.ts), [resolver](/features/catalog/resolveCatalogExercises.ts), [repository](/features/catalog/repository.ts), [catalog harness](/tests/catalog/resolveCatalogExercises.test.ts), [seed command](/scripts/seedExercises.ts). | Live `anon`/`authenticated` grants and unconditional policies remain unchanged. Authenticated save, ordinary-role denial, trusted curation, old-client handling, offline cache, device, restore, and integration evidence remain open. |
+| Shared catalog authority / AP-01 | Working and production-enforced: generated save and developer fixtures resolve read-only catalog identities before program mutation; swaps require a catalog UUID; seed uses the administrator client; ordinary roles are SELECT-only and trusted curation remains available. | [catalog contracts](/features/catalog/contracts.ts), [resolver](/features/catalog/resolveCatalogExercises.ts), [repository](/features/catalog/repository.ts), [catalog harness](/tests/catalog/resolveCatalogExercises.test.ts), [authority migration](/supabase/migrations/20260910190000_reconcile_auth_trigger_and_enforce_catalog_authority.sql), [isolation suite](/supabase/tests/ap_01_3_catalog_authority_isolation.sql). | Database authority/restore gates are closed. Offline cache, actual Expo-device UI, runtime missing-schema, and integrator evidence remain application gates. |
 | Standard generation / AP-06 | Working code generates a multiweek artifact, goal/experience/time/focus inputs and explanation metadata. | [`generateProgram`](/utils/programGenerator.ts#L385), [`selectExercises`](/utils/programGenerator.ts#L116), [`buildSlot`](/utils/programGenerator.ts#L222), [defaults](/constants/programDefaults.ts), [local catalog](/lib/exerciseDatabase.ts). | Fixed split mapping, random selection, inferred compound identity, demographic load estimates, baked future load rises and scheduled deloads do not implement the approved goal/constraints/precision policy. |
 | Generated-program persistence / AP-01, AP-03 | Partial: resolves the complete read-only catalog before program mutation, then writes program, required context, days, and prescriptions. Context-phase failures attempt cleanup and previous-active restoration. | [`saveProgramToDb`](/utils/saveProgramToDb.ts), [catalog repository](/features/catalog/repository.ts). | Ordinary-client catalog upsert and unresolved-prescription omission are removed locally. The hierarchy is still not atomic across all stages; multiple active programs/concurrent replacement, day/prescription failure recovery, authenticated runtime, and full snapshot preservation remain unresolved. |
 | Manual authoring / AP-03 | Working creation UI with partial persistence guarantees. | [Create Program `handleSave`](/app/create-program.tsx#L237), independent writes :253/:265/:298/:328. | Shares neither generator context nor a transaction/revision/checkpoint contract. Manual creation remains free under D-01; historical Advanced-only entitlement claims are superseded. |
@@ -76,7 +71,7 @@ The application is Expo Router/React Native with screen-level Supabase access, s
 | Shared UI and accessibility / all slices | Scaffolded: shared colors/tokens and a small generic UI set; bespoke screen styles dominate. | [UI directory](/components/ui/), [theme context](/contexts/ThemeContext.tsx). | No measured device accessibility, dynamic-type/contrast/screen-reader pass or complete shared component system was established here. |
 | Privacy/export/deletion / AP-16 | Scaffolded metadata request UI. | [`handleDataRequest`](/app/(tabs)/profile/privacy-data.tsx#L223), metadata request timestamp :249. | No secure request processor, downloadable export, deletion saga, status/audit or retention fulfillment. A metadata update is not an export or deletion. |
 | Support / AP-16 | Scaffolded metadata request action and unsupported delivery promises. | [Help & Support](/app/(tabs)/profile/help-support.tsx), `handleSupportAction`. | No issue body delivery/ticket lifecycle or proven response SLA. Requests need server acknowledgment and named operational ownership. |
-| Flags, tests and release / AP-01, AP-16 and each slice | Partial local gate infrastructure. | [package scripts](/package.json#L5), [catalog tests](/tests/catalog/resolveCatalogExercises.test.ts), [Supabase config](/supabase/config.toml), [temporary app identity](/app.json#L3). | Focused catalog tests and pinned database CLI exist; broader application tests, feature flags, durable outbox, production bundle/package identity, isolated database target, and complete release configuration remain missing. |
+| Flags, tests and release / AP-01, AP-16 and each slice | Partial gate infrastructure with AP-01 database restore/security/rollout coverage. | [package scripts](/package.json#L5), [catalog tests](/tests/catalog/resolveCatalogExercises.test.ts), [Supabase config](/supabase/config.toml), [database isolation suite](/supabase/tests/ap_01_3_catalog_authority_isolation.sql), [temporary app identity](/app.json#L3). | Broader application tests, feature flags, durable outbox, production bundle/package identity, device validation, and complete release configuration remain missing. |
 
 ## Unresolved defect ledger
 
@@ -84,7 +79,7 @@ These items are actionable source findings, not a claim that a new runtime failu
 
 | ID | Defect / impact | Evidence and minimum correction gate |
 |---|---|---|
-| DEF-01 / AP-01 | Catalog policies are unconditional and `anon`/`authenticated` have all table privileges. Lookup-only generated/dev saves are locally implemented, but tightening the boundary remains a compatibility and deployment change. | September 9 database evidence and catalog commits; verify authenticated normal save, ordinary-role denial, trusted curation, old-client handling, backup/restore, and safe rollout in isolation before production enforcement. |
+| DEF-01 / AP-01 | **Resolved 2026-09-10:** production catalog authority is SELECT-only for `anon`/`authenticated`; mutation policies are removed; trusted curation remains. | Baseline/enforcement migrations, encrypted restore proof, fresh two-owner/storage suite, dry-run, production deployment, and rolled-back production role probe in the September 10 evidence. Device/missing-schema/integrator work remains separate. |
 | DEF-02 / AP-02 | Session insert precedes set insert; set failure navigates away after partial-save alert. There is no transactional outcome or operation token. | `handleFinish` :374/:410/:415; fixture must recover entered sets after a failure, replay finalization once and preserve an explicit partial state. |
 | DEF-03 / AP-02 | Missing exercise IDs silently drop sets; filtered sets are renumbered; `parseFloat(weight) \|\| null` collapses valid zero to null. | `handleFinish` :390–405. Validate before completion; preserve stable set identity and distinguish zero/bodyweight/unknown/assistance. |
 | DEF-04 / AP-02, AP-04 | Any session linked to a day is treated as completion, regardless of missing sets/partial outcome. | `refresh` :164–173. Require explicit fulfillment rather than row existence; pending sync is neither failure nor completion. |

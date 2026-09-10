@@ -43,6 +43,34 @@ BEGIN
 END
 $assert_signup_trigger$;
 
+SET LOCAL ROLE service_role;
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('avatars', 'avatars', false)
+ON CONFLICT (id) DO NOTHING;
+INSERT INTO public.exercises (id, name, exercisedb_id)
+VALUES
+  ('00000000-0000-4000-8000-000000000161', 'AP 01.3 catalog fixture', 'ap-01-3-fixture'),
+  ('00000000-0000-4000-8000-000000000162', 'AP 01.3 disposable fixture', 'ap-01-3-disposable');
+UPDATE public.exercises
+SET primary_muscle = 'verification'
+WHERE id = '00000000-0000-4000-8000-000000000162';
+DELETE FROM public.exercises
+WHERE id = '00000000-0000-4000-8000-000000000162';
+
+DO $assert_admin_catalog$
+BEGIN
+  IF (
+    SELECT count(*)
+    FROM public.exercises
+    WHERE id = '00000000-0000-4000-8000-000000000161'
+      AND exercisedb_id = 'ap-01-3-fixture'
+  ) <> 1 THEN
+    RAISE EXCEPTION 'trusted catalog curation did not persist the fixture';
+  END IF;
+END
+$assert_admin_catalog$;
+RESET ROLE;
+
 SET LOCAL ROLE anon;
 DO $assert_anon_catalog$
 DECLARE
@@ -111,31 +139,6 @@ BEGIN
   END IF;
 END
 $assert_authenticated_catalog$;
-RESET ROLE;
-
-SET LOCAL ROLE service_role;
-INSERT INTO public.exercises (id, name, exercisedb_id)
-VALUES
-  ('00000000-0000-4000-8000-000000000161', 'AP 01.3 catalog fixture', 'ap-01-3-fixture'),
-  ('00000000-0000-4000-8000-000000000162', 'AP 01.3 disposable fixture', 'ap-01-3-disposable');
-UPDATE public.exercises
-SET primary_muscle = 'verification'
-WHERE id = '00000000-0000-4000-8000-000000000162';
-DELETE FROM public.exercises
-WHERE id = '00000000-0000-4000-8000-000000000162';
-
-DO $assert_admin_catalog$
-BEGIN
-  IF (
-    SELECT count(*)
-    FROM public.exercises
-    WHERE id = '00000000-0000-4000-8000-000000000161'
-      AND exercisedb_id = 'ap-01-3-fixture'
-  ) <> 1 THEN
-    RAISE EXCEPTION 'trusted catalog curation did not persist the fixture';
-  END IF;
-END
-$assert_admin_catalog$;
 RESET ROLE;
 
 SELECT set_config(

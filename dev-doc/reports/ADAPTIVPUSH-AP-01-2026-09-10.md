@@ -192,7 +192,7 @@ authorized. Label the evidence “isolated integration tests,” never read-only
 10. Complete actual Expo Quick Setup/Profile/Generate Program UI evidence on a
     supported device or simulator.
 
-## AC-TR and universal-gate disposition
+## AP-01.3a interim AC-TR and universal-gate disposition
 
 | Row / gate | 2026-09-10 result |
 |---|---|
@@ -215,9 +215,9 @@ high, 2 critical). No audit fix was run because dependency remediation is outsid
 this bounded database-tooling packet and forced fixes could change application
 behavior.
 
-## Exact next executable packet
+## Historical next packet at the AP-01.3a boundary
 
-**AP-01.3b — authorized baseline capture and backup/target decision** becomes
+At that point, **AP-01.3b — authorized baseline capture and backup/target decision** became
 executable when all of the following are supplied:
 
 1. the named Supabase credential operator plus existing access token and database
@@ -403,3 +403,53 @@ read/deactivation/write. The previously completed compatibility evidence remains
 valid; no regression was observed in the static gates. Production rollout and
 its post-apply checks are recorded in the next section when executed. Expo-device
 and integrator evidence remain separate non-database gates.
+
+### Production catalog enforcement
+
+Immediately before rollout, the linked ref was reconfirmed as
+`thfxcvxcsfvrzdysdnkq`; the encrypted backup hashes still matched; the managed
+ledger showed the baseline remote and the enforcement migration local-only; and
+`npx supabase db push --dry-run` listed exactly one file:
+`20260910190000_reconcile_auth_trigger_and_enforce_catalog_authority.sql`.
+
+The authorized `npx supabase db push` then applied that single migration.
+Post-apply `migration list` showed both `20260910175317` and `20260910190000`
+aligned locally/remotely. Read-only production inspection confirmed:
+
+- `anon` and `authenticated` have `SELECT` only on `public.exercises`;
+- `service_role` retains the intended catalog curation privileges and
+  `BYPASSRLS`;
+- only `exercises_select TO public USING (true)` remains;
+- `handle_new_user()` remains owned by `postgres`, SECURITY DEFINER, with
+  `search_path=""`, and EXECUTE restricted to owner/service role;
+- `auth.users.on_auth_user_created` exists and calls the profile trigger
+  function; and
+- the catalog remains 1,369 rows, with 51 missing external IDs and zero
+  duplicate non-null external IDs.
+
+A transaction-scoped production probe exercised actual role behavior. `anon`
+and `authenticated` both read the catalog and both received
+`insufficient_privilege` on INSERT. `service_role` inserted, updated, and deleted
+one tagged synthetic catalog row inside the same transaction. The transaction
+rolled back; a separate read-only check returned 1,369 catalog rows and zero
+tagged probe rows. No private user data was queried or changed.
+
+Database foundation gates required before AP-02/AP-03 implementation are now
+closed. Remaining integrator configuration, Expo-device UI, and runtime
+missing-schema evidence are application/integration gates; they are not
+unfinished database baseline, recovery, authority, or rollout work.
+
+### Final database-gate disposition
+
+| Row / gate | Final 2026-09-10 result |
+|---|---|
+| AC-TR-001 | Database portion passed: baseline, drift, ledger, encrypted backup, restore, and semantic comparison evidenced. |
+| AC-TR-002 | Passed: compatible lookup client, effective ordinary denial, trusted curation, isolated save, and production probe. |
+| AC-TR-003 | Passed for current database boundary: fresh two-owner program/child and avatar-folder negative tests rolled back. |
+| AC-TR-004 | Historical service-level compatibility preserved; actual Expo/runtime missing-schema UI remains a separate application gate. |
+| AC-TR-005 | Preserved: legacy `checkin_id` was not reinterpreted or migrated. |
+| AC-TR-006 | Passed for catalog rollout: counts/IDs unchanged, ambiguous/missing resolution remains explicit, and no ordinary reseed path exists. |
+| AC-TR-007 | Passed: only baseline reconciliation and catalog authority shipped; no 28-table proposal was applied. |
+| G-07 | Catalog tests 9/9; TypeScript passed; lint 0 errors/17 unchanged warnings; DB lint no errors; fresh local reset and SQL role suite passed. |
+| G-08 | Database restore/role evidence passed. Integrator and Expo-device evidence remain unavailable and unclaimed. |
+| G-09 | Encrypted recovery set verified; production dry-run was single-file; rollout and rolled-back forward verification passed. Unsafe catalog writes are not a rollback. |

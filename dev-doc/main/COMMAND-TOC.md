@@ -23,4 +23,4 @@
 
 ## Current execution lane
 
-Use bounded Expo/TypeScript/Supabase AP slices from the [execution register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md). AP-01.1/AP-01.2a are locally verified and AP-01.3a local tooling preparation is complete. Exact next packet is AP-01.3b authorized baseline capture plus backup/isolated-target decision. Planning documents and local configuration do not authorize remote database mutations. Source/status, restore, security, integration, and compatibility gates precede new exposed behavior.
+Use bounded Expo/TypeScript/Supabase AP slices from the [execution register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md). AP-01.1/AP-01.2a are locally verified and AP-01.3 has released the baseline/ledger, encrypted restore, isolated role suite, and production catalog authority. AP-02/AP-03 database implementation is now unblocked; AP-01 still requires integrator, Expo-device UI, and runtime missing-schema application evidence. Planning documents alone do not authorize remote mutations; each later slice retains its source/status, recovery, security, integration, and compatibility gates.
