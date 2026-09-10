@@ -47,7 +47,7 @@ checklists. No remote database or migration-history action occurred.
 **Commits**:
 
 - `96ba874` `chore(database): pin supabase baseline tooling`
-- documentation closeout commit follows this entry
+- `e426766` `docs(adaptivpush): prepare AP-01.3 baseline gates`
 
 **Remaining gates**: Name the credential operator; provide an existing access
 token/database password securely; run or provision PostgreSQL 17 tooling; choose

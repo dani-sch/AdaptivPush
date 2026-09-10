@@ -55,6 +55,7 @@ Primary references:
 - [PostgreSQL 17 `pg_dump` compatibility](https://www.postgresql.org/docs/17/app-pgdump.html)
 
 Tooling commit: `96ba874` (`chore(database): pin supabase baseline tooling`).
+Evidence/status commit: `e426766` (`docs(adaptivpush): prepare AP-01.3 baseline gates`).
 
 ## Command-effect review
 
