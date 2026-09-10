@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import {
     ActivityIndicator,
     Image,
@@ -60,26 +60,22 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
 
     const [alternatives, setAlternatives] = useState<SwapOption[]>([]);
     const [loadingExercises, setLoadingExercises] = useState(false);
-    const [resolvedMuscleGroup, setResolvedMuscleGroup] = useState<MuscleGroup | undefined>(undefined);
+    const resolvedMuscleGroup = useMemo<MuscleGroup | undefined>(() => {
+        if (!currentExercise) return undefined;
+        if (currentExercise.muscleGroup) return currentExercise.muscleGroup;
+        if (!currentExercise.name) return undefined;
+        const name = currentExercise.name.toLowerCase();
+        const match = Object.entries(exercisesByMuscleGroup).find(([, exercises]) =>
+            exercises.some((exercise) => exercise.name.toLowerCase() === name),
+        );
+        return match?.[0] as MuscleGroup | undefined;
+    }, [currentExercise]);
     const [catalogUnavailable, setCatalogUnavailable] = useState(false);
 
-    useEffect(() => {
-        if (!currentExercise) return;
-        let muscleGroup = currentExercise.muscleGroup;
-        if (!muscleGroup && currentExercise.name) {
-            const name = currentExercise.name.toLowerCase();
-            for (const [group, exercises] of Object.entries(exercisesByMuscleGroup)) {
-                if (exercises.some(ex => ex.name.toLowerCase() === name)) {
-                    muscleGroup = group as MuscleGroup;
-                    break;
-                }
-            }
-        }
-        loadAlternatives(muscleGroup, currentExercise.exerciseId);
-        setResolvedMuscleGroup(muscleGroup);
-    }, [currentExercise]);
-
-    async function loadAlternatives(muscleGroup: MuscleGroup | undefined, excludedExerciseId?: string) {
+    const loadAlternatives = useCallback(async (
+        muscleGroup: MuscleGroup | undefined,
+        excludedExerciseId?: string,
+    ) => {
         setLoadingExercises(true);
         setSelectedExercise(null);
         setAlternatives([]);
@@ -143,7 +139,14 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
         } finally {
             setLoadingExercises(false);
         }
-    }
+    }, []);
+
+    useEffect(() => {
+        if (!currentExercise) return;
+        void Promise.resolve().then(() =>
+            loadAlternatives(resolvedMuscleGroup, currentExercise.exerciseId),
+        );
+    }, [currentExercise, loadAlternatives, resolvedMuscleGroup]);
 
     const filteredAlternatives = useMemo(() => {
         const q = searchQuery.trim().toLowerCase();

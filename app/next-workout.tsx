@@ -221,6 +221,7 @@ export default function NextWorkoutScreen() {
         if (!stored) await workoutDraftStore.save(nextDraft);
         if (cancelled) return;
         setDraft(nextDraft);
+        setElapsed(Math.max(0, Math.floor((Date.now() - new Date(nextDraft.startedAt).getTime()) / 1000)));
         setExercises(draftToExercises(nextDraft, programWorkout));
         setWorkoutName(nextDraft.workoutName);
         if (nextDraft.lifecycle === 'finalized') setSyncMessage('This workout is already finalized.');
@@ -261,7 +262,6 @@ export default function NextWorkoutScreen() {
       () => setElapsed(Math.max(0, Math.floor((Date.now() - new Date(draft.startedAt).getTime()) / 1000))),
       1000,
     );
-    setElapsed(Math.max(0, Math.floor((Date.now() - new Date(draft.startedAt).getTime()) / 1000)));
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
@@ -906,7 +906,7 @@ function createStyles(theme: Theme) {
       fontWeight: "700",
     },
     savingOverlay: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       backgroundColor: "rgba(0,0,0,0.75)",
       justifyContent: "center",
       alignItems: "center",

@@ -2,7 +2,7 @@
   "extends": "./node_modules/expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
-    "types": ["expo-router/types", "node"],
+    "types": ["node"],
     "paths": {
       "@/*": [
         "./*"

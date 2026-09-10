@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { ChevronLeft, Archive } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -74,9 +74,11 @@ export default function ArchivedProgramsScreen() {
         }
     }, []);
 
-    useEffect(() => {
-        loadArchivedPrograms();
-    }, [loadArchivedPrograms]);
+    useFocusEffect(
+        useCallback(() => {
+            void loadArchivedPrograms();
+        }, [loadArchivedPrograms]),
+    );
 
     const unarchiveProgram = async (
         programId: string,
