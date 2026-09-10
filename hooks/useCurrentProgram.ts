@@ -7,7 +7,8 @@ import type { ProgressionContext, LoggedSet } from '@/types/progression';
 import type { TrainingExperience } from '@/types/database';
 import { computeCyclePhase } from '@/utils/cyclePhase';
 import { isCatalogExerciseId } from '@/features/catalog/contracts';
-import { resolveCatalogExerciseRequests } from '@/features/catalog/repository';
+import { archiveProgram } from '@/features/programs/commands';
+import { programRepository } from '@/features/programs/repository';
 
 type SwapArgs = { exerciseId: string; replacement: WorkoutExercise; applyToProgram: boolean };
 
@@ -18,6 +19,8 @@ type DbProgram = {
     duration_weeks: number;
     start_date: string | null; // YYYY-MM-DD
     swap_interval_weeks?: number | null;
+    current_revision: number;
+    current_revision_id: string | null;
 };
 
 type DbProgramDay = {
@@ -27,8 +30,10 @@ type DbProgramDay = {
     order_in_week: number;
     workout_name: string;
     estimated_duration_min: number | null;
+    program_revision_id: string | null;
     program_day_exercises: Array<{
         id: string;
+        stable_slot_id: string;
         position: number;
         set_count: number;
         rep_range_min: number;
@@ -107,7 +112,7 @@ export function useCurrentProgram() {
             // Get active program
             const { data: prog, error: progErr } = await supabase
                 .from('programs')
-                .select('id,name,goal,duration_weeks,start_date,swap_interval_weeks')
+                .select('id,name,goal,duration_weeks,start_date,swap_interval_weeks,current_revision,current_revision_id')
                 .eq('user_id', user.id)
                 .eq('is_active', true)
                 .order('created_at', { ascending: false })
@@ -133,8 +138,10 @@ export function useCurrentProgram() {
           order_in_week,
           workout_name,
           estimated_duration_min,
+          program_revision_id,
           program_day_exercises (
             id,
+            stable_slot_id,
             position,
             set_count,
             rep_range_min,
@@ -168,9 +175,11 @@ export function useCurrentProgram() {
             if (dayIds.length > 0) {
                 const { data: sessions } = await supabase
                     .from('workout_sessions')
-                    .select('program_day_id')
+                    .select('program_day_id,completion_class,lifecycle')
                     .eq('user_id', user.id)
-                    .in('program_day_id', dayIds);
+                    .in('program_day_id', dayIds)
+                    .eq('lifecycle', 'finalized')
+                    .in('completion_class', ['complete', 'reduced']);
                 completedDayIds = new Set(
                     (sessions ?? []).map((s: { program_day_id: string }) => s.program_day_id)
                 );
@@ -186,6 +195,7 @@ export function useCurrentProgram() {
                             const ex = pde.exercises;
                             return {
                                 id: pde.id, // program_day_exercises row id (swap targets this)
+                                stableSlotId: pde.stable_slot_id,
                                 exerciseId: ex?.id ?? undefined,
                                 name: ex?.name ?? 'Unknown exercise',
                                 imageUrl: (ex as any)?.image_url ?? undefined,
@@ -202,6 +212,7 @@ export function useCurrentProgram() {
 
                     return {
                         id: d.id, // program_day id
+                        prescriptionRevisionId: d.program_revision_id ?? prog.current_revision_id ?? undefined,
                         name: d.workout_name,
                         day: DAY_NAMES[(d.day_index ?? 1) - 1] ?? `Day ${d.day_index}`,
                         estimatedTime: d.estimated_duration_min ?? 0,
@@ -222,6 +233,8 @@ export function useCurrentProgram() {
 
             const mapped: CurrentProgram = {
                 id: prog.id,
+                currentRevision: prog.current_revision,
+                currentRevisionId: prog.current_revision_id ?? undefined,
                 name: prog.name,
                 goal: prog.goal ?? '',
                 currentWeek,
@@ -445,6 +458,11 @@ export function useCurrentProgram() {
             // in the mapping above, exerciseId is the program_day_exercises row id (pde.id)
             // replacement.id should be the exercises.id from the exercises table
             if (!program) return;
+            if (program.currentRevisionId && applyToProgram) {
+                throw new Error(
+                    'Installed prescriptions are immutable. Create and activate a revised program instead of rewriting this one.',
+                );
+            }
 
             const pdeId = exerciseId;
             const newExerciseId = replacement.exerciseId ?? replacement.id;
@@ -503,67 +521,20 @@ export function useCurrentProgram() {
         [program, refresh],
     );
 
-    const createBlankProgram = useCallback(async () => {
-        const userId = await requireUserId();
-
-        // end any existing active programs
-        // TODO: (decide whether to add archivability)
-        await supabase
-            .from('programs')
-            .update({ is_active: false, updated_at: new Date().toISOString() })
-            .eq('user_id', userId)
-            .eq('is_active', true);
-
-        const { data: prog, error: progErr } = await supabase
-            .from('programs')
-            .insert({
-                user_id: userId,
-                name: 'My Program',
-                goal: 'Build strength',
-                duration_weeks: 4,
-                start_date: todayISODate(),
-                is_active: true,
-            })
-            .select('id')
-            .single<{ id: string }>();
-
-        if (progErr) throw progErr;
-
-        await refresh();
-        return prog.id;
-    }, [refresh]);
-
     const endCurrentProgram = useCallback(async () => {
-        const userId = await requireUserId();
         const programId = program?.id;
-        const lastActiveWeek = program?.currentWeek ?? 1;
-
-        // Essential: deactivate the program — must succeed or throw
-        const { error } = await supabase
-            .from('programs')
-            .update({ is_active: false, updated_at: new Date().toISOString() })
-            .eq('user_id', userId)
-            .eq('is_active', true);
-
-        if (error) throw error;
-
-        // Best-effort: snapshot the week for restore (requires migration 003).
-        // Failure here must NOT prevent the program from being ended.
-        if (programId) {
-            try {
-                await supabase
-                    .from('programs')
-                    .update({ last_active_week: lastActiveWeek })
-                    .eq('id', programId);
-            } catch {
-                // Migration 003 not yet applied — non-fatal, restore will default to week 1
-            }
-        }
+        if (!programId) return;
+        await archiveProgram(
+            programRepository,
+            programId,
+            program.currentRevision,
+            program.currentWeek,
+        );
 
         await refresh();
     }, [program, refresh]);
 
-    const createDevTestProgram = useCallback(async () => {
+    /* Legacy development multiwrite coordinator removed from the runtime.
         const userId = await requireUserId();
 
         const exerciseSeeds = [
@@ -779,13 +750,12 @@ export function useCurrentProgram() {
 
         await refresh();
         return prog.id;
-    }, [refresh]);
+    }, []);
+    */
 
-    // Readiness adjustments are now applied as a UI overlay when loading the workout.
-    // This function is kept for API compatibility but no longer mutates program_day_exercises.
-    // The readiness score is already saved to readiness_logs by the home screen check-in.
+    // Kept for API compatibility. A readiness response cannot mutate a frozen workout;
+    // a future AP-08 decision command must create an explicit accepted amendment.
     const applyReadinessAdjustmentOnly = useCallback(async (_readinessScore: number) => {
-        // No-op: readiness modifier is computed at display time in next-workout.tsx buildExercises()
         await refresh();
     }, [refresh]);
 
@@ -835,5 +805,5 @@ export function useCurrentProgram() {
         }
     }, [program, refresh]);
 
-    return { program, loading, refresh, swapExercise, createBlankProgram, createDevTestProgram, endCurrentProgram, applyProgressionToNextWeek, applyReadinessAdjustmentOnly, advanceToNextWeek };
+    return { program, loading, refresh, swapExercise, endCurrentProgram, applyProgressionToNextWeek, applyReadinessAdjustmentOnly, advanceToNextWeek };
 }

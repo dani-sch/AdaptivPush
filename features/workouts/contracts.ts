@@ -34,6 +34,7 @@ export interface FrozenPrescriptionSet {
 export interface FrozenPrescriptionSlot {
   slotId: string;
   prescribedExerciseId: string;
+  exerciseName?: string;
   order: number;
   prescribedSetCount: number;
   sets: FrozenPrescriptionSet[];
@@ -53,11 +54,15 @@ export interface WorkoutActualSet extends FrozenPrescriptionSet {
   actualRpe: number | null;
   logged: boolean;
   loggedAt: string | null;
+  enteredLoadText: string;
+  enteredRepsText: string;
+  enteredRpeText: string;
 }
 
 export interface WorkoutDraftSlot {
   slotId: string;
   prescribedExerciseId: string;
+  exerciseName?: string;
   actualExerciseId: string;
   order: number;
   prescribedSetCount: number;
@@ -154,6 +159,9 @@ export function createWorkoutDraft(input: {
         actualRpe: null,
         logged: false,
         loggedAt: null,
+        enteredLoadText: set.plannedLoad === null ? '' : String(set.plannedLoad),
+        enteredRepsText: '',
+        enteredRpeText: '',
       })),
     })),
     finalizedReceipt: null,
@@ -170,6 +178,9 @@ export function updateWorkoutSet(
     rpe?: number | null;
     logged?: boolean;
     loggedAt?: string | null;
+    enteredLoadText?: string;
+    enteredRepsText?: string;
+    enteredRpeText?: string;
   },
 ): WorkoutDraft {
   let found = false;
@@ -185,6 +196,9 @@ export function updateWorkoutSet(
         actualRpe: update.rpe === undefined ? set.actualRpe : update.rpe,
         logged: update.logged === undefined ? set.logged : update.logged,
         loggedAt: update.loggedAt === undefined ? set.loggedAt : update.loggedAt,
+        enteredLoadText: update.enteredLoadText === undefined ? set.enteredLoadText : update.enteredLoadText,
+        enteredRepsText: update.enteredRepsText === undefined ? set.enteredRepsText : update.enteredRepsText,
+        enteredRpeText: update.enteredRpeText === undefined ? set.enteredRpeText : update.enteredRpeText,
       };
     }),
   }));
@@ -194,7 +208,7 @@ export function updateWorkoutSet(
 
 export function amendWorkoutExercise(
   draft: WorkoutDraft,
-  amendment: { slotId: string; replacementExerciseId: string; amendedAt: string },
+  amendment: { slotId: string; replacementExerciseId: string; replacementName?: string; amendedAt: string },
 ): WorkoutDraft {
   let found = false;
   const slots = draft.slots.map((slot) => {
@@ -203,6 +217,7 @@ export function amendWorkoutExercise(
     return {
       ...slot,
       actualExerciseId: amendment.replacementExerciseId,
+      exerciseName: amendment.replacementName ?? slot.exerciseName,
       requiresRecalibration: true,
       sets: slot.sets.map((set) =>
         set.logged
@@ -213,12 +228,31 @@ export function amendWorkoutExercise(
               actualLoad: null,
               actualRpe: null,
               loggedAt: null,
+              enteredLoadText: '',
+              enteredRpeText: '',
             },
       ),
     };
   });
   if (!found) throw new Error('Stable prescription slot was not found in this draft.');
   return { ...draft, revision: nextRevision(draft.revision), slots };
+}
+
+export function confirmWorkoutRecalibration(draft: WorkoutDraft, slotId: string): WorkoutDraft {
+  const slot = draft.slots.find((candidate) => candidate.slotId === slotId);
+  if (!slot) throw new Error('Stable prescription slot was not found in this draft.');
+  if (!slot.requiresRecalibration) return draft;
+  const replacementSets = slot.sets.filter((set) => !set.logged || set.actualExerciseId === slot.actualExerciseId);
+  if (!replacementSets.some((set) => set.actualLoad !== null || set.loadKind === 'bodyweight')) {
+    throw new Error('Enter or confirm a replacement load before acknowledging recalibration.');
+  }
+  return {
+    ...draft,
+    revision: nextRevision(draft.revision),
+    slots: draft.slots.map((candidate) =>
+      candidate.slotId === slotId ? { ...candidate, requiresRecalibration: false } : candidate,
+    ),
+  };
 }
 
 export function classifyWorkoutCompletion(draft: WorkoutDraft): WorkoutCompletionClass {

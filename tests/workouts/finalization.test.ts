@@ -4,10 +4,14 @@ import test from 'node:test';
 import {
   amendWorkoutExercise,
   classifyWorkoutCompletion,
+  confirmWorkoutRecalibration,
   createWorkoutDraft,
   updateWorkoutSet,
   validateWorkoutDraft,
 } from '../../features/workouts/contracts';
+import { finalizeWorkout } from '../../features/workouts/commands';
+import type { WorkoutDraftStore } from '../../features/workouts/draftStore';
+import type { WorkoutRepository } from '../../features/workouts/repository';
 
 const ownerId = '11111111-1111-4111-8111-111111111111';
 const programDayId = '22222222-2222-4222-8222-222222222222';
@@ -77,6 +81,17 @@ test('a temporary swap preserves completed set identity and requires recalibrati
   assert.equal(swapped.slots[0].actualExerciseId, replacementExerciseId);
   assert.equal(swapped.slots[0].requiresRecalibration, true);
   assert.equal(swapped.revision, 3);
+
+  const calibratedInput = updateWorkoutSet(swapped, {
+    setId: '77777777-7777-4777-8777-777777777771',
+    load: 40,
+    enteredLoadText: '40',
+  });
+  const calibrated = confirmWorkoutRecalibration(
+    calibratedInput,
+    '66666666-6666-4666-8666-666666666666',
+  );
+  assert.equal(calibrated.slots[0].requiresRecalibration, false);
 });
 
 test('late prescription data cannot mutate a frozen draft', () => {
@@ -94,4 +109,43 @@ test('invalid exercise identity is rejected rather than skipped', () => {
   const result = validateWorkoutDraft(invalid);
   assert.equal(result.ok, false);
   assert.match(result.errors.join(' '), /exercise identity/i);
+});
+
+test('response loss preserves the outbox operation and retry returns one receipt', async () => {
+  const saved: ReturnType<typeof fixtureDraft>[] = [];
+  const store: WorkoutDraftStore = {
+    load: async () => saved.at(-1) ?? null,
+    save: async (draft) => { saved.push(draft); },
+    remove: async () => undefined,
+  };
+  let attempts = 0;
+  const repository: WorkoutRepository = {
+    finalize: async (draft) => {
+      attempts += 1;
+      if (attempts === 1) throw new Error('network unavailable after request');
+      return {
+        sessionId: '99999999-9999-4999-8999-999999999999',
+        operationId: draft.operationId,
+        draftId: draft.draftId,
+        revision: draft.revision,
+        completionClass: 'partial',
+        finalizedAt: '2026-09-10T12:10:00.000Z',
+        setCount: 1,
+        replayed: true,
+      };
+    },
+  };
+  const draft = updateWorkoutSet(fixtureDraft(), {
+    setId: '77777777-7777-4777-8777-777777777770',
+    reps: 8,
+    load: 0,
+    logged: true,
+  });
+  const first = await finalizeWorkout(repository, store, draft, '2026-09-10T12:10:00.000Z');
+  assert.equal(first.status, 'pending');
+  const pending = saved.at(-1)!;
+  assert.equal(pending.operationId, draft.operationId);
+  const second = await finalizeWorkout(repository, store, pending, '2026-09-10T12:10:00.000Z');
+  assert.equal(second.status, 'replay');
+  assert.equal(saved.at(-1)?.lifecycle, 'finalized');
 });

@@ -40,6 +40,11 @@ interface OverviewWeek {
   days: OverviewDay[];
 }
 
+interface ProgramRationale {
+  label: string;
+  detail: string;
+}
+
 // ─── Fetch ────────────────────────────────────────────────────────────────────
 
 async function fetchProgramOverview(programId: string): Promise<OverviewWeek[]> {
@@ -182,12 +187,39 @@ export default function ProgramOverviewScreen() {
   const [loading, setLoading] = useState(true);
   const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(new Set());
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
+  const [rationale, setRationale] = useState<ProgramRationale>({
+    label: 'Rationale unknown',
+    detail: 'This legacy program has no persisted generation context. No explanation has been fabricated.',
+  });
 
   useEffect(() => {
     if (!program) return;
-    fetchProgramOverview(program.id).then((data) => {
+    Promise.all([
+      fetchProgramOverview(program.id),
+      supabase
+        .from('program_generation_context')
+        .select('goal,policy_version,experience_level,session_length_target_min')
+        .eq('program_id', program.id)
+        .maybeSingle(),
+    ]).then(([data, contextResult]) => {
       setWeeks(data);
-      // Auto-expand current week
+      const context = contextResult.data as {
+        goal?: string;
+        policy_version?: string;
+        experience_level?: string;
+        session_length_target_min?: number | null;
+      } | null;
+      if (context) {
+        setRationale({
+          label: 'Persisted program context',
+          detail: [
+            context.goal ? `Goal: ${context.goal}` : null,
+            context.experience_level ? `Experience: ${context.experience_level}` : null,
+            context.session_length_target_min ? `Session target: ${context.session_length_target_min} min` : null,
+            context.policy_version ? `Policy: ${context.policy_version}` : null,
+          ].filter(Boolean).join(' · '),
+        });
+      }
       setExpandedWeeks(new Set([program.currentWeek]));
       setLoading(false);
     });
@@ -247,6 +279,10 @@ export default function ProgramOverviewScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
+          <View style={styles.rationaleCard} accessibilityLabel={`${rationale.label}. ${rationale.detail}`}>
+            <Text style={styles.rationaleTitle}>{rationale.label}</Text>
+            <Text style={styles.rationaleText}>{rationale.detail}</Text>
+          </View>
           {weeks.map((week) => {
             const isCurrent = program?.currentWeek === week.weekNumber;
             const isPast = (program?.currentWeek ?? 0) > week.weekNumber;
@@ -372,6 +408,15 @@ function createStyles(theme: Theme) {
       paddingBottom: 40,
       gap: 10,
     },
+    rationaleCard: {
+      backgroundColor: theme.cardBg,
+      borderColor: theme.border,
+      borderWidth: 1,
+      borderRadius: 12,
+      padding: 14,
+    },
+    rationaleTitle: { color: theme.textPrimary, fontSize: 15, fontWeight: '700' },
+    rationaleText: { color: theme.text, fontSize: 13, lineHeight: 19, marginTop: 4 },
 
     // Week accordion
     weekSection: {
