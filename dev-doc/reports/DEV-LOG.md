@@ -21,9 +21,11 @@ Quick Setup reached generation with optional demographic and weight fields
 omitted. The local catalog fixture came only from the repository snapshot; no
 production credential or mutation was used.
 
-**Verification**: `npm run test:programs` 6/6, `npx tsc --noEmit` pass,
-`npm run lint` pass with zero errors and three unrelated warnings, and native
-Android build/install pass on API 36 with JDK 17. The full kill/offline,
+**Verification**: Integrator merge `91ceb50` is clean with catalog 9/9,
+workouts 5/5, programs 6/6, strict TypeScript pass and lint pass with zero
+errors/three unrelated warnings. Native Android build/install passes on API 36
+with JDK 17. No SQL changed, so the existing fresh-reset/SQL integration
+evidence remains applicable. The full kill/offline,
 background, manual/archive, account-switch, old-client and accessibility/theme
 matrix remains open.
 
