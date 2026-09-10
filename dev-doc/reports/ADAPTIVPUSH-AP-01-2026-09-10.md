@@ -302,7 +302,7 @@ never written to the repository or this report.
 | Production source | `AdaptivPush`, ref `thfxcvxcsfvrzdysdnkq`, `main` / `PRODUCTION`, `us-east-1`, Free plan. |
 | Isolated target | Local Docker Supabase project `AdaptivPush`, loopback PostgreSQL endpoint, PostgreSQL `17.6`; no hosted ref and no route to production. Destructive work and synthetic writes were explicitly authorized. |
 | CLI/runtime | Supabase CLI `2.117.0`; Docker Desktop server `29.4.3`; local Supabase PostgreSQL image `17.6.1.167`. Core database/Auth/REST/Storage containers were healthy. The optional Vector log collector remained unhealthy because its Docker log endpoint was unavailable; database validation did not depend on it. |
-| Credential path | A 30-day account token named `AdaptivPush AP-01.3` was created with expiry 2026-10-10. The production database password was reset by the user and the CLI linked through the existing-password path. Values were not recorded. |
+| Credential path | A 30-day account token named `AdaptivPush AP-01.3` was created for execution and deleted after final verification; no account token remains. The production database password was reset by the user and the CLI linked through the existing-password path. Values were not recorded; the operator shell and clipboard were cleared. |
 
 ### Supported baseline and managed-ledger effect
 
