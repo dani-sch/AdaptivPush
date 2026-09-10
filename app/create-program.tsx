@@ -20,6 +20,15 @@ import { SymbolView } from 'expo-symbols';
 import { supabase } from '@/utils/supabase';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
+import { createOperationId } from '@/features/kernel/operationId';
+import { installProgram } from '@/features/programs/commands';
+import {
+    DEFAULT_PROGRAM_NAME,
+    PROGRAM_POLICY_VERSION,
+    PROGRAM_SCHEMA_VERSION,
+    type ProgramArtifact,
+} from '@/features/programs/contracts';
+import { programRepository } from '@/features/programs/repository';
 
 interface ProgramDay {
     id: string;
@@ -79,14 +88,6 @@ function generateDays(count: number, existingDays: ProgramDay[] = []): ProgramDa
     });
 }
 
-function todayISODate() {
-    const d = new Date();
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-}
-
 async function requireUserId() {
     const { data, error } = await supabase.auth.getUser();
     if (error) throw error;
@@ -122,21 +123,18 @@ export default function CreateProgramScreen() {
     const [notesInput, setNotesInput] = useState('');
 
     const [keyboardVisible, setKeyboardVisible] = useState(false);
-    const [keyboardHeight, setKeyboardHeight] = useState(0);
 
     useEffect(() => {
         setDays((prev) => generateDays(daysPerWeek, prev));
     }, [daysPerWeek]);
 
     useEffect(() => {
-        const showSub = Keyboard.addListener('keyboardDidShow', (e) => {
+        const showSub = Keyboard.addListener('keyboardDidShow', () => {
             setKeyboardVisible(true);
-            setKeyboardHeight(e.endCoordinates.height);
         });
 
         const hideSub = Keyboard.addListener('keyboardDidHide', () => {
             setKeyboardVisible(false);
-            setKeyboardHeight(0);
         });
 
         return () => {
@@ -239,7 +237,7 @@ export default function CreateProgramScreen() {
         const trimmedGoal = programGoal.trim();
         const parsedLength = Number(programLength);
 
-        if (!trimmedName || !trimmedGoal || parsedLength < 1 || parsedLength > 52) {
+        if (!trimmedGoal || parsedLength < 1 || parsedLength > 52) {
             Alert.alert('Missing information', 'Please complete all required fields.');
             return;
         }
@@ -249,88 +247,62 @@ export default function CreateProgramScreen() {
 
             const userId = await requireUserId();
 
-            // End any currently active program first
-            const { error: endExistingError } = await supabase
+            const { data: activeProgram, error: activeProgramError } = await supabase
                 .from('programs')
-                .update({
-                    is_active: false,
-                    updated_at: new Date().toISOString(),
-                })
+                .select('id,current_revision')
                 .eq('user_id', userId)
-                .eq('is_active', true);
+                .eq('is_active', true)
+                .maybeSingle<{ id: string; current_revision: number }>();
+            if (activeProgramError) throw activeProgramError;
 
-            if (endExistingError) throw endExistingError;
-
-            // Create the new active program
-            const { data: createdProgram, error: programError } = await supabase
-                .from('programs')
-                .insert({
-                    user_id: userId,
-                    name: trimmedName,
-                    goal: trimmedGoal,
-                    duration_weeks: parsedLength,
-                    days_per_week: daysPerWeek,
-                    start_date: todayISODate(),
-                    is_active: true,
-                })
-                .select('id')
-                .single<{ id: string }>();
-
-            if (programError) throw programError;
-            if (!createdProgram?.id) {
-                throw new Error('Program was created but no id was returned.');
-            }
-
-            const programId = createdProgram.id;
             const chosenDayIndexes = DEFAULT_DAY_INDEXES_BY_COUNT[daysPerWeek];
 
-            const dayRows = Array.from({ length: parsedLength }, (_, weekOffset) =>
-                visibleDays.map((day, index) => ({
-                    program_id: programId,
-                    week_number: weekOffset + 1,
-                    day_index: chosenDayIndexes[index],
-                    order_in_week: index + 1,
-                    workout_name: day.name.trim() || `Day ${index + 1}`,
-                    estimated_duration_min: 45,
-                })),
-            ).flat();
-
-            const { data: createdDays, error: daysError } = await supabase
-                .from('program_days')
-                .insert(dayRows)
-                .select('id, week_number, order_in_week')
-                .returns<{ id: string; week_number: number; order_in_week: number }[]>();
-
-            if (daysError) throw daysError;
-
-            // Create program_day_exercises only for values that are actual exercise UUIDs
-            const pdeRows =
-                createdDays?.flatMap((createdDay) => {
-                    const originalDay = visibleDays[createdDay.order_in_week - 1];
-                    if (!originalDay) return [];
-
-                    return originalDay.exercises
-                        .filter((exercise) => exercise.set_count > 0 && exercise.rep_range_min > 0 && exercise.rep_range_max >= exercise.rep_range_min)
-                        .map((exercise, exerciseIndex) => ({
-                            program_day_id: createdDay.id,
-                            exercise_id: exercise.exercise_id,
+            const artifact: ProgramArtifact = {
+                name: trimmedName || DEFAULT_PROGRAM_NAME,
+                goal: trimmedGoal,
+                durationWeeks: parsedLength,
+                daysPerWeek,
+                source: 'manual',
+                schemaVersion: PROGRAM_SCHEMA_VERSION,
+                catalogVersion: 'catalog-2026-09-10',
+                policyVersion: PROGRAM_POLICY_VERSION,
+                context: null,
+                days: Array.from({ length: parsedLength }, (_, weekOffset) =>
+                    visibleDays.map((day, index) => ({
+                        dayId: createOperationId(),
+                        weekNumber: weekOffset + 1,
+                        dayIndex: chosenDayIndexes[index],
+                        orderInWeek: index + 1,
+                        workoutName: day.name.trim() || `Day ${index + 1}`,
+                        estimatedDurationMin: 45,
+                        exercises: day.exercises.map((exercise, exerciseIndex) => ({
+                            slotId: createOperationId(),
+                            exerciseId: exercise.exercise_id,
                             position: exerciseIndex + 1,
-                            set_count: exercise.set_count,
-                            rep_range_min: exercise.rep_range_min,
-                            rep_range_max: exercise.rep_range_max,
-                            target_rpe: exercise.target_rpe ?? null,
-                            suggested_weight_lb: exercise.suggested_weight_lb ?? null,
+                            setCount: exercise.set_count,
+                            repRangeMin: exercise.rep_range_min,
+                            repRangeMax: exercise.rep_range_max,
+                            targetRpe: exercise.target_rpe ?? null,
+                            suggestedLoad: exercise.suggested_weight_lb ?? null,
+                            loadUnit: 'lb' as const,
+                            loadKind: exercise.suggested_weight_lb === 0 ? 'bodyweight' as const :
+                                exercise.suggested_weight_lb == null ? 'unknown' as const : 'external' as const,
+                            loadSide: 'external_total' as const,
                             notes: exercise.notes ?? null,
-                        }));
-                }) ?? [];
-
-            if (pdeRows.length > 0) {
-                const { error: pdeError } = await supabase
-                    .from('program_day_exercises')
-                    .insert(pdeRows);
-
-                if (pdeError) throw pdeError;
-            }
+                        })),
+                    })),
+                ).flat(),
+            };
+            const outcome = await installProgram(
+                programRepository,
+                userId,
+                artifact,
+                activeProgram?.id ?? null,
+                activeProgram?.current_revision ?? null,
+            );
+            if (outcome.status === 'validation') throw new Error(outcome.errors.join(' '));
+            if (outcome.status === 'conflict') throw new Error('Your active program changed on another device. Refresh and try again.');
+            if (outcome.status === 'unavailable') throw new Error(outcome.message);
 
             Alert.alert('Program created', 'Your custom program has been saved.');
             router.replace('/plan');
@@ -346,7 +318,6 @@ export default function CreateProgramScreen() {
     };
 
     const isStepOneValid =
-        programName.trim().length > 0 &&
         programGoal.trim().length > 0 &&
         Number(programLength) >= 1 &&
         Number(programLength) <= 52;
@@ -388,7 +359,7 @@ export default function CreateProgramScreen() {
                         {step === 1 && (
                             <View style={styles.section}>
                                 <View style={styles.fieldGroup}>
-                                    <Text style={styles.label}>Program Name</Text>
+                                    <Text style={styles.label}>Program Name (optional)</Text>
                                     <TextInput
                                         value={programName}
                                         onChangeText={setProgramName}
