@@ -9,6 +9,9 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "test:catalog": "tsx --test tests/catalog/*.test.ts",
+    "test:workouts": "tsx --test tests/workouts/*.test.ts",
+    "test:programs": "tsx --test tests/programs/*.test.ts",
+    "test:ap02-ap03": "npm run test:workouts && npm run test:programs",
     "seed:exercises": "tsx scripts/seedExercises.ts"
   },
   "dependencies": {
