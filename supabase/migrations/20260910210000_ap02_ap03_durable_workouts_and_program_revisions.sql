@@ -254,7 +254,27 @@ ALTER TABLE public.workout_sessions
 CREATE UNIQUE INDEX workout_sessions_owner_operation_idx
   ON public.workout_sessions(user_id, operation_id) WHERE operation_id IS NOT NULL;
 
+CREATE TABLE public.workout_receipt_effects (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  workout_session_id uuid NOT NULL REFERENCES public.workout_sessions(id) ON DELETE CASCADE,
+  effect_type text NOT NULL CHECK (effect_type IN ('personal_record_projection', 'progression_projection', 'analytics_projection')),
+  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed_retryable')),
+  attempt_count integer NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+  last_error_code text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT workout_receipt_effects_session_type_key UNIQUE (workout_session_id, effect_type)
+);
+
+ALTER TABLE public.workout_receipt_effects ENABLE ROW LEVEL SECURITY;
+CREATE POLICY workout_receipt_effects_select_own ON public.workout_receipt_effects
+  FOR SELECT TO authenticated USING (user_id = (SELECT auth.uid()));
+CREATE INDEX workout_receipt_effects_pending_idx
+  ON public.workout_receipt_effects(status, created_at) WHERE status IN ('pending', 'failed_retryable');
+
 ALTER TABLE public.workout_exercise_sets
+  DROP CONSTRAINT workout_exercise_sets_session_id_exercise_id_set_number_key,
   ADD COLUMN actual_set_id uuid,
   ADD COLUMN prescription_slot_id uuid,
   ADD COLUMN prescribed_exercise_id uuid,
@@ -607,6 +627,10 @@ BEGIN
     END LOOP;
   END LOOP;
 
+  INSERT INTO public.workout_receipt_effects(user_id, workout_session_id, effect_type)
+  SELECT v_user_id, v_session_id, effect_type
+  FROM unnest(ARRAY['personal_record_projection', 'progression_projection', 'analytics_projection']) AS effect_type;
+
   v_receipt := jsonb_build_object(
     'sessionId', v_session_id, 'operationId', v_operation_id, 'draftId', v_draft_id,
     'revision', (p_payload->>'revision')::integer, 'completionClass', v_completion,
@@ -769,12 +793,76 @@ CREATE POLICY workout_sets_delete_legacy ON public.workout_exercise_sets
       AND s.user_id = (SELECT auth.uid()) AND s.schema_version = 1
   ));
 
+-- Installed V2 program hierarchies are command-owned and immutable to ordinary clients.
+DROP POLICY programs_insert ON public.programs;
+DROP POLICY programs_update ON public.programs;
+DROP POLICY programs_delete ON public.programs;
+CREATE POLICY programs_insert_legacy ON public.programs
+  FOR INSERT TO authenticated
+  WITH CHECK (user_id = (SELECT auth.uid()) AND schema_version = 1);
+CREATE POLICY programs_update_legacy ON public.programs
+  FOR UPDATE TO authenticated
+  USING (user_id = (SELECT auth.uid()) AND schema_version = 1)
+  WITH CHECK (user_id = (SELECT auth.uid()) AND schema_version = 1);
+CREATE POLICY programs_delete_legacy ON public.programs
+  FOR DELETE TO authenticated
+  USING (user_id = (SELECT auth.uid()) AND schema_version = 1);
+
+DROP POLICY program_days_insert ON public.program_days;
+DROP POLICY program_days_update ON public.program_days;
+DROP POLICY program_days_delete ON public.program_days;
+CREATE POLICY program_days_insert_legacy ON public.program_days
+  FOR INSERT TO authenticated
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM public.programs p
+    WHERE p.id = program_days.program_id AND p.user_id = (SELECT auth.uid()) AND p.schema_version = 1
+  ));
+CREATE POLICY program_days_update_legacy ON public.program_days
+  FOR UPDATE TO authenticated
+  USING (EXISTS (
+    SELECT 1 FROM public.programs p
+    WHERE p.id = program_days.program_id AND p.user_id = (SELECT auth.uid()) AND p.schema_version = 1
+  ));
+CREATE POLICY program_days_delete_legacy ON public.program_days
+  FOR DELETE TO authenticated
+  USING (EXISTS (
+    SELECT 1 FROM public.programs p
+    WHERE p.id = program_days.program_id AND p.user_id = (SELECT auth.uid()) AND p.schema_version = 1
+  ));
+
+DROP POLICY program_day_exercises_insert ON public.program_day_exercises;
+DROP POLICY program_day_exercises_update ON public.program_day_exercises;
+DROP POLICY program_day_exercises_delete ON public.program_day_exercises;
+CREATE POLICY program_day_exercises_insert_legacy ON public.program_day_exercises
+  FOR INSERT TO authenticated
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM public.program_days pd JOIN public.programs p ON p.id = pd.program_id
+    WHERE pd.id = program_day_exercises.program_day_id
+      AND p.user_id = (SELECT auth.uid()) AND p.schema_version = 1
+  ));
+CREATE POLICY program_day_exercises_update_legacy ON public.program_day_exercises
+  FOR UPDATE TO authenticated
+  USING (EXISTS (
+    SELECT 1 FROM public.program_days pd JOIN public.programs p ON p.id = pd.program_id
+    WHERE pd.id = program_day_exercises.program_day_id
+      AND p.user_id = (SELECT auth.uid()) AND p.schema_version = 1
+  ));
+CREATE POLICY program_day_exercises_delete_legacy ON public.program_day_exercises
+  FOR DELETE TO authenticated
+  USING (EXISTS (
+    SELECT 1 FROM public.program_days pd JOIN public.programs p ON p.id = pd.program_id
+    WHERE pd.id = program_day_exercises.program_day_id
+      AND p.user_id = (SELECT auth.uid()) AND p.schema_version = 1
+  ));
+
 REVOKE ALL ON TABLE public.program_revisions FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.program_installation_receipts FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.program_lifecycle_receipts FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.workout_receipt_effects FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON TABLE public.program_revisions TO authenticated;
 GRANT SELECT ON TABLE public.program_installation_receipts TO authenticated;
 GRANT SELECT ON TABLE public.program_lifecycle_receipts TO authenticated;
+GRANT SELECT ON TABLE public.workout_receipt_effects TO authenticated;
 
 REVOKE ALL ON FUNCTION public.install_program_v2(jsonb) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.finalize_workout_v2(jsonb) FROM PUBLIC, anon;

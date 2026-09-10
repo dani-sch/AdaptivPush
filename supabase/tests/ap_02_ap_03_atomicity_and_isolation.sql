@@ -107,6 +107,8 @@ SELECT set_config(
 DO $assert_install$
 DECLARE replay jsonb;
 DECLARE mismatch_denied boolean := false;
+DECLARE conflict_denied boolean := false;
+DECLARE affected integer;
 BEGIN
   IF (SELECT count(*) FROM public.programs WHERE is_active) <> 1 THEN
     RAISE EXCEPTION 'atomic install did not produce exactly one active program';
@@ -130,6 +132,19 @@ BEGIN
     mismatch_denied := SQLERRM LIKE '%operation_payload_mismatch%';
   END;
   IF NOT mismatch_denied THEN RAISE EXCEPTION 'operation id payload mismatch was accepted'; END IF;
+  BEGIN
+    PERFORM public.install_program_v2(pg_temp.install_payload(
+      current_setting('adaptivpush.install_op_2')::uuid, NULL, 'Concurrent loser'));
+  EXCEPTION WHEN OTHERS THEN conflict_denied := SQLERRM LIKE '%stale_revision%';
+  END;
+  IF NOT conflict_denied THEN RAISE EXCEPTION 'concurrent replacement did not return an explicit conflict'; END IF;
+  UPDATE public.programs SET name='mutated v2 root' WHERE id=current_setting('adaptivpush.program_1')::uuid;
+  GET DIAGNOSTICS affected = ROW_COUNT;
+  IF affected <> 0 THEN RAISE EXCEPTION 'ordinary client mutated installed v2 program'; END IF;
+  UPDATE public.program_day_exercises SET set_count=99
+  WHERE program_revision_id=current_setting('adaptivpush.revision_1')::uuid;
+  GET DIAGNOSTICS affected = ROW_COUNT;
+  IF affected <> 0 THEN RAISE EXCEPTION 'ordinary client mutated immutable v2 prescription'; END IF;
   IF (SELECT count(*) FROM public.programs) <> 1 THEN RAISE EXCEPTION 'install replay duplicated a program'; END IF;
 END
 $assert_install$;
@@ -211,6 +226,9 @@ BEGIN
      OR (SELECT count(*) FROM public.workout_exercise_sets WHERE session_id=(replay->>'sessionId')::uuid) <> 1 THEN
     RAISE EXCEPTION 'workout replay duplicated session or sets';
   END IF;
+  IF (SELECT count(*) FROM public.workout_receipt_effects WHERE workout_session_id=(replay->>'sessionId')::uuid) <> 3 THEN
+    RAISE EXCEPTION 'durable receipt effects were missing or duplicated';
+  END IF;
   IF (SELECT completion_class FROM public.workout_sessions WHERE id=(replay->>'sessionId')::uuid) <> 'partial' THEN
     RAISE EXCEPTION 'one of four sets was not classified partial';
   END IF;
@@ -250,6 +268,51 @@ BEGIN
   END IF;
 END
 $assert_mid_transaction_failure$;
+
+DO $assert_archive_restore$
+DECLARE original_start date;
+DECLARE sessions_before integer;
+BEGIN
+  SELECT start_date INTO original_start FROM public.programs WHERE id=current_setting('adaptivpush.program_1')::uuid;
+  SELECT count(*) INTO sessions_before FROM public.workout_sessions;
+  PERFORM public.archive_program_v2(
+    '90000000-0000-4000-8000-000000000001'::uuid,
+    current_setting('adaptivpush.program_1')::uuid,
+    1,
+    '{"week":1}'::jsonb
+  );
+  IF EXISTS (SELECT 1 FROM public.programs WHERE id=current_setting('adaptivpush.program_1')::uuid AND is_active) THEN
+    RAISE EXCEPTION 'archive left program active';
+  END IF;
+  PERFORM public.restore_program_v2(
+    '90000000-0000-4000-8000-000000000002'::uuid,
+    current_setting('adaptivpush.program_1')::uuid,
+    'exact',
+    NULL
+  );
+  IF (SELECT start_date FROM public.programs WHERE id=current_setting('adaptivpush.program_1')::uuid) IS DISTINCT FROM original_start THEN
+    RAISE EXCEPTION 'exact restore rewrote start date';
+  END IF;
+  PERFORM public.archive_program_v2(
+    '90000000-0000-4000-8000-000000000003'::uuid,
+    current_setting('adaptivpush.program_1')::uuid,
+    1,
+    '{"week":4}'::jsonb
+  );
+  PERFORM public.restore_program_v2(
+    '90000000-0000-4000-8000-000000000004'::uuid,
+    current_setting('adaptivpush.program_1')::uuid,
+    'restart',
+    NULL
+  );
+  IF (SELECT start_date FROM public.programs WHERE id=current_setting('adaptivpush.program_1')::uuid) <> current_date THEN
+    RAISE EXCEPTION 'deliberate restart did not begin at current date';
+  END IF;
+  IF (SELECT count(*) FROM public.workout_sessions) <> sessions_before THEN
+    RAISE EXCEPTION 'archive/restore replayed or removed workout history';
+  END IF;
+END
+$assert_archive_restore$;
 
 SELECT set_config('request.jwt.claim.sub', current_setting('adaptivpush.user_2'), true);
 SET LOCAL ROLE authenticated;
