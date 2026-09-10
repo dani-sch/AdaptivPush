@@ -9,6 +9,7 @@ import { computeCyclePhase } from '@/utils/cyclePhase';
 import { isCatalogExerciseId } from '@/features/catalog/contracts';
 import { archiveProgram } from '@/features/programs/commands';
 import { programRepository } from '@/features/programs/repository';
+import { isMissingRelationOrColumnError } from '@/utils/profilePreferences';
 
 type SwapArgs = { exerciseId: string; replacement: WorkoutExercise; applyToProgram: boolean };
 
@@ -19,8 +20,8 @@ type DbProgram = {
     duration_weeks: number;
     start_date: string | null; // YYYY-MM-DD
     swap_interval_weeks?: number | null;
-    current_revision: number;
-    current_revision_id: string | null;
+    current_revision?: number;
+    current_revision_id?: string | null;
 };
 
 type DbProgramDay = {
@@ -30,10 +31,10 @@ type DbProgramDay = {
     order_in_week: number;
     workout_name: string;
     estimated_duration_min: number | null;
-    program_revision_id: string | null;
+    program_revision_id?: string | null;
     program_day_exercises: Array<{
         id: string;
-        stable_slot_id: string;
+        stable_slot_id?: string;
         position: number;
         set_count: number;
         rep_range_min: number;
@@ -110,7 +111,7 @@ export function useCurrentProgram() {
             }
 
             // Get active program
-            const { data: prog, error: progErr } = await supabase
+            const currentProgramResult = await supabase
                 .from('programs')
                 .select('id,name,goal,duration_weeks,start_date,swap_interval_weeks,current_revision,current_revision_id')
                 .eq('user_id', user.id)
@@ -118,6 +119,34 @@ export function useCurrentProgram() {
                 .order('created_at', { ascending: false })
                 .limit(1)
                 .maybeSingle<DbProgram>();
+
+            let prog = currentProgramResult.data;
+            let progErr = currentProgramResult.error;
+
+            // AP-03 ships additively. Keep existing programs readable while the
+            // database migration and writer flag are still rolling out.
+            if (
+                progErr &&
+                isMissingRelationOrColumnError(progErr, 'programs', 'current_revision')
+            ) {
+                const legacyProgramResult = await supabase
+                    .from('programs')
+                    .select('id,name,goal,duration_weeks,start_date,swap_interval_weeks')
+                    .eq('user_id', user.id)
+                    .eq('is_active', true)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle<Omit<DbProgram, 'current_revision' | 'current_revision_id'>>();
+
+                prog = legacyProgramResult.data
+                    ? {
+                        ...legacyProgramResult.data,
+                        current_revision: 1,
+                        current_revision_id: null,
+                    }
+                    : null;
+                progErr = legacyProgramResult.error;
+            }
 
             if (progErr) throw progErr;
             if (!prog) {
@@ -128,7 +157,7 @@ export function useCurrentProgram() {
             const currentWeek = computeWeekNumber(prog.start_date, prog.duration_weeks);
 
             // Get THIS WEEK's program_days with nested exercises
-            const { data: days, error: daysErr } = await supabase
+            const currentDaysResult = await supabase
                 .from('program_days')
                 .select(
                     `
@@ -167,19 +196,86 @@ export function useCurrentProgram() {
                 .order('order_in_week', { ascending: true })
                 .returns<DbProgramDay[]>();
 
+            let days = currentDaysResult.data;
+            let daysErr = currentDaysResult.error;
+
+            if (
+                daysErr &&
+                isMissingRelationOrColumnError(daysErr, 'program_days', 'program_revision_id')
+            ) {
+                const legacyDaysResult = await supabase
+                    .from('program_days')
+                    .select(
+                        `
+          id,
+          week_number,
+          day_index,
+          order_in_week,
+          workout_name,
+          estimated_duration_min,
+          program_day_exercises (
+            id,
+            position,
+            set_count,
+            rep_range_min,
+            rep_range_max,
+            target_rpe,
+            suggested_weight_lb,
+            per_set_weights_lb,
+            notes,
+            exercises (
+              id,
+              name,
+              primary_muscle,
+              equipment,
+              image_url,
+              instructions
+            )
+          )
+        `,
+                    )
+                    .eq('program_id', prog.id)
+                    .eq('week_number', currentWeek)
+                    .order('day_index', { ascending: true })
+                    .order('order_in_week', { ascending: true })
+                    .returns<DbProgramDay[]>();
+
+                days = legacyDaysResult.data;
+                daysErr = legacyDaysResult.error;
+            }
+
             if (daysErr) throw daysErr;
 
             // Find which days in this week already have a completed session
             const dayIds = (days ?? []).map((d) => d.id);
             let completedDayIds = new Set<string>();
             if (dayIds.length > 0) {
-                const { data: sessions } = await supabase
+                const currentSessionsResult = await supabase
                     .from('workout_sessions')
                     .select('program_day_id,completion_class,lifecycle')
                     .eq('user_id', user.id)
                     .in('program_day_id', dayIds)
                     .eq('lifecycle', 'finalized')
                     .in('completion_class', ['complete', 'reduced']);
+
+                let sessions: { program_day_id: string }[] | null = currentSessionsResult.data;
+                let sessionsErr = currentSessionsResult.error;
+
+                if (
+                    sessionsErr &&
+                    isMissingRelationOrColumnError(sessionsErr, 'workout_sessions', 'lifecycle')
+                ) {
+                    const legacySessionsResult = await supabase
+                        .from('workout_sessions')
+                        .select('program_day_id')
+                        .eq('user_id', user.id)
+                        .in('program_day_id', dayIds);
+
+                    sessions = legacySessionsResult.data;
+                    sessionsErr = legacySessionsResult.error;
+                }
+
+                if (sessionsErr) throw sessionsErr;
                 completedDayIds = new Set(
                     (sessions ?? []).map((s: { program_day_id: string }) => s.program_day_id)
                 );
@@ -233,7 +329,7 @@ export function useCurrentProgram() {
 
             const mapped: CurrentProgram = {
                 id: prog.id,
-                currentRevision: prog.current_revision,
+                currentRevision: prog.current_revision ?? 1,
                 currentRevisionId: prog.current_revision_id ?? undefined,
                 name: prog.name,
                 goal: prog.goal ?? '',
