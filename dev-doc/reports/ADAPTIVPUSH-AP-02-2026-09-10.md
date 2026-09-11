@@ -80,7 +80,7 @@ AP-05 still owns full comparable-history reconciliation and effect processing.
 
 ## 2026-09-11 device-hardening addendum
 
-Status of this bounded packet: **LOCAL VERIFIED; INTEGRATION PENDING; RELEASE BLOCKED**.
+Status of this bounded packet: **INTEGRATION VERIFIED; RELEASE BLOCKED**.
 
 - `@react-navigation/native` is now a direct Expo-compatible dependency. The
   installed graph resolves one `@react-navigation/core` version; imports remain
@@ -106,6 +106,9 @@ Status of this bounded packet: **LOCAL VERIFIED; INTEGRATION PENDING; RELEASE BL
   existing warnings. A fresh local reset applies four migrations, database lint
   reports no schema errors, and AP-01, combined AP-02/AP-03 and successor-revision
   SQL assertion suites pass through `psql`.
+- Integrator merge `54e5a39` reruns those focused/static and database gates,
+  exports the 3,819-module Android bundle, and completes the generated native
+  debug assembly in 5m08s with all 435 tasks executed.
 
 The supported runtime was the repository's native Android development build on
 API 36. Expo Go was observed separately and reports the expected SDK 57

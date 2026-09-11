@@ -89,7 +89,7 @@ or fabricating a precise checkpoint.
 
 ## 2026-09-11 successor-revision and device addendum
 
-Status of this bounded packet: **LOCAL VERIFIED; INTEGRATION PENDING; RELEASE BLOCKED**.
+Status of this bounded packet: **INTEGRATION VERIFIED; RELEASE BLOCKED**.
 
 Migration `20260911120000_ap03_revision_safe_exercise_swap.sql` has SHA-256
 `3303D5E9737481942EBB74794BD0AAC341119DC1CCCE4F7927E41F9CD6C6A98E`.
@@ -116,7 +116,8 @@ program results are displayed separately.
 Fresh local reset, database lint, the AP-01/combined AP-02/AP-03/successor SQL
 suites, catalog 9/9, dependency 1/1, workouts 13/13, programs 10/10, strict
 TypeScript, lint, Expo doctor, Android Metro export and native debug assemble
-pass on the feature branch. Physical-device, old-client, accessibility,
+pass on the feature branch and integrator merge `54e5a39`; the merged native
+assembly completes in 5m08s with all 435 tasks executed. Physical-device, old-client, accessibility,
 production backup/deploy and flag-enable gates remain open.
 
 ## Rollout, recovery, and open gates

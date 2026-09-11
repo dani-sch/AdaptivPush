@@ -28,10 +28,12 @@ errors; AP-01, combined AP-02/AP-03 and successor-revision SQL suites; catalog
 9/9; dependency 1/1; workouts 13/13; programs 10/10; strict TypeScript; lint
 with zero errors/three unrelated warnings; Expo doctor 21/21; Android Metro
 export of 3,819 modules; and native debug assemble all pass. The feature-branch
-APK assemble completed in 3m51s with 435 tasks.
+APK assemble completed in 3m51s with 435 tasks. Integrator merge `54e5a39`
+reruns the focused/static and fresh-reset/SQL gates, exports the same 3,819-module
+Android bundle, and completes a clean 435-task debug assembly in 5m08s.
 
-**Disposition**: The bounded packet is **LOCAL VERIFIED; INTEGRATION PENDING;
-RELEASE BLOCKED**. No production credentials or mutations were used, both
+**Disposition**: The bounded packet is **INTEGRATION VERIFIED; RELEASE
+BLOCKED**. No production credentials or mutations were used, both
 writers remain default-off, and physical-device/accessibility/old-client plus
 production backup/deploy/rollout gates remain open.
 

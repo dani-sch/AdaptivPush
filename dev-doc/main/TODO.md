@@ -46,6 +46,7 @@
 - [COMPLETE] Establish a local Android 16 native development build and prove generated save fails before server mutation with the writer off, then installs one complete schema-v2 hierarchy with it on.
 - [COMPLETE] Locally verify the bounded swap/route matrix on Android 16: Home and Plan entry, current-only zero/partial swaps, completed-set attribution, explicit recalibration, future immutable successor revision, reload, background/foreground, kill/reopen, cold offline recovery, stale route and actual account switching.
 - [COMPLETE] Declare Expo-compatible `@react-navigation/native`, align SDK patch dependencies, pass Metro export and native debug build, and confirm no duplicate navigation core.
+- [COMPLETE] Merge the bounded hardening packet as integrator commit `54e5a39` and rerun focused/static, Expo Doctor, fresh-reset/SQL, 3,819-module Metro and 435-task native debug assembly gates there.
 - [OPEN] Complete physical-device Expo/development-build comparison, manual program, archive/restore, old-client, dynamic type, TalkBack and theme coverage.
 - [BLOCKED] Securely reauthenticate the Supabase CLI, create a fresh encrypted production logical backup, prove PostgreSQL 17 decrypt/restore equivalence, then dry-run/apply/verify the production migration. Dashboard confirms Free has no managed backup.
 - [OPEN] Enable `EXPO_PUBLIC_AP02_DURABLE_WRITER` and `EXPO_PUBLIC_AP03_ATOMIC_WRITER` only after all release gates pass; monitor conflicts/replays/outcome coverage without sensitive payloads.

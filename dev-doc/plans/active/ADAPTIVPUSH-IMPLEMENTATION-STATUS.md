@@ -45,16 +45,19 @@ authenticated generated flow installed one active schema-v2 program, one
 revision, 24 days, 112 slots and one context row in local Supabase. This is
 partial device evidence, not the full AP-02/AP-03 device or production gate.
 
-The 2026-09-11 `codex/ap02-ap03-swap-recalibration` packet is locally verified
-against local Supabase in the supported Android 16 native development build. It
+The 2026-09-11 `codex/ap02-ap03-swap-recalibration` packet is integration-
+verified at local integrator merge `54e5a39` against local Supabase in the
+supported Android 16 native development build. It
 declares the Expo-compatible React Navigation runtime, adds an authenticated
 immutable successor-revision swap command, separates current-draft and future
 program outcomes, preserves logged-set exercise identity, requires explicit
 replacement-load confirmation, and resolves routes from complete immutable
 identity plus an owner-scoped stable active-draft alias. Home, Plan, reload,
 background/foreground, kill/reopen, gateway-off cold launch, stale routes and an
-actual account switch pass on the emulator. Expo Go was observed separately and
-retains the SDK/native-module remote-notification limitation; physical-device,
+actual account switch pass on the emulator. The merged tree also passes focused
+and static gates, a fresh four-migration reset and all three SQL suites, Expo
+Doctor 21/21, a 3,819-module Metro export and a 435-task native debug assembly.
+Expo Go was observed separately and retains the SDK/native-module remote-notification limitation; physical-device,
 accessibility, old-client and production rollout evidence remains open.
 
 | Label | Meaning |
