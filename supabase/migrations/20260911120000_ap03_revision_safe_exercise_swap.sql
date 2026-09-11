@@ -74,6 +74,12 @@ CREATE POLICY program_generation_context_update_legacy ON public.program_generat
   WITH CHECK (
     user_id = (SELECT auth.uid())
     AND program_revision_id IS NULL
+    AND EXISTS (
+      SELECT 1 FROM public.programs p
+      WHERE p.id = program_generation_context.program_id
+        AND p.user_id = (SELECT auth.uid())
+        AND p.schema_version < 2
+    )
   );
 
 CREATE POLICY program_generation_context_delete_legacy ON public.program_generation_context

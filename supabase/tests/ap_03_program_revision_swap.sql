@@ -116,6 +116,39 @@ SELECT public.finalize_workout_v2(jsonb_build_object(
   ))
 ));
 
+DO $assert_catalog_and_lineage_validation$
+DECLARE
+  catalog_denied boolean := false;
+  slot_denied boolean := false;
+BEGIN
+  BEGIN
+    PERFORM public.revise_program_exercise_v2(pg_temp.revision_payload(
+      '31000000-0000-4000-8000-000000000005'::uuid,
+      current_setting('adaptivpush.program')::uuid,
+      1,
+      current_setting('adaptivpush.revision_1')::uuid,
+      '21000000-0000-4000-8000-000000000099'::uuid
+    ));
+  EXCEPTION WHEN OTHERS THEN catalog_denied := SQLERRM LIKE '%unknown catalog exercise%'; END;
+
+  BEGIN
+    PERFORM public.revise_program_exercise_v2(
+      pg_temp.revision_payload(
+        '31000000-0000-4000-8000-000000000006'::uuid,
+        current_setting('adaptivpush.program')::uuid,
+        1,
+        current_setting('adaptivpush.revision_1')::uuid,
+        current_setting('adaptivpush.exercise_2')::uuid
+      ) || jsonb_build_object('currentStableSlotId', current_setting('adaptivpush.slot_2'))
+    );
+  EXCEPTION WHEN OTHERS THEN slot_denied := SQLERRM LIKE '%stable slot or original exercise mismatch%'; END;
+
+  IF NOT catalog_denied OR NOT slot_denied THEN
+    RAISE EXCEPTION 'catalog or stable slot lineage validation did not reject invalid identity';
+  END IF;
+END;
+$assert_catalog_and_lineage_validation$;
+
 SELECT set_config(
   'adaptivpush.revise_receipt',
   public.revise_program_exercise_v2(pg_temp.revision_payload(
