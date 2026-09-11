@@ -68,7 +68,6 @@ export function workoutAvailability(input: {
       return 'ready';
     }
   }
-  if (input.programWorkout) return 'ready';
   if (input.programLoading) return 'loading';
   return 'unavailable';
 }

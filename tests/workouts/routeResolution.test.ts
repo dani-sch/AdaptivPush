@@ -67,6 +67,30 @@ test('loading never becomes unavailable before program and draft resolution sett
   }), 'loading');
 });
 
+test('a resolved program workout remains loading while draft initialization is pending', () => {
+  assert.equal(workoutAvailability({
+    authLoading: false,
+    programLoading: true,
+    program,
+    programWorkout: program.workouts[0],
+    draft: null,
+    ownerId,
+    route,
+  }), 'loading');
+});
+
+test('a resolved program workout is unavailable when draft initialization settles without a draft', () => {
+  assert.equal(workoutAvailability({
+    authLoading: false,
+    programLoading: false,
+    program,
+    programWorkout: program.workouts[0],
+    draft: null,
+    ownerId,
+    route,
+  }), 'unavailable');
+});
+
 test('an exact owner-scoped draft recovers while the server program is unavailable', () => {
   assert.equal(workoutDraftMatches(draft, ownerId, draftLookupForRoute(route)), true);
   assert.equal(workoutAvailability({
@@ -78,6 +102,30 @@ test('an exact owner-scoped draft recovers while the server program is unavailab
     ownerId,
     route,
   }), 'ready');
+});
+
+test('a matching owned draft is ready after program-backed draft creation completes', () => {
+  assert.equal(workoutAvailability({
+    authLoading: false,
+    programLoading: false,
+    program,
+    programWorkout: program.workouts[0],
+    draft,
+    ownerId,
+    route,
+  }), 'ready');
+});
+
+test('a draft for another owner is unavailable after initialization settles', () => {
+  assert.equal(workoutAvailability({
+    authLoading: false,
+    programLoading: false,
+    program,
+    programWorkout: program.workouts[0],
+    draft,
+    ownerId: 'another-owner',
+    route,
+  }), 'unavailable');
 });
 
 test('stale or malformed routes never substitute a different workout', () => {
