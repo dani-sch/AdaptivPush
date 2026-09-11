@@ -182,8 +182,8 @@ function DayCard({
 export default function ProgramOverviewScreen() {
   const insets = useSafeAreaInsets();
   const { program } = useCurrentProgram();
-  const { theme } = useTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const { theme, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(theme, isDark), [isDark, theme]);
 
   const [weeks, setWeeks] = useState<OverviewWeek[]>([]);
   const [loading, setLoading] = useState(true);
@@ -311,6 +311,7 @@ export default function ProgramOverviewScreen() {
                       style={[
                         styles.weekTitle,
                         isPast && !isCurrent && styles.weekTitleMuted,
+                        isCurrent && styles.weekTitleCurrent,
                       ]}
                     >
                       Week {week.weekNumber}
@@ -325,7 +326,7 @@ export default function ProgramOverviewScreen() {
                         <Text style={styles.deloadBadgeText}>Deload</Text>
                       </View>
                     )}
-                    <Text style={styles.weekDayCount}>
+                    <Text style={[styles.weekDayCount, isCurrent && styles.weekDayCountCurrent]}>
                       {week.days.length} workout{week.days.length !== 1 ? 's' : ''}
                     </Text>
                   </View>
@@ -362,11 +363,11 @@ export default function ProgramOverviewScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-function createStyles(theme: Theme) {
+function createStyles(theme: Theme, isDark: boolean) {
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: '#03040b',
+      backgroundColor: theme.background,
     },
     header: {
       flexDirection: 'row',
@@ -374,6 +375,7 @@ function createStyles(theme: Theme) {
       gap: 12,
       paddingHorizontal: 16,
       paddingVertical: 14,
+      backgroundColor: theme.surfaceBg,
       borderBottomWidth: 1,
       borderBottomColor: theme.border,
     },
@@ -425,6 +427,7 @@ function createStyles(theme: Theme) {
 
     // Week accordion
     weekSection: {
+      backgroundColor: theme.cardBg,
       borderRadius: 16,
       borderWidth: 1,
       borderColor: theme.border,
@@ -439,9 +442,9 @@ function createStyles(theme: Theme) {
       backgroundColor: theme.cardBg,
     },
     weekHeaderCurrent: {
-      backgroundColor: '#1a2744',
+      backgroundColor: theme.primary,
       borderBottomWidth: 1,
-      borderBottomColor: theme.primary + '44',
+      borderBottomColor: theme.white + '55',
     },
     weekHeaderLeft: {
       flexDirection: 'row',
@@ -457,31 +460,37 @@ function createStyles(theme: Theme) {
     weekTitleMuted: {
       color: theme.placeholder,
     },
+    weekTitleCurrent: {
+      color: theme.white,
+    },
     weekDayCount: {
       color: theme.placeholder,
       fontSize: 13,
     },
+    weekDayCountCurrent: {
+      color: theme.white,
+    },
     currentBadge: {
-      backgroundColor: theme.primary,
+      backgroundColor: theme.white,
       borderRadius: 8,
       paddingHorizontal: 8,
       paddingVertical: 2,
     },
     currentBadgeText: {
-      color: theme.white,
+      color: theme.primary,
       fontSize: 11,
       fontWeight: '700',
     },
     deloadBadge: {
-      backgroundColor: '#2a1f00',
+      backgroundColor: isDark ? '#3a2504' : '#fef3c7',
       borderRadius: 8,
       paddingHorizontal: 8,
       paddingVertical: 2,
       borderWidth: 1,
-      borderColor: '#c87900',
+      borderColor: isDark ? '#fbbf24' : '#b45309',
     },
     deloadBadgeText: {
-      color: '#c87900',
+      color: isDark ? '#fde68a' : '#92400e',
       fontSize: 11,
       fontWeight: '700',
     },
@@ -490,7 +499,7 @@ function createStyles(theme: Theme) {
     daysContainer: {
       paddingHorizontal: 12,
       paddingVertical: 10,
-      backgroundColor: '#0a0b10',
+      backgroundColor: theme.backgroundDark,
       gap: 8,
     },
     dayCard: {
