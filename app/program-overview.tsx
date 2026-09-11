@@ -311,7 +311,6 @@ export default function ProgramOverviewScreen() {
                       style={[
                         styles.weekTitle,
                         isPast && !isCurrent && styles.weekTitleMuted,
-                        isCurrent && styles.weekTitleCurrent,
                       ]}
                     >
                       Week {week.weekNumber}
@@ -333,7 +332,7 @@ export default function ProgramOverviewScreen() {
                   <Ionicons
                     name={isExpanded ? 'chevron-up' : 'chevron-down'}
                     size={20}
-                    color={isCurrent ? theme.white : theme.placeholder}
+                    color={isCurrent ? theme.textPrimary : theme.placeholder}
                   />
                 </Pressable>
 
@@ -442,9 +441,11 @@ function createStyles(theme: Theme, isDark: boolean) {
       backgroundColor: theme.cardBg,
     },
     weekHeaderCurrent: {
-      backgroundColor: theme.primary,
+      backgroundColor: theme.mutedBg,
+      borderLeftWidth: 4,
+      borderLeftColor: theme.primary,
       borderBottomWidth: 1,
-      borderBottomColor: theme.white + '55',
+      borderBottomColor: theme.primary,
     },
     weekHeaderLeft: {
       flexDirection: 'row',
@@ -460,24 +461,23 @@ function createStyles(theme: Theme, isDark: boolean) {
     weekTitleMuted: {
       color: theme.placeholder,
     },
-    weekTitleCurrent: {
-      color: theme.white,
-    },
     weekDayCount: {
       color: theme.placeholder,
       fontSize: 13,
     },
     weekDayCountCurrent: {
-      color: theme.white,
+      color: theme.text,
     },
     currentBadge: {
-      backgroundColor: theme.white,
+      backgroundColor: theme.textPrimary,
       borderRadius: 8,
       paddingHorizontal: 8,
       paddingVertical: 2,
+      borderWidth: 1,
+      borderColor: theme.primary,
     },
     currentBadgeText: {
-      color: theme.primary,
+      color: theme.surfaceBg,
       fontSize: 11,
       fontWeight: '700',
     },
