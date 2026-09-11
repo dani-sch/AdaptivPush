@@ -1,5 +1,5 @@
 import type { CurrentProgram, ProgramWorkout } from '@/types/program';
-import type { WorkoutDraft } from './contracts';
+import { validateWorkoutDraft, type WorkoutDraft } from './contracts';
 import { activeWorkoutDraftMatches, workoutDraftMatches, type WorkoutDraftLookup } from './draftStore';
 
 export interface WorkoutRouteTarget {
@@ -63,8 +63,9 @@ export function workoutAvailability(input: {
   if (input.authLoading) return 'loading';
   if (input.draft && input.ownerId) {
     const lookup = draftLookupForRoute(input.route, input.programWorkout ?? undefined);
-    if (workoutDraftMatches(input.draft, input.ownerId, lookup)
-      || activeWorkoutDraftMatches(input.draft, input.ownerId, lookup)) {
+    if (validateWorkoutDraft(input.draft).ok
+      && (workoutDraftMatches(input.draft, input.ownerId, lookup)
+        || activeWorkoutDraftMatches(input.draft, input.ownerId, lookup))) {
       return 'ready';
     }
   }

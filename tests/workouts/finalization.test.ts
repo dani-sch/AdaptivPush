@@ -158,6 +158,13 @@ test('invalid exercise identity is rejected rather than skipped', () => {
   assert.match(result.errors.join(' '), /exercise identity/i);
 });
 
+test('an empty workout draft is rejected rather than finalized as abandoned', () => {
+  const result = validateWorkoutDraft({ ...fixtureDraft(), slots: [] });
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(' '), /at least one exercise slot/i);
+});
+
 test('response loss preserves the outbox operation and retry returns one receipt', async () => {
   const saved: ReturnType<typeof fixtureDraft>[] = [];
   const store: WorkoutDraftStore = {

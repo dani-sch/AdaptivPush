@@ -12,6 +12,7 @@ import {
   confirmWorkoutRecalibration,
   createWorkoutDraft,
   updateWorkoutSet,
+  validateWorkoutDraft,
   type WorkoutDraft,
 } from "@/features/workouts/contracts";
 import { finalizeWorkout } from "@/features/workouts/commands";
@@ -288,6 +289,10 @@ export default function NextWorkoutScreen() {
         const lookup = draftLookupForRoute(routeTarget, programWorkout ?? undefined);
         const stored = await workoutDraftStore.loadMatching(ownerId, lookup);
         if (stored) {
+          const validation = validateWorkoutDraft(stored);
+          if (!validation.ok) {
+            throw new Error(`Stored workout draft is invalid. ${validation.errors.join(' ')}`);
+          }
           settled = true;
           if (cancelled) return;
           setDraft(stored);
@@ -302,6 +307,9 @@ export default function NextWorkoutScreen() {
         settled = true;
         if (!program || !programWorkout || !programWorkout.prescriptionRevisionId || !programWorkout.stableDayId) {
           throw new Error('This requested workout is stale, malformed, or no longer belongs to the active prescription.');
+        }
+        if (programWorkout.exercises.length === 0) {
+          throw new Error('This requested workout has no exercise prescription. Refresh the plan and try again.');
         }
         const nextDraft = createWorkoutDraft({
           ownerId,
