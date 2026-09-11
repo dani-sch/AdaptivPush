@@ -69,6 +69,34 @@ export type ProgramCommandOutcome =
   | { status: 'conflict'; message: string; activeProgramId: string | null }
   | { status: 'unavailable'; message: string };
 
+export interface ProgramExerciseRevisionRequest {
+  programId: string;
+  expectedRevision: number;
+  expectedRevisionId: string;
+  currentStableDayId: string;
+  currentStableSlotId: string;
+  originalExerciseId: string;
+  replacementExerciseId: string;
+  includeCurrentDay: boolean;
+}
+
+export interface ProgramExerciseRevisionReceipt {
+  operationId: string;
+  programId: string;
+  baseRevisionId: string;
+  revisionId: string;
+  revision: number;
+  changedSlotCount: number;
+  revisedAt: string;
+  replayed: boolean;
+}
+
+export type ProgramExerciseRevisionOutcome =
+  | { status: 'revised' | 'replay'; receipt: ProgramExerciseRevisionReceipt }
+  | { status: 'validation'; errors: string[] }
+  | { status: 'conflict'; message: string }
+  | { status: 'unavailable'; message: string };
+
 export function normalizeProgramArtifact(
   input: ProgramArtifact & { depthMode?: unknown; entitlement?: unknown },
 ): NormalizedProgramArtifact {

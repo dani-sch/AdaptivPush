@@ -38,7 +38,7 @@ type Props = {
         exerciseId: string;
         replacement: WorkoutExercise;
         applyToProgram: boolean;
-    }) => void;
+    }) => unknown | Promise<unknown>;
 };
 
 export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwap, embedded }: Props) {
@@ -48,6 +48,8 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
     const [searchQuery, setSearchQuery] = useState('');
     const [applyToProgram, setApplyToProgram] = useState(false);
     const [selectedExercise, setSelectedExercise] = useState<SwapOption | null>(null);
+    const [applying, setApplying] = useState(false);
+    const [applyError, setApplyError] = useState<string | null>(null);
     const [expandedId, setExpandedId] = useState<string | null>(null);
 
     const currentExercise = useMemo(() => {
@@ -158,25 +160,33 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
         });
     }, [alternatives, searchQuery, currentExercise]);
 
-    const handleSwap = () => {
+    const handleSwap = async () => {
         const catalogExerciseId = selectedExercise?.catalogExerciseId;
         if (!selectedExercise || !isCatalogExerciseId(catalogExerciseId)) return;
-        onSwap({
-            exerciseId,
-            replacement: {
-                id:          catalogExerciseId,
-                exerciseId:  catalogExerciseId,
-                name:        selectedExercise.name,
-                muscleGroup: selectedExercise.muscleGroup,
-                equipment:   selectedExercise.equipment,
-                sets:        selectedExercise.sets,
-                reps:        selectedExercise.reps,
-                imageUrl:    selectedExercise.imageUrl,
-                description: selectedExercise.description,
-            },
-            applyToProgram: context === 'workout' ? applyToProgram : true,
-        });
-        onClose();
+        setApplying(true);
+        setApplyError(null);
+        try {
+            const applied = await onSwap({
+                exerciseId,
+                replacement: {
+                    id:          catalogExerciseId,
+                    exerciseId:  catalogExerciseId,
+                    name:        selectedExercise.name,
+                    muscleGroup: selectedExercise.muscleGroup,
+                    equipment:   selectedExercise.equipment,
+                    sets:        selectedExercise.sets,
+                    reps:        selectedExercise.reps,
+                    imageUrl:    selectedExercise.imageUrl,
+                    description: selectedExercise.description,
+                },
+                applyToProgram: context === 'workout' ? applyToProgram : true,
+            });
+            if (applied !== false) onClose();
+        } catch (error) {
+            setApplyError(error instanceof Error ? error.message : 'The exercise swap could not be saved.');
+        } finally {
+            setApplying(false);
+        }
     };
 
     const canApplySelectedExercise = isCatalogExerciseId(selectedExercise?.catalogExerciseId);
@@ -299,29 +309,39 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
             <View style={styles.footer}>
                 {context === 'workout' && (
                     <View style={styles.switchRow}>
-                        <Text style={styles.switchText}>Apply to program going forward</Text>
+                        <View style={styles.switchCopy}>
+                            <Text style={styles.switchText}>Also update future uncompleted workouts</Text>
+                            <Text style={styles.switchDescription}>
+                                Creates a new program revision. This workout stays frozen, and future replacement loads still need recalibration.
+                            </Text>
+                        </View>
                         <Switch
                             value={applyToProgram}
                             onValueChange={setApplyToProgram}
                             trackColor={{ false: theme.mutedBg, true: theme.primary }}
                             thumbColor={theme.white}
+                            accessibilityLabel="Also update future uncompleted workouts"
+                            accessibilityHint="Creates an immutable successor program revision without changing this workout or completed history"
                         />
                     </View>
                 )}
+                {applyError ? <Text style={styles.applyError} accessibilityLiveRegion="assertive">{applyError}</Text> : null}
 
                 <Pressable
-                    onPress={handleSwap}
-                    disabled={!canApplySelectedExercise}
+                    onPress={() => void handleSwap()}
+                    disabled={!canApplySelectedExercise || applying}
                     accessibilityRole="button"
                     accessibilityState={{ disabled: !canApplySelectedExercise }}
                     style={({ pressed }) => [
                         styles.swapBtn,
-                        !canApplySelectedExercise && styles.swapBtnDisabled,
+                        (!canApplySelectedExercise || applying) && styles.swapBtnDisabled,
                         pressed && canApplySelectedExercise && { opacity: 0.92 },
                     ]}
                 >
                     <Text style={styles.swapBtnText}>
-                        {selectedExercise && !canApplySelectedExercise
+                        {applying
+                            ? 'Saving…'
+                            : selectedExercise && !canApplySelectedExercise
                             ? 'Reconnect to Apply'
                             : 'Swap Exercise'}
                     </Text>
@@ -538,6 +558,10 @@ function createStyles(theme: Theme) {
             alignItems: 'center',
             justifyContent: 'space-between',
         },
+        switchCopy: {
+            flex: 1,
+            paddingRight: 12,
+        },
         switchText: {
             color: theme.textPrimary,
             fontSize: 13,
@@ -558,6 +582,17 @@ function createStyles(theme: Theme) {
             color: theme.white,
             fontSize: 15,
             fontWeight: '800',
+        },
+        switchDescription: {
+            color: theme.text,
+            fontSize: 11,
+            lineHeight: 16,
+            marginTop: 3,
+        },
+        applyError: {
+            color: theme.error,
+            fontSize: 12,
+            lineHeight: 18,
         },
     });
 }
