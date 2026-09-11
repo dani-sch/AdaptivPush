@@ -28,6 +28,12 @@ export interface Exercise {
     imageUrl?: string;
     description?: string;
     requiresRecalibration?: boolean;
+    recalibration?: {
+        originalExerciseName: string;
+        completedOriginalSets: number[];
+        remainingReplacementSets: number[];
+        suggestedCopyLoad: number | null;
+    };
 }
 
 // ─── SetRow ───────────────────────────────────────────────────────────────────
@@ -163,7 +169,7 @@ export default function ExerciseCard({
                         </Text>
                         <Text style={styles.prescription}>{exercise.prescription}</Text>
                         {exercise.requiresRecalibration && (
-                            <Text style={styles.recalibrationText}>Replacement load needs recalibration</Text>
+                            <Text style={styles.recalibrationText}>Action needed: choose replacement loads</Text>
                         )}
                     </View>
                 </View>
@@ -194,14 +200,29 @@ export default function ExerciseCard({
                 </View>
             </View>
             {exercise.requiresRecalibration && onConfirmRecalibration && (
-                <Pressable
-                    style={styles.recalibrationButton}
-                    onPress={onConfirmRecalibration}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Confirm recalibrated load for ${exercise.name}`}
-                >
-                    <Text style={styles.recalibrationButtonText}>Use entered replacement load</Text>
-                </Pressable>
+                <View style={styles.recalibrationPanel} accessibilityRole="summary">
+                    <Text style={styles.recalibrationExplanation}>
+                        {exercise.recalibration?.completedOriginalSets.length
+                            ? `Completed ${exercise.recalibration.completedOriginalSets.length === 1 ? 'set' : 'sets'} ${exercise.recalibration.completedOriginalSets.join(', ')} remain recorded under ${exercise.recalibration.originalExerciseName}. `
+                            : ''}
+                        {`Unlogged ${exercise.recalibration?.remainingReplacementSets.length === 1 ? 'set' : 'sets'} ${exercise.recalibration?.remainingReplacementSets.join(', ') ?? ''} need a load for ${exercise.name}. This changes only this workout; future prescriptions are separate.`}
+                    </Text>
+                    <Text style={styles.recalibrationHint}>You can enter a different load in each remaining set.</Text>
+                    <Pressable
+                        style={styles.recalibrationButton}
+                        onPress={onConfirmRecalibration}
+                        accessibilityRole="button"
+                        accessibilityLabel={exercise.recalibration?.suggestedCopyLoad != null
+                            ? `Use ${exercise.recalibration?.suggestedCopyLoad} pounds for remaining replacement sets in this workout only`
+                            : `Confirm manually entered loads for remaining ${exercise.name} sets in this workout only`}
+                    >
+                        <Text style={styles.recalibrationButtonText}>
+                            {exercise.recalibration?.suggestedCopyLoad != null
+                                ? `Use ${exercise.recalibration?.suggestedCopyLoad} lb for remaining sets ${exercise.recalibration?.remainingReplacementSets.join(', ')}`
+                                : 'Confirm manually entered replacement loads'}
+                        </Text>
+                    </Pressable>
+                </View>
             )}
 
             {showInfo && (
@@ -306,7 +327,7 @@ function createStyles(theme: Theme) {
             marginTop: 3,
         },
         recalibrationButton: {
-            minHeight: 44,
+            minHeight: 48,
             borderRadius: 10,
             borderWidth: 1,
             borderColor: theme.secondaryLight,
@@ -316,6 +337,24 @@ function createStyles(theme: Theme) {
             paddingHorizontal: 12,
         },
         recalibrationButtonText: { color: theme.textPrimary, fontSize: 13, fontWeight: "700" },
+        recalibrationPanel: {
+            borderWidth: 1,
+            borderColor: theme.border,
+            borderRadius: 14,
+            padding: 12,
+            marginBottom: 14,
+            gap: 8,
+        },
+        recalibrationExplanation: {
+            color: theme.textPrimary,
+            fontSize: 13,
+            lineHeight: 19,
+        },
+        recalibrationHint: {
+            color: theme.text,
+            fontSize: 12,
+            lineHeight: 18,
+        },
 
         actions: {
             flexDirection: "row",

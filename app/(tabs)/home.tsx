@@ -21,6 +21,7 @@ import { useCurrentProgram } from "../../hooks/useCurrentProgram";
 import { getReadinessModifier } from "../../utils/progressionEngine";
 import { supabase } from "../../utils/supabase";
 import { computeCyclePhase } from "../../utils/cyclePhase";
+import { workoutRouteParams } from "@/features/workouts/routeResolution";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -659,12 +660,8 @@ export default function HomeScreen() {
     : undefined;
 
   const handleStartWorkout = () => {
-    const workoutId = nextWorkout?.id;
-    if (workoutId) {
-      router.push({ pathname: "/next-workout", params: { workoutId } });
-    } else {
-      router.push("/next-workout");
-    }
+    if (!program || !nextWorkout) return;
+    router.push({ pathname: "/next-workout", params: workoutRouteParams(program, nextWorkout) });
   };
 
   const handleOpenReadinessModal = () => {

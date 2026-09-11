@@ -3,11 +3,12 @@ import { ExerciseHistoryModal } from "@/components/ExerciseHistoryModal";
 import { SwapExerciseModal } from "@/components/SwapExerciseModal";
 import { useCurrentProgram } from "@/hooks/useCurrentProgram";
 import type { CurrentProgram, ProgramWorkout } from "@/types/program";
-import { supabase } from "@/utils/supabase";
+import { getPersistedSessionOwnerId, supabase } from "@/utils/supabase";
 import { notifyPRCelebration } from "@/utils/notifications";
 import { createOperationId } from "@/features/kernel/operationId";
 import {
   amendWorkoutExercise,
+  applyWorkoutRecalibrationLoad,
   confirmWorkoutRecalibration,
   createWorkoutDraft,
   updateWorkoutSet,
@@ -15,6 +16,12 @@ import {
 } from "@/features/workouts/contracts";
 import { finalizeWorkout } from "@/features/workouts/commands";
 import { workoutDraftStore } from "@/features/workouts/draftStore";
+import {
+  draftLookupForRoute,
+  resolveProgramWorkout,
+  workoutAvailability,
+  type WorkoutRouteTarget,
+} from "@/features/workouts/routeResolution";
 import { workoutRepository } from "@/features/workouts/repository";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -41,12 +48,33 @@ import type { Theme } from "@/constants/themes";
 function draftToExercises(draft: WorkoutDraft, workout?: ProgramWorkout): Exercise[] {
   return draft.slots.map((slot) => {
     const current = workout?.exercises.find((exercise) => exercise.stableSlotId === slot.slotId);
-    const repDisplay = current?.reps?.replace("-", "–") ?? "prescribed reps";
+    const frozen = draft.frozenPrescription.slots.find((candidate) => candidate.slotId === slot.slotId);
+    const originalExerciseName = frozen?.exerciseName ?? current?.name ?? 'the original exercise';
+    const remainingReplacementSets = slot.sets
+      .filter((set) => !set.logged && set.actualExerciseId === slot.actualExerciseId)
+      .map((set) => set.order);
+    const completedOriginalSets = slot.sets
+      .filter((set) => set.logged && set.actualExerciseId === slot.prescribedExerciseId)
+      .map((set) => set.order);
+    const allLoadsUnconfirmed = slot.sets
+      .filter((set) => !set.logged && set.actualExerciseId === slot.actualExerciseId)
+      .every((set) => set.actualLoad === null);
+    const referenceLoadText = slot.sets.find(
+      (set) => !set.logged && set.actualExerciseId === slot.actualExerciseId && set.enteredLoadText.trim() !== '',
+    )?.enteredLoadText;
+    const referenceLoad = referenceLoadText === undefined ? null : Number(referenceLoadText);
+    const firstSet = slot.sets[0];
+    const frozenRepDisplay = firstSet
+      ? firstSet.plannedRepsMin === firstSet.plannedRepsMax
+        ? String(firstSet.plannedRepsMin)
+        : `${firstSet.plannedRepsMin}–${firstSet.plannedRepsMax}`
+      : 'prescribed reps';
+    const repDisplay = current?.reps?.replace("-", "–") ?? frozenRepDisplay;
     return {
       id: slot.slotId,
       exerciseId: slot.actualExerciseId,
       name: slot.actualExerciseId !== slot.prescribedExerciseId
-        ? slot.exerciseName ?? "Replacement exercise"
+        ? slot.replacementExerciseName ?? "Replacement exercise"
         : current?.name ?? slot.exerciseName ?? "Prescribed exercise",
       prescription: `${slot.prescribedSetCount}×${repDisplay}`,
       muscleGroup: current?.muscleGroup,
@@ -61,6 +89,14 @@ function draftToExercises(draft: WorkoutDraft, workout?: ProgramWorkout): Exerci
       })),
       completed: slot.sets.length > 0 && slot.sets.every((set) => set.logged),
       requiresRecalibration: slot.requiresRecalibration,
+      recalibration: slot.requiresRecalibration ? {
+        originalExerciseName,
+        completedOriginalSets,
+        remainingReplacementSets,
+        suggestedCopyLoad: allLoadsUnconfirmed && referenceLoad !== null && Number.isFinite(referenceLoad) && referenceLoad >= 0
+          ? referenceLoad
+          : null,
+      } : undefined,
     };
   });
 }
@@ -70,6 +106,12 @@ function formatTime(seconds: number): string {
   const s = seconds % 60;
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
+
+type WorkoutSwapResult = {
+  currentDraft: 'saved';
+  futureProgram: 'not_requested' | 'revised' | 'failed';
+  futureMessage?: string;
+};
 
 // ─── Finish Modal ─────────────────────────────────────────────────────────────
 
@@ -136,21 +178,36 @@ const FinishModal: React.FC<{
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function NextWorkoutScreen() {
-  const { workoutId } = useLocalSearchParams<{ workoutId?: string }>();
-  const { program, loading } = useCurrentProgram();
+  const params = useLocalSearchParams<{
+    workoutId?: string;
+    programId?: string;
+    revisionId?: string;
+    stableDayId?: string;
+    programDayId?: string;
+  }>();
+  const { program, loading, refresh, swapExercise } = useCurrentProgram();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-
-  // A requested target is strict: stale routes never substitute another workout.
-  const programWorkout = workoutId
-    ? program?.workouts.find((w) => w.id === workoutId)
-    : program?.workouts[0];
+  const routeTarget = useMemo<WorkoutRouteTarget>(() => ({
+    workoutId: params.workoutId,
+    programId: params.programId,
+    revisionId: params.revisionId,
+    stableDayId: params.stableDayId,
+    programDayId: params.programDayId,
+  }), [params.programDayId, params.programId, params.revisionId, params.stableDayId, params.workoutId]);
+  const programWorkout = useMemo(
+    () => resolveProgramWorkout(program, routeTarget),
+    [program, routeTarget],
+  );
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [workoutName, setWorkoutName] = useState("Workout");
   const [draft, setDraft] = useState<WorkoutDraft | null>(null);
   const [draftLoading, setDraftLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [ownerId, setOwnerId] = useState<string | null>(null);
+  const [resolutionAttempt, setResolutionAttempt] = useState(0);
+  const [resolutionError, setResolutionError] = useState<string | null>(null);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
-  const targetUnavailable = Boolean(!draftLoading && workoutId && !programWorkout && !draft);
   const [elapsed, setElapsed] = useState(0);
   const [showFinishModal, setShowFinishModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -165,32 +222,86 @@ export default function NextWorkoutScreen() {
   );
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const persistQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const hydratedTargetRef = useRef<string | null>(null);
 
   const persistDraft = (nextDraft: WorkoutDraft) => {
-    persistQueueRef.current = persistQueueRef.current.then(() => workoutDraftStore.save(nextDraft));
+    const save = persistQueueRef.current
+      .catch(() => undefined)
+      .then(() => workoutDraftStore.save(nextDraft));
+    persistQueueRef.current = save;
+    return save;
   };
 
-  // Hydrate once per immutable target. Later program/readiness refreshes cannot reset entered work.
+  useEffect(() => {
+    let mounted = true;
+    void getPersistedSessionOwnerId().then((persistedOwnerId) => {
+      if (!mounted || !persistedOwnerId) return;
+      setOwnerId(persistedOwnerId);
+      setAuthLoading(false);
+    }).catch(() => undefined);
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      setOwnerId(data.session?.user.id ?? null);
+      setAuthLoading(false);
+    });
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
+      setOwnerId(session?.user.id ?? null);
+      setAuthLoading(false);
+    });
+    return () => {
+      mounted = false;
+      subscription.subscription.unsubscribe();
+    };
+  }, []);
+
+  // Resolve the exact owner/revision/stable-day target. A local draft may win while
+  // the network-backed program is still loading, but an unrelated workout never does.
   useEffect(() => {
     let cancelled = false;
+    const targetKey = JSON.stringify([ownerId, routeTarget.programId, routeTarget.revisionId,
+      routeTarget.stableDayId, routeTarget.programDayId, routeTarget.workoutId]);
+    if (hydratedTargetRef.current !== targetKey) {
+      hydratedTargetRef.current = targetKey;
+      setDraft(null);
+      setExercises([]);
+      setResolutionError(null);
+      setSyncMessage(null);
+      setDraftLoading(true);
+    }
+    if (authLoading) return () => { cancelled = true; };
     (async () => {
+      let settled = false;
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const user = session?.user;
-        const targetProgramDayId = programWorkout?.id ?? workoutId;
-        if (!user || !targetProgramDayId) throw new Error('Sign in to restore this workout draft.');
-        const stored = await workoutDraftStore.load(user.id, targetProgramDayId);
-        if (!stored && (!programWorkout || !programWorkout.prescriptionRevisionId)) {
-          throw new Error('The requested workout is unavailable and no local draft exists.');
+        if (!ownerId) throw new Error('Sign in to restore this workout draft.');
+        const lookup = draftLookupForRoute(routeTarget, programWorkout ?? undefined);
+        const stored = await workoutDraftStore.loadMatching(ownerId, lookup);
+        if (stored) {
+          settled = true;
+          if (cancelled) return;
+          setDraft(stored);
+          setElapsed(Math.max(0, Math.floor((Date.now() - new Date(stored.startedAt).getTime()) / 1000)));
+          setExercises(draftToExercises(stored, programWorkout ?? undefined));
+          setWorkoutName(stored.workoutName);
+          setResolutionError(null);
+          if (stored.lifecycle === 'finalized') setSyncMessage('This workout is already finalized.');
+          return;
         }
-        const nextDraft = stored ?? createWorkoutDraft({
-          ownerId: user.id,
-          programDayId: programWorkout!.id,
-          prescriptionRevisionId: programWorkout!.prescriptionRevisionId!,
-          workoutName: programWorkout!.name,
+        if (loading) return;
+        settled = true;
+        if (!program || !programWorkout || !programWorkout.prescriptionRevisionId || !programWorkout.stableDayId) {
+          throw new Error('This requested workout is stale, malformed, or no longer belongs to the active prescription.');
+        }
+        const nextDraft = createWorkoutDraft({
+          ownerId,
+          programId: program.id,
+          programDayId: programWorkout.id,
+          stableDayId: programWorkout.stableDayId,
+          prescriptionRevisionId: programWorkout.prescriptionRevisionId,
+          workoutName: programWorkout.name,
           startedAt: new Date().toISOString(),
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-          slots: programWorkout!.exercises.map((exercise, slotIndex) => {
+          slots: programWorkout.exercises.map((exercise, slotIndex) => {
             if (!exercise.exerciseId) throw new Error(`${exercise.name} has no catalog exercise identity.`);
             const repMatch = (exercise.reps ?? '8-12').match(/(\d+)\D+(\d+)/);
             const min = Number(repMatch?.[1] ?? 8);
@@ -218,32 +329,47 @@ export default function NextWorkoutScreen() {
             };
           }),
         });
-        if (!stored) await workoutDraftStore.save(nextDraft);
+        await workoutDraftStore.save(nextDraft);
         if (cancelled) return;
         setDraft(nextDraft);
         setElapsed(Math.max(0, Math.floor((Date.now() - new Date(nextDraft.startedAt).getTime()) / 1000)));
         setExercises(draftToExercises(nextDraft, programWorkout));
         setWorkoutName(nextDraft.workoutName);
-        if (nextDraft.lifecycle === 'finalized') setSyncMessage('This workout is already finalized.');
+        setResolutionError(null);
       } catch (error) {
-        if (!cancelled) setSyncMessage(error instanceof Error ? error.message : 'Workout draft is unavailable.');
+        settled = true;
+        if (!cancelled) setResolutionError(error instanceof Error ? error.message : 'Workout draft is unavailable.');
       } finally {
-        if (!cancelled) setDraftLoading(false);
+        if (!cancelled && settled) setDraftLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [workoutId, programWorkout]);
+  }, [authLoading, loading, ownerId, program, programWorkout, resolutionAttempt, routeTarget]);
+
+  const availability = workoutAvailability({
+    authLoading,
+    programLoading: loading || draftLoading,
+    program,
+    programWorkout,
+    draft,
+    ownerId,
+    route: routeTarget,
+  });
 
   const programForSwap = useMemo<CurrentProgram | null>(() => {
-    if (!program || !programWorkout) return null;
+    if (!program || !draft) return null;
+    const activeWorkout = programWorkout
+      ?? program.workouts.find((workout) => workout.stableDayId === draft.stableDayId);
     return {
       ...program,
       workouts: [
         {
-          id: programWorkout.id,
-          name: programWorkout.name,
-          day: programWorkout.day,
-          estimatedTime: programWorkout.estimatedTime,
+          id: activeWorkout?.id ?? draft.programDayId,
+          stableDayId: draft.stableDayId,
+          prescriptionRevisionId: activeWorkout?.prescriptionRevisionId ?? draft.prescriptionRevisionId,
+          name: draft.workoutName,
+          day: activeWorkout?.day ?? 'Current workout',
+          estimatedTime: activeWorkout?.estimatedTime ?? 0,
           exercises: exercises.map((ex) => ({
             id: ex.id,
             exerciseId: ex.exerciseId,
@@ -254,7 +380,7 @@ export default function NextWorkoutScreen() {
         },
       ],
     };
-  }, [program, programWorkout, exercises]);
+  }, [draft, program, programWorkout, exercises]);
 
   useEffect(() => {
     if (!draft || draft.lifecycle === 'finalized') return;
@@ -286,7 +412,7 @@ export default function NextWorkoutScreen() {
           : { logged: Boolean(value), loggedAt: value ? new Date().toISOString() : null };
     const nextDraft = updateWorkoutSet(draft, { setId, ...update });
     setDraft(nextDraft);
-    setExercises(draftToExercises(nextDraft, programWorkout));
+    setExercises(draftToExercises(nextDraft, programWorkout ?? undefined));
     persistDraft(nextDraft);
   };
 
@@ -305,7 +431,7 @@ export default function NextWorkoutScreen() {
       });
     }
     setDraft(nextDraft);
-    setExercises(draftToExercises(nextDraft, programWorkout));
+    setExercises(draftToExercises(nextDraft, programWorkout ?? undefined));
     persistDraft(nextDraft);
   };
 
@@ -317,8 +443,8 @@ export default function NextWorkoutScreen() {
     exerciseId: string;
     replacement: ProgramWorkout["exercises"][number];
     applyToProgram: boolean;
-  }) => {
-    if (!draft || !programWorkout) throw new Error('Workout draft is unavailable.');
+  }): Promise<WorkoutSwapResult | null> => {
+    if (!draft) throw new Error('Workout draft is unavailable.');
     const replacementExerciseId = replacement.exerciseId ?? replacement.id;
     const slot = draft.slots.find((candidate) => candidate.slotId === exerciseId);
     if (!slot || !replacementExerciseId) throw new Error('Replacement identity is unavailable.');
@@ -334,12 +460,7 @@ export default function NextWorkoutScreen() {
           { cancelable: true, onDismiss: () => resolve(false) },
         );
       });
-      if (!confirmed) return;
-    }
-    if (applyToProgram) {
-      throw new Error(
-        'This swap can be saved for the current workout. Future prescription changes require a new program revision.',
-      );
+      if (!confirmed) return null;
     }
     const nextDraft = amendWorkoutExercise(draft, {
       slotId: exerciseId,
@@ -347,9 +468,43 @@ export default function NextWorkoutScreen() {
       replacementName: replacement.name,
       amendedAt: new Date().toISOString(),
     });
+    await persistDraft(nextDraft);
     setDraft(nextDraft);
-    setExercises(draftToExercises(nextDraft, programWorkout));
-    persistDraft(nextDraft);
+    setExercises(draftToExercises(nextDraft, programWorkout ?? undefined));
+    setSyncMessage('Current workout swap saved on this device. Remaining replacement sets need explicit load confirmation.');
+
+    if (applyToProgram) {
+      const activeWorkout = program?.workouts.find(
+        (workout) => workout.stableDayId === draft.stableDayId,
+      );
+      const original = activeWorkout?.exercises.find(
+        (exercise) => exercise.stableSlotId === exerciseId || exercise.id === exerciseId,
+      );
+      if (!original) {
+        const message = 'The active program changed and no longer contains this stable exercise slot.';
+        setSyncMessage(`Current workout swap saved. Future program update failed: ${message}`);
+        return { currentDraft: 'saved', futureProgram: 'failed', futureMessage: message };
+      }
+      try {
+        await swapExercise({
+          exerciseId: original?.id ?? exerciseId,
+          replacement,
+          applyToProgram: true,
+          scope: 'future_after_current',
+        });
+        setSyncMessage('Current workout swap saved. A successor program revision updated future uncompleted prescriptions.');
+        return { currentDraft: 'saved', futureProgram: 'revised' };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'The future program revision was not updated.';
+        setSyncMessage(`Current workout swap saved. Future program update failed: ${message}`);
+        Alert.alert(
+          'Current workout swapped',
+          `Saved for this workout. Your existing program remains usable, but future prescriptions were not changed. ${message}`,
+        );
+        return { currentDraft: 'saved', futureProgram: 'failed', futureMessage: message };
+      }
+    }
+    return { currentDraft: 'saved', futureProgram: 'not_requested' };
   };
 
   const handleFinish = async () => {
@@ -490,23 +645,37 @@ export default function NextWorkoutScreen() {
     }
   };
 
-  if (targetUnavailable || (!loading && !draftLoading && !programWorkout && !draft)) {
+  if (availability === 'unavailable') {
     return (
       <SafeAreaView style={styles.safeArea} edges={["top"]}>
         <View style={styles.loadingContainer}>
           <Text style={styles.unavailableTitle}>Workout unavailable</Text>
           <Text style={styles.unavailableText}>
-            This requested workout is stale or no longer belongs to the active prescription. Choose a workout from your current plan.
+            {resolutionError ?? 'This requested workout is stale or malformed. It was not replaced with a different workout.'}
           </Text>
-          <Pressable style={styles.finishButton} onPress={() => router.replace('/plan')} accessibilityRole="button">
-            <Text style={styles.finishButtonText}>Choose from current plan</Text>
-          </Pressable>
+          <View style={styles.unavailableActions}>
+            <Pressable
+              style={styles.secondaryButton}
+              onPress={() => {
+                setDraftLoading(true);
+                setResolutionError(null);
+                void refresh().finally(() => setResolutionAttempt((attempt) => attempt + 1));
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Retry requested workout"
+            >
+              <Text style={styles.secondaryButtonText}>Retry</Text>
+            </Pressable>
+            <Pressable style={styles.finishButton} onPress={() => router.replace('/plan')} accessibilityRole="button">
+              <Text style={styles.finishButtonText}>Return to Plan</Text>
+            </Pressable>
+          </View>
         </View>
       </SafeAreaView>
     );
   }
 
-  if ((loading || draftLoading) && exercises.length === 0) {
+  if (availability === 'loading' && exercises.length === 0) {
     return (
       <SafeAreaView style={styles.safeArea} edges={["top"]}>
         <View style={styles.loadingContainer}>
@@ -583,10 +752,14 @@ export default function NextWorkoutScreen() {
               onConfirmRecalibration={() => {
                 if (!draft) return;
                 try {
-                  const nextDraft = confirmWorkoutRecalibration(draft, exercise.id);
+                  const copyLoad = exercise.recalibration?.suggestedCopyLoad;
+                  const nextDraft = copyLoad !== null && copyLoad !== undefined
+                    ? applyWorkoutRecalibrationLoad(draft, exercise.id, copyLoad)
+                    : confirmWorkoutRecalibration(draft, exercise.id);
                   setDraft(nextDraft);
-                  setExercises(draftToExercises(nextDraft, programWorkout));
+                  setExercises(draftToExercises(nextDraft, programWorkout ?? undefined));
                   persistDraft(nextDraft);
+                  setSyncMessage('Replacement loads confirmed for the remaining sets in this workout only.');
                 } catch (error) {
                   Alert.alert('Recalibration needed', error instanceof Error ? error.message : 'Enter a replacement load first.');
                 }
@@ -671,20 +844,10 @@ export default function NextWorkoutScreen() {
             exerciseId={swapTargetId}
             context="workout"
             onClose={() => setSwapTargetId(null)}
-            onSwap={(swapArgs) => {
+            onSwap={async (swapArgs) => {
                 void haptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
-                void applyWorkoutSwap(swapArgs)
-                  .then(() => {
-                    setSwapTargetId(null);
-                  })
-                  .catch((error: unknown) => {
-                    Alert.alert(
-                      "Couldn't swap exercise",
-                      error instanceof Error
-                        ? error.message
-                        : "Please try again.",
-                    );
-                  });
+                const outcome = await applyWorkoutSwap(swapArgs);
+                return outcome !== null;
             }}
           />
         )}
@@ -746,6 +909,26 @@ function createStyles(theme: Theme) {
       textAlign: "center",
       maxWidth: 360,
       paddingHorizontal: 20,
+    },
+    unavailableActions: {
+      width: '100%',
+      maxWidth: 360,
+      paddingHorizontal: 20,
+      gap: 10,
+    },
+    secondaryButton: {
+      minHeight: 48,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 16,
+    },
+    secondaryButtonText: {
+      color: theme.textPrimary,
+      fontSize: 15,
+      fontWeight: '700',
     },
     header: {
       flexDirection: "row",

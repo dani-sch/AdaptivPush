@@ -44,7 +44,9 @@
 - [COMPLETE] Route generated/manual program saves and Next Workout through the common commands; remove false completion and visible development-program behavior.
 - [COMPLETE] Pass focused contract tests, AP-01 regression SQL, AP-02/AP-03 atomicity/isolation SQL, fresh reset, database lint, strict types, lint and clean integrator verification.
 - [COMPLETE] Establish a local Android 16 native development build and prove generated save fails before server mutation with the writer off, then installs one complete schema-v2 hierarchy with it on.
-- [OPEN] Complete authenticated kill/offline/reconnect, route, background timer, manual program, archive/restore, account-switch and accessibility/theme device coverage.
+- [COMPLETE] Locally verify the bounded swap/route matrix on Android 16: Home and Plan entry, current-only zero/partial swaps, completed-set attribution, explicit recalibration, future immutable successor revision, reload, background/foreground, kill/reopen, cold offline recovery, stale route and actual account switching.
+- [COMPLETE] Declare Expo-compatible `@react-navigation/native`, align SDK patch dependencies, pass Metro export and native debug build, and confirm no duplicate navigation core.
+- [OPEN] Complete physical-device Expo/development-build comparison, manual program, archive/restore, old-client, dynamic type, TalkBack and theme coverage.
 - [BLOCKED] Securely reauthenticate the Supabase CLI, create a fresh encrypted production logical backup, prove PostgreSQL 17 decrypt/restore equivalence, then dry-run/apply/verify the production migration. Dashboard confirms Free has no managed backup.
 - [OPEN] Enable `EXPO_PUBLIC_AP02_DURABLE_WRITER` and `EXPO_PUBLIC_AP03_ATOMIC_WRITER` only after all release gates pass; monitor conflicts/replays/outcome coverage without sensitive payloads.
 
