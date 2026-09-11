@@ -5,6 +5,41 @@
 
 ---
 
+### 2026-09-11 AP-02/AP-03 swap, route and recalibration hardening {#2026-09-11-ap-02-ap-03-device-hardening}
+
+**Summary**: Implemented the bounded device-hardening packet on
+`codex/ap02-ap03-swap-recalibration`. Added the direct Expo-compatible React
+Navigation dependency, an authenticated immutable successor-revision swap RPC,
+separate current/future swap outcomes, explicit replacement-load confirmation,
+complete route identity and owner-scoped active-draft recovery.
+
+**Android/local evidence**: In the API 36 native development build against
+local Supabase, current-only zero and partial swaps preserve entered values,
+completion and original exercise attribution; future swap advances the active
+revision once and changes only later uncompleted prescriptions. Home and Plan,
+Expo reload, background/foreground, kill/reopen and gateway-off cold launch
+recover the frozen draft. A malformed route shows Retry/Return to Plan without
+substitution. After a real sign-out/sign-in, a second local account receives the
+unavailable state and cannot see the first account's draft. Expo Go was observed
+separately with its SDK 57 remote-notification limitation.
+
+**Verification**: fresh four-migration reset; database lint with no schema
+errors; AP-01, combined AP-02/AP-03 and successor-revision SQL suites; catalog
+9/9; dependency 1/1; workouts 13/13; programs 10/10; strict TypeScript; lint
+with zero errors/three unrelated warnings; Expo doctor 21/21; Android Metro
+export of 3,819 modules; and native debug assemble all pass. The feature-branch
+APK assemble completed in 3m51s with 435 tasks.
+
+**Disposition**: The bounded packet is **LOCAL VERIFIED; INTEGRATION PENDING;
+RELEASE BLOCKED**. No production credentials or mutations were used, both
+writers remain default-off, and physical-device/accessibility/old-client plus
+production backup/deploy/rollout gates remain open.
+
+**Commits**: `4f2160a`, `cd057ae`, `07e3403`, `cd6310f`, `318579f`,
+`39039e3`, `e6754c2`.
+
+---
+
 ### 2026-09-10 AP-03 flag-off recovery and Android generated-save smoke {#2026-09-10-ap-03-flag-off-recovery}
 
 **Summary**: Reproduced a generic generated-program save failure with the

@@ -87,6 +87,38 @@ or fabricating a precise checkpoint.
 | AC-TR-024 | Implemented persisted context versus legacy unknown rationale and removal of the dev CTA; device presentation proof remains open. |
 | AC-TR-025 | Stored artifacts are not entitlement-gated; offline/downgrade device proof remains open. |
 
+## 2026-09-11 successor-revision and device addendum
+
+Status of this bounded packet: **LOCAL VERIFIED; INTEGRATION PENDING; RELEASE BLOCKED**.
+
+Migration `20260911120000_ap03_revision_safe_exercise_swap.sql` has SHA-256
+`3303D5E9737481942EBB74794BD0AAC341119DC1CCCE4F7927E41F9CD6C6A98E`.
+Its authenticated `revise_program_exercise_v2` command locks and validates the
+owned active program/base revision, catalog replacement and stable day/slot,
+then creates one immutable successor. Completed days retain the base
+prescription; only future uncompleted matching slots change. Suggested loads
+are cleared and recalibration is required for changed future slots.
+
+The operation receipt makes identical replay idempotent, rejects operation-ID
+payload reuse, and returns an explicit stale-base conflict without changing the
+prior active program. Direct ordinary-client V2 prescription updates remain
+denied. The free manual creation path is unchanged and available; no production
+rollout flag was enabled.
+
+Android local evidence starts from a frozen current workout, applies a future
+swap, and observes exactly two revisions with the active pointer advanced once.
+The current week remains on its original prescription, later uncompleted weeks
+use the replacement with null load/recalibration required, and the current
+draft retains its completed original set identity through rerender, navigation,
+reload, offline restart and a later current-only swap. Current-draft and future
+program results are displayed separately.
+
+Fresh local reset, database lint, the AP-01/combined AP-02/AP-03/successor SQL
+suites, catalog 9/9, dependency 1/1, workouts 13/13, programs 10/10, strict
+TypeScript, lint, Expo doctor, Android Metro export and native debug assemble
+pass on the feature branch. Physical-device, old-client, accessibility,
+production backup/deploy and flag-enable gates remain open.
+
 ## Rollout, recovery, and open gates
 
 `EXPO_PUBLIC_AP03_ATOMIC_WRITER` defaults off and enables only for literal
@@ -112,4 +144,8 @@ AP-02 artifact plus release-hardening commit `dec5170`. Integration merge
 commits before the original evidence closeout are `c6bc219`, `8884d5f` and
 `7acc28f`; hardening integration merge `91ceb50` passed the changed-surface
 gates recorded above.
+
+The 2026-09-11 packet implementation commits are `cd057ae`, `07e3403`,
+`cd6310f`, `318579f`, `39039e3` and `e6754c2`; integration reconciliation is
+pending at this addendum stage.
 
