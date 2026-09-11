@@ -175,7 +175,7 @@ export function useCurrentProgram() {
           workout_name,
           estimated_duration_min,
           program_revision_id,
-          program_day_exercises (
+          program_day_exercises!program_day_exercises_program_day_id_fkey (
             id,
             stable_slot_id,
             position,
@@ -186,7 +186,7 @@ export function useCurrentProgram() {
             suggested_weight_lb,
             per_set_weights_lb,
             notes,
-            exercises (
+            exercises!program_day_exercises_exercise_id_fkey (
               id,
               name,
               primary_muscle,
@@ -224,7 +224,7 @@ export function useCurrentProgram() {
           order_in_week,
           workout_name,
           estimated_duration_min,
-          program_day_exercises (
+          program_day_exercises!program_day_exercises_program_day_id_fkey (
             id,
             position,
             set_count,
@@ -234,7 +234,7 @@ export function useCurrentProgram() {
             suggested_weight_lb,
             per_set_weights_lb,
             notes,
-            exercises (
+            exercises!program_day_exercises_exercise_id_fkey (
               id,
               name,
               primary_muscle,
@@ -411,11 +411,11 @@ export function useCurrentProgram() {
         const isCycleReduced = cyclePhase === 'menstrual' || cyclePhase === 'luteal';
 
         // Get next week's program_days with nested program_day_exercises
-        const { data: nextDays, error: nextDaysError } = await supabase
+        let nextDaysQuery = supabase
             .from('program_days')
             .select(`
               id,
-              program_day_exercises (
+              program_day_exercises!program_day_exercises_program_day_id_fkey (
                 id,
                 exercise_id,
                 set_count,
@@ -423,11 +423,15 @@ export function useCurrentProgram() {
                 rep_range_max,
                 target_rpe,
                 suggested_weight_lb,
-                exercises ( name )
+                exercises!program_day_exercises_exercise_id_fkey ( name )
               )
             `)
             .eq('program_id', program.id)
             .eq('week_number', nextWeek);
+        if (program.currentRevisionId) {
+            nextDaysQuery = nextDaysQuery.eq('program_revision_id', program.currentRevisionId);
+        }
+        const { data: nextDays, error: nextDaysError } = await nextDaysQuery;
         if (nextDaysError) throw nextDaysError;
 
         if (!nextDays) return;
