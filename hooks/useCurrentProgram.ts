@@ -7,11 +7,16 @@ import type { ProgressionContext, LoggedSet } from '@/types/progression';
 import type { TrainingExperience } from '@/types/database';
 import { computeCyclePhase } from '@/utils/cyclePhase';
 import { isCatalogExerciseId } from '@/features/catalog/contracts';
-import { archiveProgram } from '@/features/programs/commands';
+import { archiveProgram, reviseProgramExercise } from '@/features/programs/commands';
 import { programRepository } from '@/features/programs/repository';
 import { isMissingRelationOrColumnError } from '@/utils/profilePreferences';
 
-type SwapArgs = { exerciseId: string; replacement: WorkoutExercise; applyToProgram: boolean };
+type SwapArgs = {
+    exerciseId: string;
+    replacement: WorkoutExercise;
+    applyToProgram: boolean;
+    scope?: 'selected_and_future' | 'future_after_current';
+};
 
 type DbProgram = {
     id: string;
@@ -26,6 +31,7 @@ type DbProgram = {
 
 type DbProgramDay = {
     id: string;
+    stable_day_id?: string;
     week_number: number;
     day_index: number; // 1..7
     order_in_week: number;
@@ -157,18 +163,19 @@ export function useCurrentProgram() {
             const currentWeek = computeWeekNumber(prog.start_date, prog.duration_weeks);
 
             // Get THIS WEEK's program_days with nested exercises
-            const currentDaysResult = await supabase
+            let currentDaysQuery = supabase
                 .from('program_days')
                 .select(
                     `
           id,
+          stable_day_id,
           week_number,
           day_index,
           order_in_week,
           workout_name,
           estimated_duration_min,
           program_revision_id,
-          program_day_exercises (
+          program_day_exercises!program_day_exercises_program_day_id_fkey (
             id,
             stable_slot_id,
             position,
@@ -179,7 +186,7 @@ export function useCurrentProgram() {
             suggested_weight_lb,
             per_set_weights_lb,
             notes,
-            exercises (
+            exercises!program_day_exercises_exercise_id_fkey (
               id,
               name,
               primary_muscle,
@@ -191,7 +198,11 @@ export function useCurrentProgram() {
         `,
                 )
                 .eq('program_id', prog.id)
-                .eq('week_number', currentWeek)
+                .eq('week_number', currentWeek);
+            if (prog.current_revision_id) {
+                currentDaysQuery = currentDaysQuery.eq('program_revision_id', prog.current_revision_id);
+            }
+            const currentDaysResult = await currentDaysQuery
                 .order('day_index', { ascending: true })
                 .order('order_in_week', { ascending: true })
                 .returns<DbProgramDay[]>();
@@ -213,7 +224,7 @@ export function useCurrentProgram() {
           order_in_week,
           workout_name,
           estimated_duration_min,
-          program_day_exercises (
+          program_day_exercises!program_day_exercises_program_day_id_fkey (
             id,
             position,
             set_count,
@@ -223,7 +234,7 @@ export function useCurrentProgram() {
             suggested_weight_lb,
             per_set_weights_lb,
             notes,
-            exercises (
+            exercises!program_day_exercises_exercise_id_fkey (
               id,
               name,
               primary_muscle,
@@ -247,7 +258,18 @@ export function useCurrentProgram() {
             if (daysErr) throw daysErr;
 
             // Find which days in this week already have a completed session
-            const dayIds = (days ?? []).map((d) => d.id);
+            let completionDays = (days ?? []).map((d) => ({ id: d.id, stable_day_id: d.stable_day_id }));
+            const stableDayIds = completionDays.flatMap((day) => day.stable_day_id ? [day.stable_day_id] : []);
+            if (prog.current_revision_id && stableDayIds.length > 0) {
+                const lineageDaysResult = await supabase
+                    .from('program_days')
+                    .select('id,stable_day_id')
+                    .eq('program_id', prog.id)
+                    .in('stable_day_id', stableDayIds)
+                    .returns<Array<{ id: string; stable_day_id: string }>>();
+                if (!lineageDaysResult.error && lineageDaysResult.data) completionDays = lineageDaysResult.data;
+            }
+            const dayIds = completionDays.map((d) => d.id);
             let completedDayIds = new Set<string>();
             if (dayIds.length > 0) {
                 const currentSessionsResult = await supabase
@@ -280,6 +302,11 @@ export function useCurrentProgram() {
                     (sessions ?? []).map((s: { program_day_id: string }) => s.program_day_id)
                 );
             }
+            const completedStableDayIds = new Set(
+                completionDays
+                    .filter((day) => completedDayIds.has(day.id) && day.stable_day_id)
+                    .map((day) => day.stable_day_id as string),
+            );
 
             // Map DB -> UI types
             const workouts: ProgramWorkout[] =
@@ -308,12 +335,14 @@ export function useCurrentProgram() {
 
                     return {
                         id: d.id, // program_day id
+                        stableDayId: d.stable_day_id,
                         prescriptionRevisionId: d.program_revision_id ?? prog.current_revision_id ?? undefined,
                         name: d.workout_name,
                         day: DAY_NAMES[(d.day_index ?? 1) - 1] ?? `Day ${d.day_index}`,
                         estimatedTime: d.estimated_duration_min ?? 0,
                         exercises,
-                        isCompleted: completedDayIds.has(d.id),
+                        isCompleted: completedDayIds.has(d.id)
+                            || Boolean(d.stable_day_id && completedStableDayIds.has(d.stable_day_id)),
                     };
                 }) ?? [];
 
@@ -382,11 +411,11 @@ export function useCurrentProgram() {
         const isCycleReduced = cyclePhase === 'menstrual' || cyclePhase === 'luteal';
 
         // Get next week's program_days with nested program_day_exercises
-        const { data: nextDays, error: nextDaysError } = await supabase
+        let nextDaysQuery = supabase
             .from('program_days')
             .select(`
               id,
-              program_day_exercises (
+              program_day_exercises!program_day_exercises_program_day_id_fkey (
                 id,
                 exercise_id,
                 set_count,
@@ -394,11 +423,15 @@ export function useCurrentProgram() {
                 rep_range_max,
                 target_rpe,
                 suggested_weight_lb,
-                exercises ( name )
+                exercises!program_day_exercises_exercise_id_fkey ( name )
               )
             `)
             .eq('program_id', program.id)
             .eq('week_number', nextWeek);
+        if (program.currentRevisionId) {
+            nextDaysQuery = nextDaysQuery.eq('program_revision_id', program.currentRevisionId);
+        }
+        const { data: nextDays, error: nextDaysError } = await nextDaysQuery;
         if (nextDaysError) throw nextDaysError;
 
         if (!nextDays) return;
@@ -550,22 +583,43 @@ export function useCurrentProgram() {
     applyProgressionRef.current = applyProgressionToNextWeek;
 
     const swapExercise = useCallback(
-        async ({ exerciseId, replacement, applyToProgram }: SwapArgs) => {
+        async ({ exerciseId, replacement, applyToProgram, scope = 'selected_and_future' }: SwapArgs) => {
             // in the mapping above, exerciseId is the program_day_exercises row id (pde.id)
             // replacement.id should be the exercises.id from the exercises table
             if (!program) return;
-            if (program.currentRevisionId && applyToProgram) {
-                throw new Error(
-                    'Installed prescriptions are immutable. Create and activate a revised program instead of rewriting this one.',
-                );
-            }
-
             const pdeId = exerciseId;
             const newExerciseId = replacement.exerciseId ?? replacement.id;
             if (!isCatalogExerciseId(newExerciseId)) {
                 throw new Error(
                     'This exercise is only available in the local preview. Reconnect and resolve its catalog ID before applying the swap.',
                 );
+            }
+
+            if (program.currentRevisionId && applyToProgram) {
+                const workout = program.workouts.find((candidate) => candidate.exercises.some(
+                    (exercise) => exercise.id === exerciseId || exercise.stableSlotId === exerciseId,
+                ));
+                const original = workout?.exercises.find(
+                    (exercise) => exercise.id === exerciseId || exercise.stableSlotId === exerciseId,
+                );
+                if (!workout?.stableDayId || !original?.stableSlotId || !original.exerciseId) {
+                    throw new Error('Stable program revision identity is unavailable for this exercise.');
+                }
+                const ownerId = await requireUserId();
+                const outcome = await reviseProgramExercise(programRepository, ownerId, {
+                    programId: program.id,
+                    expectedRevision: program.currentRevision,
+                    expectedRevisionId: program.currentRevisionId,
+                    currentStableDayId: workout.stableDayId,
+                    currentStableSlotId: original.stableSlotId,
+                    originalExerciseId: original.exerciseId,
+                    replacementExerciseId: newExerciseId,
+                    includeCurrentDay: scope === 'selected_and_future',
+                });
+                if (outcome.status === 'validation') throw new Error(outcome.errors.join(' '));
+                if (outcome.status === 'conflict' || outcome.status === 'unavailable') throw new Error(outcome.message);
+                await refresh();
+                return outcome;
             }
 
             // find the PDE row to know the “original exercise” and parent program_day_id

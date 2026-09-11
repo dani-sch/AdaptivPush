@@ -4,12 +4,19 @@ import {
   type ProgramArtifact,
   type ProgramCommandOutcome,
   validateProgramArtifact,
+  type ProgramExerciseRevisionOutcome,
+  type ProgramExerciseRevisionRequest,
 } from './contracts';
 import {
   clearPendingProgramInstall,
   getOrCreatePendingProgramInstall,
 } from './installStore';
 import type { ProgramRepository } from './repository';
+import {
+  clearPendingProgramExerciseRevision,
+  getOrCreatePendingProgramExerciseRevision,
+} from './revisionStore';
+import type { OperationId } from '../kernel/operationId';
 
 function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -77,4 +84,37 @@ export async function restoreProgram(
     mode,
     expectedActiveProgramId,
   });
+}
+
+export async function executeProgramExerciseRevision(
+  repository: ProgramRepository,
+  operationId: OperationId,
+  request: ProgramExerciseRevisionRequest,
+): Promise<ProgramExerciseRevisionOutcome> {
+  const required = [request.programId, request.expectedRevisionId, request.currentStableDayId,
+    request.currentStableSlotId, request.originalExerciseId, request.replacementExerciseId];
+  if (required.some((value) => !value) || request.expectedRevision < 1) {
+    return { status: 'validation', errors: ['Complete program, revision, day, slot, and exercise identity is required.'] };
+  }
+  try {
+    const receipt = await repository.reviseExercise({ operationId, ...request });
+    return { status: receipt.replayed ? 'replay' : 'revised', receipt };
+  } catch (error) {
+    const message = errorMessage(error);
+    if (message.toLowerCase().includes('stale_revision')) return { status: 'conflict', message };
+    return { status: 'unavailable', message };
+  }
+}
+
+export async function reviseProgramExercise(
+  repository: ProgramRepository,
+  ownerId: string,
+  request: ProgramExerciseRevisionRequest,
+): Promise<ProgramExerciseRevisionOutcome> {
+  const pending = await getOrCreatePendingProgramExerciseRevision(ownerId, request);
+  const outcome = await executeProgramExerciseRevision(repository, pending.operationId, request);
+  if (outcome.status === 'revised' || outcome.status === 'replay') {
+    await clearPendingProgramExerciseRevision(ownerId, request, pending.operationId);
+  }
+  return outcome;
 }

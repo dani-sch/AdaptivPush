@@ -5,6 +5,73 @@
 
 ---
 
+### 2026-09-11 AP-02/AP-03 swap, route and recalibration hardening {#2026-09-11-ap-02-ap-03-device-hardening}
+
+**Summary**: Implemented the bounded device-hardening packet on
+`codex/ap02-ap03-swap-recalibration`. Added the direct Expo-compatible React
+Navigation dependency, an authenticated immutable successor-revision swap RPC,
+separate current/future swap outcomes, explicit replacement-load confirmation,
+complete route identity and owner-scoped active-draft recovery.
+
+**Android/local evidence**: In the API 36 native development build against
+local Supabase, current-only zero and partial swaps preserve entered values,
+completion and original exercise attribution; future swap advances the active
+revision once and changes only later uncompleted prescriptions. Home and Plan,
+Expo reload, background/foreground, kill/reopen and gateway-off cold launch
+recover the frozen draft. A malformed route shows Retry/Return to Plan without
+substitution. After a real sign-out/sign-in, a second local account receives the
+unavailable state and cannot see the first account's draft. Expo Go was observed
+separately with its SDK 57 remote-notification limitation.
+
+**Verification**: fresh four-migration reset; database lint with no schema
+errors; AP-01, combined AP-02/AP-03 and successor-revision SQL suites; catalog
+9/9; dependency 1/1; workouts 13/13; programs 10/10; strict TypeScript; lint
+with zero errors/three unrelated warnings; Expo doctor 21/21; Android Metro
+export of 3,819 modules; and native debug assemble all pass. The feature-branch
+APK assemble completed in 3m51s with 435 tasks. Integrator merge `54e5a39`
+reruns the focused/static and fresh-reset/SQL gates, exports the same 3,819-module
+Android bundle, and completes a clean 435-task debug assembly in 5m08s.
+
+**Disposition**: The bounded packet is **INTEGRATION VERIFIED; RELEASE
+BLOCKED**. No production credentials or mutations were used, both
+writers remain default-off, and physical-device/accessibility/old-client plus
+production backup/deploy/rollout gates remain open.
+
+**Commits**: `4f2160a`, `cd057ae`, `07e3403`, `cd6310f`, `318579f`,
+`39039e3`, `e6754c2`.
+
+---
+
+### 2026-09-10 AP-03 flag-off recovery and Android generated-save smoke {#2026-09-10-ap-03-flag-off-recovery}
+
+**Summary**: Reproduced a generic generated-program save failure with the
+default-off AP-03 writer in an Android 16 development build. Added a public
+save-entry guard before catalog/profile/database work and retained actionable
+repository errors instead of collapsing them to `Program save failed`.
+
+**Device/local evidence**: With the writer off, the UI displayed the explicit
+disabled-install recovery message, a sentinel profile preference stayed at 45,
+and the synthetic owner retained zero program/context rows. With AP-02/AP-03
+writers on against local Supabase, the same flow installed one active schema-v2
+program, one immutable revision, 24 days, 112 slots and one generation context.
+Quick Setup reached generation with optional demographic and weight fields
+omitted. The local catalog fixture came only from the repository snapshot; no
+production credential or mutation was used.
+
+**Verification**: Integrator merge `91ceb50` is clean with catalog 9/9,
+workouts 5/5, programs 6/6, strict TypeScript pass and lint pass with zero
+errors/three unrelated warnings. Native Android build/install passes on API 36
+with JDK 17. No SQL changed, so the existing fresh-reset/SQL integration
+evidence remains applicable. The full kill/offline,
+background, manual/archive, account-switch, old-client and accessibility/theme
+matrix remains open.
+
+**Disposition**: AP-03 remains **INTEGRATION VERIFIED; RELEASE BLOCKED**. This
+is bounded release hardening and partial device evidence, not LOCAL VERIFIED,
+RELEASED, production deployment or rollout enablement. Code commit: `dec5170`.
+
+---
+
 ### 2026-09-10 AP-02/AP-03 durable-record integration {#2026-09-10-ap-02-ap-03}
 
 **Summary**: Implemented and integration-verified versioned workout/program

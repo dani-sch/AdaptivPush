@@ -2,7 +2,12 @@ import { supabase } from '@/utils/supabase';
 
 import type { OperationId } from '../kernel/operationId';
 import { requireRollout, rollout } from '../kernel/rollout';
-import type { ProgramArtifact, ProgramInstallationReceipt } from './contracts';
+import type {
+  ProgramArtifact,
+  ProgramExerciseRevisionReceipt,
+  ProgramExerciseRevisionRequest,
+  ProgramInstallationReceipt,
+} from './contracts';
 
 export interface ProgramRepository {
   install(input: {
@@ -23,6 +28,7 @@ export interface ProgramRepository {
     mode: 'exact' | 'restart' | 'legacy_approximate';
     expectedActiveProgramId: string | null;
   }): Promise<Record<string, unknown>>;
+  reviseExercise(input: ProgramExerciseRevisionRequest & { operationId: OperationId }): Promise<ProgramExerciseRevisionReceipt>;
 }
 
 export const programRepository: ProgramRepository = {
@@ -60,5 +66,23 @@ export const programRepository: ProgramRepository = {
     });
     if (error) throw error;
     return data as Record<string, unknown>;
+  },
+  async reviseExercise(input) {
+    requireRollout(rollout.atomicProgramWriter, 'Future program exercise updates');
+    const { data, error } = await supabase.rpc('revise_program_exercise_v2', {
+      p_payload: {
+        operationId: input.operationId,
+        programId: input.programId,
+        expectedRevision: input.expectedRevision,
+        expectedRevisionId: input.expectedRevisionId,
+        currentStableDayId: input.currentStableDayId,
+        currentStableSlotId: input.currentStableSlotId,
+        originalExerciseId: input.originalExerciseId,
+        replacementExerciseId: input.replacementExerciseId,
+        includeCurrentDay: input.includeCurrentDay,
+      },
+    });
+    if (error) throw error;
+    return data as unknown as ProgramExerciseRevisionReceipt;
   },
 };

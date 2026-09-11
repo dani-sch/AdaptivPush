@@ -78,6 +78,45 @@ AP-05 still owns full comparable-history reconciliation and effect processing.
 | AC-TR-014 | Timestamp and best-effort haptic behavior implemented; background/device proof remains open. |
 | AC-TR-015 | Preserved as deferred; elapsed time is not relabeled as a rest timer. |
 
+## 2026-09-11 device-hardening addendum
+
+Status of this bounded packet: **INTEGRATION VERIFIED; RELEASE BLOCKED**.
+
+- `@react-navigation/native` is now a direct Expo-compatible dependency. The
+  installed graph resolves one `@react-navigation/core` version; imports remain
+  intact. Expo doctor passes 21/21, Android Metro exports 3,819 modules, and the
+  native debug APK assembles successfully.
+- Current-only swap persists in the owner-scoped frozen draft. Android zero-set
+  and partial-set flows preserve entered load/reps/RPE/completion and original
+  exercise attribution for completed sets, move only unlogged work, and never
+  show the generic swap-failure alert after the local save succeeds.
+- Recalibration copy is opt-in. The UI identifies the remaining set numbers,
+  source load, replacement exercise, current-workout-only scope and manual-load
+  alternative; status is textual and the action has an accessible description
+  and at least a 44-point target.
+- Route resolution waits for auth/route/draft hydration, uses full immutable
+  identity, and can recover a non-finalized frozen draft through an
+  owner/program/stable-day alias after a successor revision. Android Home, Plan,
+  reload, background/foreground, kill/reopen and a gateway-off cold launch all
+  recover the same draft without the false unavailable banner. A malformed
+  route shows dedicated Retry and Return to Plan actions. An actual second
+  account cannot recover the first account's draft.
+- Focused results are catalog 9/9, dependency 1/1, workouts 13/13 and programs
+  10/10. Strict TypeScript passes; lint has zero errors and three unrelated
+  existing warnings. A fresh local reset applies four migrations, database lint
+  reports no schema errors, and AP-01, combined AP-02/AP-03 and successor-revision
+  SQL assertion suites pass through `psql`.
+- Integrator merge `54e5a39` reruns those focused/static and database gates,
+  exports the 3,819-module Android bundle, and completes the generated native
+  debug assembly in 5m08s with all 435 tasks executed.
+
+The supported runtime was the repository's native Android development build on
+API 36. Expo Go was observed separately and reports the expected SDK 57
+`expo-notifications` remote-push limitation; that does not explain or waive the
+route defect. No physical device, production credential, production mutation or
+rollout enablement was used. Physical hardware, TalkBack/dynamic type/theme,
+old-client, manual-program and archive/restore coverage remain release gates.
+
 ## Rollout, recovery, and open gates
 
 `EXPO_PUBLIC_AP02_DURABLE_WRITER` is enabled only by the literal value `true`
@@ -106,4 +145,9 @@ Release remains blocked on all of the following:
 - `f5e6775` `test: harden durable command isolation and recovery`
 - `9b5bf78` `build: declare Node typings for test harness`
 - `8e93352` `build: load Node types in strict TypeScript gate`
+- `4f2160a` `fix(deps): declare React Navigation runtime`
+- `07e3403` `build: align Expo SDK patch versions`
+- `cd6310f` `feat(workouts): harden swap and route recovery`
+- `39039e3` `fix(database): disambiguate revisioned program reads`
+- `e6754c2` `fix(workouts): recover owner drafts across lifecycle changes`
 

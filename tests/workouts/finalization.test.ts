@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   amendWorkoutExercise,
+  applyWorkoutRecalibrationLoad,
   classifyWorkoutCompletion,
   confirmWorkoutRecalibration,
   createWorkoutDraft,
@@ -22,7 +23,9 @@ const replacementExerciseId = '55555555-5555-4555-8555-555555555555';
 function fixtureDraft() {
   return createWorkoutDraft({
     ownerId,
+    programId: '12121212-1212-4121-8121-121212121212',
     programDayId,
+    stableDayId: '13131313-1313-4131-8131-131313131313',
     prescriptionRevisionId,
     workoutName: 'Strength A',
     startedAt: '2026-09-10T12:00:00.000Z',
@@ -78,20 +81,64 @@ test('a temporary swap preserves completed set identity and requires recalibrati
   });
 
   assert.equal(swapped.slots[0].sets[0].actualExerciseId, prescribedExerciseId);
+  assert.equal(swapped.slots[0].sets[0].setId, logged.slots[0].sets[0].setId);
+  assert.equal(swapped.slots[0].sets[0].actualLoad, 100);
   assert.equal(swapped.slots[0].actualExerciseId, replacementExerciseId);
   assert.equal(swapped.slots[0].requiresRecalibration, true);
+  assert.equal(swapped.slots[0].sets[1].enteredLoadText, '0');
+  assert.equal(swapped.slots[0].sets[1].actualLoad, null);
+  assert.equal(swapped.slots[0].sets[1].loadKind, 'unknown');
   assert.equal(swapped.revision, 3);
 
-  const calibratedInput = updateWorkoutSet(swapped, {
-    setId: '77777777-7777-4777-8777-777777777771',
-    load: 40,
-    enteredLoadText: '40',
-  });
-  const calibrated = confirmWorkoutRecalibration(
-    calibratedInput,
+  const calibrated = applyWorkoutRecalibrationLoad(
+    swapped,
     '66666666-6666-4666-8666-666666666666',
+    40,
   );
   assert.equal(calibrated.slots[0].requiresRecalibration, false);
+  assert.equal(calibrated.slots[0].sets[0].actualLoad, 100);
+  assert.deepEqual(calibrated.slots[0].sets.slice(1).map((set) => set.actualLoad), [40, 40, 40]);
+});
+
+test('zero-set swap retains entered values and copies load only after explicit confirmation', () => {
+  const typed = updateWorkoutSet(
+    updateWorkoutSet(fixtureDraft(), {
+      setId: '77777777-7777-4777-8777-777777777770',
+      reps: 9,
+      enteredRepsText: '9',
+      rpe: 8,
+      enteredRpeText: '8',
+    }),
+    {
+      setId: '77777777-7777-4777-8777-777777777770',
+      load: 25,
+      enteredLoadText: '25',
+    },
+  );
+  const swapped = amendWorkoutExercise(typed, {
+    slotId: '66666666-6666-4666-8666-666666666666',
+    replacementExerciseId,
+    amendedAt: '2026-09-10T12:06:00.000Z',
+  });
+
+  assert.equal(swapped.slots[0].sets[0].enteredLoadText, '25');
+  assert.equal(swapped.slots[0].sets[0].enteredRepsText, '9');
+  assert.equal(swapped.slots[0].sets[0].enteredRpeText, '8');
+  assert.equal(swapped.slots[0].sets[0].actualLoad, null);
+  assert.equal(swapped.slots[0].sets[0].actualRpe, 8);
+  assert.throws(
+    () => confirmWorkoutRecalibration(swapped, '66666666-6666-4666-8666-666666666666'),
+    /every remaining set/i,
+  );
+
+  const copied = applyWorkoutRecalibrationLoad(
+    swapped,
+    '66666666-6666-4666-8666-666666666666',
+    30,
+  );
+  assert.equal(copied.slots[0].requiresRecalibration, false);
+  assert.deepEqual(copied.slots[0].sets.map((set) => set.actualLoad), [30, 30, 30, 30]);
+  assert.deepEqual(copied.slots[0].sets.map((set) => set.enteredLoadText), ['30', '30', '30', '30']);
 });
 
 test('late prescription data cannot mutate a frozen draft', () => {
@@ -115,6 +162,7 @@ test('response loss preserves the outbox operation and retry returns one receipt
   const saved: ReturnType<typeof fixtureDraft>[] = [];
   const store: WorkoutDraftStore = {
     load: async () => saved.at(-1) ?? null,
+    loadMatching: async () => saved.at(-1) ?? null,
     save: async (draft) => { saved.push(draft); },
     remove: async () => undefined,
   };

@@ -9,6 +9,7 @@ import { WorkoutTemplateModal } from '@/components/WorkoutTemplateModal';
 import { GenerateProgramModal } from '@/components/GenerateProgramModal';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
+import { workoutRouteParams } from '@/features/workouts/routeResolution';
 
 function LoadingState({ styles }: { styles: ReturnType<typeof createStyles> }) {
     return (
@@ -369,6 +370,10 @@ export default function PlanScreen() {
                         program={program}
                         onSwapExercise={swapExercise}
                         onClose={() => setSelectedWorkout(null)}
+                        onStart={() => {
+                            setSelectedWorkout(null);
+                            router.push({ pathname: '/next-workout', params: workoutRouteParams(program, selectedWorkoutObj) });
+                        }}
                     />
                 </Modal>
             )}

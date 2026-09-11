@@ -11,8 +11,9 @@ import type { Theme } from '@/constants/themes';
 type Props = {
     workout: ProgramWorkout;
     program: CurrentProgram;
-    onSwapExercise: (args: { exerciseId: string; replacement: WorkoutExercise; applyToProgram: boolean }) => void;
+    onSwapExercise: (args: { exerciseId: string; replacement: WorkoutExercise; applyToProgram: boolean }) => unknown | Promise<unknown>;
     onClose: () => void;
+    onStart: () => void;
 };
 
 function ExerciseRow({ exercise, idx, onSwap, styles, theme }: {
@@ -76,7 +77,7 @@ function ExerciseRow({ exercise, idx, onSwap, styles, theme }: {
     );
 }
 
-export function WorkoutTemplateModal({ workout, program, onSwapExercise, onClose }: Props) {
+export function WorkoutTemplateModal({ workout, program, onSwapExercise, onClose, onStart }: Props) {
     const { theme } = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -114,6 +115,14 @@ export function WorkoutTemplateModal({ workout, program, onSwapExercise, onClose
                             theme={theme}
                         />
                     ))}
+                    <Pressable
+                        onPress={onStart}
+                        style={({ pressed }) => [styles.startButton, pressed && { opacity: 0.85 }]}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Start ${workout.name}`}
+                    >
+                        <Text style={styles.startButtonText}>Start This Workout</Text>
+                    </Pressable>
                 </ScrollView>
             </View>
 
@@ -251,6 +260,20 @@ function createStyles(theme: Theme) {
         statText: {
             color: theme.text,
             fontSize: 13,
+        },
+        startButton: {
+            minHeight: 48,
+            borderRadius: 14,
+            backgroundColor: theme.primary,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginTop: 4,
+            paddingHorizontal: 16,
+        },
+        startButtonText: {
+            color: theme.white,
+            fontSize: 15,
+            fontWeight: '800',
         },
         swapOverlay: {
             ...StyleSheet.absoluteFill,

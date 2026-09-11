@@ -63,6 +63,7 @@ export interface WorkoutDraftSlot {
   slotId: string;
   prescribedExerciseId: string;
   exerciseName?: string;
+  replacementExerciseName?: string;
   actualExerciseId: string;
   order: number;
   prescribedSetCount: number;
@@ -78,7 +79,9 @@ export interface WorkoutDraft {
   draftId: string;
   revision: Revision;
   lifecycle: WorkoutDraftLifecycle;
+  programId: string;
   programDayId: string;
+  stableDayId: string;
   prescriptionRevisionId: string;
   workoutName: string;
   startedAt: string;
@@ -118,7 +121,9 @@ function deepFreeze<T>(value: T): Readonly<T> {
 
 export function createWorkoutDraft(input: {
   ownerId: string;
+  programId: string;
   programDayId: string;
+  stableDayId: string;
   prescriptionRevisionId: string;
   workoutName: string;
   startedAt: string;
@@ -141,7 +146,9 @@ export function createWorkoutDraft(input: {
     draftId: input.draftId ?? createOperationId(),
     revision: asRevision(1),
     lifecycle: 'draft',
+    programId: input.programId,
     programDayId: input.programDayId,
+    stableDayId: input.stableDayId,
     prescriptionRevisionId: input.prescriptionRevisionId,
     workoutName: input.workoutName.trim() || 'Workout',
     startedAt: input.startedAt,
@@ -217,7 +224,7 @@ export function amendWorkoutExercise(
     return {
       ...slot,
       actualExerciseId: amendment.replacementExerciseId,
-      exerciseName: amendment.replacementName ?? slot.exerciseName,
+      replacementExerciseName: amendment.replacementName,
       requiresRecalibration: true,
       sets: slot.sets.map((set) =>
         set.logged
@@ -226,10 +233,10 @@ export function amendWorkoutExercise(
               ...set,
               actualExerciseId: amendment.replacementExerciseId,
               actualLoad: null,
-              actualRpe: null,
+              loadKind: 'unknown' as const,
+              loadUnit: 'none' as const,
+              loadSide: 'unknown' as const,
               loggedAt: null,
-              enteredLoadText: '',
-              enteredRpeText: '',
             },
       ),
     };
@@ -242,9 +249,11 @@ export function confirmWorkoutRecalibration(draft: WorkoutDraft, slotId: string)
   const slot = draft.slots.find((candidate) => candidate.slotId === slotId);
   if (!slot) throw new Error('Stable prescription slot was not found in this draft.');
   if (!slot.requiresRecalibration) return draft;
-  const replacementSets = slot.sets.filter((set) => !set.logged || set.actualExerciseId === slot.actualExerciseId);
-  if (!replacementSets.some((set) => set.actualLoad !== null || set.loadKind === 'bodyweight')) {
-    throw new Error('Enter or confirm a replacement load before acknowledging recalibration.');
+  const replacementSets = slot.sets.filter(
+    (set) => !set.logged && set.actualExerciseId === slot.actualExerciseId,
+  );
+  if (replacementSets.some((set) => set.actualLoad === null && set.loadKind !== 'bodyweight')) {
+    throw new Error('Enter a replacement load for every remaining set before confirming recalibration.');
   }
   return {
     ...draft,
@@ -253,6 +262,41 @@ export function confirmWorkoutRecalibration(draft: WorkoutDraft, slotId: string)
       candidate.slotId === slotId ? { ...candidate, requiresRecalibration: false } : candidate,
     ),
   };
+}
+
+export function applyWorkoutRecalibrationLoad(
+  draft: WorkoutDraft,
+  slotId: string,
+  load: number,
+): WorkoutDraft {
+  if (!Number.isFinite(load) || load < 0) {
+    throw new Error('Replacement load must be a nonnegative number.');
+  }
+  const slot = draft.slots.find((candidate) => candidate.slotId === slotId);
+  if (!slot) throw new Error('Stable prescription slot was not found in this draft.');
+  if (!slot.requiresRecalibration) return draft;
+
+  const next = {
+    ...draft,
+    revision: nextRevision(draft.revision),
+    slots: draft.slots.map((candidate) => candidate.slotId !== slotId
+      ? candidate
+      : {
+          ...candidate,
+          requiresRecalibration: false,
+          sets: candidate.sets.map((set) => set.logged || set.actualExerciseId !== candidate.actualExerciseId
+            ? set
+            : {
+                ...set,
+                actualLoad: load,
+                enteredLoadText: String(load),
+                loadKind: 'external' as const,
+                loadUnit: 'lb' as const,
+                loadSide: 'external_total' as const,
+              }),
+        }),
+  };
+  return next;
 }
 
 export function classifyWorkoutCompletion(draft: WorkoutDraft): WorkoutCompletionClass {

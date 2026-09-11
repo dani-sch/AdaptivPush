@@ -47,15 +47,15 @@ interface ProgramRationale {
 
 // ─── Fetch ────────────────────────────────────────────────────────────────────
 
-async function fetchProgramOverview(programId: string): Promise<OverviewWeek[]> {
-  const { data, error } = await supabase
+async function fetchProgramOverview(programId: string, revisionId?: string): Promise<OverviewWeek[]> {
+  let query = supabase
     .from('program_days')
     .select(`
       id,
       week_number,
       day_index,
       workout_name,
-      program_day_exercises (
+      program_day_exercises!program_day_exercises_program_day_id_fkey (
         id,
         position,
         set_count,
@@ -63,10 +63,12 @@ async function fetchProgramOverview(programId: string): Promise<OverviewWeek[]> 
         rep_range_max,
         target_rpe,
         suggested_weight_lb,
-        exercises ( id, name )
+        exercises!program_day_exercises_exercise_id_fkey ( id, name )
       )
     `)
-    .eq('program_id', programId)
+    .eq('program_id', programId);
+  if (revisionId) query = query.eq('program_revision_id', revisionId);
+  const { data, error } = await query
     .order('week_number', { ascending: true })
     .order('day_index', { ascending: true });
 
@@ -194,13 +196,16 @@ export default function ProgramOverviewScreen() {
 
   useEffect(() => {
     if (!program) return;
+    let contextQuery = supabase
+      .from('program_generation_context')
+      .select('goal,policy_version,experience_level,session_length_target_min')
+      .eq('program_id', program.id);
+    contextQuery = program.currentRevisionId
+      ? contextQuery.eq('program_revision_id', program.currentRevisionId)
+      : contextQuery.is('program_revision_id', null);
     Promise.all([
-      fetchProgramOverview(program.id),
-      supabase
-        .from('program_generation_context')
-        .select('goal,policy_version,experience_level,session_length_target_min')
-        .eq('program_id', program.id)
-        .maybeSingle(),
+      fetchProgramOverview(program.id, program.currentRevisionId),
+      contextQuery.maybeSingle(),
     ]).then(([data, contextResult]) => {
       setWeeks(data);
       const context = contextResult.data as {
