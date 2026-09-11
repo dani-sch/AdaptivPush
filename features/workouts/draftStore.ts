@@ -4,6 +4,7 @@ import type { WorkoutDraft } from './contracts';
 
 const PREFIX = '@adaptivpush/workout-drafts/v2';
 const STABLE_PREFIX = '@adaptivpush/workout-drafts/v3';
+const ACTIVE_STABLE_PREFIX = '@adaptivpush/workout-drafts/v3-active';
 
 export interface WorkoutDraftLookup {
   programId?: string;
@@ -31,6 +32,13 @@ function stableDraftKey(
   return `${STABLE_PREFIX}/${ownerId}/${lookup.programId}/${lookup.prescriptionRevisionId}/${lookup.stableDayId}`;
 }
 
+function activeStableDraftKey(
+  ownerId: string,
+  lookup: Required<Pick<WorkoutDraftLookup, 'programId' | 'stableDayId'>>,
+): string {
+  return `${ACTIVE_STABLE_PREFIX}/${ownerId}/${lookup.programId}/${lookup.stableDayId}`;
+}
+
 export function workoutDraftMatches(
   draft: WorkoutDraft,
   ownerId: string,
@@ -41,6 +49,18 @@ export function workoutDraftMatches(
     && (!lookup.prescriptionRevisionId || draft.prescriptionRevisionId === lookup.prescriptionRevisionId)
     && (!lookup.stableDayId || draft.stableDayId === lookup.stableDayId)
     && (!lookup.programDayId || draft.programDayId === lookup.programDayId);
+}
+
+export function activeWorkoutDraftMatches(
+  draft: WorkoutDraft,
+  ownerId: string,
+  lookup: Pick<WorkoutDraftLookup, 'programId' | 'stableDayId'>,
+): boolean {
+  return draft.lifecycle !== 'finalized'
+    && Boolean(lookup.programId && lookup.stableDayId)
+    && draft.ownerId === ownerId
+    && draft.programId === lookup.programId
+    && draft.stableDayId === lookup.stableDayId;
 }
 
 export const workoutDraftStore: WorkoutDraftStore = {
@@ -54,17 +74,17 @@ export const workoutDraftStore: WorkoutDraftStore = {
     return draft;
   },
   async loadMatching(ownerId, lookup) {
-    const keys: string[] = [];
+    const exactKeys: string[] = [];
     if (lookup.programId && lookup.prescriptionRevisionId && lookup.stableDayId) {
-      keys.push(stableDraftKey(ownerId, {
+      exactKeys.push(stableDraftKey(ownerId, {
         programId: lookup.programId,
         prescriptionRevisionId: lookup.prescriptionRevisionId,
         stableDayId: lookup.stableDayId,
       }));
     }
-    if (lookup.programDayId) keys.push(draftKey(ownerId, lookup.programDayId));
+    if (lookup.programDayId) exactKeys.push(draftKey(ownerId, lookup.programDayId));
 
-    for (const key of [...new Set(keys)]) {
+    for (const key of [...new Set(exactKeys)]) {
       const serialized = await AsyncStorage.getItem(key);
       if (!serialized) continue;
       const parsed = JSON.parse(serialized) as WorkoutDraft;
@@ -75,6 +95,18 @@ export const workoutDraftStore: WorkoutDraftStore = {
       };
       if (workoutDraftMatches(draft, ownerId, lookup)) return draft;
     }
+    if (lookup.programId && lookup.stableDayId) {
+      const serialized = await AsyncStorage.getItem(activeStableDraftKey(ownerId, {
+        programId: lookup.programId,
+        stableDayId: lookup.stableDayId,
+      }));
+      if (serialized) {
+        const draft = JSON.parse(serialized) as WorkoutDraft;
+        if (activeWorkoutDraftMatches(draft, ownerId, lookup)) {
+          return draft;
+        }
+      }
+    }
     return null;
   },
   async save(draft) {
@@ -84,6 +116,10 @@ export const workoutDraftStore: WorkoutDraftStore = {
       AsyncStorage.setItem(stableDraftKey(draft.ownerId, {
         programId: draft.programId,
         prescriptionRevisionId: draft.prescriptionRevisionId,
+        stableDayId: draft.stableDayId,
+      }), serialized),
+      AsyncStorage.setItem(activeStableDraftKey(draft.ownerId, {
+        programId: draft.programId,
         stableDayId: draft.stableDayId,
       }), serialized),
     ]);

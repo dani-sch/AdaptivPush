@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { createWorkoutDraft } from '../../features/workouts/contracts';
-import { workoutDraftMatches } from '../../features/workouts/draftStore';
+import { activeWorkoutDraftMatches, workoutDraftMatches } from '../../features/workouts/draftStore';
 import {
   draftLookupForRoute,
   resolveProgramWorkout,
@@ -100,4 +100,37 @@ test('draft matching rejects another owner, revision, stable day, or row identit
   assert.equal(workoutDraftMatches(draft, ownerId, { ...lookup, prescriptionRevisionId: 'stale' }), false);
   assert.equal(workoutDraftMatches(draft, ownerId, { ...lookup, stableDayId: 'stale' }), false);
   assert.equal(workoutDraftMatches(draft, ownerId, { ...lookup, programDayId: 'stale' }), false);
+});
+
+test('an active frozen draft can bridge a successor revision only by owner, program, and stable day', () => {
+  const successorRoute = {
+    ...route,
+    revisionId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+    programDayId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+  };
+  assert.equal(activeWorkoutDraftMatches(draft, ownerId, {
+    programId: program.id,
+    stableDayId,
+  }), true);
+  assert.equal(workoutAvailability({
+    authLoading: false,
+    programLoading: true,
+    program: null,
+    programWorkout: null,
+    draft,
+    ownerId,
+    route: successorRoute,
+  }), 'ready');
+  assert.equal(activeWorkoutDraftMatches(draft, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', {
+    programId: program.id,
+    stableDayId,
+  }), false);
+  assert.equal(activeWorkoutDraftMatches(draft, ownerId, {
+    programId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    stableDayId,
+  }), false);
+  assert.equal(activeWorkoutDraftMatches({ ...draft, lifecycle: 'finalized' }, ownerId, {
+    programId: program.id,
+    stableDayId,
+  }), false);
 });

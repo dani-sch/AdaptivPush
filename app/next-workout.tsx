@@ -3,7 +3,7 @@ import { ExerciseHistoryModal } from "@/components/ExerciseHistoryModal";
 import { SwapExerciseModal } from "@/components/SwapExerciseModal";
 import { useCurrentProgram } from "@/hooks/useCurrentProgram";
 import type { CurrentProgram, ProgramWorkout } from "@/types/program";
-import { supabase } from "@/utils/supabase";
+import { getPersistedSessionOwnerId, supabase } from "@/utils/supabase";
 import { notifyPRCelebration } from "@/utils/notifications";
 import { createOperationId } from "@/features/kernel/operationId";
 import {
@@ -63,7 +63,13 @@ function draftToExercises(draft: WorkoutDraft, workout?: ProgramWorkout): Exerci
       (set) => !set.logged && set.actualExerciseId === slot.actualExerciseId && set.enteredLoadText.trim() !== '',
     )?.enteredLoadText;
     const referenceLoad = referenceLoadText === undefined ? null : Number(referenceLoadText);
-    const repDisplay = current?.reps?.replace("-", "–") ?? "prescribed reps";
+    const firstSet = slot.sets[0];
+    const frozenRepDisplay = firstSet
+      ? firstSet.plannedRepsMin === firstSet.plannedRepsMax
+        ? String(firstSet.plannedRepsMin)
+        : `${firstSet.plannedRepsMin}–${firstSet.plannedRepsMax}`
+      : 'prescribed reps';
+    const repDisplay = current?.reps?.replace("-", "–") ?? frozenRepDisplay;
     return {
       id: slot.slotId,
       exerciseId: slot.actualExerciseId,
@@ -228,6 +234,11 @@ export default function NextWorkoutScreen() {
 
   useEffect(() => {
     let mounted = true;
+    void getPersistedSessionOwnerId().then((persistedOwnerId) => {
+      if (!mounted || !persistedOwnerId) return;
+      setOwnerId(persistedOwnerId);
+      setAuthLoading(false);
+    }).catch(() => undefined);
     void supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
       setOwnerId(data.session?.user.id ?? null);
@@ -346,15 +357,19 @@ export default function NextWorkoutScreen() {
   });
 
   const programForSwap = useMemo<CurrentProgram | null>(() => {
-    if (!program || !programWorkout) return null;
+    if (!program || !draft) return null;
+    const activeWorkout = programWorkout
+      ?? program.workouts.find((workout) => workout.stableDayId === draft.stableDayId);
     return {
       ...program,
       workouts: [
         {
-          id: programWorkout.id,
-          name: programWorkout.name,
-          day: programWorkout.day,
-          estimatedTime: programWorkout.estimatedTime,
+          id: activeWorkout?.id ?? draft.programDayId,
+          stableDayId: draft.stableDayId,
+          prescriptionRevisionId: activeWorkout?.prescriptionRevisionId ?? draft.prescriptionRevisionId,
+          name: draft.workoutName,
+          day: activeWorkout?.day ?? 'Current workout',
+          estimatedTime: activeWorkout?.estimatedTime ?? 0,
           exercises: exercises.map((ex) => ({
             id: ex.id,
             exerciseId: ex.exerciseId,
@@ -365,7 +380,7 @@ export default function NextWorkoutScreen() {
         },
       ],
     };
-  }, [program, programWorkout, exercises]);
+  }, [draft, program, programWorkout, exercises]);
 
   useEffect(() => {
     if (!draft || draft.lifecycle === 'finalized') return;
@@ -429,7 +444,7 @@ export default function NextWorkoutScreen() {
     replacement: ProgramWorkout["exercises"][number];
     applyToProgram: boolean;
   }): Promise<WorkoutSwapResult | null> => {
-    if (!draft || !programWorkout) throw new Error('Workout draft is unavailable.');
+    if (!draft) throw new Error('Workout draft is unavailable.');
     const replacementExerciseId = replacement.exerciseId ?? replacement.id;
     const slot = draft.slots.find((candidate) => candidate.slotId === exerciseId);
     if (!slot || !replacementExerciseId) throw new Error('Replacement identity is unavailable.');
@@ -459,9 +474,17 @@ export default function NextWorkoutScreen() {
     setSyncMessage('Current workout swap saved on this device. Remaining replacement sets need explicit load confirmation.');
 
     if (applyToProgram) {
-      const original = programWorkout.exercises.find(
+      const activeWorkout = program?.workouts.find(
+        (workout) => workout.stableDayId === draft.stableDayId,
+      );
+      const original = activeWorkout?.exercises.find(
         (exercise) => exercise.stableSlotId === exerciseId || exercise.id === exerciseId,
       );
+      if (!original) {
+        const message = 'The active program changed and no longer contains this stable exercise slot.';
+        setSyncMessage(`Current workout swap saved. Future program update failed: ${message}`);
+        return { currentDraft: 'saved', futureProgram: 'failed', futureMessage: message };
+      }
       try {
         await swapExercise({
           exerciseId: original?.id ?? exerciseId,
@@ -736,6 +759,7 @@ export default function NextWorkoutScreen() {
                   setDraft(nextDraft);
                   setExercises(draftToExercises(nextDraft, programWorkout ?? undefined));
                   persistDraft(nextDraft);
+                  setSyncMessage('Replacement loads confirmed for the remaining sets in this workout only.');
                 } catch (error) {
                   Alert.alert('Recalibration needed', error instanceof Error ? error.message : 'Enter a replacement load first.');
                 }
