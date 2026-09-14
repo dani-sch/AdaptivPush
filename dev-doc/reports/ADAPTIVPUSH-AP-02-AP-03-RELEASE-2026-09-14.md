@@ -1,5 +1,110 @@
 # AP-02/AP-03 durable-record release packet - 2026-09-14
 
+## iPhone failure remediation - September 14, current addendum
+
+**IMPLEMENTED AND LOCALLY VERIFIED; iOS acceptance and production release remain blocked.**
+This addendum supersedes earlier statements that no reachable QA route or flag
+variants exist. It does not supersede the signed-native, physical-device,
+accessibility, backup/restore, distribution or production gates below.
+
+### Confirmed environment and causes
+
+- Intake source was clean `95c4670` on `codex/ap02-ap03-release`; existing work
+  was preserved. Metro PID 4060 ran `expo start --clear` from this checkout on
+  port 8081. Its freshly requested iOS bundle targeted production and contained
+  no definitions for either public writer flag: both evaluated false. The
+  current process/user/machine environment had no writer overrides. This proves
+  the inspected bundle configuration, not what the original phone had loaded.
+- The user identifies App Store Expo Go SDK 57 on iOS 26.6.1. Installed source
+  is Expo 57.0.22 / React Native 0.86.3; Expo Doctor passes 21/21. Exact Expo Go
+  patch/build and iPhone model remain unrecorded; no device debugger was connected.
+- Fresh credentialed production reads confirm PostgreSQL 17.6, ledger exactly
+  `20260910175317`, `20260910190000`, and no revision table, revision identity
+  column or atomic install RPC. Both pending migration byte hashes match the
+  reviewed table below. No production writers were enabled and no backup,
+  application migration, reset or customer-data write was performed.
+- Disabled guards were classified as unknown and flattened by save callers.
+  Legacy reads could show a workout without durable IDs, while entry rejected
+  it as stale. These are confirmed code defects with regression reproductions.
+  Production schema plus current bundle configuration explains the inspected
+  read/write mismatch; the original runtime flags remain retrospectively uncertain.
+
+### Native startup investigation
+
+`ExpoAsset`/`ExponentConstants` failures precede app registration; `main` and
+`stopSurface` failures are downstream startup symptoms. Later program failures
+are a separate path. Notifications warnings are not their cause. Expo's
+[SDK 57 issue 48950](https://github.com/expo/expo/issues/48950) documents the same
+native-module symptom with stale Metro state, but this task has not proved that
+trigger on the user's phone. No dependency upgrade was made. The obsolete SDK 54
+FormData placeholder was removed: installed SDK 57 explicitly initializes RN
+globals before its Winter runtime. Fresh isolated Metro sessions and an opt-in,
+payload-free runtime diagnostic now bind source, backend, effective flags,
+platform/OS and Expo Go/native version. **Native cold-launch resolution remains
+unverified until the iPhone retest; exports do not prove it.**
+
+### Changes and reproducible verification
+
+Code commits `0f498bc` and `d2d4d09` preserve sanitized typed failures across
+repository/command/UI boundaries, distinguish disabled/schema/auth/conflict/
+validation/service outcomes, retain unsaved inputs and uncertain submissions,
+and share one strict workout-entry identity check across Home, Plan preview and
+entry. Matching owner-scoped drafts still recover offline. No IDs are invented
+and no legacy multiwrite fallback was added. The repository factory allows the
+actual command code to be tested against synthetic HTTP and the local backend.
+
+Tooling commit `cbc8325` fixes an observed export-cache defect: the initial
+Disabled export reused Enabled transforms. That initial candidate was rejected.
+Expo 57 skips reset-cache under CI; the launcher now clears CI, exports with
+`--clear`, and rejects bundles whose actual flags/backend do not match.
+
+| Verification | Current result |
+|---|---|
+| Unit suites | 65 unique passes: dependency 1, workouts 24, programs 19, availability 12, catalog 9 |
+| TypeScript / lint | Passed; three existing unrelated unused-variable warnings only |
+| Expo Doctor | 21/21 passed; no dependency changes |
+| Existing SQL / concurrency | All three isolated SQL suites and six concurrent-session assertions passed |
+| `scripts/verifyIosProgramFlows.ts` | Real LAN login and shipped repository/commands: disabled install/archive/restore reject without mutation; enabled manual/generated artifact installs, exact archive/restore, complete identities, one active program, owner isolation; temporary accounts cleaned |
+| `scripts/verifyLegacyMigration.ts` | Separate AP-01-only Supabase stack, real pre-migration rows, exact two reviewed migrations; blocked legacy preview becomes a valid startable draft from database identities; V1 migration provenance and approximate archive preserved; archive/restart succeeds in rolled-back transaction |
+| Existing manual fixtures | A authenticates through LAN and reads 3 programs; B authenticates and reads 0; preserved |
+| Reachability | LAN interface `192.168.2.49:54330` HTTP health and authenticated flows pass from workstation; separate Docker network also reaches health. Physical iPhone network path awaits Safari check |
+| Integrator | Application/tests/types/lint reverified in `C:\workout-app\AdaptivPush-integrator`; code/tooling merge `615765d`. Final documentation binding is in external closeout manifest |
+
+These tests do not exercise physical UI interactions or claim a generated-form,
+custom-form, native accessibility or signed-build pass. The legacy replay uses
+a separate synthetic database, not production; it does not supply an old app binary.
+
+### Ready Expo Go comparison session
+
+`scripts/Start-ApIosQa.ps1 -ExpectedCommit 4f0b394 -LanAddress 192.168.2.49`
+uses only local Supabase's public key, overrides inherited backend/flags,
+disables dotenv, validates local schema and LAN proxy, and binds the source.
+Enabled Metro is `exp://192.168.2.49:8082`; Disabled is port `8083`, both using
+`http://192.168.2.49:54330`. Both live iOS bundles were inspected: correct
+true/true or false/false values, local backend present, production backend absent.
+The original port 8081 production-targeted session was left intact.
+
+Standalone iOS JavaScript exports (no native/signing claim), source `4f0b394`:
+
+| Variant | Actual bundled flags | SHA-256 |
+|---|---|---|
+| Enabled | true / true | `EAEA59C56E7E917136718462D69E4C441D1C84D70073DAF34CFD41BA06902C32` |
+| Disabled | false / false | `45C7D37C532F15AF649A74F8A054EFE57ECF395D11CFC0DE057B36A2D0D843C0` |
+
+Logs, exports and per-variant `qa-binding.json` are under the existing external
+evidence directory's `ios-remediation` subdirectory. Fault controls remain
+workstation-only; the proxy forwards solely to local Supabase and logs no
+headers or bodies. The exact iPhone steps are in the manual matrix's current
+addendum. The user has used Expo Go throughout and has not supplied a separate
+Apple team/bundle identity. Signed native acceptance therefore remains open;
+no invented signing identifiers or build configuration were created.
+
+Next: physical iPhone reachability/cold launch and five-flow retest, then the
+remaining applicable matrix/native/accessibility gates. Production still waits
+for required user passes, fresh encrypted backup and isolated decrypt/restore,
+exact dry-run/identity checks, reviewed migration application and verification.
+AP-04/AP-05 were not started.
+
 ## Platform correction — September 14, following user review
 
 **iOS-FIRST — native candidate preparation remains open; RELEASE BLOCKED.**

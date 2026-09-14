@@ -1,5 +1,60 @@
 # AP-02/AP-03 remaining manual release verification - 2026-09-14
 
+## Current Expo Go retest - September 14 remediation
+
+The five reported failures have code fixes and nonvisual regression evidence in
+the [release addendum](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md).
+An isolated LAN Expo Go comparison session is now prepared. Earlier statements
+below that all iOS flag variants and LAN routes are unprepared are superseded
+for this comparison only. **No physical or signed-native pass is recorded.**
+The user reports App Store Expo Go SDK 57, iOS 26.6.1. Record exact Expo Go
+patch/build and phone model with the retest; keep application storage intact.
+
+1. Keep the iPhone on the workstation's Wi-Fi. In Safari open
+   `http://192.168.2.49:54330/__qa/health`. It must show
+   `AdaptivPush synthetic QA`, `local-only`, and `normal`. This is the one
+   physical reachability check the workstation cannot prove on your behalf.
+2. Choose a password for synthetic account A by running this in PowerShell:
+   `& "$env:LOCALAPPDATA\AdaptivPush\release-auth\Set-ApManualPassword.ps1" -Account A`.
+   It prompts privately; sign in as `apqa-a@example.test`. Do not use the
+   production account or put passwords in results/screenshots.
+3. Fully close Expo Go, reopen it and scan the prepared Enabled QR for
+   `exp://192.168.2.49:8082`. The source is `4f0b394`, both writers are true,
+   backend `192.168.2.49:54330`. This replaces the production-targeted port 8081
+   connection for testing. Record whether native startup errors recur. The
+   terminal's `[AP iOS QA runtime]` line confirms the actually loaded runtime.
+4. Retest Plan > workout > Start; generated Save Program; custom Create Program;
+   End Current Program; and Restore Program. Reopen Plan after each accepted
+   change. Use the exact V2 archive for exact-resume testing. Preserve any inputs
+   if an operation fails, and report the action and exact visible message.
+5. Scan the Disabled QR, `exp://192.168.2.49:8083`, using the same account.
+   Retry save/archive/restore and workout finish: the message must explain that
+   saving is disabled, with no server change and no generic retry prompt. Return
+   to Enabled afterward. These are M02-M04/M07/M16/M17 evidence where applicable,
+   not substitutes for the rest of the matrix.
+
+| Gate | Current result |
+|---|---|
+| Five reported failures on original iPhone session | User-observed FAIL; original Metro log retained externally |
+| Shared nonvisual fixes and synthetic command flows | PASS, release addendum owns commands/hashes |
+| Enabled/Disabled iOS exports and live Metro configuration | PASS for source/backend/flags; not native execution |
+| Physical LAN, cold startup, five-flow retest | AWAITING USER; no device result inferred |
+| M01 signed development build / cold launch without Metro | BLOCKED: no existing Apple signing/team/bundle route supplied; Expo Go comparison can proceed |
+| VoiceOver / Dynamic Type / Reduce Motion / lifecycle and remaining M cases | OPEN, physical evidence required |
+| Real legacy schema upgrade | Automated before/after PASS; old-client binary compatibility and physical legacy matrix remain OPEN |
+| Production migration and W cases | BLOCKED by the unchanged release sequence |
+
+Restart support: local Supabase must be running. For the LAN proxy in one
+terminal, set `$env:AP_QA_LISTEN_ADDRESS='192.168.2.49'` and
+`$env:AP_QA_PROXY_PORT='54330'`, then run `node scripts/manualQaProxy.mjs`.
+In another run `./scripts/Start-ApIosQa.ps1 -ExpectedCommit 4f0b394 -LanAddress 192.168.2.49 -Writers Enabled -MetroPort 8082`;
+use Disabled/8083 for the other variant. Do not launch duplicate listeners if
+the prepared sessions are still running. If the workstation's LAN address
+changes, restart the proxy/launcher with the new private address and rebind QA.
+Fault mode controls use the same workstation address on port 54330; remote
+phones cannot change modes. `legacy-reader`/`missing-schema` are still labeled
+simulations; they never count as old-client proof.
+
 ## Execution boundary and build binding
 
 **iOS-FIRST — native candidate preparation remains open; no manual passes recorded.**

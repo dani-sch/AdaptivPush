@@ -2,6 +2,8 @@
 
 ## Planning and code posture
 
+- September 14 iPhone remediation: typed program failures and shared strict workout-entry availability are implemented and tested; legacy views no longer promise a start without durable identity. A LAN synthetic QA route and verified enabled/disabled iOS Expo Go bundles are prepared. The original/current production-targeted bundle has writers off and production still lacks the durable schema. App Store Expo Go SDK 57 / iOS 26.6.1 is user-reported; physical cold launch and five-flow retest remain unverified. The [release addendum](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md) owns current evidence and the [manual matrix](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-MANUAL-QA-2026-09-14.md) owns precise retest steps. Signed native/signing identity, accessibility and production backup/migration gates remain open; Expo Go preparation does not close them.
+
 - Neutral [plan index](/dev-doc/plans/active/PLAN-INDEX.md) routes the approved product contract and supporting owners.
 - AP-01.1 captured current read-only database/repository evidence. AP-01.2a locally implements lookup-only generated/dev saves, explicit source/exact identity, UUID-guarded swaps, and administrator-only seed code.
 - AP-01.3 completed the supported production baseline and aligned ledger, encrypted PostgreSQL 17 backup/decryption, local destructive restore and semantic comparison, cross-schema signup-trigger reconciliation, fresh role/Storage suite, and production catalog enforcement. The shared catalog is SELECT-only for ordinary roles; trusted curation remains available.

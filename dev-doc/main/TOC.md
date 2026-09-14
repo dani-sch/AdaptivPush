@@ -10,8 +10,8 @@
 | Category | Files |
 |----------|-------|
 | Project Root | 4 |
-| Tests | 12 |
-| Top-level Scripts | 30 |
+| Tests | 13 |
+| Top-level Scripts | 33 |
 | Automation Scripts | 24 |
 | Tool Scripts | 27 |
 | Power Automate Scripts | 1 |
@@ -21,7 +21,7 @@
 | Skills | 62 |
 | Agents | 17 |
 | Commands | 8 |
-| **Total** | **242** |
+| **Total** | **246** |
 
 ---
 
@@ -55,6 +55,7 @@ _Test suite_
     ├── programs/
     │   ├── checkpoint.test.ts — import assert from 'node:assert/strict';
     │   ├── installation.test.ts — import assert from 'node:assert/strict';
+    │   ├── repository.test.ts — import assert from 'node:assert/strict';
     │   ├── revision.test.ts — import assert from 'node:assert/strict';
     │   └── rollout.test.ts — import assert from 'node:assert/strict';
     └── workouts/
@@ -97,10 +98,13 @@ _Standalone utility scripts_
     ├── seedExercises.ts — import { createClient } from "@supabase/supabase-js";
     ├── seedImages.ts — /**
     ├── seedManualQa.ts — // Synthetic public catalog only. This script has no remote-target option.
+    ├── Start-ApIosQa.ps1 — param(
     ├── Start-ApManualQa.ps1 — param(
     ├── sync-all-clones.sh — sync-all-clones.sh - Fast-forward all CHAOS clones to a selected origin branch.
     ├── tsconfig.json — {
-    └── verifyDurableConcurrency.mjs — // Nonvisual integration proof. Only the named local Supabase container is used.
+    ├── verifyDurableConcurrency.mjs — // Nonvisual integration proof. Only the named local Supabase container is used.
+    ├── verifyIosProgramFlows.ts — // Exercises the shipped repository + commands against LAN-reachable synthetic Supabase.
+    └── verifyLegacyMigration.ts — // Real AP-01 -> AP-02/AP-03 upgrade on a separate synthetic local database.
 ```
 
 ---
@@ -300,7 +304,7 @@ _Build, lint, test, and infrastructure config_
 ├── app.json — {
 ├── eslint.config.js — // https://docs.expo.dev/guides/using-eslint/
 ├── expo-env.d.ts — /// <reference types="expo/types" />
-├── index.js — // Polyfill FormData for Hermes before Expo's winter runtime loads.
+├── index.js — // SDK 57 initializes React Native globals in expo/src/winter/runtime.native.
 ├── package-lock.json — {
 ├── package.json — {
 └── tsconfig.json — {

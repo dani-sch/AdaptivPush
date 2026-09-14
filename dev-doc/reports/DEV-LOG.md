@@ -1,5 +1,20 @@
 # AdaptivPush — Development Log
 
+## 2026-09-14 - iPhone program failure remediation
+
+Preserved the clean existing feature branch and integrated focused code/tooling
+commits through the configured integrator. Confirmed the inspected Metro iOS
+bundle targets production with absent/off writers, and fresh production reads
+show only AP-01 migrations and no durable schema. Fixed typed error propagation,
+legacy workout availability, rejected-draft recovery and stale export-cache
+binding. Prepared local LAN-only QA and verified shipped commands through HTTP,
+real AP-01 backfill, unit/static/SQL/concurrency checks, and distinct enabled/
+disabled iOS bundles. User reports App Store Expo Go SDK 57 on iOS 26.6.1.
+Physical native startup and UI acceptance remain unverified; no production
+rollout or AP-04/AP-05 work occurred. The [owning release report](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md)
+and [manual matrix](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-MANUAL-QA-2026-09-14.md)
+contain exact commands, evidence and unchanged remaining gates.
+
 ## 2026-09-14 — iOS platform and handoff readiness correction
 
 User review identified that the AP-02/AP-03 handoff incorrectly centered Android
