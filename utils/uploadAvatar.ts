@@ -3,6 +3,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import { readAsStringAsync, EncodingType } from 'expo-file-system/legacy';
 import { toByteArray } from 'base64-js';
 import { supabase } from '@/utils/supabase';
+import { runSupabaseOperation } from '@/utils/supabaseResilience';
 
 /**
  * Launches the image library, resizes the selected photo to 400×400,
@@ -41,13 +42,15 @@ export async function uploadAvatar(userId: string): Promise<string | null> {
   const path = `${userId}/avatar.jpg`;
   const cacheVersion = Date.now();
 
-  const { error: uploadError } = await supabase.storage
-    .from('avatars')
-    .upload(path, bytes, { upsert: true, contentType: 'image/jpeg' });
+  const { error: uploadError } = await runSupabaseOperation(
+    () => supabase.storage
+      .from('avatars')
+      .upload(path, bytes, { upsert: true, contentType: 'image/jpeg' }),
+    { kind: 'storage', operation: 'profile.avatar_upload' },
+  );
 
   if (uploadError) {
-    console.error('Avatar upload failed:', uploadError.message);
-    return null;
+    throw uploadError;
   }
 
   const { data } = supabase.storage.from('avatars').getPublicUrl(path);

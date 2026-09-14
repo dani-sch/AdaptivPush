@@ -6,6 +6,7 @@ import {
   type WorkoutFinalizationReceipt,
   validateWorkoutDraft,
 } from './contracts';
+import { reportSupabaseFailure, supabaseUserMessage } from '@/utils/supabaseResilience';
 
 function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -34,9 +35,13 @@ export async function finalizeWorkout(
     await store.save(finalized);
     return { status: receipt.replayed ? 'replay' : 'finalized', receipt };
   } catch (error) {
-    const message = errorMessage(error);
-    const lower = message.toLowerCase();
+    const rawMessage = errorMessage(error);
+    const lower = rawMessage.toLowerCase();
     const lifecycle = lower.includes('stale_revision') || lower.includes('conflict') ? 'conflict' : 'failed';
+    const message = lifecycle === 'conflict'
+      ? 'This workout changed on another device. Review it before retrying.'
+      : supabaseUserMessage(error, 'Workout synchronization is unavailable. Your draft is safe on this device.');
+    reportSupabaseFailure('workout.finalize', error);
     await store.save({ ...finalizing, lifecycle, lastError: message });
     if (lifecycle === 'conflict') return { status: 'conflict', message };
     if (lower.includes('target_unavailable')) return { status: 'unavailable', message };

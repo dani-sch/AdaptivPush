@@ -29,6 +29,7 @@ import {
     type ProgramArtifact,
 } from '@/features/programs/contracts';
 import { programRepository } from '@/features/programs/repository';
+import { reportSupabaseFailure, supabaseSaveFailureMessage } from '@/utils/supabaseResilience';
 
 interface ProgramDay {
     id: string;
@@ -89,10 +90,10 @@ function generateDays(count: number, existingDays: ProgramDay[] = []): ProgramDa
 }
 
 async function requireUserId() {
-    const { data, error } = await supabase.auth.getUser();
+    const { data, error } = await supabase.auth.getSession();
     if (error) throw error;
-    if (!data.user) throw new Error('Not signed in');
-    return data.user.id;
+    if (!data.session?.user) throw new Error('Not signed in');
+    return data.session.user.id;
 }
 
 export default function CreateProgramScreen() {
@@ -303,10 +304,10 @@ export default function CreateProgramScreen() {
             Alert.alert('Program created', 'Your custom program has been saved.');
             router.replace('/plan');
         } catch (error: any) {
-            console.error('Error creating custom program:', error);
+            reportSupabaseFailure('program.custom_save', error);
             Alert.alert(
                 'Could not create program',
-                error?.message ?? 'Something went wrong while saving your program.'
+                supabaseSaveFailureMessage(error),
             );
         } finally {
             setSaving(false);

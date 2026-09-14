@@ -7,6 +7,7 @@ import { saveProgramToDb } from '@/utils/saveProgramToDb';
 import { computeCyclePhase } from '@/utils/cyclePhase';
 import type { ProgramGenParams, TrainingGoal, MuscleGroup, GeneratedProgram } from '@/types/program';
 import type { TrainingExperience } from '@/types/database';
+import { reportSupabaseFailure, supabaseSaveFailureMessage, supabaseUserMessage } from '@/utils/supabaseResilience';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
 
@@ -90,8 +91,9 @@ export function GenerateProgramModal({
     setLoading(true);
     try {
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user;
       if (!user) throw new Error('Not signed in');
 
       const { data: profile } = await supabase
@@ -120,7 +122,8 @@ export function GenerateProgramModal({
       setPendingProgram(generated);
       setCustomName(generated.name);
     } catch (err: any) {
-      Alert.alert('Could not generate program', err?.message ?? 'Please try again.');
+      reportSupabaseFailure('program.generate_context', err);
+      Alert.alert('Could not generate program', supabaseUserMessage(err, 'Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -131,8 +134,9 @@ export function GenerateProgramModal({
     setLoading(true);
     try {
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user;
       if (!user) throw new Error('Not signed in');
 
       const params: ProgramGenParams = {
@@ -155,7 +159,8 @@ export function GenerateProgramModal({
       onProgramCreated();
       onClose();
     } catch (err: any) {
-      Alert.alert('Could not save program', err?.message ?? 'Please try again.');
+      reportSupabaseFailure('program.generated_save', err);
+      Alert.alert('Could not save program', supabaseSaveFailureMessage(err));
     } finally {
       setLoading(false);
     }

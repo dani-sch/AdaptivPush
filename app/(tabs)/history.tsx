@@ -25,6 +25,7 @@ import { useFocusEffect } from 'expo-router';
 import { supabase } from '@/utils/supabase';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
+import { reportSupabaseFailure, supabaseUserMessage } from '@/utils/supabaseResilience';
 
 interface WorkoutHistoryRow {
   id?: string;
@@ -346,7 +347,8 @@ export default function HistoryScreen() {
     setShowPrModal(true);
     setPrLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
       if (!user) { setPrLoading(false); return; }
 
       // Fetch all PR rows for this user
@@ -405,9 +407,10 @@ export default function HistoryScreen() {
       setError(null);
 
       const {
-        data: { user },
+        data: { session },
         error: authError,
-      } = await supabase.auth.getUser();
+      } = await supabase.auth.getSession();
+      const user = session?.user;
 
       if (authError || !user) {
         setError('Unable to load user session.');
@@ -425,8 +428,8 @@ export default function HistoryScreen() {
       const sessionsResult = await fetchRowsFromTable('workout_sessions', user.id);
       const sessionsMissing = isMissingTableError(sessionsResult.error, 'workout_sessions');
       if (sessionsResult.error && !sessionsMissing) {
-        setError(sessionsResult.error.message ?? 'Failed to load workout history.');
-        setWorkouts([]);
+        reportSupabaseFailure('history.sessions', sessionsResult.error);
+        setError(supabaseUserMessage(sessionsResult.error, 'Unable to refresh workout history.'));
         return;
       }
 
@@ -438,8 +441,8 @@ export default function HistoryScreen() {
         const historyMissing = isMissingTableError(historyResult.error, 'workout_history');
 
         if (historyResult.error && !historyMissing) {
-          setError(historyResult.error.message ?? 'Failed to load workout history.');
-          setWorkouts([]);
+          reportSupabaseFailure('history.legacy', historyResult.error);
+          setError(supabaseUserMessage(historyResult.error, 'Unable to refresh workout history.'));
           return;
         }
 
@@ -463,9 +466,8 @@ export default function HistoryScreen() {
       setWorkouts(sessionsResult.rows.map(toWorkoutEntry));
       setError(null);
     } catch (fetchError) {
-      console.error('Failed to fetch workout history:', fetchError);
-      setError('Failed to load workout history.');
-      setWorkouts([]);
+      reportSupabaseFailure('history.load', fetchError);
+      setError(supabaseUserMessage(fetchError, 'Unable to refresh workout history.'));
     } finally {
       setLoading(false);
     }

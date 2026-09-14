@@ -71,7 +71,10 @@ test('future revision failure leaves a distinct unavailable outcome', async () =
     operationId,
     request,
   );
-  assert.deepEqual(outcome, { status: 'unavailable', message: 'network unavailable' });
+  assert.deepEqual(outcome, {
+    status: 'unavailable',
+    message: 'You appear to be offline. Check your connection and try again.',
+  });
 });
 
 test('incomplete revision identity is rejected before the repository call', async () => {

@@ -9,6 +9,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
 import { restoreProgram } from '@/features/programs/commands';
 import { programRepository } from '@/features/programs/repository';
+import { reportSupabaseFailure, supabaseSaveFailureMessage, supabaseUserMessage } from '@/utils/supabaseResilience';
 
 type ArchivedProgram = {
     id: string;
@@ -45,9 +46,10 @@ export default function ArchivedProgramsScreen() {
             setLoadError(null);
 
             const {
-                data: { user },
+                data: { session },
                 error: authError,
-            } = await supabase.auth.getUser();
+            } = await supabase.auth.getSession();
+            const user = session?.user;
 
             if (authError) throw authError;
             if (!user) {
@@ -66,9 +68,8 @@ export default function ArchivedProgramsScreen() {
             if (error) throw error;
             setPrograms(data ?? []);
         } catch (e) {
-            console.error('loadArchivedPrograms error', e);
-            setPrograms([]);
-            setLoadError('Archived programs are unavailable. Check your connection and try again.');
+            reportSupabaseFailure('program.archived_load', e);
+            setLoadError(supabaseUserMessage(e, 'Archived programs are unavailable. Try again.'));
         } finally {
             setLoading(false);
         }
@@ -85,7 +86,8 @@ export default function ArchivedProgramsScreen() {
         mode: 'exact' | 'restart' | 'legacy_approximate',
     ) => {
         try {
-            const { data: { user } } = await supabase.auth.getUser();
+            const { data: { session } } = await supabase.auth.getSession();
+            const user = session?.user;
             if (!user) return;
             const { data: active, error: activeError } = await supabase
                 .from('programs')
@@ -99,10 +101,10 @@ export default function ArchivedProgramsScreen() {
             await loadArchivedPrograms();
             router.back();
         } catch (e) {
-            console.error('unarchiveProgram error', e);
+            reportSupabaseFailure('program.restore', e);
             Alert.alert(
                 'Could not restore program',
-                e instanceof Error ? e.message : 'The program was not changed. Please try again.',
+                supabaseSaveFailureMessage(e),
             );
         }
     };

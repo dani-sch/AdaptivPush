@@ -6,12 +6,18 @@ import {
 import { Stack, router, useRootNavigationState, useSegments } from "expo-router";
 import * as Notifications from "expo-notifications";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import "react-native-reanimated";
 
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { supabase } from "@/utils/supabase";
 import { AppThemeProvider, useTheme } from "@/contexts/ThemeContext";
+import { CurrentProgramProvider } from "@/hooks/useCurrentProgram";
+import {
+  classifySupabaseError,
+  reportSupabaseFailure,
+  runSupabaseOperation,
+} from "@/utils/supabaseResilience";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -28,11 +34,26 @@ function RootLayoutInner() {
   const navigationState = useRootNavigationState();
   const segments = useSegments();
   const { isDark } = useTheme();
+  const [authVersion, setAuthVersion] = useState(0);
+  const [routeOwnerId, setRouteOwnerId] = useState<string | null>(null);
+  const routeOwnerIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT") return;
+      const nextOwnerId = session?.user.id ?? null;
+      if (nextOwnerId === routeOwnerIdRef.current) return;
+      routeOwnerIdRef.current = nextOwnerId;
+      setRouteOwnerId(nextOwnerId);
+      setAuthVersion((value) => value + 1);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (!navigationState?.key) return;
 
-    let cancelled = false;
+    const controller = new AbortController();
 
     const syncRoute = async () => {
       const rootSegment = segments[0];
@@ -42,24 +63,45 @@ function RootLayoutInner() {
 
       const {
         data: { session },
-      } = await supabase.auth.getSession();
+      } = await runSupabaseOperation(() => supabase.auth.getSession(), {
+        kind: "auth",
+        operation: "navigation.local_session",
+        signal: controller.signal,
+      });
 
-      if (cancelled) return;
+      if (controller.signal.aborted) return;
 
       if (!session?.user) {
+        routeOwnerIdRef.current = null;
+        setRouteOwnerId(null);
         if (!isAuthRoute && !isRootRoute) {
           router.replace("/");
         }
         return;
       }
 
-      const { data: profile, error: profileError } = await supabase
-        .from("user_profile")
-        .select("onboarded")
-        .eq("user_id", session.user.id)
-        .maybeSingle<{ onboarded: boolean | null }>();
+      const { data: profile, error: profileError } = await runSupabaseOperation(
+        (signal) =>
+          supabase
+            .from("user_profile")
+            .select("onboarded")
+            .eq("user_id", session.user.id)
+            .abortSignal(signal)
+            .maybeSingle<{ onboarded: boolean | null }>(),
+        {
+          kind: "read",
+          operation: "navigation.profile_route",
+          signal: controller.signal,
+        },
+      );
 
-      if (cancelled || profileError) return;
+      if (controller.signal.aborted) return;
+      if (profileError) {
+        reportSupabaseFailure("navigation.profile_route", profileError);
+        return;
+      }
+      routeOwnerIdRef.current = session.user.id;
+      setRouteOwnerId(session.user.id);
 
       if (profile?.onboarded !== true) {
         if (!isSetupRoute) {
@@ -73,18 +115,21 @@ function RootLayoutInner() {
       }
     };
 
-    syncRoute().catch(() => {
-      // Network unavailable or credentials not yet configured — stay on current screen
+    syncRoute().catch((error: unknown) => {
+      if (classifySupabaseError(error).category !== "cancelled") {
+        reportSupabaseFailure("navigation.profile_route", error);
+      }
+      // Preserve the current route and valid local session during an availability failure.
     });
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
-  }, [navigationState?.key, segments]);
+  }, [authVersion, navigationState?.key, segments]);
 
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-      <Stack>
+      <Stack key={routeOwnerId ?? "signed-out"}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(qsetup)" options={{ headerShown: false }} />
@@ -111,7 +156,9 @@ function RootLayoutInner() {
 export default function RootLayout() {
   return (
     <AppThemeProvider>
-      <RootLayoutInner />
+      <CurrentProgramProvider>
+        <RootLayoutInner />
+      </CurrentProgramProvider>
     </AppThemeProvider>
   );
 }

@@ -314,6 +314,9 @@ export function validateWorkoutDraft(draft: WorkoutDraft): { ok: boolean; errors
   if (!draft.ownerId || !draft.programDayId || !draft.prescriptionRevisionId) {
     errors.push('Owner, program day, and prescription revision identity are required.');
   }
+  if (draft.slots.length === 0) {
+    errors.push('Workout draft must contain at least one exercise slot.');
+  }
   const setIds = new Set<string>();
   for (const slot of draft.slots) {
     if (!slot.slotId || !slot.prescribedExerciseId || !slot.actualExerciseId) {

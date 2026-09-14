@@ -17,6 +17,7 @@ import {
   getOrCreatePendingProgramExerciseRevision,
 } from './revisionStore';
 import type { OperationId } from '../kernel/operationId';
+import { reportSupabaseFailure, supabaseUserMessage } from '@/utils/supabaseResilience';
 
 function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -52,9 +53,10 @@ export async function installProgram(
   } catch (error) {
     const message = errorMessage(error);
     if (message.toLowerCase().includes('stale_revision')) {
-      return { status: 'conflict', message, activeProgramId: null };
+      return { status: 'conflict', message: 'Your active program changed on another device. Refresh and try again.', activeProgramId: null };
     }
-    return { status: 'unavailable', message };
+    reportSupabaseFailure('program.install', error);
+    return { status: 'unavailable', message: supabaseUserMessage(error, 'Program installation is unavailable. Try again.') };
   }
 }
 
@@ -101,8 +103,11 @@ export async function executeProgramExerciseRevision(
     return { status: receipt.replayed ? 'replay' : 'revised', receipt };
   } catch (error) {
     const message = errorMessage(error);
-    if (message.toLowerCase().includes('stale_revision')) return { status: 'conflict', message };
-    return { status: 'unavailable', message };
+    if (message.toLowerCase().includes('stale_revision')) {
+      return { status: 'conflict', message: 'Your active program changed on another device. Refresh and try again.' };
+    }
+    reportSupabaseFailure('program.revise_exercise', error);
+    return { status: 'unavailable', message: supabaseUserMessage(error, 'The future program update is unavailable. Try again.') };
   }
 }
 

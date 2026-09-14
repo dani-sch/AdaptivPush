@@ -12,6 +12,7 @@ import {
   confirmWorkoutRecalibration,
   createWorkoutDraft,
   updateWorkoutSet,
+  validateWorkoutDraft,
   type WorkoutDraft,
 } from "@/features/workouts/contracts";
 import { finalizeWorkout } from "@/features/workouts/commands";
@@ -23,6 +24,7 @@ import {
   type WorkoutRouteTarget,
 } from "@/features/workouts/routeResolution";
 import { workoutRepository } from "@/features/workouts/repository";
+import { reportSupabaseFailure } from "@/utils/supabaseResilience";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -206,6 +208,7 @@ export default function NextWorkoutScreen() {
   const [authLoading, setAuthLoading] = useState(true);
   const [ownerId, setOwnerId] = useState<string | null>(null);
   const [resolutionAttempt, setResolutionAttempt] = useState(0);
+  const [resolvedTargetKey, setResolvedTargetKey] = useState<string | null>(null);
   const [resolutionError, setResolutionError] = useState<string | null>(null);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
@@ -223,6 +226,17 @@ export default function NextWorkoutScreen() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const persistQueueRef = useRef<Promise<void>>(Promise.resolve());
   const hydratedTargetRef = useRef<string | null>(null);
+  const resolutionTargetKey = useMemo(
+    () => JSON.stringify([
+      ownerId,
+      routeTarget.programId,
+      routeTarget.revisionId,
+      routeTarget.stableDayId,
+      routeTarget.programDayId,
+      routeTarget.workoutId,
+    ]),
+    [ownerId, routeTarget],
+  );
 
   const persistDraft = (nextDraft: WorkoutDraft) => {
     const save = persistQueueRef.current
@@ -259,15 +273,14 @@ export default function NextWorkoutScreen() {
   // the network-backed program is still loading, but an unrelated workout never does.
   useEffect(() => {
     let cancelled = false;
-    const targetKey = JSON.stringify([ownerId, routeTarget.programId, routeTarget.revisionId,
-      routeTarget.stableDayId, routeTarget.programDayId, routeTarget.workoutId]);
-    if (hydratedTargetRef.current !== targetKey) {
-      hydratedTargetRef.current = targetKey;
+    if (hydratedTargetRef.current !== resolutionTargetKey) {
+      hydratedTargetRef.current = resolutionTargetKey;
       setDraft(null);
       setExercises([]);
       setResolutionError(null);
       setSyncMessage(null);
       setDraftLoading(true);
+      setResolvedTargetKey(null);
     }
     if (authLoading) return () => { cancelled = true; };
     (async () => {
@@ -277,6 +290,10 @@ export default function NextWorkoutScreen() {
         const lookup = draftLookupForRoute(routeTarget, programWorkout ?? undefined);
         const stored = await workoutDraftStore.loadMatching(ownerId, lookup);
         if (stored) {
+          const validation = validateWorkoutDraft(stored);
+          if (!validation.ok) {
+            throw new Error(`Stored workout draft is invalid. ${validation.errors.join(' ')}`);
+          }
           settled = true;
           if (cancelled) return;
           setDraft(stored);
@@ -291,6 +308,9 @@ export default function NextWorkoutScreen() {
         settled = true;
         if (!program || !programWorkout || !programWorkout.prescriptionRevisionId || !programWorkout.stableDayId) {
           throw new Error('This requested workout is stale, malformed, or no longer belongs to the active prescription.');
+        }
+        if (programWorkout.exercises.length === 0) {
+          throw new Error('This requested workout has no exercise prescription. Refresh the plan and try again.');
         }
         const nextDraft = createWorkoutDraft({
           ownerId,
@@ -340,21 +360,28 @@ export default function NextWorkoutScreen() {
         settled = true;
         if (!cancelled) setResolutionError(error instanceof Error ? error.message : 'Workout draft is unavailable.');
       } finally {
-        if (!cancelled && settled) setDraftLoading(false);
+        if (!cancelled && settled) {
+          setResolvedTargetKey(resolutionTargetKey);
+          setDraftLoading(false);
+        }
       }
     })();
     return () => { cancelled = true; };
-  }, [authLoading, loading, ownerId, program, programWorkout, resolutionAttempt, routeTarget]);
+  }, [authLoading, loading, ownerId, program, programWorkout, resolutionAttempt, resolutionTargetKey, routeTarget]);
 
   const availability = workoutAvailability({
     authLoading,
-    programLoading: loading || draftLoading,
+    programLoading: loading || draftLoading || resolvedTargetKey !== resolutionTargetKey,
     program,
     programWorkout,
     draft,
     ownerId,
     route: routeTarget,
   });
+  const canFinishWorkout = availability === 'ready'
+    && draft?.ownerId === ownerId
+    && draft.lifecycle !== 'finalized'
+    && !saving;
 
   const programForSwap = useMemo<CurrentProgram | null>(() => {
     if (!program || !draft) return null;
@@ -514,9 +541,10 @@ export default function NextWorkoutScreen() {
 
     try {
       const {
-        data: { user },
+        data: { session },
         error: authErr,
-      } = await supabase.auth.getUser();
+      } = await supabase.auth.getSession();
+      const user = session?.user;
       if (authErr || !user) throw new Error("Not signed in");
       if (!draft || draft.ownerId !== user.id) throw new Error('Workout draft is unavailable for this account.');
       await persistQueueRef.current;
@@ -632,7 +660,7 @@ export default function NextWorkoutScreen() {
         router.back();
       }
     } catch (err) {
-      console.error("[handleFinish] Failed to save workout:", err);
+      reportSupabaseFailure('workout.finish', err);
       setSaving(false);
       Alert.alert(
         "Save Failed",
@@ -775,10 +803,11 @@ export default function NextWorkoutScreen() {
           <Pressable
             style={({ pressed }) => [
               styles.finishButton,
-              pressed && { opacity: 0.85 },
+              !canFinishWorkout && styles.finishButtonDisabled,
+              pressed && canFinishWorkout && { opacity: 0.85 },
             ]}
-            onPress={() => draft?.lifecycle !== 'finalized' && setShowFinishModal(true)}
-            disabled={draft?.lifecycle === 'finalized'}
+            onPress={() => canFinishWorkout && setShowFinishModal(true)}
+            disabled={!canFinishWorkout}
             accessibilityRole="button"
             accessibilityLabel={draft?.lifecycle === 'finalized' ? 'Workout already finalized' : 'Finish workout'}
           >
@@ -998,6 +1027,10 @@ function createStyles(theme: Theme) {
       alignItems: "center",
       justifyContent: "center",
       marginTop: 8,
+    },
+    finishButtonDisabled: {
+      backgroundColor: theme.buttonDisabled,
+      opacity: 0.7,
     },
     finishButtonText: {
       color: theme.white,
