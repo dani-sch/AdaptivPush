@@ -46,9 +46,10 @@ export default function ArchivedProgramsScreen() {
             setLoadError(null);
 
             const {
-                data: { user },
+                data: { session },
                 error: authError,
-            } = await supabase.auth.getUser();
+            } = await supabase.auth.getSession();
+            const user = session?.user;
 
             if (authError) throw authError;
             if (!user) {
@@ -85,7 +86,8 @@ export default function ArchivedProgramsScreen() {
         mode: 'exact' | 'restart' | 'legacy_approximate',
     ) => {
         try {
-            const { data: { user } } = await supabase.auth.getUser();
+            const { data: { session } } = await supabase.auth.getSession();
+            const user = session?.user;
             if (!user) return;
             const { data: active, error: activeError } = await supabase
                 .from('programs')

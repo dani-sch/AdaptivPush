@@ -63,7 +63,11 @@ function RootLayoutInner() {
 
       const {
         data: { session },
-      } = await supabase.auth.getSession();
+      } = await runSupabaseOperation(() => supabase.auth.getSession(), {
+        kind: "auth",
+        operation: "navigation.local_session",
+        signal: controller.signal,
+      });
 
       if (controller.signal.aborted) return;
 

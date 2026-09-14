@@ -347,7 +347,8 @@ export default function HistoryScreen() {
     setShowPrModal(true);
     setPrLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
       if (!user) { setPrLoading(false); return; }
 
       // Fetch all PR rows for this user
@@ -406,9 +407,10 @@ export default function HistoryScreen() {
       setError(null);
 
       const {
-        data: { user },
+        data: { session },
         error: authError,
-      } = await supabase.auth.getUser();
+      } = await supabase.auth.getSession();
+      const user = session?.user;
 
       if (authError || !user) {
         setError('Unable to load user session.');

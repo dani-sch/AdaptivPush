@@ -24,6 +24,7 @@ import {
   type WorkoutRouteTarget,
 } from "@/features/workouts/routeResolution";
 import { workoutRepository } from "@/features/workouts/repository";
+import { reportSupabaseFailure } from "@/utils/supabaseResilience";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -540,9 +541,10 @@ export default function NextWorkoutScreen() {
 
     try {
       const {
-        data: { user },
+        data: { session },
         error: authErr,
-      } = await supabase.auth.getUser();
+      } = await supabase.auth.getSession();
+      const user = session?.user;
       if (authErr || !user) throw new Error("Not signed in");
       if (!draft || draft.ownerId !== user.id) throw new Error('Workout draft is unavailable for this account.');
       await persistQueueRef.current;
@@ -658,7 +660,7 @@ export default function NextWorkoutScreen() {
         router.back();
       }
     } catch (err) {
-      console.error("[handleFinish] Failed to save workout:", err);
+      reportSupabaseFailure('workout.finish', err);
       setSaving(false);
       Alert.alert(
         "Save Failed",

@@ -98,9 +98,10 @@ export default function QSetupPage() {
             setSaving(true);
 
             const {
-                data: { user },
+                data: { session },
                 error: authError,
-            } = await supabase.auth.getUser();
+            } = await supabase.auth.getSession();
+            const user = session?.user;
 
             if (authError) {
                 throw authError;

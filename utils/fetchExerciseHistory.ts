@@ -6,7 +6,8 @@ export async function fetchExerciseHistory(
   limit = 10
 ): Promise<ExerciseHistoryEntry[]> {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user;
     if (!user) return [];
 
     // Fetch all sets for this exercise, newest first
