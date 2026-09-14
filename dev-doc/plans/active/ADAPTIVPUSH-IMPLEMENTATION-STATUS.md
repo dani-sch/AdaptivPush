@@ -4,6 +4,19 @@ Snapshot: 2026-09-14 for the bounded AP-02/AP-03 release update; unrelated sourc
 
 ## Evidence boundaries
 
+September 14 iPhone failure remediation adds current nonvisual evidence: typed
+program failures survive caller layers; Home/Plan and entry share strict durable
+identity checks; rejected first workout submissions preserve editable drafts,
+while prior uncertain submissions remain frozen. Local LAN tests exercise the
+shipped command/repository implementations, and a separate AP-01 database proves
+real migration identities make legacy plans startable without changing legacy
+provenance. Enabled/Disabled iOS exports and live Metro bundles are verified,
+including rejection and correction of stale cached flag values. The user
+reports SDK 57 App Store Expo Go on iOS 26.6.1. Native crash resolution and
+physical UI passes are not yet demonstrated. Production schema/writers remain
+gated. Exact source, commands, results and limits are in the current
+[release addendum](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md).
+
 This consolidation inspected repository source, schema documentation, migrations 001–017, the retained migration verification script, historical status/register documents, the unchanged September decision packet, and the August audit/development log. It did not run the application, connect to Supabase, run a migration, or perform a device, integration, security, or purchase test. File line numbers below refer to the inspected working tree and may shift during implementation; symbols are the durable navigation aid. The pre-existing `utils/saveProgramToDb.ts` user modification was inspected and left intact.
 
 AP-01.1 subsequently added a current, read-only production metadata observation

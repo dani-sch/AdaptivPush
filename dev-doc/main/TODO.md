@@ -38,6 +38,9 @@
 
 ## [INTEGRATION VERIFIED — RELEASE BLOCKED] AP-02/AP-03 — Durable records
 
+- [COMPLETE] Resolve typed disabled/schema/auth/conflict/validation outcomes and align legacy Plan/Home availability with strict workout entry; verify 65 unique unit cases, SQL/concurrency, real AP-01 migration backfill and shipped commands over synthetic LAN HTTP. Prepare correctly verified Enabled/Disabled iOS exports and Metro sessions; preserve production writers off.
+- [OPEN] Obtain physical iPhone Safari reachability, clean Expo Go launch and five-flow results using the current [retest instructions](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-MANUAL-QA-2026-09-14.md). User reports App Store Expo Go SDK 57 / iOS 26.6.1; original native startup cause and corrected phone behavior remain unverified. Separate signed-native build/signing and remaining accessibility/manual gates are still open.
+
 - [COMPLETE] Add versioned workout/program contracts, stable identities, frozen prescriptions and actual-versus-planned/load semantics.
 - [COMPLETE] Add owner-scoped durable pending stores and replay-safe common repositories/commands.
 - [COMPLETE] Add the two-migration packet: `20260910210000` supplies immutable program revisions, one-active-per-owner, exact V2 checkpoints, transactional install/finalize RPCs, direct-write denial and receipts; `20260911120000` supplies revision-safe future exercise swaps. Both remain local-only pending the production release gates.

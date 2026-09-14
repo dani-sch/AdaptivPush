@@ -3,6 +3,12 @@
 ## Authority and status
 
 **Current AP-02/AP-03 platform scope: iOS-first, as directed by the user.**
+The September 14 failure-remediation addendum supplies typed error and workout
+entry fixes, verified local LAN commands, real legacy migration proof, and
+Enabled/Disabled iOS Expo Go comparison bundles. Physical cold-start and UI
+results remain pending. The user reports App Store Expo Go SDK 57 / iOS 26.6.1
+and has not supplied a separate Apple signing route. Expo Go retesting can
+proceed using the current matrix; it does not close signed native acceptance.
 Prepare and bind a signed iOS native candidate and reachable nonproduction test
 backend before physical-iPhone QA. Dynamic Type, VoiceOver and iOS lifecycle
 coverage are required. Existing Android evidence is supplementary; Android
