@@ -1,0 +1,413 @@
+export type SupabaseFailureCategory =
+  | 'retryable_service_unavailable'
+  | 'timeout'
+  | 'offline'
+  | 'project_unavailable'
+  | 'authentication_required'
+  | 'forbidden'
+  | 'schema_unavailable'
+  | 'cancelled'
+  | 'unknown';
+
+export interface SupabaseFailure {
+  category: SupabaseFailureCategory;
+  retryable: boolean;
+  status?: number;
+  code?: string;
+}
+
+type ErrorLike = {
+  name?: unknown;
+  message?: unknown;
+  status?: unknown;
+  statusCode?: unknown;
+  code?: unknown;
+};
+
+export const SUPABASE_TIMEOUTS = {
+  readMs: 12_000,
+  authMs: 15_000,
+  writeMs: 18_000,
+  storageMs: 30_000,
+} as const;
+
+export const SUPABASE_READ_RETRY_POLICY = {
+  maxAttempts: 2,
+  baseDelayMs: 350,
+  maxJitterMs: 250,
+} as const;
+
+const SERVICE_UNAVAILABLE_MESSAGE =
+  "AdaptivPush's data service is temporarily unavailable. Your data is safe. Try again shortly.";
+
+export class SupabaseRequestTimeoutError extends Error {
+  readonly code = 'SUPABASE_REQUEST_TIMEOUT';
+
+  constructor(readonly timeoutMs: number) {
+    super(`Supabase request exceeded its ${timeoutMs}ms deadline`);
+    this.name = 'SupabaseRequestTimeoutError';
+  }
+}
+
+function asErrorLike(error: unknown): ErrorLike {
+  return typeof error === 'object' && error !== null ? (error as ErrorLike) : {};
+}
+
+function numericStatus(error: ErrorLike): number | undefined {
+  const candidate = error.status ?? error.statusCode;
+  if (typeof candidate === 'number' && Number.isFinite(candidate)) return candidate;
+  if (typeof candidate === 'string' && /^\d{3}$/.test(candidate)) return Number(candidate);
+  return undefined;
+}
+
+function safeCode(error: ErrorLike): string | undefined {
+  return typeof error.code === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(error.code)
+    ? error.code
+    : undefined;
+}
+
+export function classifySupabaseError(error: unknown): SupabaseFailure {
+  const source = asErrorLike(error);
+  const status = numericStatus(source);
+  const code = safeCode(source);
+  const name = typeof source.name === 'string' ? source.name.toLowerCase() : '';
+  const message = typeof source.message === 'string' ? source.message.toLowerCase() : '';
+  const combined = `${name} ${code?.toLowerCase() ?? ''} ${message}`;
+
+  if (
+    code === 'SUPABASE_REQUEST_CANCELLED' ||
+    (name === 'aborterror' && !combined.includes('timeout')) ||
+    combined.includes('request cancelled') ||
+    combined.includes('request canceled')
+  ) {
+    return { category: 'cancelled', retryable: false, status, code };
+  }
+
+  if (
+    combined.includes('failed to get project config') ||
+    status === 502 ||
+    status === 503 ||
+    status === 504
+  ) {
+    return { category: 'retryable_service_unavailable', retryable: true, status, code };
+  }
+
+  if (
+    code === 'SUPABASE_REQUEST_TIMEOUT' ||
+    name.includes('timeout') ||
+    combined.includes('timed out') ||
+    combined.includes('timeout') ||
+    combined.includes('deadline exceeded')
+  ) {
+    return { category: 'timeout', retryable: true, status, code };
+  }
+
+  if (
+    combined.includes('project paused') ||
+    combined.includes('project is paused') ||
+    combined.includes('project is not active') ||
+    combined.includes('project has been paused') ||
+    combined.includes('project is restricted')
+  ) {
+    return { category: 'project_unavailable', retryable: false, status, code };
+  }
+
+  if (
+    status === 401 ||
+    code === 'refresh_token_not_found' ||
+    code === 'refresh_token_already_used' ||
+    code === 'invalid_jwt' ||
+    combined.includes('jwt expired') ||
+    combined.includes('session missing') ||
+    combined.includes('not signed in')
+  ) {
+    return { category: 'authentication_required', retryable: false, status, code };
+  }
+
+  if (
+    status === 403 ||
+    code === '42501' ||
+    combined.includes('row-level security') ||
+    combined.includes('row level security') ||
+    combined.includes('permission denied') ||
+    combined.includes('not authorized')
+  ) {
+    return { category: 'forbidden', retryable: false, status, code };
+  }
+
+  if (
+    code === 'PGRST204' ||
+    code === 'PGRST205' ||
+    code === '42P01' ||
+    code === '42703' ||
+    combined.includes('schema cache') ||
+    combined.includes('could not find the table') ||
+    combined.includes('could not find the column') ||
+    combined.includes('does not exist')
+  ) {
+    return { category: 'schema_unavailable', retryable: false, status, code };
+  }
+
+  if (
+    combined.includes('network request failed') ||
+    combined.includes('failed to fetch') ||
+    combined.includes('network is offline') ||
+    combined.includes('internet connection') ||
+    combined.includes('enotfound') ||
+    combined.includes('eai_again') ||
+    combined.includes('dns')
+  ) {
+    return { category: 'offline', retryable: true, status, code };
+  }
+
+  if (status !== undefined && status >= 500) {
+    return { category: 'retryable_service_unavailable', retryable: true, status, code };
+  }
+
+  return { category: 'unknown', retryable: false, status, code };
+}
+
+export function supabaseUserMessage(
+  errorOrFailure: unknown | SupabaseFailure,
+  fallback = 'Something went wrong. Please try again.',
+): string {
+  const failure =
+    typeof errorOrFailure === 'object' &&
+    errorOrFailure !== null &&
+    'category' in errorOrFailure
+      ? (errorOrFailure as SupabaseFailure)
+      : classifySupabaseError(errorOrFailure);
+
+  switch (failure.category) {
+    case 'retryable_service_unavailable':
+    case 'project_unavailable':
+      return SERVICE_UNAVAILABLE_MESSAGE;
+    case 'timeout':
+      return "AdaptivPush's data service took too long to respond. Your data is safe. Try again.";
+    case 'offline':
+      return 'You appear to be offline. Check your connection and try again.';
+    case 'authentication_required':
+      return 'Your session has expired. Please sign in again.';
+    case 'forbidden':
+      return "You don't have permission to make this change.";
+    case 'schema_unavailable':
+      return 'This feature is temporarily unavailable while the app service is updated.';
+    case 'cancelled':
+      return 'The request was cancelled. Your changes are still here.';
+    default:
+      return fallback;
+  }
+}
+
+export function loginErrorMessage(error: unknown): string {
+  const source = asErrorLike(error);
+  const code = safeCode(source)?.toLowerCase();
+  const message = typeof source.message === 'string' ? source.message.toLowerCase() : '';
+
+  if (
+    code === 'invalid_credentials' ||
+    message.includes('invalid login credentials') ||
+    message.includes('invalid credentials')
+  ) {
+    return 'The email or password is incorrect.';
+  }
+
+  return supabaseUserMessage(error, 'Unable to sign in right now. Please try again.');
+}
+
+export interface SupabaseDiagnostic {
+  operation: string;
+  category: SupabaseFailureCategory;
+  retryable: boolean;
+  status?: number;
+  code?: string;
+  occurredAt: string;
+}
+
+export function sanitizedSupabaseDiagnostic(
+  operation: string,
+  error: unknown,
+  now = new Date(),
+): SupabaseDiagnostic {
+  const failure = classifySupabaseError(error);
+  return {
+    operation,
+    ...failure,
+    occurredAt: now.toISOString(),
+  };
+}
+
+export function reportSupabaseFailure(operation: string, error: unknown): void {
+  if (typeof __DEV__ === 'undefined' || !__DEV__) return;
+  const diagnostic = sanitizedSupabaseDiagnostic(operation, error);
+  if (diagnostic.retryable || diagnostic.category === 'cancelled') {
+    console.warn('[Supabase availability]', diagnostic);
+    return;
+  }
+  console.error('[Supabase failure]', diagnostic);
+}
+
+type ResultWithError = { error?: unknown | null };
+
+export interface SupabaseOperationOptions {
+  kind: 'read' | 'auth' | 'write' | 'storage';
+  operation: string;
+  signal?: AbortSignal;
+  timeoutMs?: number;
+  maxAttempts?: number;
+  baseDelayMs?: number;
+  maxJitterMs?: number;
+  random?: () => number;
+  sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
+}
+
+function defaultTimeout(kind: SupabaseOperationOptions['kind']): number {
+  switch (kind) {
+    case 'read':
+      return SUPABASE_TIMEOUTS.readMs;
+    case 'auth':
+      return SUPABASE_TIMEOUTS.authMs;
+    case 'storage':
+      return SUPABASE_TIMEOUTS.storageMs;
+    default:
+      return SUPABASE_TIMEOUTS.writeMs;
+  }
+}
+
+function abortError(): Error {
+  const error = new Error('Supabase request cancelled') as Error & { code: string };
+  error.name = 'AbortError';
+  error.code = 'SUPABASE_REQUEST_CANCELLED';
+  return error;
+}
+
+function delay(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(abortError());
+      return;
+    }
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timer);
+        reject(abortError());
+      },
+      { once: true },
+    );
+  });
+}
+
+async function oneAttempt<T>(
+  operation: (signal: AbortSignal) => PromiseLike<T>,
+  timeoutMs: number,
+  externalSignal?: AbortSignal,
+): Promise<T> {
+  if (externalSignal?.aborted) throw abortError();
+
+  const controller = new AbortController();
+  let timedOut = false;
+  const forwardAbort = () => controller.abort();
+  externalSignal?.addEventListener('abort', forwardAbort, { once: true });
+  let rejectDeadline: ((error: Error) => void) | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    rejectDeadline = reject;
+  });
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+    rejectDeadline?.(new SupabaseRequestTimeoutError(timeoutMs));
+  }, timeoutMs);
+
+  try {
+    return await Promise.race([Promise.resolve(operation(controller.signal)), deadline]);
+  } catch (error) {
+    if (timedOut) throw new SupabaseRequestTimeoutError(timeoutMs);
+    if (externalSignal?.aborted) throw abortError();
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    externalSignal?.removeEventListener('abort', forwardAbort);
+  }
+}
+
+export async function runSupabaseOperation<T extends ResultWithError>(
+  operation: (signal: AbortSignal) => PromiseLike<T>,
+  options: SupabaseOperationOptions,
+): Promise<T> {
+  const canRetry = options.kind === 'read';
+  const maxAttempts = canRetry
+    ? Math.max(1, options.maxAttempts ?? SUPABASE_READ_RETRY_POLICY.maxAttempts)
+    : 1;
+  const timeoutMs = options.timeoutMs ?? defaultTimeout(options.kind);
+  const baseDelayMs = options.baseDelayMs ?? SUPABASE_READ_RETRY_POLICY.baseDelayMs;
+  const maxJitterMs = options.maxJitterMs ?? SUPABASE_READ_RETRY_POLICY.maxJitterMs;
+  const random = options.random ?? Math.random;
+  const sleep = options.sleep ?? delay;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const result = await oneAttempt(operation, timeoutMs, options.signal);
+      if (!result.error || !classifySupabaseError(result.error).retryable || attempt === maxAttempts) {
+        return result;
+      }
+      reportSupabaseFailure(`${options.operation}:attempt-${attempt}`, result.error);
+    } catch (error) {
+      const failure = classifySupabaseError(error);
+      if (!canRetry || !failure.retryable || attempt === maxAttempts) throw error;
+      reportSupabaseFailure(`${options.operation}:attempt-${attempt}`, error);
+    }
+
+    const jitter = Math.floor(random() * (maxJitterMs + 1));
+    await sleep(baseDelayMs * 2 ** (attempt - 1) + jitter, options.signal);
+  }
+
+  throw new Error('Supabase operation exhausted without a result');
+}
+
+function requestMethod(input: RequestInfo | URL, init?: RequestInit): string {
+  if (init?.method) return init.method.toUpperCase();
+  if (typeof Request !== 'undefined' && input instanceof Request) return input.method.toUpperCase();
+  return 'GET';
+}
+
+function requestUrl(input: RequestInfo | URL): string {
+  if (typeof input === 'string') return input;
+  if (input instanceof URL) return input.toString();
+  return input.url;
+}
+
+function fetchTimeout(input: RequestInfo | URL, init?: RequestInit): number {
+  const url = requestUrl(input);
+  const method = requestMethod(input, init);
+  if (url.includes('/storage/v1/')) return SUPABASE_TIMEOUTS.storageMs;
+  if (url.includes('/auth/v1/')) return SUPABASE_TIMEOUTS.authMs;
+  if (method === 'GET' || method === 'HEAD') return SUPABASE_TIMEOUTS.readMs;
+  return SUPABASE_TIMEOUTS.writeMs;
+}
+
+export async function resilientSupabaseFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  const timeoutMs = fetchTimeout(input, init);
+  const controller = new AbortController();
+  let timedOut = false;
+  const forwardAbort = () => controller.abort();
+  init?.signal?.addEventListener('abort', forwardAbort, { once: true });
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (timedOut) throw new SupabaseRequestTimeoutError(timeoutMs);
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    init?.signal?.removeEventListener('abort', forwardAbort);
+  }
+}
