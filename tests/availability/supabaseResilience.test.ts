@@ -120,4 +120,20 @@ test('a bounded request times out and cancellation prevents stale work', async (
     }),
     (error) => classifySupabaseError(error).category === 'cancelled',
   );
+
+  const inFlightController = new AbortController();
+  const inFlight = runSupabaseOperation(
+    async () => new Promise<{ data: null; error: null }>(() => undefined),
+    {
+      kind: 'read',
+      operation: 'test.in_flight_cancel',
+      signal: inFlightController.signal,
+      timeoutMs: 1_000,
+    },
+  );
+  inFlightController.abort();
+  await assert.rejects(
+    inFlight,
+    (error) => classifySupabaseError(error).category === 'cancelled',
+  );
 });

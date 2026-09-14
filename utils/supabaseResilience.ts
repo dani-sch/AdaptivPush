@@ -324,7 +324,14 @@ async function oneAttempt<T>(
 
   const controller = new AbortController();
   let timedOut = false;
-  const forwardAbort = () => controller.abort();
+  let rejectCancellation: ((error: Error) => void) | undefined;
+  const cancellation = new Promise<never>((_resolve, reject) => {
+    rejectCancellation = reject;
+  });
+  const forwardAbort = () => {
+    controller.abort();
+    rejectCancellation?.(abortError());
+  };
   externalSignal?.addEventListener('abort', forwardAbort, { once: true });
   let rejectDeadline: ((error: Error) => void) | undefined;
   const deadline = new Promise<never>((_resolve, reject) => {
@@ -337,7 +344,11 @@ async function oneAttempt<T>(
   }, timeoutMs);
 
   try {
-    return await Promise.race([Promise.resolve(operation(controller.signal)), deadline]);
+    return await Promise.race([
+      Promise.resolve(operation(controller.signal)),
+      deadline,
+      cancellation,
+    ]);
   } catch (error) {
     if (timedOut) throw new SupabaseRequestTimeoutError(timeoutMs);
     if (externalSignal?.aborted) throw abortError();
