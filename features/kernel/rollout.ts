@@ -3,7 +3,10 @@ export const rollout = Object.freeze({
   atomicProgramWriter: process.env.EXPO_PUBLIC_AP03_ATOMIC_WRITER === 'true',
 });
 
-export class RolloutDisabledError extends Error {}
+export class RolloutDisabledError extends Error {
+  readonly code = 'ROLLOUT_DISABLED';
+  readonly name = 'RolloutDisabledError';
+}
 
 export function requireRollout(enabled: boolean, capability: string): void {
   if (!enabled) {

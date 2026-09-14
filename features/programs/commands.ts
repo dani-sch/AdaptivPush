@@ -17,7 +17,7 @@ import {
   getOrCreatePendingProgramExerciseRevision,
 } from './revisionStore';
 import type { OperationId } from '../kernel/operationId';
-import { reportSupabaseFailure, supabaseUserMessage } from '@/utils/supabaseResilience';
+import { classifySupabaseError, reportSupabaseFailure, supabaseUserMessage } from '@/utils/supabaseResilience';
 
 function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -60,7 +60,7 @@ export async function installProgram(
       return { status: 'conflict', message: 'Your active program changed on another device. Refresh and try again.', activeProgramId: null };
     }
     reportSupabaseFailure('program.install', error);
-    return { status: 'unavailable', message: supabaseUserMessage(error, 'Program installation is unavailable. Try again.') };
+    return { status: 'unavailable', failure: classifySupabaseError(error), message: supabaseUserMessage(error, 'Program installation could not be confirmed. Keep your inputs and retry to reconcile the same request.') };
   }
 }
 
@@ -111,7 +111,7 @@ export async function executeProgramExerciseRevision(
       return { status: 'conflict', message: 'Your active program changed on another device. Refresh and try again.' };
     }
     reportSupabaseFailure('program.revise_exercise', error);
-    return { status: 'unavailable', message: supabaseUserMessage(error, 'The future program update is unavailable. Try again.') };
+    return { status: 'unavailable', failure: classifySupabaseError(error), message: supabaseUserMessage(error, 'The future program update could not be confirmed. Keep your draft and retry to reconcile the same request.') };
   }
 }
 

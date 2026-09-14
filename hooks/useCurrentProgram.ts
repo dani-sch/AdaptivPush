@@ -23,6 +23,7 @@ import { programRepository } from '@/features/programs/repository';
 import { isMissingRelationOrColumnError } from '@/utils/profilePreferences';
 import {
     classifySupabaseError,
+    OperationFailureError,
     reportSupabaseFailure,
     runSupabaseOperation,
     supabaseUserMessage,
@@ -760,8 +761,9 @@ function useCurrentProgramState() {
                     replacementExerciseId: newExerciseId,
                     includeCurrentDay: scope === 'selected_and_future',
                 });
-                if (outcome.status === 'validation') throw new Error(outcome.errors.join(' '));
-                if (outcome.status === 'conflict' || outcome.status === 'unavailable') throw new Error(outcome.message);
+                if (outcome.status === 'validation') throw new OperationFailureError({ category: 'validation', retryable: false }, outcome.errors.join(' '));
+                if (outcome.status === 'conflict') throw new OperationFailureError({ category: 'conflict', retryable: false }, outcome.message);
+                if (outcome.status === 'unavailable') throw new OperationFailureError(outcome.failure, outcome.message);
                 await refresh();
                 return outcome;
             }

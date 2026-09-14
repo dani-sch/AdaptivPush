@@ -21,7 +21,7 @@ import { useCurrentProgram } from "../../hooks/useCurrentProgram";
 import { getReadinessModifier } from "../../utils/progressionEngine";
 import { supabase } from "../../utils/supabase";
 import { computeCyclePhase } from "../../utils/cyclePhase";
-import { workoutRouteParams } from "@/features/workouts/routeResolution";
+import { workoutEntryIssue, workoutRouteParams } from "@/features/workouts/routeResolution";
 import {
   classifySupabaseError,
   reportSupabaseFailure,
@@ -63,11 +63,13 @@ const HeaderDateBlock: React.FC<{ styles: ReturnType<typeof createStyles> }> = (
 // next workout card section
 
 const NextWorkoutSection: React.FC<{
+  entryIssue?: string | null;
   workout?: WorkoutSummary;
   onPressStart?: () => void;
-}> = ({ workout, onPressStart }) => {
+}> = ({ workout, onPressStart, entryIssue }) => {
   return (
     <NextWorkoutCard
+      entryIssue={entryIssue}
       workout={workout}
       onPressStart={onPressStart}
       onPressCalendar={() => console.log("Calendar pressed")}
@@ -732,7 +734,7 @@ export default function HomeScreen() {
     : undefined;
 
   const handleStartWorkout = () => {
-    if (!program || !nextWorkout) return;
+    if (!program || !nextWorkout || workoutEntryIssue(program, nextWorkout)) return;
     router.push({ pathname: "/next-workout", params: workoutRouteParams(program, nextWorkout) });
   };
 
@@ -815,6 +817,7 @@ export default function HomeScreen() {
           </>
         ) : (
           <NextWorkoutSection
+            entryIssue={workoutEntryIssue(program, nextWorkout ?? null)}
             workout={nextWorkoutSummary}
             onPressStart={handleStartWorkout}
           />

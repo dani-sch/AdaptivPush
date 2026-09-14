@@ -73,6 +73,7 @@ test('future revision failure leaves a distinct unavailable outcome', async () =
   );
   assert.deepEqual(outcome, {
     status: 'unavailable',
+    failure: { category: 'offline', retryable: true, status: undefined, code: undefined },
     message: 'You appear to be offline. Check your connection and try again.',
   });
 });

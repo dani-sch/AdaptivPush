@@ -10,6 +10,22 @@ export interface WorkoutRouteTarget {
   workoutId?: string;
 }
 
+/** Shared by previews and entry; a readable legacy plan is not yet startable. */
+export function workoutEntryIssue(program: CurrentProgram | null, workout: ProgramWorkout | null): string | null {
+  if (!program || !workout) return 'This workout no longer matches your active plan. Return to Plan and refresh.';
+  if (!program.currentRevisionId || !workout.prescriptionRevisionId || !workout.stableDayId
+    || workout.exercises.some((exercise) => !exercise.stableSlotId)) {
+    return 'This plan is available to view, but starting workouts needs the program service update. Your existing program and history are preserved.';
+  }
+  if (workout.prescriptionRevisionId !== program.currentRevisionId) {
+    return 'This workout belongs to an earlier program revision. Return to Plan and refresh.';
+  }
+  if (workout.exercises.length === 0 || workout.exercises.some((exercise) => !exercise.exerciseId)) {
+    return 'This workout has an incomplete exercise prescription. Return to Plan and refresh.';
+  }
+  return null;
+}
+
 export function workoutRouteParams(program: CurrentProgram, workout: ProgramWorkout) {
   return {
     programId: program.id,

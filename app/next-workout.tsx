@@ -25,7 +25,8 @@ import {
   type WorkoutRouteTarget,
 } from "@/features/workouts/routeResolution";
 import { workoutRepository } from "@/features/workouts/repository";
-import { reportSupabaseFailure } from "@/utils/supabaseResilience";
+import { reportSupabaseFailure, supabaseUserMessage } from "@/utils/supabaseResilience";
+import { workoutEntryIssue } from '@/features/workouts/routeResolution';
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -190,7 +191,7 @@ export default function NextWorkoutScreen() {
     stableDayId?: string;
     programDayId?: string;
   }>();
-  const { program, loading, refresh, swapExercise } = useCurrentProgram();
+  const { program, loading, refresh, swapExercise, failureCategory } = useCurrentProgram();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const routeTarget = useMemo<WorkoutRouteTarget>(() => ({
@@ -309,8 +310,11 @@ export default function NextWorkoutScreen() {
         }
         if (loading) return;
         settled = true;
-        if (!program || !programWorkout || !programWorkout.prescriptionRevisionId || !programWorkout.stableDayId) {
-          throw new Error('This requested workout is stale, malformed, or no longer belongs to the active prescription.');
+        if (failureCategory) throw new Error(supabaseUserMessage({ category: failureCategory, retryable: false }, 'The plan could not be loaded. Check your connection and refresh.'));
+        const entryIssue = workoutEntryIssue(program, programWorkout);
+        if (entryIssue) throw new Error(entryIssue);
+        if (!program || !programWorkout?.prescriptionRevisionId || !programWorkout.stableDayId) {
+          throw new Error('Return to Plan and select a current workout.');
         }
         if (programWorkout.exercises.length === 0) {
           throw new Error('This requested workout has no exercise prescription. Refresh the plan and try again.');
@@ -370,7 +374,7 @@ export default function NextWorkoutScreen() {
       }
     })();
     return () => { cancelled = true; };
-  }, [authLoading, loading, ownerId, program, programWorkout, resolutionAttempt, resolutionTargetKey, routeTarget]);
+  }, [authLoading, failureCategory, loading, ownerId, program, programWorkout, resolutionAttempt, resolutionTargetKey, routeTarget]);
 
   const availability = workoutAvailability({
     authLoading,
