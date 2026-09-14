@@ -220,7 +220,7 @@ BEGIN
       AND (pd.week_number, pd.order_in_week, pd.day_index) >=
           (v_source_day.week_number, v_source_day.order_in_week, v_source_day.day_index)
       AND (v_include_current_day OR pd.stable_day_id <> v_current_stable_day_id)
-      AND NOT EXISTS (SELECT 1 FROM public.workout_sessions ws WHERE ws.program_day_id = pd.id)
+      AND NOT EXISTS (SELECT 1 FROM public.workout_sessions ws JOIN public.program_days completed_day ON completed_day.id = ws.program_day_id WHERE completed_day.program_id = v_program_id AND completed_day.stable_day_id = pd.stable_day_id)
   ) THEN
     RAISE EXCEPTION 'invalid_input: no eligible future uncompleted prescriptions';
   END IF;
@@ -262,51 +262,51 @@ BEGIN
           AND (v_day.week_number, v_day.order_in_week, v_day.day_index) >=
               (v_source_day.week_number, v_source_day.order_in_week, v_source_day.day_index)
           AND (v_include_current_day OR v_day.stable_day_id <> v_current_stable_day_id)
-          AND NOT EXISTS (SELECT 1 FROM public.workout_sessions ws WHERE ws.program_day_id = v_day.id)
+          AND NOT EXISTS (SELECT 1 FROM public.workout_sessions ws JOIN public.program_days completed_day ON completed_day.id = ws.program_day_id WHERE completed_day.program_id = v_program_id AND completed_day.stable_day_id = v_day.stable_day_id)
         THEN v_replacement_exercise_id ELSE pde.exercise_id END,
       pde.position, pde.set_count, pde.rep_range_min, pde.rep_range_max, pde.target_rpe,
       CASE WHEN pde.exercise_id = v_original_exercise_id
           AND (v_day.week_number, v_day.order_in_week, v_day.day_index) >=
               (v_source_day.week_number, v_source_day.order_in_week, v_source_day.day_index)
           AND (v_include_current_day OR v_day.stable_day_id <> v_current_stable_day_id)
-          AND NOT EXISTS (SELECT 1 FROM public.workout_sessions ws WHERE ws.program_day_id = v_day.id)
+          AND NOT EXISTS (SELECT 1 FROM public.workout_sessions ws JOIN public.program_days completed_day ON completed_day.id = ws.program_day_id WHERE completed_day.program_id = v_program_id AND completed_day.stable_day_id = v_day.stable_day_id)
         THEN NULL ELSE pde.suggested_weight_lb END,
       CASE WHEN pde.exercise_id = v_original_exercise_id
           AND (v_day.week_number, v_day.order_in_week, v_day.day_index) >=
               (v_source_day.week_number, v_source_day.order_in_week, v_source_day.day_index)
           AND (v_include_current_day OR v_day.stable_day_id <> v_current_stable_day_id)
-          AND NOT EXISTS (SELECT 1 FROM public.workout_sessions ws WHERE ws.program_day_id = v_day.id)
+          AND NOT EXISTS (SELECT 1 FROM public.workout_sessions ws JOIN public.program_days completed_day ON completed_day.id = ws.program_day_id WHERE completed_day.program_id = v_program_id AND completed_day.stable_day_id = v_day.stable_day_id)
         THEN NULL ELSE pde.per_set_weights_lb END,
       pde.notes, pde.stable_slot_id, v_successor_revision_id,
       CASE WHEN pde.exercise_id = v_original_exercise_id
           AND (v_day.week_number, v_day.order_in_week, v_day.day_index) >=
               (v_source_day.week_number, v_source_day.order_in_week, v_source_day.day_index)
           AND (v_include_current_day OR v_day.stable_day_id <> v_current_stable_day_id)
-          AND NOT EXISTS (SELECT 1 FROM public.workout_sessions ws WHERE ws.program_day_id = v_day.id)
+          AND NOT EXISTS (SELECT 1 FROM public.workout_sessions ws JOIN public.program_days completed_day ON completed_day.id = ws.program_day_id WHERE completed_day.program_id = v_program_id AND completed_day.stable_day_id = v_day.stable_day_id)
         THEN 'unknown' ELSE pde.load_kind END,
       CASE WHEN pde.exercise_id = v_original_exercise_id
           AND (v_day.week_number, v_day.order_in_week, v_day.day_index) >=
               (v_source_day.week_number, v_source_day.order_in_week, v_source_day.day_index)
           AND (v_include_current_day OR v_day.stable_day_id <> v_current_stable_day_id)
-          AND NOT EXISTS (SELECT 1 FROM public.workout_sessions ws WHERE ws.program_day_id = v_day.id)
+          AND NOT EXISTS (SELECT 1 FROM public.workout_sessions ws JOIN public.program_days completed_day ON completed_day.id = ws.program_day_id WHERE completed_day.program_id = v_program_id AND completed_day.stable_day_id = v_day.stable_day_id)
         THEN 'none' ELSE pde.load_unit END,
       CASE WHEN pde.exercise_id = v_original_exercise_id
           AND (v_day.week_number, v_day.order_in_week, v_day.day_index) >=
               (v_source_day.week_number, v_source_day.order_in_week, v_source_day.day_index)
           AND (v_include_current_day OR v_day.stable_day_id <> v_current_stable_day_id)
-          AND NOT EXISTS (SELECT 1 FROM public.workout_sessions ws WHERE ws.program_day_id = v_day.id)
+          AND NOT EXISTS (SELECT 1 FROM public.workout_sessions ws JOIN public.program_days completed_day ON completed_day.id = ws.program_day_id WHERE completed_day.program_id = v_program_id AND completed_day.stable_day_id = v_day.stable_day_id)
         THEN 'unknown' ELSE pde.load_side END,
       CASE WHEN pde.exercise_id = v_original_exercise_id
           AND (v_day.week_number, v_day.order_in_week, v_day.day_index) >=
               (v_source_day.week_number, v_source_day.order_in_week, v_source_day.day_index)
           AND (v_include_current_day OR v_day.stable_day_id <> v_current_stable_day_id)
-          AND NOT EXISTS (SELECT 1 FROM public.workout_sessions ws WHERE ws.program_day_id = v_day.id)
+          AND NOT EXISTS (SELECT 1 FROM public.workout_sessions ws JOIN public.program_days completed_day ON completed_day.id = ws.program_day_id WHERE completed_day.program_id = v_program_id AND completed_day.stable_day_id = v_day.stable_day_id)
         THEN pde.exercise_id ELSE pde.replaces_exercise_id END,
       CASE WHEN pde.exercise_id = v_original_exercise_id
           AND (v_day.week_number, v_day.order_in_week, v_day.day_index) >=
               (v_source_day.week_number, v_source_day.order_in_week, v_source_day.day_index)
           AND (v_include_current_day OR v_day.stable_day_id <> v_current_stable_day_id)
-          AND NOT EXISTS (SELECT 1 FROM public.workout_sessions ws WHERE ws.program_day_id = v_day.id)
+          AND NOT EXISTS (SELECT 1 FROM public.workout_sessions ws JOIN public.program_days completed_day ON completed_day.id = ws.program_day_id WHERE completed_day.program_id = v_program_id AND completed_day.stable_day_id = v_day.stable_day_id)
         THEN true ELSE pde.requires_recalibration END
     FROM public.program_day_exercises pde
     WHERE pde.program_day_id = v_day.id AND pde.program_revision_id = v_expected_revision_id;
