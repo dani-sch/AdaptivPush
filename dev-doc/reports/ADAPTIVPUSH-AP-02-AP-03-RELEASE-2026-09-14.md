@@ -49,7 +49,7 @@ Code commits `0f498bc` and `d2d4d09` preserve sanitized typed failures across
 repository/command/UI boundaries, distinguish disabled/schema/auth/conflict/
 validation/service outcomes, retain unsaved inputs and uncertain submissions,
 and share one strict workout-entry identity check across Home, Plan preview and
-entry. Matching owner-scoped drafts still recover offline. No IDs are invented
+entry. Follow-up `4f0b394` also reports restore session expiry instead of silently returning. Matching owner-scoped drafts still recover offline. No IDs are invented
 and no legacy multiwrite fallback was added. The repository factory allows the
 actual command code to be tested against synthetic HTTP and the local backend.
 
@@ -68,7 +68,7 @@ Expo 57 skips reset-cache under CI; the launcher now clears CI, exports with
 | `scripts/verifyLegacyMigration.ts` | Separate AP-01-only Supabase stack, real pre-migration rows, exact two reviewed migrations; blocked legacy preview becomes a valid startable draft from database identities; V1 migration provenance and approximate archive preserved; archive/restart succeeds in rolled-back transaction |
 | Existing manual fixtures | A authenticates through LAN and reads 3 programs; B authenticates and reads 0; preserved |
 | Reachability | LAN interface `192.168.2.49:54330` HTTP health and authenticated flows pass from workstation; separate Docker network also reaches health. Physical iPhone network path awaits Safari check |
-| Integrator | Application/tests/types/lint reverified in `C:\workout-app\AdaptivPush-integrator`; code/tooling merge `615765d`. Final documentation binding is in external closeout manifest |
+| Integrator | Application/tests/types/lint reverified in `C:\workout-app\AdaptivPush-integrator`; code/tooling/auth merge `a7d23dc`. Final documentation binding is in external closeout manifest |
 
 These tests do not exercise physical UI interactions or claim a generated-form,
 custom-form, native accessibility or signed-build pass. The legacy replay uses
@@ -88,8 +88,8 @@ Standalone iOS JavaScript exports (no native/signing claim), source `4f0b394`:
 
 | Variant | Actual bundled flags | SHA-256 |
 |---|---|---|
-| Enabled | true / true | `EAEA59C56E7E917136718462D69E4C441D1C84D70073DAF34CFD41BA06902C32` |
-| Disabled | false / false | `45C7D37C532F15AF649A74F8A054EFE57ECF395D11CFC0DE057B36A2D0D843C0` |
+| Enabled | true / true | `EE5C2EFF9226AB6FE4ABCCF6DBD9F007866673CA92E303AA78273E4E71107CFE` |
+| Disabled | false / false | `17EAB715BE26662CAD9CADECBACF63AF54258BFC8A26FF33D737B3CB20D5C419` |
 
 Logs, exports and per-variant `qa-binding.json` are under the existing external
 evidence directory's `ios-remediation` subdirectory. Fault controls remain
