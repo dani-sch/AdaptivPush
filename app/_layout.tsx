@@ -7,6 +7,9 @@ import { Stack, router, useRootNavigationState, useSegments } from "expo-router"
 import * as Notifications from "expo-notifications";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
+import { rollout } from '@/features/kernel/rollout';
 import "react-native-reanimated";
 
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -30,6 +33,21 @@ Notifications.setNotificationHandler({
 });
 
 function RootLayoutInner() {
+  useEffect(() => {
+    if (!__DEV__ || !process.env.EXPO_PUBLIC_AP_QA_BUILD) return;
+    // Opt-in local QA evidence only: never log credentials, sessions or user data.
+    console.info('[AP iOS QA runtime]', {
+      build: process.env.EXPO_PUBLIC_AP_QA_BUILD,
+      platform: Platform.OS,
+      osVersion: Platform.Version,
+      expoGoVersion: Constants.expoVersion,
+      nativeVersion: Constants.nativeAppVersion,
+      nativeBuild: Constants.nativeBuildVersion,
+      sdk: Constants.expoConfig?.sdkVersion,
+      backend: new URL(process.env.EXPO_PUBLIC_SUPABASE_URL!).host,
+      ...rollout,
+    });
+  }, []);
   const colorScheme = useColorScheme();
   const navigationState = useRootNavigationState();
   const segments = useSegments();
