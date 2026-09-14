@@ -113,9 +113,10 @@ export default function ArchivedProgramsScreen() {
         mode: 'exact' | 'restart' | 'legacy_approximate',
     ) => {
         try {
-            const { data: { session } } = await supabase.auth.getSession();
+            const { data: { session }, error: authError } = await supabase.auth.getSession();
+            if (authError) throw authError;
             const user = session?.user;
-            if (!user) return;
+            if (!user) throw new Error('Not signed in');
             const { data: active, error: activeError } = await supabase
                 .from('programs')
                 .select('id')
