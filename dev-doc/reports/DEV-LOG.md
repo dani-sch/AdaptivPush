@@ -1,5 +1,17 @@
 # AdaptivPush — Development Log
 
+## 2026-09-14 — iOS platform and handoff readiness correction
+
+User review identified that the AP-02/AP-03 handoff incorrectly centered Android
+despite the requested iOS focus. Corrected the manual matrix, current state,
+task board and execution register to require iPhone, VoiceOver, Dynamic Type
+and iOS lifecycle coverage. The release report now explicitly supersedes the
+premature pre-QA-complete claim while preserving earlier build evidence.
+Signed iOS candidate preparation, flag variants, installation and backend
+reachability remain open. Android testing is supplementary and does not gate
+this iOS release. Documentation only; no new build/device pass, production
+migration or writer enablement is claimed.
+
 
 ## 2026-09-14 — Final AP-02/AP-03 pre-QA candidate
 

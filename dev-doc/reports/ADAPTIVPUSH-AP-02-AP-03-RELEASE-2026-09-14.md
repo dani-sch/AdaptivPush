@@ -1,5 +1,26 @@
 # AP-02/AP-03 durable-record release packet - 2026-09-14
 
+## Platform correction — September 14, following user review
+
+**iOS-FIRST — native candidate preparation remains open; RELEASE BLOCKED.**
+The earlier final pre-QA result below incorrectly promoted available Android
+build tooling into the release target. It is superseded wherever it claims
+pre-QA completion, a ready user handoff, an Android device requirement, or
+conditional iOS scope. The user requires an iOS focus.
+
+Shared-code, SQL and Metro checks remain valid evidence. Android APKs remain
+supplementary build evidence. An iOS Metro export is not a signed native build.
+No iOS native artifact, signing/install binding, reachable nonproduction backend
+route or physical-iPhone acceptance result is established by this packet.
+Prepare those dependencies and both flag variants before handing off the
+[corrected iOS matrix](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-MANUAL-QA-2026-09-14.md).
+VoiceOver, Dynamic Type, Reduce Motion and iOS recovery/lifecycle checks are
+required; no Android test is required to close this iOS release packet.
+Production migration and writer enablement remain gated as before.
+
+The original results below are retained as dated evidence, subject to this
+correction. The current next action is iOS candidate preparation.
+
 ## Final pre-QA result — September 14
 
 **INTEGRATION VERIFIED — RELEASE BLOCKED. Agent-executable pre-QA work is complete.**
