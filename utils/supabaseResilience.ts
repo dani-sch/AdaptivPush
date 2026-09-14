@@ -150,6 +150,7 @@ export function classifySupabaseError(error: unknown): SupabaseFailure {
 
   if (
     combined.includes('network request failed') ||
+    combined.includes('network unavailable') ||
     combined.includes('failed to fetch') ||
     combined.includes('network is offline') ||
     combined.includes('internet connection') ||
@@ -213,6 +214,13 @@ export function loginErrorMessage(error: unknown): string {
   }
 
   return supabaseUserMessage(error, 'Unable to sign in right now. Please try again.');
+}
+
+export function supabaseSaveFailureMessage(error: unknown, completedSteps = 0): string {
+  const base = supabaseUserMessage(error, 'Unable to save your changes. Please try again.');
+  return completedSteps > 0
+    ? `${base} Some settings may already have saved; retry to reconcile them.`
+    : `${base} Your unsaved changes are still here.`;
 }
 
 export interface SupabaseDiagnostic {
@@ -332,7 +340,7 @@ async function oneAttempt<T>(
   }
 }
 
-export async function runSupabaseOperation<T extends ResultWithError>(
+export async function runSupabaseOperation<T>(
   operation: (signal: AbortSignal) => PromiseLike<T>,
   options: SupabaseOperationOptions,
 ): Promise<T> {
@@ -349,10 +357,11 @@ export async function runSupabaseOperation<T extends ResultWithError>(
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       const result = await oneAttempt(operation, timeoutMs, options.signal);
-      if (!result.error || !classifySupabaseError(result.error).retryable || attempt === maxAttempts) {
+      const resultError = (result as ResultWithError).error;
+      if (!resultError || !classifySupabaseError(resultError).retryable || attempt === maxAttempts) {
         return result;
       }
-      reportSupabaseFailure(`${options.operation}:attempt-${attempt}`, result.error);
+      reportSupabaseFailure(`${options.operation}:attempt-${attempt}`, resultError);
     } catch (error) {
       const failure = classifySupabaseError(error);
       if (!canRetry || !failure.retryable || attempt === maxAttempts) throw error;
@@ -394,8 +403,12 @@ export async function resilientSupabaseFetch(
   const timeoutMs = fetchTimeout(input, init);
   const controller = new AbortController();
   let timedOut = false;
+  const inputSignal =
+    typeof Request !== 'undefined' && input instanceof Request ? input.signal : undefined;
+  const externalSignal = init?.signal ?? inputSignal;
   const forwardAbort = () => controller.abort();
-  init?.signal?.addEventListener('abort', forwardAbort, { once: true });
+  if (externalSignal?.aborted) controller.abort();
+  externalSignal?.addEventListener('abort', forwardAbort, { once: true });
   const timer = setTimeout(() => {
     timedOut = true;
     controller.abort();
@@ -408,6 +421,6 @@ export async function resilientSupabaseFetch(
     throw error;
   } finally {
     clearTimeout(timer);
-    init?.signal?.removeEventListener('abort', forwardAbort);
+    externalSignal?.removeEventListener('abort', forwardAbort);
   }
 }

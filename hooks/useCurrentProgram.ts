@@ -1,4 +1,14 @@
-import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import {
+    createContext,
+    createElement,
+    type ReactNode,
+    useContext,
+    useEffect,
+    useMemo,
+    useState,
+    useCallback,
+    useRef,
+} from 'react';
 import { supabase } from "@/utils/supabase";
 import { notifyDeloadWeek } from '@/utils/notifications';
 import type { CurrentProgram, ProgramWorkout, WorkoutExercise } from '@/types/program';
@@ -10,6 +20,17 @@ import { isCatalogExerciseId } from '@/features/catalog/contracts';
 import { archiveProgram, reviseProgramExercise } from '@/features/programs/commands';
 import { programRepository } from '@/features/programs/repository';
 import { isMissingRelationOrColumnError } from '@/utils/profilePreferences';
+import {
+    classifySupabaseError,
+    reportSupabaseFailure,
+    runSupabaseOperation,
+    supabaseUserMessage,
+    type SupabaseFailureCategory,
+} from '@/utils/supabaseResilience';
+import {
+    canApplyOwnerScopedResult,
+    programStateAfterFailure,
+} from '@/features/programs/availability';
 
 type SwapArgs = {
     exerciseId: string;
@@ -89,42 +110,85 @@ function todayISODate() {
 }
 
 async function requireUserId() {
-    const { data, error } = await supabase.auth.getUser();
+    const { data, error } = await supabase.auth.getSession();
     if (error) throw error;
-    if (!data.user) throw new Error('Not signed in');
-    return data.user.id;
+    if (!data.session?.user) throw new Error('Not signed in');
+    return data.session.user.id;
 }
 
-export function useCurrentProgram() {
+function useCurrentProgramState() {
     const [program, setProgram] = useState<CurrentProgram | null>(null);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [unavailable, setUnavailable] = useState(false);
+    const [failureCategory, setFailureCategory] = useState<SupabaseFailureCategory | null>(null);
+    const [actionError, setActionError] = useState<string | null>(null);
 
     const prevWeekRef = useRef<number>(0);
     const applyProgressionRef = useRef<(() => Promise<void>) | undefined>(undefined);
+    const programRef = useRef<CurrentProgram | null>(null);
+    const ownerIdRef = useRef<string | null>(null);
+    const refreshControllerRef = useRef<AbortController | null>(null);
+    const refreshGenerationRef = useRef(0);
+
+    useEffect(() => {
+        programRef.current = program;
+    }, [program]);
 
     const refresh = useCallback(async () => {
-        setLoading(true);
+        const generation = refreshGenerationRef.current + 1;
+        refreshGenerationRef.current = generation;
+        refreshControllerRef.current?.abort();
+        const controller = new AbortController();
+        refreshControllerRef.current = controller;
+        const hadProgram = programRef.current !== null;
+        setLoading(!hadProgram);
+        setRefreshing(hadProgram);
         try {
             const {
-                data: { user },
+                data: { session },
                 error: authErr,
-            } = await supabase.auth.getUser();
+            } = await runSupabaseOperation(() => supabase.auth.getSession(), {
+                kind: 'auth',
+                operation: 'program.local_session',
+                signal: controller.signal,
+            });
 
             if (authErr) throw authErr;
+            const user = session?.user;
             if (!user) {
+                ownerIdRef.current = null;
                 setProgram(null);
+                programRef.current = null;
+                setUnavailable(false);
+                setFailureCategory(null);
                 return;
+            }
+            const requestOwnerId = user.id;
+            if (ownerIdRef.current !== requestOwnerId) {
+                ownerIdRef.current = requestOwnerId;
+                programRef.current = null;
+                setProgram(null);
+                prevWeekRef.current = 0;
             }
 
             // Get active program
-            const currentProgramResult = await supabase
-                .from('programs')
-                .select('id,name,goal,duration_weeks,start_date,swap_interval_weeks,current_revision,current_revision_id')
-                .eq('user_id', user.id)
-                .eq('is_active', true)
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .maybeSingle<DbProgram>();
+            const currentProgramResult = await runSupabaseOperation(
+                (signal) => supabase
+                    .from('programs')
+                    .select('id,name,goal,duration_weeks,start_date,swap_interval_weeks,current_revision,current_revision_id')
+                    .eq('user_id', requestOwnerId)
+                    .eq('is_active', true)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .abortSignal(signal)
+                    .maybeSingle<DbProgram>(),
+                {
+                    kind: 'read',
+                    operation: 'program.active',
+                    signal: controller.signal,
+                },
+            );
 
             let prog = currentProgramResult.data;
             let progErr = currentProgramResult.error;
@@ -135,14 +199,22 @@ export function useCurrentProgram() {
                 progErr &&
                 isMissingRelationOrColumnError(progErr, 'programs', 'current_revision')
             ) {
-                const legacyProgramResult = await supabase
-                    .from('programs')
-                    .select('id,name,goal,duration_weeks,start_date,swap_interval_weeks')
-                    .eq('user_id', user.id)
-                    .eq('is_active', true)
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .maybeSingle<Omit<DbProgram, 'current_revision' | 'current_revision_id'>>();
+                const legacyProgramResult = await runSupabaseOperation(
+                    (signal) => supabase
+                        .from('programs')
+                        .select('id,name,goal,duration_weeks,start_date,swap_interval_weeks')
+                        .eq('user_id', requestOwnerId)
+                        .eq('is_active', true)
+                        .order('created_at', { ascending: false })
+                        .limit(1)
+                        .abortSignal(signal)
+                        .maybeSingle<Omit<DbProgram, 'current_revision' | 'current_revision_id'>>(),
+                    {
+                        kind: 'read',
+                        operation: 'program.active_legacy',
+                        signal: controller.signal,
+                    },
+                );
 
                 prog = legacyProgramResult.data
                     ? {
@@ -156,7 +228,12 @@ export function useCurrentProgram() {
 
             if (progErr) throw progErr;
             if (!prog) {
-                setProgram(null);
+                if (canApplyOwnerScopedResult(requestOwnerId, ownerIdRef.current, controller.signal.aborted)) {
+                    setProgram(null);
+                    programRef.current = null;
+                    setUnavailable(false);
+                    setFailureCategory(null);
+                }
                 return;
             }
 
@@ -202,10 +279,18 @@ export function useCurrentProgram() {
             if (prog.current_revision_id) {
                 currentDaysQuery = currentDaysQuery.eq('program_revision_id', prog.current_revision_id);
             }
-            const currentDaysResult = await currentDaysQuery
-                .order('day_index', { ascending: true })
-                .order('order_in_week', { ascending: true })
-                .returns<DbProgramDay[]>();
+            const currentDaysResult = await runSupabaseOperation(
+                (signal) => currentDaysQuery
+                    .order('day_index', { ascending: true })
+                    .order('order_in_week', { ascending: true })
+                    .abortSignal(signal)
+                    .returns<DbProgramDay[]>(),
+                {
+                    kind: 'read',
+                    operation: 'program.current_days',
+                    signal: controller.signal,
+                },
+            );
 
             let days = currentDaysResult.data;
             let daysErr = currentDaysResult.error;
@@ -214,9 +299,10 @@ export function useCurrentProgram() {
                 daysErr &&
                 isMissingRelationOrColumnError(daysErr, 'program_days', 'program_revision_id')
             ) {
-                const legacyDaysResult = await supabase
-                    .from('program_days')
-                    .select(
+                const legacyDaysResult = await runSupabaseOperation(
+                    (signal) => supabase
+                        .from('program_days')
+                        .select(
                         `
           id,
           week_number,
@@ -244,12 +330,19 @@ export function useCurrentProgram() {
             )
           )
         `,
-                    )
-                    .eq('program_id', prog.id)
-                    .eq('week_number', currentWeek)
-                    .order('day_index', { ascending: true })
-                    .order('order_in_week', { ascending: true })
-                    .returns<DbProgramDay[]>();
+                        )
+                        .eq('program_id', prog.id)
+                        .eq('week_number', currentWeek)
+                        .order('day_index', { ascending: true })
+                        .order('order_in_week', { ascending: true })
+                        .abortSignal(signal)
+                        .returns<DbProgramDay[]>(),
+                    {
+                        kind: 'read',
+                        operation: 'program.current_days_legacy',
+                        signal: controller.signal,
+                    },
+                );
 
                 days = legacyDaysResult.data;
                 daysErr = legacyDaysResult.error;
@@ -261,24 +354,40 @@ export function useCurrentProgram() {
             let completionDays = (days ?? []).map((d) => ({ id: d.id, stable_day_id: d.stable_day_id }));
             const stableDayIds = completionDays.flatMap((day) => day.stable_day_id ? [day.stable_day_id] : []);
             if (prog.current_revision_id && stableDayIds.length > 0) {
-                const lineageDaysResult = await supabase
-                    .from('program_days')
-                    .select('id,stable_day_id')
-                    .eq('program_id', prog.id)
-                    .in('stable_day_id', stableDayIds)
-                    .returns<Array<{ id: string; stable_day_id: string }>>();
+                const lineageDaysResult = await runSupabaseOperation(
+                    (signal) => supabase
+                        .from('program_days')
+                        .select('id,stable_day_id')
+                        .eq('program_id', prog.id)
+                        .in('stable_day_id', stableDayIds)
+                        .abortSignal(signal)
+                        .returns<Array<{ id: string; stable_day_id: string }>>(),
+                    {
+                        kind: 'read',
+                        operation: 'program.day_lineage',
+                        signal: controller.signal,
+                    },
+                );
                 if (!lineageDaysResult.error && lineageDaysResult.data) completionDays = lineageDaysResult.data;
             }
             const dayIds = completionDays.map((d) => d.id);
             let completedDayIds = new Set<string>();
             if (dayIds.length > 0) {
-                const currentSessionsResult = await supabase
-                    .from('workout_sessions')
-                    .select('program_day_id,completion_class,lifecycle')
-                    .eq('user_id', user.id)
-                    .in('program_day_id', dayIds)
-                    .eq('lifecycle', 'finalized')
-                    .in('completion_class', ['complete', 'reduced']);
+                const currentSessionsResult = await runSupabaseOperation(
+                    (signal) => supabase
+                        .from('workout_sessions')
+                        .select('program_day_id,completion_class,lifecycle')
+                        .eq('user_id', requestOwnerId)
+                        .in('program_day_id', dayIds)
+                        .eq('lifecycle', 'finalized')
+                        .in('completion_class', ['complete', 'reduced'])
+                        .abortSignal(signal),
+                    {
+                        kind: 'read',
+                        operation: 'program.completed_sessions',
+                        signal: controller.signal,
+                    },
+                );
 
                 let sessions: { program_day_id: string }[] | null = currentSessionsResult.data;
                 let sessionsErr = currentSessionsResult.error;
@@ -287,11 +396,19 @@ export function useCurrentProgram() {
                     sessionsErr &&
                     isMissingRelationOrColumnError(sessionsErr, 'workout_sessions', 'lifecycle')
                 ) {
-                    const legacySessionsResult = await supabase
-                        .from('workout_sessions')
-                        .select('program_day_id')
-                        .eq('user_id', user.id)
-                        .in('program_day_id', dayIds);
+                    const legacySessionsResult = await runSupabaseOperation(
+                        (signal) => supabase
+                            .from('workout_sessions')
+                            .select('program_day_id')
+                            .eq('user_id', requestOwnerId)
+                            .in('program_day_id', dayIds)
+                            .abortSignal(signal),
+                        {
+                            kind: 'read',
+                            operation: 'program.completed_sessions_legacy',
+                            signal: controller.signal,
+                        },
+                    );
 
                     sessions = legacySessionsResult.data;
                     sessionsErr = legacySessionsResult.error;
@@ -369,7 +486,13 @@ export function useCurrentProgram() {
                 workouts,
             };
 
+            if (!canApplyOwnerScopedResult(requestOwnerId, ownerIdRef.current, controller.signal.aborted)) {
+                return;
+            }
             setProgram(mapped);
+            programRef.current = mapped;
+            setUnavailable(false);
+            setFailureCategory(null);
 
             // Trigger progression when week advances
             if (mapped.currentWeek > prevWeekRef.current && prevWeekRef.current !== 0) {
@@ -377,15 +500,40 @@ export function useCurrentProgram() {
             }
             prevWeekRef.current = mapped.currentWeek;
         } catch (e) {
-            console.error('useCurrentProgram refresh error', e);
-            setProgram(null);
+            const failure = classifySupabaseError(e);
+            if (failure.category === 'cancelled' || generation !== refreshGenerationRef.current) return;
+            reportSupabaseFailure('program.refresh', e);
+            const failedState = programStateAfterFailure(programRef.current, failure.category);
+            setProgram(failedState.program);
+            setUnavailable(failedState.unavailable);
+            setFailureCategory(failedState.failureCategory);
         } finally {
-            setLoading(false);
+            if (generation === refreshGenerationRef.current) {
+                setLoading(false);
+                setRefreshing(false);
+                if (refreshControllerRef.current === controller) refreshControllerRef.current = null;
+            }
         }
     }, []);
 
     useEffect(() => {
-        refresh();
+        void refresh();
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            const nextOwnerId = session?.user.id ?? null;
+            if (nextOwnerId === ownerIdRef.current) return;
+            refreshControllerRef.current?.abort();
+            ownerIdRef.current = nextOwnerId;
+            programRef.current = null;
+            setProgram(null);
+            setUnavailable(false);
+            setFailureCategory(null);
+            prevWeekRef.current = 0;
+            void refresh();
+        });
+        return () => {
+            subscription.unsubscribe();
+            refreshControllerRef.current?.abort();
+        };
     }, [refresh]);
 
     const applyProgressionToNextWeek = useCallback(async () => {
@@ -919,7 +1067,8 @@ export function useCurrentProgram() {
             return;
         }
 
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { session } } = await supabase.auth.getSession();
+        const user = session?.user;
         if (!user) {
             console.log('[advanceToNextWeek] No user');
             return;
@@ -942,11 +1091,13 @@ export function useCurrentProgram() {
             .eq('user_id', user.id);
 
         if (updateErr) {
-            console.error('[advanceToNextWeek] Update failed:', updateErr.message);
+            reportSupabaseFailure('program.advance_week', updateErr);
+            setActionError(supabaseUserMessage(updateErr, 'Unable to start the next week. Try again.'));
             return;
         }
 
         console.log('[advanceToNextWeek] Success, refreshing');
+        setActionError(null);
         await refresh();
 
         // Every 4th week is a deload — notify the user when transitioning into one
@@ -955,5 +1106,47 @@ export function useCurrentProgram() {
         }
     }, [program, refresh]);
 
-    return { program, loading, refresh, swapExercise, endCurrentProgram, applyProgressionToNextWeek, applyReadinessAdjustmentOnly, advanceToNextWeek };
+    const availabilityMessage = useMemo(
+        () => failureCategory
+            ? supabaseUserMessage(
+                { category: failureCategory, retryable: failureCategory === 'retryable_service_unavailable' || failureCategory === 'timeout' || failureCategory === 'offline' },
+                'Unable to refresh your program. Try again.',
+            )
+            : null,
+        [failureCategory],
+    );
+
+    return {
+        program,
+        loading,
+        refreshing,
+        unavailable,
+        failureCategory,
+        availabilityMessage,
+        actionError,
+        refresh,
+        retry: refresh,
+        swapExercise,
+        endCurrentProgram,
+        applyProgressionToNextWeek,
+        applyReadinessAdjustmentOnly,
+        advanceToNextWeek,
+    };
+}
+
+type CurrentProgramContextValue = ReturnType<typeof useCurrentProgramState>;
+
+const CurrentProgramContext = createContext<CurrentProgramContextValue | null>(null);
+
+export function CurrentProgramProvider({ children }: { children: ReactNode }) {
+    const value = useCurrentProgramState();
+    return createElement(CurrentProgramContext.Provider, { value }, children);
+}
+
+export function useCurrentProgram(): CurrentProgramContextValue {
+    const value = useContext(CurrentProgramContext);
+    if (!value) {
+        throw new Error('useCurrentProgram must be used within CurrentProgramProvider');
+    }
+    return value;
 }

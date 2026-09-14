@@ -9,6 +9,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
 import { restoreProgram } from '@/features/programs/commands';
 import { programRepository } from '@/features/programs/repository';
+import { reportSupabaseFailure, supabaseSaveFailureMessage, supabaseUserMessage } from '@/utils/supabaseResilience';
 
 type ArchivedProgram = {
     id: string;
@@ -66,9 +67,8 @@ export default function ArchivedProgramsScreen() {
             if (error) throw error;
             setPrograms(data ?? []);
         } catch (e) {
-            console.error('loadArchivedPrograms error', e);
-            setPrograms([]);
-            setLoadError('Archived programs are unavailable. Check your connection and try again.');
+            reportSupabaseFailure('program.archived_load', e);
+            setLoadError(supabaseUserMessage(e, 'Archived programs are unavailable. Try again.'));
         } finally {
             setLoading(false);
         }
@@ -99,10 +99,10 @@ export default function ArchivedProgramsScreen() {
             await loadArchivedPrograms();
             router.back();
         } catch (e) {
-            console.error('unarchiveProgram error', e);
+            reportSupabaseFailure('program.restore', e);
             Alert.alert(
                 'Could not restore program',
-                e instanceof Error ? e.message : 'The program was not changed. Please try again.',
+                supabaseSaveFailureMessage(e),
             );
         }
     };

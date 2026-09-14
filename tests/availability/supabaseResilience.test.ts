@@ -6,6 +6,7 @@ import {
   loginErrorMessage,
   runSupabaseOperation,
   sanitizedSupabaseDiagnostic,
+  supabaseSaveFailureMessage,
   SupabaseRequestTimeoutError,
 } from '../../utils/supabaseResilience';
 
@@ -89,6 +90,11 @@ test('writes are never automatically duplicated', async () => {
   );
   assert.equal(calls, 1);
   assert.equal(result.error && classifySupabaseError(result.error).category, 'retryable_service_unavailable');
+});
+
+test('save failures distinguish no-write from possible partial completion', () => {
+  assert.match(supabaseSaveFailureMessage({ status: 503 }, 0), /unsaved changes are still here/i);
+  assert.match(supabaseSaveFailureMessage({ status: 503 }, 1), /may already have saved/i);
 });
 
 test('a bounded request times out and cancellation prevents stale work', async () => {

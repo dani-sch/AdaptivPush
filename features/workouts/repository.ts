@@ -1,4 +1,5 @@
 import { supabase } from '@/utils/supabase';
+import { runSupabaseOperation } from '@/utils/supabaseResilience';
 import { requireRollout, rollout } from '../kernel/rollout';
 
 import type { WorkoutDraft, WorkoutFinalizationReceipt } from './contracts';
@@ -31,9 +32,12 @@ export function workoutFinalizationPayload(draft: WorkoutDraft, endedAt: string)
 export const workoutRepository: WorkoutRepository = {
   async finalize(draft, endedAt) {
     requireRollout(rollout.durableWorkoutWriter, 'Durable workout synchronization');
-    const { data, error } = await supabase.rpc('finalize_workout_v2', {
-      p_payload: workoutFinalizationPayload(draft, endedAt),
-    });
+    const { data, error } = await runSupabaseOperation(
+      (signal) => supabase.rpc('finalize_workout_v2', {
+        p_payload: workoutFinalizationPayload(draft, endedAt),
+      }).abortSignal(signal),
+      { kind: 'write', operation: 'workout.finalize' },
+    );
     if (error) throw error;
     if (!data || typeof data !== 'object') throw new Error('Workout finalization returned no receipt.');
     return data as unknown as WorkoutFinalizationReceipt;
