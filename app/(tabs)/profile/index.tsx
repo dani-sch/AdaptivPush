@@ -453,6 +453,7 @@ export default function ProfileScreen() {
           const { daysSincePeriod: dsp } = await import('@/utils/cyclePhase');
           if (isCurrent(user.id)) setDaysSincePeriod(String(dsp(result.data.last_period_start_date)));
         }
+        return result.data;
       })();
 
       const progressTask = (async () => {
@@ -483,6 +484,15 @@ export default function ProfileScreen() {
 
       const results = await Promise.allSettled([adaptationTask, userProfileTask, progressTask]);
       if (!isCurrent(user.id)) return;
+      if (results[0].status === 'fulfilled' && results[1].status === 'fulfilled') {
+        const loadedProfileSettings = results[1].value;
+        if (typeof loadedProfileSettings?.healthkit_enabled !== 'boolean') {
+          setIsAppleHealthConnected(readinessPreferences.source === 'apple');
+        }
+        if (typeof loadedProfileSettings?.cycle_enabled !== 'boolean') {
+          setCycleEnabled(parsedAdaptationPreferences.cycle_support_enabled ?? false);
+        }
+      }
       const firstFailure = results.find((result): result is PromiseRejectedResult => result.status === 'rejected');
       if (firstFailure) {
         reportSupabaseFailure('profile.partial_load', firstFailure.reason);
