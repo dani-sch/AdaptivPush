@@ -5,6 +5,45 @@
 
 ---
 
+### 2026-09-14 Supabase availability resilience hardening {#2026-09-14-supabase-availability-resilience}
+
+**Summary**: Diagnosed the reported temporary Auth 502 / project-config failure
+as an external availability event amplified by unbounded client requests,
+sequential profile reads, duplicate mounted program hooks, raw error rendering,
+and transient failures being collapsed into empty program/profile state. Added a
+pure error classifier, sanitized diagnostics, per-operation request deadlines,
+bounded retry for idempotent reads only, owner-scoped cancellation, shared
+program state, partial profile rendering, and explicit retry/save outcomes.
+
+**Policy**: Reads use a 12-second attempt deadline and at most two attempts with
+350 ms exponential backoff plus up to 250 ms jitter. Auth requests use 15
+seconds, writes 18 seconds, and Storage 30 seconds. Writes are never
+automatically retried. Expected classified failures use sanitized development
+warnings rather than `console.error`, so retryable outages do not open React
+Native LogBox. No production infrastructure, schema, RLS, or remote project
+state changed.
+
+**Write integrity**: Generated program installation remains one replay-safe RPC;
+the optional session-length preference now runs only after that atomic success
+and cannot cause installation replay. Existing readiness/cycle/personal-info
+multi-step saves cannot be made atomic without a backend command; they now
+report possible partial completion, retain form input, settle their saving
+state, and require an explicit retry to converge.
+
+**Verification**: availability 12/12; programs 10/10; workouts 19/19; strict
+TypeScript pass; lint zero errors with the same three unrelated warnings.
+Windows cannot perform the required iOS device matrix, so healthy/invalid login,
+injected 502/timeout/offline recovery, profile partial-save recovery, in-flight
+account switching, and offline draft checks remain manual device evidence.
+No sanitized incident-window Supabase logs or request IDs were present locally;
+dashboard 5xx/latency/resource correlation remains an owner operational action.
+
+**Commits**: `8ac2e93`, `5425c38`, `05aa38e`, `ec3587f`, `4beee79`,
+`0cab21d`, `9a081ed`, `4ee3bf1`, and `b07efe6` (plus this documentation
+commit).
+
+---
+
 ### 2026-09-11 AP-02/AP-03 swap, route and recalibration hardening {#2026-09-11-ap-02-ap-03-device-hardening}
 
 **Summary**: Implemented the bounded device-hardening packet on
