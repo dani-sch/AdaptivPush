@@ -35,7 +35,8 @@ try {
         }
         & $apAdb @apArgs reverse tcp:8081 tcp:8081
         if ($LASTEXITCODE -ne 0) { throw 'Metro USB reverse mapping failed.' }
-        & $apAdb @apArgs install -r (Join-Path $apRepo 'android\app\build\outputs\apk\debug\app-debug.apk')
+        $apArtifact=Join-Path $env:LOCALAPPDATA "AdaptivPush/release-evidence/2026-09-14/$($ExpectedCommit.Substring(0,7))-$($Writers.ToLowerInvariant()).apk"
+        & $apAdb @apArgs install -r $apArtifact
         if ($LASTEXITCODE -ne 0) { throw 'Installing the local debug build failed.' }
     }
     Write-Host "Manual QA source: $ExpectedCommit | backend: $env:EXPO_PUBLIC_SUPABASE_URL | writers: $Writers"
