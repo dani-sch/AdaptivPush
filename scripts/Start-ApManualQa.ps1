@@ -2,6 +2,7 @@ param(
     [Parameter(Mandatory)][string]$ExpectedCommit,
     [ValidateSet('Enabled','Disabled')][string]$Writers = 'Enabled',
     [string]$DeviceSerial,
+    [switch]$FaultProxy,
     [switch]$ServerOnly
 )
 $ErrorActionPreference = 'Stop'
@@ -18,7 +19,7 @@ try {
     $apStatus = ($apStatusText -join "`n") | ConvertFrom-Json
     if ($apStatus.API_URL -ne 'http://127.0.0.1:54321' -or -not $apStatus.ANON_KEY) { throw 'Unexpected local backend configuration.' }
     $env:EXPO_NO_DOTENV = '1'
-    $env:EXPO_PUBLIC_SUPABASE_URL = $apStatus.API_URL
+    $env:EXPO_PUBLIC_SUPABASE_URL = if ($FaultProxy) { 'http://127.0.0.1:54329' } else { $apStatus.API_URL }
     $env:EXPO_PUBLIC_SUPABASE_KEY = $apStatus.ANON_KEY
     $env:EXPO_PUBLIC_AP02_DURABLE_WRITER = ($Writers -eq 'Enabled').ToString().ToLowerInvariant()
     $env:EXPO_PUBLIC_AP03_ATOMIC_WRITER = $env:EXPO_PUBLIC_AP02_DURABLE_WRITER
@@ -28,12 +29,16 @@ try {
         if ($DeviceSerial) { $apArgs = @('-s', $DeviceSerial) }
         & $apAdb @apArgs reverse tcp:54321 tcp:54321
         if ($LASTEXITCODE -ne 0) { throw 'Connect and authorize the physical Android phone; supply -DeviceSerial if multiple devices exist.' }
+        if ($FaultProxy) {
+            & $apAdb @apArgs reverse tcp:54329 tcp:54329
+            if ($LASTEXITCODE -ne 0) { throw 'Fault proxy USB reverse mapping failed.' }
+        }
         & $apAdb @apArgs reverse tcp:8081 tcp:8081
         if ($LASTEXITCODE -ne 0) { throw 'Metro USB reverse mapping failed.' }
         & $apAdb @apArgs install -r (Join-Path $apRepo 'android\app\build\outputs\apk\debug\app-debug.apk')
         if ($LASTEXITCODE -ne 0) { throw 'Installing the local debug build failed.' }
     }
-    Write-Host "Manual QA source: $ExpectedCommit | backend: local 127.0.0.1:54321 | writers: $Writers"
+    Write-Host "Manual QA source: $ExpectedCommit | backend: $env:EXPO_PUBLIC_SUPABASE_URL | writers: $Writers"
     Write-Host 'Keep this terminal open. Launch the installed temp-app on the phone after Metro is ready. Do not clear app storage during recovery tests.'
     & .\node_modules\.bin\expo.cmd start --localhost --clear
 } finally {
