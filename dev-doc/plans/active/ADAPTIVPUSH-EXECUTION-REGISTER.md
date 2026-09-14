@@ -19,10 +19,16 @@ enforcement versions. Exact commands, hashes, automatic baseline-ledger effect,
 restore caveats, synthetic rollback probes, and post-rollout checks are in [the
 September 10 evidence artifact](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-10.md).
 Database prerequisites for AP-02/AP-03 were closed by AP-01. Both durable slices
-are now integration-verified locally on `codex/ap02-ap03` and the configured
-`integrator` worktree. Their writer flags default off. Release remains blocked on
-a fresh encrypted production logical backup/restore comparison, secure CLI
-reauthentication, the remaining Expo-device matrix, and production rollout checks.
+have prior local integration evidence, including `54e5a39`; their current
+September 14 corrections run on `codex/ap02-ap03-release` from `origin/main`
+baseline `9d968d56`. The [current release report](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md)
+owns final current-packet verification and integrator evidence. Secure
+CLI/database authentication for `thfxcvxcsfvrzdysdnkq` is verified through the
+local DPAPI-protected mechanism. Both writers default off and production still
+awaits exactly the two reviewed AP-02/AP-03 migrations. Required user device and
+accessibility passes precede fresh encrypted production backup/restore and
+migration; real distribution identity, rollback rehearsal and monitoring remain
+writer-enable gates. Authentication is not a production mutation or release.
 
 ## Register mechanics and universal slice contract
 
@@ -77,10 +83,10 @@ Critical path for trustworthy free training: `AP-01 -> AP-02 + AP-03 -> AP-04 + 
 
 ## AP-02 — Durable workout capture and finalization
 
-**Status:** INTEGRATION VERIFIED; RELEASE BLOCKED on fresh production backup/restore, CLI reauthentication, Expo-device evidence and production rollout. **Owner:** typescript-agent, security-agent for finalize command, test-agent for fault injection. **Outcome:** logged sets survive restart and Finish cannot create false completion or duplicates.
+**Status:** INTEGRATION VERIFIED — RELEASE BLOCKED. Prior integration evidence is retained; September 14 changes require their own final verification/integration evidence in the current release report. Remaining gates are user device/accessibility results, fresh production backup/restore, exact two-migration rollout, real distribution identity and monitoring. CLI/database authentication is verified. **Owner:** typescript-agent, security-agent for finalize command, test-agent for fault injection. **Outcome:** logged sets survive restart and Finish cannot create false completion or duplicates.
 
 - **Scope:** durable account-scoped drafts, frozen accepted prescription, stable actual exercise/set IDs, explicit partial/full outcomes, atomic idempotent finalize, PR/fulfillment projections after success. Excludes advanced adaptation and new program generation.
-- **Current files:** `features/workouts/*`, `features/kernel/*`, `app/next-workout.tsx`, `components/ExerciseCard.tsx`, `hooks/useCurrentProgram.ts`, `app/workout-history.tsx`, the AP-02/AP-03 migration and SQL suite, `types/database.ts`, `types/program.ts`.
+- **Current files:** `features/workouts/*`, `features/kernel/*`, `app/next-workout.tsx`, `components/ExerciseCard.tsx`, `hooks/useCurrentProgram.ts`, `app/workout-history.tsx`, the AP-02/AP-03 two-migration packet and SQL suites, `types/database.ts`, `types/program.ts`.
 - **Planned files:** `features/workouts/contracts.ts`, `features/workouts/draftStore.ts`, `features/workouts/commands.ts`, `features/workouts/repository.ts`, `features/kernel/operationId.ts`; focused `tests/workouts/finalization.test.ts` (planned harness). Narrow finalize RPC/command and additive migration are owned by the database plan.
 - **Data/contracts:** prescription reference/revision, session state, operation ID, stable set ID, actual loading semantics and completion classification on workout session/exercise records; occurrence link initially nullable for legacy compatibility. Finalize validates ownership of every linked row, returns one durable receipt, and queues derived side effects independently.
 - **Dependencies:** AP-01 before production data rollout; agree AP-03 prescription identity contract, but draft resilience can develop first using a frozen legacy snapshot. AP-04 is enrichment for occurrence fulfillment, not a blocker for fixing session durability.
@@ -91,10 +97,10 @@ Critical path for trustworthy free training: `AP-01 -> AP-02 + AP-03 -> AP-04 + 
 
 ## AP-03 — Durable program installation, revisions, and archive checkpoints
 
-**Status:** INTEGRATION VERIFIED; RELEASE BLOCKED on fresh production backup/restore, CLI reauthentication, the remaining Expo-device matrix and production rollout. Android 16 generated-save and flag-off recovery evidence is partial release evidence only. **Owner:** typescript-agent plus security-agent for installation authority. **Outcome:** failed creation/replacement leaves the prior usable plan intact, and historical prescriptions never change under recorded workouts.
+**Status:** INTEGRATION VERIFIED — RELEASE BLOCKED. Prior integration evidence is retained; September 14 changes require their own final verification/integration evidence in the current release report. Remaining gates are user device/accessibility results, fresh production backup/restore, exact two-migration rollout, real distribution identity and monitoring. CLI/database authentication is verified. Historical Android 16 generated-save and flag-off recovery evidence is partial release evidence only. **Owner:** typescript-agent plus security-agent for installation authority. **Outcome:** failed creation/replacement leaves the prior usable plan intact, and historical prescriptions never change under recorded workouts.
 
 - **Scope:** one generated/manual installation command, immutable prescription/program revisions, catalog identity validation, one-active-instance concurrency, explicit archive/restore/restart checkpoint. Excludes published templates and selective update merging.
-- **Current files:** `features/programs/*`, `features/kernel/*`, `utils/saveProgramToDb.ts`, `app/create-program.tsx`, `components/GenerateProgramModal.tsx`, `hooks/useCurrentProgram.ts`, `app/archived-programs.tsx`, `app/program-overview.tsx`, `tests/programs/*`, the AP-02/AP-03 migration and SQL suite, `types/program.ts`, `types/database.ts`.
+- **Current files:** `features/programs/*`, `features/kernel/*`, `utils/saveProgramToDb.ts`, `app/create-program.tsx`, `components/GenerateProgramModal.tsx`, `hooks/useCurrentProgram.ts`, `app/archived-programs.tsx`, `app/program-overview.tsx`, `tests/programs/*`, the AP-02/AP-03 two-migration packet and SQL suites, `types/program.ts`, `types/database.ts`.
 - **Planned files:** `features/programs/contracts.ts`, `features/programs/commands.ts`, `features/programs/repository.ts`, `features/kernel/revisions.ts`; planned program install tests. Preserve the pre-existing context-failure compensation until the entire coordinator is replaced and verified.
 - **Data:** `programs`, `program_days`, `program_day_exercises`, `program_generation_context`, proposed `program_revisions`; explicit slot IDs, context/schema versions, checkpoint and revision FK. Command validates all children and swaps active instance only within successful commit. Do not backfill guessed originals as exact provenance.
 - **Dependencies:** AP-01 catalog/grant baseline; AP-02 shared prescription/set identity agreement. AP-04 later enriches checkpoint with dated occurrence placement. No premium or public dependency.

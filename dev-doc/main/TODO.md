@@ -40,7 +40,7 @@
 
 - [COMPLETE] Add versioned workout/program contracts, stable identities, frozen prescriptions and actual-versus-planned/load semantics.
 - [COMPLETE] Add owner-scoped durable pending stores and replay-safe common repositories/commands.
-- [COMPLETE] Add one additive migration with immutable program revisions, one-active-per-owner, exact V2 checkpoints, transactional program install and workout finalize RPCs, direct-write denial and durable receipt effects.
+- [COMPLETE] Add the two-migration packet: `20260910210000` supplies immutable program revisions, one-active-per-owner, exact V2 checkpoints, transactional install/finalize RPCs, direct-write denial and receipts; `20260911120000` supplies revision-safe future exercise swaps. Both remain local-only pending the production release gates.
 - [COMPLETE] Route generated/manual program saves and Next Workout through the common commands; remove false completion and visible development-program behavior.
 - [COMPLETE] Pass focused contract tests, AP-01 regression SQL, AP-02/AP-03 atomicity/isolation SQL, fresh reset, database lint, strict types, lint and clean integrator verification.
 - [COMPLETE] Establish a local Android 16 native development build and prove generated save fails before server mutation with the writer off, then installs one complete schema-v2 hierarchy with it on.
@@ -48,8 +48,12 @@
 - [COMPLETE] Declare Expo-compatible `@react-navigation/native`, align SDK patch dependencies, pass Metro export and native debug build, and confirm no duplicate navigation core.
 - [COMPLETE] Merge the bounded hardening packet as integrator commit `54e5a39` and rerun focused/static, Expo Doctor, fresh-reset/SQL, 3,819-module Metro and 435-task native debug assembly gates there.
 - [OPEN] Complete physical-device Expo/development-build comparison, manual program, archive/restore, old-client, dynamic type, TalkBack and theme coverage.
-- [BLOCKED] Securely reauthenticate the Supabase CLI, create a fresh encrypted production logical backup, prove PostgreSQL 17 decrypt/restore equivalence, then dry-run/apply/verify the production migration. Dashboard confirms Free has no managed backup.
+- [COMPLETE] Verify secure Supabase CLI/database authentication for `thfxcvxcsfvrzdysdnkq` using the local DPAPI-protected credential helper on September 14. No production migration or new backup was performed by this authentication step.
+- [COMPLETE] Implement bounded September 14 corrections for exact replay requests, finalized/pending draft protection, load semantics, ancestor-completed revision protection, exact archive elapsed checkpoint, owner-pinned installation, archive compatibility/isolation and accessible read-only entry controls. The [release report](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md) owns final gate results; earlier integration evidence does not verify this new diff.
+- [OPEN] Complete the final clean-dependency/static/build/local PostgreSQL 17/SQL packet and configured integrator verification, bind the manual development build to its committed revision and isolated backend, then obtain user results from the [manual QA matrix](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-MANUAL-QA-2026-09-14.md). Do not infer current device passes from historical emulator evidence.
+- [BLOCKED] After the user's required pre-migration passes, capture a fresh encrypted production logical backup, prove isolated PostgreSQL 17 decrypt/restore equivalence, and dry-run/apply/verify exactly the two reviewed migrations. The earlier AP-01 recovery set is not a fresh recovery point for this packet.
 - [OPEN] Enable `EXPO_PUBLIC_AP02_DURABLE_WRITER` and `EXPO_PUBLIC_AP03_ATOMIC_WRITER` only after all release gates pass; monitor conflicts/replays/outcome coverage without sensitive payloads.
+- [BLOCKED] Supply real distribution identity, package/bundle IDs, signing/deployment ownership and EAS configuration if used, plus payload-free monitoring of conflicts, replay, pending age, failures and outcome coverage. Temporary app identity and a local debug build do not satisfy production distribution.
 
 Evidence: [AP-02](/dev-doc/reports/ADAPTIVPUSH-AP-02-2026-09-10.md) and [AP-03](/dev-doc/reports/ADAPTIVPUSH-AP-03-2026-09-10.md).
 

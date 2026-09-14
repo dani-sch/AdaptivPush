@@ -6,6 +6,24 @@ The approved [decision record](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECO
 
 ## Reading the crosswalk in either direction
 
+September 14 bounded release evidence: the
+[current AP-02/AP-03 packet](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md)
+owns final commands, commits, migration hashes and integration results for the
+latest corrections. Earlier dated evidence statuses below remain scoped to
+their dates. Secure CLI/database authentication is verified, but no new
+production backup, migration, writer enablement or manual device pass follows
+from that fact. The [user QA matrix](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-MANUAL-QA-2026-09-14.md)
+must be bound to the final build; its blocking cases remain unpassed until the
+user reports results. AP-04/AP-05 requirements are not implemented by this task.
+
+| Affected acceptance | September 14 correction / remaining evidence |
+|---|---|
+| AC-TR-008/009/010/011 | Owner-lock replay ordering; exact immutable submitted payload/end time; pending-edit protection; explicit partial/load semantics. Current contract/SQL results belong to the release packet; M05-M11 cover remaining visible capture and lifecycle behavior. |
+| AC-TR-012/013/014 | Ancestor-completed sets remain protected across future revisions; current draft stays frozen; pending controls have contextual names/read-only states. M12-M15, M19 and M23-M27 require actual user swap, route, haptic and accessibility evidence. |
+| AC-TR-016/017/018/023/024 | Owner-pinned installation and exact durable install/lifecycle retries preserve accepted requests; archived reads use legacy fallback and discard prior-owner responses. M02-M04, M18-M22 cover user-visible installation, interruption, account and compatibility outcomes. |
+| AC-TR-021 | Exact elapsed checkpoint resumes without rewriting original start date; explicit restart and legacy approximation remain distinct. Checkpoint/SQL proof is coordinator-owned; M16-M18 require visible archive/restore and retry results. |
+| Relevant AP-16 release obligations | M23-M27 and W01-W03 retain physical accessibility, real distribution and rollback requirements. Fresh production backup/restore and exactly two additive migrations follow pre-migration passes; both production flags stay off until all gates and monitoring ownership are satisfied. |
+
 Each TR row is a stable requirement and has a correspondingly numbered acceptance scenario: TR-001 maps to AC-TR-001. The acceptance column states that scenario's trigger and observable expected result. Its section supplies the owning AP slice; the row supplies the decision, contract, database authority, current code seam, and required evidence. Search an AP ID, D ID, table, source alias, TR ID, or AC ID to traverse the same chain in reverse. Code references identify files to inspect or evolve, including incomplete paths; they do not assert the target contract is implemented.
 
 Disposition vocabulary: **retained** preserves the requirement; **revised** preserves intent with explicitly changed behavior; **replaced** substitutes a different model; **deferred** excludes it from the named release until its listed gate; **rejected** excludes the proposed behavior. Repeated source wording maps to one row rather than creating several authorities. Historical status/checklists are evidence claims, not new requirements or proof of current completion.

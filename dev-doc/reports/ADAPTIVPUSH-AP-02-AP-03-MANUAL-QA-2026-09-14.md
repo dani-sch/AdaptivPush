@@ -1,0 +1,384 @@
+# AP-02/AP-03 remaining manual release verification - 2026-09-14
+
+## Execution boundary and build binding
+
+**DRAFT - NOT YET BOUND; DO NOT EXECUTE.** The release coordinator must replace
+the unbound fields below with the verified committed revision, actual artifact,
+backend, and launch command after all agent-executable pre-QA work passes. This
+document records no manual test passes. Source inspection, emulator history,
+automated tests, and an intention to test cannot satisfy these cases.
+
+| Binding | Required value before execution |
+|---|---|
+| Source commit | Not yet bound; exact clean committed revision required |
+| Integration commit / result | Not yet bound; local integrator evidence required |
+| Android build identifier / SHA-256 / artifact path | Not yet bound; actual debug development artifact required |
+| Android application ID / version / build type | Not yet bound; inspect the assembled artifact, do not infer production identity |
+| Metro bundle / launch command | Not yet bound; must use the same source revision and local configuration as the build |
+| Backend | Not yet bound; isolated local PostgreSQL 17 Supabase, never production for pre-migration QA |
+| Backend schema / fixtures | Not yet bound; both reviewed AP-02/AP-03 migrations plus synthetic test fixtures required |
+| Main local QA flags | `EXPO_PUBLIC_AP02_DURABLE_WRITER=true`, `EXPO_PUBLIC_AP03_ATOMIC_WRITER=true` |
+| Disabled-writer QA variant | Same revision/backend; both flags `false`; separate identified bundle configuration |
+| iOS build / signing / hardware | Unavailable at drafting; obtain an actual identified development build and physical device before claiming iOS passes |
+| Production project / writers | `thfxcvxcsfvrzdysdnkq`; both writers remain disabled; this checklist does not authorize an early migration |
+
+Changing an `EXPO_PUBLIC_` flag requires a rebuilt or freshly generated bundle
+with that value. An environment-variable edit does not prove an already running
+bundle changed. Results must identify the variant used. Do not run flag-on QA
+against production while its durable-record migrations remain unapplied.
+
+## Setup and evidence responsibilities
+
+The coordinator supplies the built artifact, its SHA-256, the exact launch
+command, reachable local backend address, and synthetic fixture manifest before
+releasing this checklist. Install that artifact on the physical device using the
+local Android installer or the verified `adb install -r` command, then launch the
+identified app. Do not uninstall or clear application storage between recovery
+steps. If a development server is required, use only the coordinator's bound
+command from the committed checkout. A cold launch with Metro unavailable also
+requires a locally available bundle; a missing development bundle is an
+environment failure, not evidence that workout recovery passed.
+
+Keep the workstation and phone on the same permitted network, or use an
+explicitly configured USB reverse mapping. A physical phone cannot reach the
+workstation through the Android-emulator-only address `10.0.2.2`. Keep firewall
+changes limited to the supplied local test service. Configure local credentials
+through the existing secure local mechanism; do not copy secrets, connection
+strings, private records, raw request bodies, or authentication screens into
+reports. Never use production customer accounts as fixtures.
+
+The tester records visible behavior. The coordinator performs the accompanying
+nonvisual checks against the synthetic local fixtures and attaches redacted
+counts, receipt/revision relationships, and state comparisons. These supporting
+checks are not additional manual SQL work for the user. Existing deterministic
+contract, identity, atomicity, concurrency, RLS, grant, direct-write-denial, and
+catalog proofs remain in the automated release report and are not repeated here
+as manual tasks.
+
+| Required resource | Coverage and availability |
+|---|---|
+| Physical Android phone, Android 16 / API 36 | Primary bound platform; emulator tooling exists but does not supply hardware evidence. Record manufacturer/model and exact OS build. Also test the minimum supported Android OS once the release owner declares it. |
+| Physical iPhone and supported iOS version | Required iOS counterpart for core capture/recovery, accessibility, and lifecycle cases if iOS is in the release. Hardware/build unavailable; remain blocked until supplied or the owner explicitly defines an Android-only release. No iOS success can be inferred from Android. |
+| Accounts A and B | Distinct synthetic accounts; A has recognizable test programs and draft, B has different or empty data. Sign in through the actual app. Credentials stay local. |
+| Program fixtures | One generated program; one two-day manual program; a partly completed V2 program with an exact checkpoint; one legacy approximate archive; one legacy active program; empty account. All fixture IDs and expected states belong in the coordinator's local manifest. |
+| Workout/load fixtures | At least three sets in one slot and a second exercise; explicit external zero, bodyweight, assistance, and unknown-load cases where the current UI supports them. Do not fabricate unsupported controls; have the coordinator supply a valid synthetic fixture for a semantic type that has no selector. |
+| Network controls | Airplane mode/Wi-Fi toggling, backend-only interruption while Metro stays reachable, and delayed/lost-response fixture controlled by the coordinator. A development-server disconnect alone does not prove backend offline behavior. |
+| Conflict and compatibility environments | Second device/session for A; isolated legacy-schema/missing-schema targets and identified legacy build supplied by coordinator. Never drop production schema to create a fixture. |
+| Accessibility | Android font/display scaling, TalkBack, system motion settings; iOS Dynamic Type, VoiceOver, Reduce Motion where supported; physical touch and system light/dark controls. |
+
+Every numbered case below requires a result. Record `BLOCKED` when a required
+environment is unavailable, with the missing dependency; do not use `PASS` or
+silently omit it. Unless a case explicitly says observation-only, failure blocks
+its phase. For device cases, pass requires all listed visible and persistence
+criteria, no crash, no unexpected account data, and no duplicate or lost record.
+
+## Required before production migration
+
+### M01 - Supported development build and Expo Go comparison
+
+- Preconditions: Bound native development build on physical Android; compatible Expo Go available; local QA backend and A. iOS counterpart requires its separate build/device.
+- Actions: Launch the bound development app from cold; sign in; visit Home, Plan, and Profile; open a workout from Home. Separately open the same project's development URL in Expo Go, record its actual SDK/native-module support message, and return to the native app.
+- Expected visible behavior: Native app reaches usable training screens without a red error screen. Expo Go limitations are explicit; an unsupported Expo Go runtime is not treated as the release runtime. The native build remains usable after the comparison.
+- Persistence/pass: No account or program is changed just by inspecting runtimes. Pass requires successful native launch and an accurately classified Expo Go result; Expo Go need not support unavailable native features.
+- Evidence/blocking: App/build information and redacted screen recording of both launches; blocks migration. Missing physical hardware or native build is `BLOCKED`.
+
+### M02 - Generated program installation
+
+- Preconditions: A on flag-on build with local catalog fixtures; record its initial active program or empty state.
+- Actions: Plan > Generate Personal Program, or program menu > Generate New Program. Select the available days, duration, goal and equipment; tap Generate My Program. Name it `QA Generated A`, tap Save Program, and attempt a second tap while saving. Reopen Plan and View Full Program.
+- Expected visible behavior: Saving state prevents accidental repeated work; one named program appears with all displayed days/exercises and usable workout entry. Existing program replacement is clear; no success message accompanies a partial hierarchy.
+- Persistence/pass: Coordinator confirms one active program, one install outcome, complete hierarchy and generation context; the old active program is preserved as appropriate. Pass requires the visible plan to match that hierarchy after reload.
+- Evidence/blocking: Before/after Plan and full-program recording plus redacted coordinator result; blocks migration.
+
+### M03 - Manual program installation
+
+- Preconditions: A, flag-on build, catalog fixture; two training days and at least one exercise per day.
+- Actions: Plan menu > Create Custom Program (or Create Program when empty). Enter `QA Manual A`, goal, two days and duration; Continue. Name both days; Continue. Add Exercises, choose catalog exercise, enter Sets, Rep min/max and optional RPE/load, then Add To Day. Repeat for the second day. Tap Create Program; reopen Plan and both days.
+- Expected visible behavior: Required-field errors explain how to correct omissions. Successful save displays both authored days and exact entered prescriptions; optional blank load is not silently converted into claimed actual work.
+- Persistence/pass: One complete active installation, prior program retained, no orphan hierarchy or duplicate install. Pass requires authored values and all days to survive reload.
+- Evidence/blocking: Form-to-Plan recording and redacted installation comparison; blocks migration.
+
+### M04 - Disabled writers reject before unintended mutation
+
+- Preconditions: Bound flag-off variant, same synthetic backend; A has a known active program and saved draft. Coordinator captures safe before-state.
+- Actions: Attempt generated Save Program, manual Create Program, Finish Workout > Finish, End Current Program > End Program, Restore Program, and a swap with Also update future uncompleted workouts enabled. Read each response; reopen the original Plan/draft. Do not mistake a current-only local swap for an accepted future server update.
+- Expected visible behavior: Each disabled server writer reports unavailable/not enabled and does not claim server success. Existing work remains available. If a current-only swap was saved, the message distinguishes that local result from the rejected future update.
+- Persistence/pass: Coordinator verifies no unintended server mutation, including profile/context writes before rejection, no new install/finalization/lifecycle receipt, and no active-program loss. Local drafts may remain safely stored. Pass requires all attempted writer entry points to reject accurately.
+- Evidence/blocking: Responses and safe before/after comparison; blocks migration. Restore the bound flag-on variant afterward.
+
+### M05 - Actual set entry and complete finalization
+
+- Preconditions: A, flag-on build; fresh workout with at least two exercises and multiple sets.
+- Actions: Home workout card > open workout; compare title with Plan's same day. Enter distinct LBS, REPS and RPE values per set, tap each set's checkmark, and inspect the locked entered values. Tap Finish Workout > Keep Going once; then Finish Workout > Finish. Reopen Plan and History.
+- Expected visible behavior: Displayed prescriptions are not presented as logged actuals before confirmation. Keep Going preserves the draft. Saving is clear and repeated confirmation is prevented. Successful completion returns to usable navigation and appears once with actual entries.
+- Persistence/pass: Exactly one finalization/receipt and the entered actual sets; expected completion classification; no doubled history after reopening. Coordinator ties the visible workout to its frozen identity.
+- Evidence/blocking: Entry, cancellation, finalization and History recording; blocks migration.
+
+### M06 - Partial and empty workouts
+
+- Preconditions: Fresh multi-set workout with unlogged prescriptions.
+- Actions: Try finishing before logging any valid set; record the available guard. Enter/log only one set, leaving the rest untouched; Finish Workout > Finish; reopen Plan/History.
+- Expected visible behavior: Empty work does not become a completed workout. The one-set workout is visibly partial wherever its outcome is shown and is never described as full prescription fulfillment. Unlogged sets remain unperformed.
+- Persistence/pass: Coordinator confirms partial classification and only the actually logged set; no invented actual values or full-completion claim. Pass requires visible and stored classification to agree.
+- Evidence/blocking: Empty-state guard and partial outcome recording plus coordinator result; blocks migration.
+
+### M07 - Zero, bodyweight, assistance, and unknown load display
+
+- Preconditions: Coordinator supplies the listed semantic fixtures; actual visible controls and supported input units are recorded.
+- Actions: In an external-load slot enter `0` with valid reps and log it. In the bodyweight fixture log valid reps using its supported entry path. Inspect assistance and unknown fixtures, edit only through available controls, reload, then finalize valid entries. For a slot requiring load, leave it blank and attempt confirmation; enter a valid value after the guard.
+- Expected visible behavior: Explicit zero survives; bodyweight does not require inventing external weight; unknown is distinguishable from zero; assistance is not silently reclassified as external load. Missing required load produces a corrective message rather than fabricated work.
+- Persistence/pass: Coordinator matches each logged semantic kind/value after reload and finalization. Unsupported UI representations must be reported as an exact blocker or bounded limitation, not recorded as tested.
+- Evidence/blocking: Before/reload/after inputs and redacted semantic comparison; blocks migration for any supported load path that loses meaning.
+
+### M08 - Reload and background/foreground draft recovery
+
+- Preconditions: Unsubmitted draft containing one logged set and one distinct unlogged edit.
+- Actions: Record the values. Use Expo development Reload, reopen the same workout; then send the app to background for at least one minute and foreground it. Navigate back to Plan and reopen the same day.
+- Expected visible behavior: Correct workout, logged status, exact edits and original prescriptions reappear. No substitute workout, reset, false completion, or unexplained duplicate is shown.
+- Persistence/pass: Coordinator confirms the same draft/set identities and values. Pass requires recovery at each transition, not merely the final one.
+- Evidence/blocking: Continuous recording with pre-transition values; blocks migration. Repeat OS lifecycle portion on iOS when in release scope.
+
+### M09 - Kill/reopen and cold launch
+
+- Preconditions: Same kind of saved draft as M08; development bundle available for the intended cold-start configuration.
+- Actions: Kill the app through the OS app switcher; reopen from its launcher icon; inspect the same workout. Repeat after stopping the process completely using the OS's supported controls, then cold-launch. Do not clear app data or reinstall.
+- Expected visible behavior: Owner's draft and edits recover on both paths with usable navigation; no indefinite loader or unrequested new workout.
+- Persistence/pass: Same draft and set identities survive; no server completion merely due to launch. Pass requires actual process restart, not only backgrounding.
+- Evidence/blocking: OS kill/launch and recovered values recording; blocks migration. iOS kill/relaunch remains separately required when supported.
+
+### M10 - Offline entry and reconnection
+
+- Preconditions: Open cached workout while signed in; coordinator confirms backend interruption can be separated from Metro availability.
+- Actions: Disable backend connectivity; edit and log a valid set. Navigate away/back and kill/reopen while offline with an available bundle. Try Finish Workout > Finish offline; read the pending message. Reconnect and use the final build's supplied retry/resume action; reopen History.
+- Expected visible behavior: Exact draft remains available offline. Pending/unavailable status does not claim completion. After reconnection the submission reaches one truthful success or a clear recoverable conflict; no lost values or endless silent spinner.
+- Persistence/pass: No remote completion during confirmed offline period; one finalization after successful reconciliation. A coordinator-supported same-operation retry must retain original submitted content.
+- Evidence/blocking: Network state, pending message, recovered values and final History plus coordinator receipt comparison; blocks migration.
+
+### M11 - Lost response and pending submission recovery
+
+- Preconditions: Coordinator arms the synthetic lost-response fixture for a finalization; original server success may precede client acknowledgment.
+- Actions: Enter/log a valid set; Finish Workout > Finish; interrupt as instructed when the response is withheld. Kill/reopen, inspect pending state, then retry through the final build's recovery control. Attempt to edit the submitted set while pending.
+- Expected visible behavior: App distinguishes pending acknowledgment from confirmed completion. Submitted content is protected until resolved. Retry ends with the original success and one visible workout, not an endless conflict or a second workout.
+- Persistence/pass: Coordinator verifies the same operation payload/identity and single receipt; no duplicate set, finalization, or altered submitted value. No manual database manipulation by the tester is required.
+- Evidence/blocking: Pending-to-recovered recording and redacted coordinator identity result; blocks migration.
+
+### M12 - Current-only swap before any logged sets
+
+- Preconditions: Unsubmitted workout; record original exercise and future plan prescriptions.
+- Actions: Exercise card > Swap; select a valid alternative; leave Also update future uncompleted workouts off; tap Swap Exercise. Inspect replacement load guidance, return to Plan, and reopen the same workout.
+- Expected visible behavior: Current replacement and recalibration guidance survive reopening. Future plan remains unchanged; no whole-program change is implied.
+- Persistence/pass: Same current draft/slot lineage with a local amendment; no successor program revision. Pass requires future unchanged and current replacement preserved.
+- Evidence/blocking: Toggle state, before/after current and future views; blocks migration.
+
+### M13 - Partial swap, completed-set attribution, and recalibration
+
+- Preconditions: One logged original set; at least two unlogged sets in the same slot.
+- Actions: Swap to another exercise with future switch off. Cancel Recalibrate replacement? once, confirm original remains; repeat and choose Swap and recalibrate. Inspect completed-original explanation. Enter distinct replacement loads or use the displayed Use ... lb action; explicitly confirm recalibration. Log remaining sets; inspect History after finalization.
+- Expected visible behavior: Completed original sets keep original attribution/values; unlogged replacement loads are cleared until explicit confirmation. Cancel does nothing. The confirmation states its current-workout scope and clears the required-action state only after valid input.
+- Persistence/pass: Coordinator confirms original logged exercise identity and replacement identity for later sets; frozen prescription provenance remains intact. No automatic load inheritance without the displayed explicit action.
+- Evidence/blocking: Cancel/confirm, attribution text, entered loads, and history recording; blocks migration.
+
+### M14 - Future immutable swap and current-workout protection
+
+- Preconditions: Current draft has a logged set; future uncompleted instance of the slot exists; record current and future values.
+- Actions: Swap a remaining current exercise, enable Also update future uncompleted workouts, and confirm. Inspect current draft, Plan > View Full Program and future instance; reload and reopen current draft.
+- Expected visible behavior: Message distinguishes saved current amendment from successor update. Current logged sets and frozen prescriptions retain their original facts; future instance shows replacement and applicable recalibration need. Completed historical work is unchanged.
+- Persistence/pass: One immutable successor revision; earlier revision retained; current draft remains bound to its original revision. Coordinator confirms future scope excludes completed work.
+- Evidence/blocking: Toggle, success message, current/future views and redacted revision relationship; blocks migration.
+
+### M15 - Future conflict and partial-success communication
+
+- Preconditions: Coordinator opens a second A session and advances the program after the first session loaded its revision, or arms the supported future-update failure fixture.
+- Actions: On the first device request current-plus-future swap; read the result; reopen current workout and future plan. Retry only through the offered action after refreshing current state.
+- Expected visible behavior: Conflict/failure is explicit; locally saved current swap is distinguished from failed future update. The user can continue current work or refresh safely. No claim that all future workouts changed when they did not.
+- Persistence/pass: Current draft remains safe; no overwritten newer revision or duplicate successor; coordinator verifies actual partial outcome. Pass requires a clear visible path out of the conflict.
+- Evidence/blocking: Both sessions' sequence and failure/retry messaging; blocks migration. Missing conflict fixture is `BLOCKED`.
+
+### M16 - Archive and exact checkpoint restore
+
+- Preconditions: Partly progressed V2 program with an exact revision/checkpoint; coordinator records active week, dates and completion facts.
+- Actions: Plan menu > End Current Program > Cancel once; confirm no change. Repeat > End Program. Open Archived Programs > Restore Program > Resume exact checkpoint. Inspect Plan, View Full Program and completed/remaining workouts; reload.
+- Expected visible behavior: Archive removes it from active view while preserving an archived entry. Exact restore is offered for exact provenance and resumes the recorded point, not Week 1 or an estimated date. Cancel does not archive.
+- Persistence/pass: Same intended program/revision/checkpoint, dates and completion lineage; one active program; historical sessions remain. Coordinator compares checkpoint fields exactly.
+- Evidence/blocking: Pre-archive, cancel, archive list, restore choice and restored plan; blocks migration.
+
+### M17 - Restore replacement, restart, and legacy approximation
+
+- Preconditions: Active program B plus archived exact program A and legacy approximate fixture.
+- Actions: Restore A using Resume exact checkpoint while B is active; inspect Archived Programs for B. Archive A and restore using Restart from Week 1. Inspect legacy archive's Restore Program choices; choose Resume near week ... if offered.
+- Expected visible behavior: Active replacement is explained; B is preserved. Restart starts at Week 1 with history retained. Legacy approximation is explicitly described and never called an exact checkpoint or invented historical date.
+- Persistence/pass: Exactly one active program after each action; exact/restart/legacy modes match chosen semantics and preserve history. Coordinator records expected date differences for restart.
+- Evidence/blocking: All three choice dialogs and resulting plans; blocks migration. Legacy fixture unavailable means its subcase is `BLOCKED`.
+
+### M18 - Archive/restore interruption and retry
+
+- Preconditions: Coordinator arms a lost-response or transient-failure fixture for archive, then separately restore.
+- Actions: End Program during the fixture; kill/reopen; inspect active/archive lists; retry if offered. Repeat for Resume exact checkpoint and reopen again.
+- Expected visible behavior: Calm pending/error state or reconciled success matches the actual outcome; no permanent disappearance, contradictory active/archive display, or repeated restart. User sees how to refresh or retry.
+- Persistence/pass: Same lifecycle operation resolves once with exact checkpoint preserved; only one active program. Coordinator supplies receipt comparison.
+- Evidence/blocking: Both interrupted lifecycle recordings and coordinator result; blocks migration.
+
+### M19 - Stale and malformed routes
+
+- Preconditions: Coordinator supplies a valid local workout link, a stale revision/day link, a malformed-ID link, and an A-owned link for M20. Link values contain synthetic identifiers only.
+- Actions: Open valid link and compare its title with Plan. Open stale and malformed links separately; tap Retry, then Return to Plan, then select a valid workout.
+- Expected visible behavior: Invalid targets show Workout unavailable with a useful explanation. They do not silently open a different current workout. Retry and Return to Plan remain reachable and recover navigation.
+- Persistence/pass: Opening an invalid route does not create/finalize another workout or modify a draft. Pass requires each invalid category to fail closed visibly.
+- Evidence/blocking: Synthetic link type and unavailable/recovery recording; blocks migration.
+
+### M20 - Actual account switch and isolation
+
+- Preconditions: A has a distinctive draft, pending operation and archive; B has different data. Offline sign-out behavior is recorded separately from online session switching.
+- Actions: Record A's values; Profile > Log Out; sign in as B through the login screen. Open Home, Plan, History and Archived Programs; attempt A's supplied link. Kill/reopen as B. Log out and sign back into A; inspect its draft and reconcile pending work.
+- Expected visible behavior: B never sees A's values, route contents, banners or queued writes. A's data returns only after A signs in. Session transition shows usable loading/empty states rather than stale owner content.
+- Persistence/pass: No operation changes owner; B does not replay A's pending work. A's exact draft survives unless explicitly finalized. Coordinator checks synthetic owner isolation without exposing records.
+- Evidence/blocking: Redacted actual sign-out/sign-in and screen sequence, excluding credentials; blocks migration.
+
+### M21 - Legacy reader and schema compatibility
+
+- Preconditions: Identified old-client build, legacy rows in isolated migrated target, and separate legacy/missing-schema local target; coordinator supplies safe build/backend switching instructions.
+- Actions: In the new bound build read the legacy active/archive/history fixtures. In the legacy build read migrated-backend training/history as supported without enabling unsafe writers. In the new flag-off variant connect only to the isolated missing-schema fixture, open Home/Plan/History, and attempt an unavailable durable action.
+- Expected visible behavior: Legacy data remains readable or accurately labeled approximate; the old client retains its supported reading paths without crashes. Missing schema shows a controlled unavailable/compatibility state, not blank success, false empty data, or an endless loader.
+- Persistence/pass: No destructive rewrite or fallback unsafe multiwrite; coordinator verifies no unintended mutations. Pass is limited to the explicitly identified client/backend combinations.
+- Evidence/blocking: Both build IDs and safe backend aliases with recordings; blocks migration. Missing old build or isolated target is explicitly `BLOCKED`.
+
+### M22 - Loading, empty, unavailable, retry, and error states
+
+- Preconditions: Empty B; populated A; coordinator-controlled delayed response and backend outage.
+- Actions: Visit Plan and Archived Programs as empty B. As A, delay loading then restore network; repeat with failure, press Try Again/Retry/Refresh as displayed; search for a nonexistent exercise in Add Exercise, then clear the search. Review pending/partial/conflict/success evidence from M06/M10/M15/M05.
+- Expected visible behavior: Loading resolves; empty has an actionable explanation; outage is not mislabeled empty; retry can recover; no-result search clears correctly. Each pending, conflict, partial and success state has truthful text and usable controls.
+- Persistence/pass: Reads/retries do not lose or duplicate work. Pass requires evidence for every named state; cross-reference the existing case recording instead of repeating it.
+- Evidence/blocking: State-to-case evidence index and any missing state recording; blocks migration.
+
+### M23 - Large text and Dynamic Type
+
+- Preconditions: Physical Android at largest supported font and enlarged display settings; physical iOS at accessibility Dynamic Type sizes if supported.
+- Actions: Open Plan menu, generated/manual forms, workout set fields, swap/recalibration, Finish modal, archive/restore dialog and Profile. Complete one set and cancel a restore. Show the keyboard and scroll to every required control.
+- Expected visible behavior: Essential exercise identity, values, warnings, buttons and modal choices remain readable and reachable without clipping/overlap or hidden confirmation. Long names have an accessible way to read their full identity.
+- Persistence/pass: Text-size changes do not change stored values or trigger unintended actions. Pass requires completing the flow without reverting text size.
+- Evidence/blocking: OS scaling settings plus each affected screen; blocks migration for training/recovery accessibility defects. iOS Dynamic Type unavailable remains `BLOCKED` if iOS ships.
+
+### M24 - TalkBack/VoiceOver, labels, and focus order
+
+- Preconditions: Physical Android TalkBack on; physical iOS VoiceOver on for its supported build.
+- Actions: Navigate by screen-reader gestures from Plan into a workout. Identify each exercise, set number, LBS/REPS/RPE input, log-state control, History, Swap, future switch, recalibration button, Finish controls, archive Back/Refresh and Restore choices. Enter/log one set, open/close a modal, and trigger one pending/error state.
+- Expected visible behavior: Spoken names identify purpose and context; role and checked/disabled state are correct; focus order follows the task; modal focus stays usable and returns sensibly. Status changes are perceivable. No critical control is an unlabeled icon or unreachable.
+- Persistence/pass: The intended set alone changes; screen-reader activation does not double-submit. Pass requires completing capture/recovery without sighted assistance.
+- Evidence/blocking: Recording with spoken announcements and device accessibility settings; blocks migration. Android does not substitute for VoiceOver.
+
+### M25 - Physical touch and non-color status
+
+- Preconditions: Physical device at default and enlarged display sizes; logged/unlogged, pending, conflict, disabled and success fixtures available.
+- Actions: Tap each dense set input/checkmark and neighboring History/Swap controls deliberately; operate menu close/back and archive controls. Inspect the same status screens in grayscale or system color-correction mode, including selected appearance and future-update switch.
+- Expected visible behavior: Intended targets can be selected reliably without adjacent actions; critical targets meet the declared platform touch-area policy. Logged/pending/error/success/selected states remain distinguishable by text, icon, shape or announcement, not color alone.
+- Persistence/pass: Only intended fields/actions change. Pass requires no accidental adjacent operation and comprehensible status with color removed; record exact problem controls if failing.
+- Evidence/blocking: Touch demonstration and non-color screenshots; blocks migration. Coordinator supplies any nonvisual target measurements, rather than asking the user to inspect source.
+
+### M26 - Haptics disabled and reduced motion
+
+- Preconditions: Physical device; Profile > Appearance > Haptic Feedback off; OS reduced-motion/removal-of-animation setting on.
+- Actions: Change tabs, log a set, open/close swap and finish modals, trigger success, and cold-reopen. Repeat a keyboard/form transition with reduced motion enabled.
+- Expected visible behavior: No app haptic feedback occurs when disabled; confirmations remain clear through text/visual/speech. Essential navigation and status work with reduced motion, without required motion cues or disruptive animation.
+- Persistence/pass: Settings survive supported reopen behavior and do not alter workout data. Pass requires hardware observation; emulator lack of vibration is insufficient.
+- Evidence/blocking: Settings screenshots plus observed haptic/motion behavior; blocks migration for supported accessibility preferences.
+
+### M27 - Light, dark, and system appearance
+
+- Preconditions: Physical device with supported OS appearance switching.
+- Actions: Profile > Appearance > Light; inspect Plan, workout inputs, swap/recalibration, archive/restore and error/pending banners. Repeat Dark. Select System, switch OS appearance with the app foreground and background, then reopen.
+- Expected visible behavior: Text, keyboard context, inputs, disabled buttons, borders and warnings remain legible; active selection is clear; system choice follows OS changes without losing work. No essential state depends solely on a theme color.
+- Persistence/pass: Appearance choice persists as designed; draft values remain exact. Pass requires all three modes and both status/normal screens.
+- Evidence/blocking: Mode/settings and representative screen/state evidence; blocks migration.
+
+## Required before enabling production writers
+
+All blocking M cases must already pass for the exact final revision and supported
+platform scope. Fresh encrypted backup, authenticated isolated restore, exact
+two-migration dry-run/application, production verification and integration remain
+coordinator-owned nonvisual gates. They are not satisfied by this checklist.
+
+### W01 - Real distribution candidate and environment identity
+
+- Preconditions: Release owner supplies actual application IDs, EAS/deployment configuration if used, signing, artifact identity, production target and disabled-writer release candidate. No temporary guessed identity is accepted.
+- Actions: Install through the intended distribution channel on each supported physical platform. Cold-launch, sign in with the approved release test account, inspect identity/environment evidence, open Plan/History, and verify the disabled action message before enablement.
+- Expected visible behavior: Correct app and backend; supported login/navigation; existing records readable; no local-only configuration shipped accidentally.
+- Persistence/pass: No server writes from disabled actions. Coordinator corroborates exact target and deployed flag configuration. Pass requires the actual distributed candidate, not a local debug APK.
+- Evidence/blocking: Distribution/build/commit identifiers and redacted launch/read/disabled action evidence; blocks writer enablement.
+
+### W02 - Rollback rehearsal and safe recovery
+
+- Preconditions: Same release candidate rehearsed in isolated staging/local environment; coordinator controls rollout flags and monitors safe synthetic operations. Production writers remain off during rehearsal.
+- Actions: With test writers enabled, create a draft and pending operation. Follow coordinator's disablement/rebundle instructions; reopen, attempt submit, read the rejection, and inspect existing history. Re-enable only in the isolated rehearsal environment; recover the pending draft through the supported path.
+- Expected visible behavior: Disabled producers reject clearly while drafts/history remain accessible. Recovery preserves exact pending contents; there is no destructive reset or false completion.
+- Persistence/pass: Coordinator verifies preserved revisions, receipts, checkpoints and history and one eventual outcome; no replay storm. Pass requires both disabled-readability and resumed recovery.
+- Evidence/blocking: Bound configurations and observed recovery recording with coordinator monitoring comparison; blocks writer enablement.
+
+### W03 - Final platform and accessibility signoff
+
+- Preconditions: Actual distributed release candidate matches verified behavior; all M cases linked to applicable platform/build and any changed areas retested.
+- Actions: On each supported physical platform repeat launch, one set/finish, draft kill/reopen, archive access, and screen-reader navigation in the distribution candidate. Confirm earlier case evidence still applies; report any new packaging/runtime difference.
+- Expected visible behavior: Critical flows and accessibility match the approved development behavior; no signing/distribution-specific failure or forgotten production flag state.
+- Persistence/pass: Coordinator checks test-account outcome and cleanup under the authorized release procedure. Pass requires named user signoff for all blocking cases; unavailable platform cannot be assumed passed.
+- Evidence/blocking: Signed result summary by platform/build and essential regression recordings; blocks writer enablement.
+
+## Recommended post-release observation
+
+### O01 - First real sessions and pending-age observation
+
+- Preconditions: Release and writer enablement are separately authorized and recorded; named monitor owner and payload-free telemetry exist.
+- Actions: During ordinary supported use, report unexpected pending duration, repeat-history entries, conflicts without recovery, missing history, or account-transition anomalies. Provide case/build/time and redacted screen evidence; do not send raw user records.
+- Expected behavior/pass: Clear outcomes, bounded pending recovery and no duplication/data loss; coordinator correlates conflict, replay, pending age, failure and outcome-coverage telemetry. This is recommended observation, not a substitute for pre-release tests.
+- Evidence/blocking: Incident-style report and safe aggregate monitoring reference. A discovered data-loss/security defect blocks continued rollout and triggers producer disablement/forward-fix; absence of reports is not proof of coverage.
+
+## Exact release condition and remaining nonvisual blockers
+
+AP-02/AP-03 may change from `INTEGRATION VERIFIED - RELEASE BLOCKED` to `RELEASED`
+only when all blocking M and W cases pass for every declared supported platform
+and final bound candidate, the user explicitly confirms those results, every
+automated/local database/integration/compatibility gate passes, and the final
+fresh production backup decrypt/restore comparison succeeds. Production dry-run
+must list exactly `20260910210000_ap02_ap03_durable_workouts_and_program_revisions.sql`
+then `20260911120000_ap03_revision_safe_exercise_swap.sql`, application and
+production authority/isolation/replay checks must pass, rollback must be
+rehearsed, real distribution must exist, and payload-free monitoring with a named
+owner must cover conflicts, replay, pending age, failures and outcome coverage.
+Only then may the authorized production writer rollout occur and release be
+recorded. Passing manual QA alone does not satisfy the remaining production work.
+
+At drafting, exact build/revision/backend binding and fixture readiness are
+unfinished. Repository app identity is `temp-app` / `tempapp`; `app.json` supplies
+no real Android package or iOS bundle identifier, and no `eas.json` is known.
+Actual release project identity, distribution channel, signing, deployment
+ownership, monitoring configuration/owner and real rollout mechanism must be
+verified by the coordinator, not invented by the tester. iOS build/hardware,
+legacy build, supported minimum OS declarations and physical Android availability
+must be explicitly resolved. The coordinator must replace this draft paragraph
+with exact verified remaining blockers before handoff.
+
+No fresh pre-migration production recovery point or production migration is
+claimed by this document. Those operations follow the user's pre-migration
+manual passes. If any required resource, test result or release gate is missing,
+keep both production writers off and preserve the partial status.
+
+## Result-reporting template
+
+```text
+Test case ID / subcase:
+PASS / FAIL / BLOCKED:
+Device model and exact OS:
+Build identifier / artifact hash / source commit:
+Backend alias and flag variant (no credentials):
+Observed behavior:
+Expected behavior:
+Reproduction steps:
+Screenshot or recording reference (redacted):
+Coordinator persistence-evidence reference, if required:
+Missing dependency, if BLOCKED:
+```
+
+Return results with every required case ID, including blocked platform variants.
+The coordinator will diagnose failures, fix in-scope defects, add deterministic
+regression coverage where practical, rerun affected and complete automated gates,
+rebuild and rebind the candidate, then provide the reduced affected-case and
+essential-regression checklist. Until those results arrive, no manual case is
+marked passed and no production migration proceeds.
