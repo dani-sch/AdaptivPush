@@ -20,6 +20,10 @@ test('classifies availability, auth, policy, and schema failures distinctly', ()
   assert.equal(classifySupabaseError(new SupabaseRequestTimeoutError(10)).category, 'timeout');
   assert.equal(classifySupabaseError(new Error('Network request failed')).category, 'offline');
   assert.equal(classifySupabaseError(new Error('Project is paused')).category, 'project_unavailable');
+  assert.equal(
+    classifySupabaseError({ status: 503, message: 'Project has been paused' }).category,
+    'project_unavailable',
+  );
   assert.equal(classifySupabaseError({ status: 401, message: 'JWT expired' }).category, 'authentication_required');
   assert.equal(classifySupabaseError({ status: 403, code: '42501' }).category, 'forbidden');
   assert.equal(classifySupabaseError({ code: 'PGRST205' }).category, 'schema_unavailable');

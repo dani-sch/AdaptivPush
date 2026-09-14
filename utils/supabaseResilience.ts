@@ -84,20 +84,7 @@ export function classifySupabaseError(error: unknown): SupabaseFailure {
   }
 
   if (
-    combined.includes('failed to get project config') ||
-    status === 502 ||
-    status === 503 ||
-    status === 504
-  ) {
-    return { category: 'retryable_service_unavailable', retryable: true, status, code };
-  }
-
-  if (
-    code === 'SUPABASE_REQUEST_TIMEOUT' ||
-    name.includes('timeout') ||
-    combined.includes('timed out') ||
-    combined.includes('timeout') ||
-    combined.includes('deadline exceeded')
+    code === 'SUPABASE_REQUEST_TIMEOUT'
   ) {
     return { category: 'timeout', retryable: true, status, code };
   }
@@ -110,6 +97,24 @@ export function classifySupabaseError(error: unknown): SupabaseFailure {
     combined.includes('project is restricted')
   ) {
     return { category: 'project_unavailable', retryable: false, status, code };
+  }
+
+  if (
+    combined.includes('failed to get project config') ||
+    status === 502 ||
+    status === 503 ||
+    status === 504
+  ) {
+    return { category: 'retryable_service_unavailable', retryable: true, status, code };
+  }
+
+  if (
+    name.includes('timeout') ||
+    combined.includes('timed out') ||
+    combined.includes('timeout') ||
+    combined.includes('deadline exceeded')
+  ) {
+    return { category: 'timeout', retryable: true, status, code };
   }
 
   if (
@@ -248,7 +253,10 @@ export function sanitizedSupabaseDiagnostic(
 export function reportSupabaseFailure(operation: string, error: unknown): void {
   if (typeof __DEV__ === 'undefined' || !__DEV__) return;
   const diagnostic = sanitizedSupabaseDiagnostic(operation, error);
-  if (diagnostic.retryable || diagnostic.category === 'cancelled') {
+  if (
+    diagnostic.category !== 'unknown' ||
+    diagnostic.code?.toLowerCase() === 'invalid_credentials'
+  ) {
     console.warn('[Supabase availability]', diagnostic);
     return;
   }
