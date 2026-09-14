@@ -2,6 +2,13 @@
 
 ## Authority and status
 
+**Current AP-02/AP-03 platform scope: iOS-first, as directed by the user.**
+Prepare and bind a signed iOS native candidate and reachable nonproduction test
+backend before physical-iPhone QA. Dynamic Type, VoiceOver and iOS lifecycle
+coverage are required. Existing Android evidence is supplementary; Android
+hardware/testing is not a gate for this iOS release. See the
+[iOS manual QA handoff](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-MANUAL-QA-2026-09-14.md).
+
 This document owns delivery decomposition, dependencies, status, owner routes, and execution gates. Product decisions belong to [the approved decision record](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECORD-2026-09-08.md); implementation behavior belongs to [the master plan](/dev-doc/plans/active/ADAPTIVPUSH-MASTER-PLAN.md). [Code status](/dev-doc/plans/active/ADAPTIVPUSH-IMPLEMENTATION-STATUS.md) owns observed facts, [database plan](/dev-doc/plans/active/ADAPTIVPUSH-DATABASE-PLAN.md) owns data design, and [traceability](/dev-doc/plans/active/ADAPTIVPUSH-TRACEABILITY.md) owns requirement dispositions and acceptance scenarios.
 
 Baseline: 2026-09-08, feature branch `refactor-1`, starting commit `093c567`. This consolidation changes documentation only. No AP slice is newly implemented or verified. Existing evidence/policy code and historical compatibility results are reusable inputs, not completion of an entire new slice. AP-01 is the next executable slice after review of this corpus. All other implementation work is queued or explicitly gated. Names below are accountable repository routes, not claims that a human owner has accepted an assignment.

@@ -22,7 +22,7 @@ The September 9 AP-01.1 read-only packet confirms RLS enabled without force on a
 
 ## Open gates
 
-Quick Setup with optional demographics and generated program installation run in a local Android 16 development build against local Supabase. The 2026-09-11 workout matrix additionally covers Home and Plan entry, current-only and future swaps, completed-set attribution, explicit recalibration, Expo reload, background/foreground, kill/reopen, gateway-off cold launch, stale/malformed routes and a second-account isolation probe. Expo Go was observed separately and reports the expected SDK/native-module limitation for remote notifications; the route defect was reproduced and verified in the supported native development build. Physical hardware, Profile/missing-schema, manual-program, archive/restore, old-client, dynamic type, TalkBack and theme checks remain open. The production ledger contains only the verified AP-01 baseline and catalog enforcement migrations. The Free project still has no scheduled backup/PITR; the prior AP-01 recovery set is not a fresh pre-AP-02/AP-03 recovery point, so a new encrypted logical backup and restore comparison is mandatory before production migration.
+Quick Setup with optional demographics and generated program installation run in a local Android 16 development build against local Supabase. The 2026-09-11 workout matrix additionally covers Home and Plan entry, current-only and future swaps, completed-set attribution, explicit recalibration, Expo reload, background/foreground, kill/reopen, gateway-off cold launch, stale/malformed routes and a second-account isolation probe. Expo Go was observed separately and reports the expected SDK/native-module limitation for remote notifications; the route defect was reproduced and verified in the supported native development build. Physical hardware, Profile/missing-schema, manual-program, archive/restore, old-client, iOS Dynamic Type, VoiceOver and theme checks remain open. The production ledger contains only the verified AP-01 baseline and catalog enforcement migrations. The Free project still has no scheduled backup/PITR; the prior AP-01 recovery set is not a fresh pre-AP-02/AP-03 recovery point, so a new encrypted logical backup and restore comparison is mandatory before production migration.
 
 The approved `integrator` worktree exists at `C:\workout-app\AdaptivPush-integrator`; prior clean-install, static, focused and fresh-reset SQL verification passed there. The September 14 packet passed clean integrator verification at `302ce6e`; final build tooling is integrated at `7cdf598` with source-tree equality. Supabase CLI remains pinned at `2.117.0` and Docker supplies PostgreSQL 17 locally. A user-local Android SDK, JDK 17 and Android 16 tooling support noninteractive native development-build checks. CLI/database authentication is verified; credentials remain in the local secure mechanism outside the repository. Historical unreferenced avatar objects remain outside scope and were not deleted.
 
@@ -40,8 +40,12 @@ Historical focused results include `test:catalog` (9), dependency resolution (1)
 [DEV-LOG](/dev-doc/reports/DEV-LOG.md) records executed evidence; [database plan](/dev-doc/plans/active/ADAPTIVPUSH-DATABASE-PLAN.md) and [register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) own future gates.
 
 The [manual QA handoff](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-MANUAL-QA-2026-09-14.md)
-is bound to clean source `42f317d`, enabled/disabled Android debug APKs and the
-isolated local backend, and is ready for user execution. Only the user supplies new physical-device, interaction and
+targets iOS on physical iPhone. Shared-source automated checks passed at
+`42f317d`, but the earlier Android-based readiness claim was incorrect. iOS
+native build/signing, identified flag variants, installation and a reachable
+nonproduction backend remain unverified; prepare and bind them before user QA.
+Android artifacts are supplementary evidence and Android testing is not a gate
+for this iOS release. Only the user supplies new physical-iPhone, interaction and
 accessibility passes. After required pre-migration passes, the operator must
 capture a fresh encrypted backup, prove isolated PostgreSQL 17 restore, and apply
 only `20260910210000` then `20260911120000` after exact dry-run and identity checks.

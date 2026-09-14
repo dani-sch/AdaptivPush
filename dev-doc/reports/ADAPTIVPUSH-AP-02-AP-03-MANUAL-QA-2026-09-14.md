@@ -2,25 +2,23 @@
 
 ## Execution boundary and build binding
 
-**BOUND FOR USER QA — no manual passes recorded.** The Android artifacts were
-built from a clean committed checkout. Later documentation-only commits do not
-change their application source. Automated checks and historical emulator
-evidence do not satisfy these manual cases.
+**iOS-FIRST — native candidate preparation remains open; no manual passes recorded.**
+The earlier handoff incorrectly treated available Android tooling as the release
+target. The user's focus is iOS. Android artifacts are supplementary evidence;
+they do not establish iOS readiness or create an Android testing requirement.
+The iOS Metro export passed, but no signed iOS native candidate or physical
+iPhone result has been verified for this packet.
 
 | Binding | Required value before execution |
 |---|---|
-| Source commit | `42f317d66baa171d5fc5f80d6810ed9c31c46277` |
-| Integration commit / result | `7cdf598d4fb7a93a882c09448b67807409e669e3`; verified application/SQL and build-tooling integration, matching source tree |
-| Android enabled APK | `42f317d-enabled.apk`, SHA-256 `C749F4CBC22EDFC5081A4DF92A09D5F7D9DE3AEBB5327774C26C905D67512FA1` |
-| Android disabled APK | `42f317d-disabled.apk`, SHA-256 `F3D0DAB0CF47B5A124A2B2C219ADB76A8FF5E60BBEE1B7B29319CE61E1682226` |
-| Artifact directory | `C:\Users\dani2\AppData\Local\AdaptivPush\release-evidence\2026-09-14` |
-| Android application ID / version / build type | Inspected `com.dani.sch.tempapp`, version `1.0.0`/code `1`, debug signing, compiled/target API 36, minimum API 24. Existing local identity, not production identity. |
-| Embedded bundles | Enabled SHA-256 `f3e71beb43081b466441b2bb2798d187fd58f6adafa60b368f88004957bcc0fc`; disabled `46e4d5a9f708280de3c8fce2c44096e6ba257f9c39b02972dd388a26ca8c4b22`; both present and verified distinct |
-| Backend | Local fault proxy `http://127.0.0.1:54329` -> local Supabase `http://127.0.0.1:54321`; `supabase_db_AdaptivPush`, PostgreSQL 17.6 |
-| Backend schema / fixtures | Fresh four-migration local reset; both reviewed durable migrations; 52 catalog names; synthetic A has three programs, B is empty |
-| Main local QA flags | `EXPO_PUBLIC_AP02_DURABLE_WRITER=true`, `EXPO_PUBLIC_AP03_ATOMIC_WRITER=true` |
-| Disabled-writer QA variant | Same revision/backend; both flags `false`; separate identified bundle configuration |
-| iOS build / signing / hardware | Unavailable at drafting; obtain an actual identified development build and physical device before claiming iOS passes |
+| Reviewed shared source | `42f317d66baa171d5fc5f80d6810ed9c31c46277`; subsequent documentation edits do not create a native artifact |
+| Integration evidence | `7cdf598d4fb7a93a882c09448b67807409e669e3`; shared application/SQL and Android build-tooling integration |
+| Target | iOS on physical iPhone; record supported OS versions, device model and exact OS build |
+| iOS native artifact | Not yet prepared/verified; bind source, build identifier, artifact hash, bundle ID, signing and installation channel before handoff |
+| iOS backend route | Not yet verified; the prepared Supabase/proxy services use workstation loopback and are not directly reachable from an iPhone |
+| Prepared backend / fixtures | Local PostgreSQL 17.6, fresh four-migration reset, 52 catalog names, synthetic A with three programs and empty B; bind these to a reachable nonproduction iOS test environment |
+| Required QA variants | Separate identified iOS bundles with both `EXPO_PUBLIC_AP02_DURABLE_WRITER` and `EXPO_PUBLIC_AP03_ATOMIC_WRITER` enabled, and both disabled; not yet built |
+| Evidence directory | `C:\Users\dani2\AppData\Local\AdaptivPush\release-evidence\2026-09-14` |
 | Production project / writers | `thfxcvxcsfvrzdysdnkq`; both writers remain disabled; this checklist does not authorize an early migration |
 
 Changing an `EXPO_PUBLIC_` flag requires a rebuilt or freshly generated bundle
@@ -30,57 +28,31 @@ against production while its durable-record migrations remain unapplied.
 
 ## Setup and evidence responsibilities
 
-### Launch this candidate
+### Prepare the iOS candidate before user testing
 
-No Android device was attached at handoff. Connect a physical phone, enable USB
-debugging, and authorize this computer. Run these PowerShell commands from
-`C:\workout-app\AdaptivPush`. Do not clear app storage during recovery cases.
+Coordinator-owned preparation is still required:
 
-1. Choose passwords you can type on the phone, through the secure local prompts:
+1. Establish the actual iOS bundle identity, signing and build route using
+   Xcode/macOS or a configured authenticated cloud build service. Bind the
+   resulting installable development candidate to reviewed source and the
+   intended physical iPhone. Do not invent Apple identifiers or signing assets.
+2. Verify an iPhone-reachable nonproduction backend and controlled fault route.
+   Workstation `127.0.0.1` and the Android USB reverse launcher do not supply
+   this route. Preserve synthetic fixtures and keep credentials private.
+3. Build and identify enabled/disabled iOS variants. Verify their bundled
+   configuration and cold launch without Metro before handing them to the user.
+4. Provide the verified iOS installation and connection instructions with the
+   candidate. Preserve application storage when switching configurations for
+   recovery cases. Then the user can execute the matrix on iPhone.
 
-   ```powershell
-   & "$env:LOCALAPPDATA\AdaptivPush\release-auth\Set-ApManualPassword.ps1" -Account A
-   & "$env:LOCALAPPDATA\AdaptivPush\release-auth\Set-ApManualPassword.ps1" -Account B
-   ```
-
-   The emails are `apqa-a@example.test` and `apqa-b@example.test`. Both accounts
-   already exist and their sign-ins were verified nonvisually. Passwords stay in
-   CurrentUser DPAPI storage outside the repo and must not enter the report.
-
-2. The local proxy is already running on port 54329. After a workstation restart,
-   run `npx supabase start`, then keep a separate terminal open running:
-
-   ```powershell
-   node .\scripts\manualQaProxy.mjs
-   ```
-
-   Do not reset the local database now: accounts and fixtures must survive QA.
-
-3. Install the enabled APK, set USB reverse mappings, and start Metro:
-
-   ```powershell
-   .\scripts\Start-ApManualQa.ps1 -ExpectedCommit "42f317d66baa171d5fc5f80d6810ed9c31c46277" -Writers Enabled -FaultProxy
-   ```
-
-   If multiple devices are connected, append `-DeviceSerial <physical-serial>`
-   from `adb devices -l`. Launch the installed `temp-app` after Metro is ready
-   and sign in as A. The launcher validates clean source compatibility, installs
-   with `-r` to preserve data, and uses local configuration without `.env` edits.
-
-4. For M04, stop Metro with Ctrl+C and repeat the command with `-Writers Disabled`.
-   This installs the separate `42f317d-disabled` APK. Restore Enabled before
-   writer cases. Merely editing an environment variable in a running Metro
-   process is insufficient.
-
-For cold launch without Metro, stop Metro and reopen the installed APK; both
-variants have their matching embedded fallback bundle. Keep the proxy running
-for online cases. For offline cold launch set the proxy to `offline`. USB
-reverse still carries traffic in airplane mode, so airplane mode alone does not
-prove backend disconnection while USB is connected.
+The existing `scripts/Build-ApManualQa.ps1` and `scripts/Start-ApManualQa.ps1`
+are Android helpers and are not iOS setup instructions. No Android device is
+required to complete this iOS release packet.
 
 ### Fault controls and synthetic fixtures
 
-The proxy binds loopback, forwards only to local Supabase, and logs no headers
+These controls are prepared locally but are not yet bound to an iPhone-reachable
+test route. The proxy binds loopback, forwards only to local Supabase, and logs no headers
 or payloads. Set a mode in another PowerShell terminal:
 
 ```powershell
@@ -108,13 +80,11 @@ Safe fixture identities are in `manual-accounts-manifest.json` and
 `manual-program-fixtures.json` in the artifact directory. The local fixture
 scripts preserve existing fixture programs on repeated runs.
 
-Keep the workstation and phone on the same permitted network, or use an
-explicitly configured USB reverse mapping. A physical phone cannot reach the
-workstation through the Android-emulator-only address `10.0.2.2`. Keep firewall
-changes limited to the supplied local test service. Configure local credentials
-through the existing secure local mechanism; do not copy secrets, connection
-strings, private records, raw request bodies, or authentication screens into
-reports. Never use production customer accounts as fixtures.
+Verify the chosen iOS test connection before executing network cases. Do not
+assume a shared Wi-Fi network makes workstation loopback reachable. Configure
+credentials through the existing secure local mechanism; do not copy secrets,
+connection strings, private records, raw request bodies, or authentication
+screens into reports. Never use production customer accounts as fixtures.
 
 The tester records visible behavior. The coordinator performs the accompanying
 nonvisual checks against the synthetic local fixtures and attaches redacted
@@ -126,15 +96,16 @@ as manual tasks.
 
 | Required resource | Coverage and availability |
 |---|---|
-| Physical Android phone, Android 16 / API 36 | Primary bound platform; emulator tooling exists but does not supply hardware evidence. Record manufacturer/model and exact OS build. Also test the minimum supported Android OS once the release owner declares it. |
-| Physical iPhone and supported iOS version | Required iOS counterpart for core capture/recovery, accessibility, and lifecycle cases if iOS is in the release. Hardware/build unavailable; remain blocked until supplied or the owner explicitly defines an Android-only release. No iOS success can be inferred from Android. |
+| Physical iPhone and supported iOS version | Primary required platform for this release. Bind the native build, device model and exact OS version; declare and cover supported iOS versions. Native build/device verification remains open. |
 | Accounts A and B | Distinct synthetic accounts; A has recognizable test programs and draft, B has different or empty data. Sign in through the actual app. Credentials stay local. |
 | Program fixtures | One generated program; one two-day manual program; a partly completed V2 program with an exact checkpoint; one legacy approximate archive; one legacy active program; empty account. All fixture IDs and expected states belong in the coordinator's local manifest. |
 | Workout/load fixtures | At least three sets in one slot and a second exercise; explicit external zero, bodyweight, assistance, and unknown-load cases where the current UI supports them. Do not fabricate unsupported controls; have the coordinator supply a valid synthetic fixture for a semantic type that has no selector. |
 | Network controls | Airplane mode/Wi-Fi toggling, backend-only interruption while Metro stays reachable, and delayed/lost-response fixture controlled by the coordinator. A development-server disconnect alone does not prove backend offline behavior. |
 | Conflict and compatibility environments | Second device/session for A; isolated legacy-schema/missing-schema targets and identified legacy build supplied by coordinator. Never drop production schema to create a fixture. |
-| Accessibility | Android font/display scaling, TalkBack, system motion settings; iOS Dynamic Type, VoiceOver, Reduce Motion where supported; physical touch and system light/dark controls. |
+| Accessibility | iOS Dynamic Type, supported Display Zoom settings, VoiceOver and Reduce Motion; physical touch and system light/dark controls. |
 
+All device cases below apply to physical iPhone and the bound iOS candidate.
+Android coverage is supplementary and does not gate this iOS release.
 Every numbered case below requires a result. Record `BLOCKED` when a required
 environment is unavailable, with the missing dependency; do not use `PASS` or
 silently omit it. Unless a case explicitly says observation-only, failure blocks
@@ -145,7 +116,7 @@ criteria, no crash, no unexpected account data, and no duplicate or lost record.
 
 ### M01 - Supported development build and Expo Go comparison
 
-- Preconditions: Bound native development build on physical Android; compatible Expo Go available; local QA backend and A. iOS counterpart requires its separate build/device.
+- Preconditions: Bound iOS native development build on physical iPhone; compatible iOS Expo Go available for comparison; reachable nonproduction QA backend and A.
 - Actions: Launch the bound development app from cold; sign in; visit Home, Plan, and Profile; open a workout from Home. Separately open the same project's development URL in Expo Go, record its actual SDK/native-module support message, and return to the native app.
 - Expected visible behavior: Native app reaches usable training screens without a red error screen. Expo Go limitations are explicit; an unsupported Expo Go runtime is not treated as the release runtime. The native build remains usable after the comparison.
 - Persistence/pass: No account or program is changed just by inspecting runtimes. Pass requires successful native launch and an accurately classified Expo Go result; Expo Go need not support unavailable native features.
@@ -205,7 +176,7 @@ criteria, no crash, no unexpected account data, and no duplicate or lost record.
 - Actions: Record the values. Use Expo development Reload, reopen the same workout; then send the app to background for at least one minute and foreground it. Navigate back to Plan and reopen the same day.
 - Expected visible behavior: Correct workout, logged status, exact edits and original prescriptions reappear. No substitute workout, reset, false completion, or unexplained duplicate is shown.
 - Persistence/pass: Coordinator confirms the same draft/set identities and values. Pass requires recovery at each transition, not merely the final one.
-- Evidence/blocking: Continuous recording with pre-transition values; blocks migration. Repeat OS lifecycle portion on iOS when in release scope.
+- Evidence/blocking: Continuous recording with pre-transition values; blocks migration. iOS background/foreground lifecycle evidence is required.
 
 ### M09 - Kill/reopen and cold launch
 
@@ -213,7 +184,7 @@ criteria, no crash, no unexpected account data, and no duplicate or lost record.
 - Actions: Kill the app through the OS app switcher; reopen from its launcher icon; inspect the same workout. Repeat after stopping the process completely using the OS's supported controls, then cold-launch. Do not clear app data or reinstall.
 - Expected visible behavior: Owner's draft and edits recover on both paths with usable navigation; no indefinite loader or unrequested new workout.
 - Persistence/pass: Same draft and set identities survive; no server completion merely due to launch. Pass requires actual process restart, not only backgrounding.
-- Evidence/blocking: OS kill/launch and recovered values recording; blocks migration. iOS kill/relaunch remains separately required when supported.
+- Evidence/blocking: OS kill/launch and recovered values recording; blocks migration. Physical iPhone kill/relaunch evidence is required.
 
 ### M10 - Offline entry and reconnection
 
@@ -321,19 +292,19 @@ criteria, no crash, no unexpected account data, and no duplicate or lost record.
 
 ### M23 - Large text and Dynamic Type
 
-- Preconditions: Physical Android at largest supported font and enlarged display settings; physical iOS at accessibility Dynamic Type sizes if supported.
+- Preconditions: Physical iPhone at supported accessibility Dynamic Type sizes and Display Zoom settings.
 - Actions: Open Plan menu, generated/manual forms, workout set fields, swap/recalibration, Finish modal, archive/restore dialog and Profile. Complete one set and cancel a restore. Show the keyboard and scroll to every required control.
 - Expected visible behavior: Essential exercise identity, values, warnings, buttons and modal choices remain readable and reachable without clipping/overlap or hidden confirmation. Long names have an accessible way to read their full identity.
 - Persistence/pass: Text-size changes do not change stored values or trigger unintended actions. Pass requires completing the flow without reverting text size.
-- Evidence/blocking: OS scaling settings plus each affected screen; blocks migration for training/recovery accessibility defects. iOS Dynamic Type unavailable remains `BLOCKED` if iOS ships.
+- Evidence/blocking: OS scaling settings plus each affected screen; blocks migration for training/recovery accessibility defects. Unavailable iOS Dynamic Type evidence remains `BLOCKED`.
 
-### M24 - TalkBack/VoiceOver, labels, and focus order
+### M24 - VoiceOver, labels, and focus order
 
-- Preconditions: Physical Android TalkBack on; physical iOS VoiceOver on for its supported build.
+- Preconditions: Physical iPhone with VoiceOver enabled on the bound iOS build.
 - Actions: Navigate by screen-reader gestures from Plan into a workout. Identify each exercise, set number, LBS/REPS/RPE input, log-state control, History, Swap, future switch, recalibration button, Finish controls, archive Back/Refresh and Restore choices. Enter/log one set, open/close a modal, and trigger one pending/error state.
 - Expected visible behavior: Spoken names identify purpose and context; role and checked/disabled state are correct; focus order follows the task; modal focus stays usable and returns sensibly. Status changes are perceivable. No critical control is an unlabeled icon or unreachable.
 - Persistence/pass: The intended set alone changes; screen-reader activation does not double-submit. Pass requires completing capture/recovery without sighted assistance.
-- Evidence/blocking: Recording with spoken announcements and device accessibility settings; blocks migration. Android does not substitute for VoiceOver.
+- Evidence/blocking: Recording with spoken announcements and device accessibility settings; blocks migration. Physical iPhone VoiceOver evidence is required.
 
 ### M25 - Physical touch and non-color status
 
@@ -345,7 +316,7 @@ criteria, no crash, no unexpected account data, and no duplicate or lost record.
 
 ### M26 - Haptics disabled and reduced motion
 
-- Preconditions: Physical device; Profile > Appearance > Haptic Feedback off; OS reduced-motion/removal-of-animation setting on.
+- Preconditions: Physical device; Profile > Appearance > Haptic Feedback off; iOS Reduce Motion setting on.
 - Actions: Change tabs, log a set, open/close swap and finish modals, trigger success, and cold-reopen. Repeat a keyboard/form transition with reduced motion enabled.
 - Expected visible behavior: No app haptic feedback occurs when disabled; confirmations remain clear through text/visual/speech. Essential navigation and status work with reduced motion, without required motion cues or disruptive animation.
 - Persistence/pass: Settings survive supported reopen behavior and do not alter workout data. Pass requires hardware observation; emulator lack of vibration is insufficient.
@@ -369,9 +340,9 @@ coordinator-owned nonvisual gates. They are not satisfied by this checklist.
 ### W01 - Real distribution candidate and environment identity
 
 - Preconditions: Release owner supplies actual application IDs, EAS/deployment configuration if used, signing, artifact identity, production target and disabled-writer release candidate. No temporary guessed identity is accepted.
-- Actions: Install through the intended distribution channel on each supported physical platform. Cold-launch, sign in with the approved release test account, inspect identity/environment evidence, open Plan/History, and verify the disabled action message before enablement.
+- Actions: Install through the intended distribution channel on physical iPhone across the supported iOS versions. Cold-launch, sign in with the approved release test account, inspect identity/environment evidence, open Plan/History, and verify the disabled action message before enablement.
 - Expected visible behavior: Correct app and backend; supported login/navigation; existing records readable; no local-only configuration shipped accidentally.
-- Persistence/pass: No server writes from disabled actions. Coordinator corroborates exact target and deployed flag configuration. Pass requires the actual distributed candidate, not a local debug APK.
+- Persistence/pass: No server writes from disabled actions. Coordinator corroborates exact target and deployed flag configuration. Pass requires the actual distributed candidate, not an unrelated local development artifact.
 - Evidence/blocking: Distribution/build/commit identifiers and redacted launch/read/disabled action evidence; blocks writer enablement.
 
 ### W02 - Rollback rehearsal and safe recovery
@@ -385,7 +356,7 @@ coordinator-owned nonvisual gates. They are not satisfied by this checklist.
 ### W03 - Final platform and accessibility signoff
 
 - Preconditions: Actual distributed release candidate matches verified behavior; all M cases linked to applicable platform/build and any changed areas retested.
-- Actions: On each supported physical platform repeat launch, one set/finish, draft kill/reopen, archive access, and screen-reader navigation in the distribution candidate. Confirm earlier case evidence still applies; report any new packaging/runtime difference.
+- Actions: On physical iPhone across the supported iOS versions repeat launch, one set/finish, draft kill/reopen, archive access, and screen-reader navigation in the distribution candidate. Confirm earlier case evidence still applies; report any new packaging/runtime difference.
 - Expected visible behavior: Critical flows and accessibility match the approved development behavior; no signing/distribution-specific failure or forgotten production flag state.
 - Persistence/pass: Coordinator checks test-account outcome and cleanup under the authorized release procedure. Pass requires named user signoff for all blocking cases; unavailable platform cannot be assumed passed.
 - Evidence/blocking: Signed result summary by platform/build and essential regression recordings; blocks writer enablement.
@@ -402,7 +373,7 @@ coordinator-owned nonvisual gates. They are not satisfied by this checklist.
 ## Exact release condition and remaining nonvisual blockers
 
 AP-02/AP-03 may change from `INTEGRATION VERIFIED - RELEASE BLOCKED` to `RELEASED`
-only when all blocking M and W cases pass for every declared supported platform
+only when all blocking M and W cases pass for the declared supported iOS versions
 and final bound candidate, the user explicitly confirms those results, every
 automated/local database/integration/compatibility gate passes, and the final
 fresh production backup decrypt/restore comparison succeeds. Production dry-run
@@ -414,10 +385,12 @@ owner must cover conflicts, replay, pending age, failures and outcome coverage.
 Only then may the authorized production writer rollout occur and release be
 recorded. Passing manual QA alone does not satisfy the remaining production work.
 
-The Android candidate, local backend, accounts and fault controls are ready.
-Remaining external blockers are physical Android results (no attached device),
-an identified legacy build and its real compatibility environment, declared OS
-and platform support, and iOS native build/signing/hardware if iOS is in scope.
+iOS native candidate preparation remains open: establish signing/build identity,
+a verified install route, reachable nonproduction backend, and both flag variants
+before requesting user acceptance. Physical iPhone results, an identified legacy
+build with its compatibility environment, and declared iOS version support also
+remain open. Local backend/accounts/fault controls are prepared; they do not by
+themselves make an iOS handoff ready.
 Repository `app.json` still declares `temp-app`/`tempapp` without production
 package/bundle or EAS project identity; `eas.json` is absent. The generated local
 Android package does not supply store identity, release signing, deployment
@@ -453,3 +426,24 @@ regression coverage where practical, rerun affected and complete automated gates
 rebuild and rebind the candidate, then provide the reduced affected-case and
 essential-regression checklist. Until those results arrive, no manual case is
 marked passed and no production migration proceeds.
+
+## Supplementary Android build evidence
+
+The following build evidence is retained for provenance. It does not satisfy
+iOS native, device, accessibility or distribution gates. The earlier Android
+launch instructions were superseded by the iOS preparation requirements above.
+
+| Binding | Required value before execution |
+|---|---|
+| Source commit | `42f317d66baa171d5fc5f80d6810ed9c31c46277` |
+| Integration commit / result | `7cdf598d4fb7a93a882c09448b67807409e669e3`; verified application/SQL and build-tooling integration, matching source tree |
+| Android enabled APK | `42f317d-enabled.apk`, SHA-256 `C749F4CBC22EDFC5081A4DF92A09D5F7D9DE3AEBB5327774C26C905D67512FA1` |
+| Android disabled APK | `42f317d-disabled.apk`, SHA-256 `F3D0DAB0CF47B5A124A2B2C219ADB76A8FF5E60BBEE1B7B29319CE61E1682226` |
+| Artifact directory | `C:\Users\dani2\AppData\Local\AdaptivPush\release-evidence\2026-09-14` |
+| Android application ID / version / build type | Inspected `com.dani.sch.tempapp`, version `1.0.0`/code `1`, debug signing, compiled/target API 36, minimum API 24. Existing local identity, not production identity. |
+| Embedded bundles | Enabled SHA-256 `f3e71beb43081b466441b2bb2798d187fd58f6adafa60b368f88004957bcc0fc`; disabled `46e4d5a9f708280de3c8fce2c44096e6ba257f9c39b02972dd388a26ca8c4b22`; both present and verified distinct |
+| Backend | Local fault proxy `http://127.0.0.1:54329` -> local Supabase `http://127.0.0.1:54321`; `supabase_db_AdaptivPush`, PostgreSQL 17.6 |
+| Backend schema / fixtures | Fresh four-migration local reset; both reviewed durable migrations; 52 catalog names; synthetic A has three programs, B is empty |
+| Main local QA flags | `EXPO_PUBLIC_AP02_DURABLE_WRITER=true`, `EXPO_PUBLIC_AP03_ATOMIC_WRITER=true` |
+| Disabled-writer QA variant | Same revision/backend; both flags `false`; separate identified bundle configuration |
+| Production project / writers | `thfxcvxcsfvrzdysdnkq`; both writers remain disabled; this checklist does not authorize an early migration |
