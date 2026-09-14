@@ -28,6 +28,12 @@ import {
   parsePrivacyPreferences,
 } from '@/utils/profilePreferences';
 import { supabase } from '@/utils/supabase';
+import {
+  reportSupabaseFailure,
+  runSupabaseOperation,
+  supabaseSaveFailureMessage,
+  supabaseUserMessage,
+} from '@/utils/supabaseResilience';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
 
@@ -154,10 +160,14 @@ export default function PrivacyDataScreen() {
         setSaveMessage('');
 
         const {
-          data: { user },
+          data: { session },
           error: authError,
-        } = await supabase.auth.getUser();
+        } = await runSupabaseOperation(() => supabase.auth.getSession(), {
+          kind: 'auth',
+          operation: 'profile.privacy_load_session',
+        });
 
+        const user = session?.user;
         if (authError || !user) {
           setErrorMessage('Unable to load privacy settings.');
           return;
@@ -168,8 +178,8 @@ export default function PrivacyDataScreen() {
         setCrashReportsEnabled(preferences.crashReportsEnabled);
         setSensitiveDataMasking(preferences.sensitiveDataMasking);
       } catch (loadError) {
-        console.error('Failed to load privacy settings:', loadError);
-        setErrorMessage('Failed to load privacy settings.');
+        reportSupabaseFailure('profile.privacy_load', loadError);
+        setErrorMessage(supabaseUserMessage(loadError, 'Unable to load privacy settings.'));
       } finally {
         setIsLoading(false);
       }
@@ -185,10 +195,14 @@ export default function PrivacyDataScreen() {
       setSaveMessage('');
 
       const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser();
+          data: { session },
+          error: authError,
+      } = await runSupabaseOperation(() => supabase.auth.getSession(), {
+        kind: 'auth',
+        operation: 'profile.privacy_save_session',
+      });
 
+      const user = session?.user;
       if (authError || !user) {
         setErrorMessage('Unable to save privacy settings.');
         return;
@@ -200,21 +214,24 @@ export default function PrivacyDataScreen() {
         sensitiveDataMasking,
       };
 
-      const { error: saveError } = await supabase.auth.updateUser({
-        data: mergeUserMetadata(user.user_metadata, {
-          privacy_preferences: nextPreferences,
+      const { error: saveError } = await runSupabaseOperation(
+        () => supabase.auth.updateUser({
+          data: mergeUserMetadata(user.user_metadata, {
+            privacy_preferences: nextPreferences,
+          }),
         }),
-      });
+        { kind: 'write', operation: 'profile.privacy_save' },
+      );
 
       if (saveError) {
-        setErrorMessage(saveError.message);
+        setErrorMessage(supabaseSaveFailureMessage(saveError));
         return;
       }
 
       setSaveMessage('Privacy controls saved to backend.');
     } catch (saveError) {
-      console.error('Failed to save privacy settings:', saveError);
-      setErrorMessage('Failed to save privacy settings.');
+      reportSupabaseFailure('profile.privacy_save', saveError);
+      setErrorMessage(supabaseSaveFailureMessage(saveError));
     } finally {
       setIsSaving(false);
     }
@@ -227,10 +244,14 @@ export default function PrivacyDataScreen() {
       setSaveMessage('');
 
       const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser();
+          data: { session },
+          error: authError,
+      } = await runSupabaseOperation(() => supabase.auth.getSession(), {
+        kind: 'auth',
+        operation: 'profile.data_request_session',
+      });
 
+      const user = session?.user;
       if (authError || !user) {
         setErrorMessage('Unable to submit data request right now.');
         return;
@@ -249,14 +270,17 @@ export default function PrivacyDataScreen() {
         [requestType === 'export' ? 'exportRequestedAt' : 'deletionRequestedAt']: new Date().toISOString(),
       };
 
-      const { error: requestError } = await supabase.auth.updateUser({
-        data: mergeUserMetadata(user.user_metadata, {
-          privacy_data_requests: nextRequests,
+      const { error: requestError } = await runSupabaseOperation(
+        () => supabase.auth.updateUser({
+          data: mergeUserMetadata(user.user_metadata, {
+            privacy_data_requests: nextRequests,
+          }),
         }),
-      });
+        { kind: 'write', operation: `profile.data_request_${requestType}` },
+      );
 
       if (requestError) {
-        setErrorMessage(requestError.message);
+        setErrorMessage(supabaseSaveFailureMessage(requestError));
         return;
       }
 
@@ -266,8 +290,8 @@ export default function PrivacyDataScreen() {
           : 'Account deletion request submitted to backend.',
       );
     } catch (requestError) {
-      console.error('Failed to submit data request:', requestError);
-      setErrorMessage('Failed to submit data request.');
+      reportSupabaseFailure(`profile.data_request_${requestType}`, requestError);
+      setErrorMessage(supabaseSaveFailureMessage(requestError));
     } finally {
       setActiveRequest(null);
     }
