@@ -2,21 +2,22 @@
 
 ## Execution boundary and build binding
 
-**DRAFT - NOT YET BOUND; DO NOT EXECUTE.** The release coordinator must replace
-the unbound fields below with the verified committed revision, actual artifact,
-backend, and launch command after all agent-executable pre-QA work passes. This
-document records no manual test passes. Source inspection, emulator history,
-automated tests, and an intention to test cannot satisfy these cases.
+**BOUND FOR USER QA — no manual passes recorded.** The Android artifacts were
+built from a clean committed checkout. Later documentation-only commits do not
+change their application source. Automated checks and historical emulator
+evidence do not satisfy these manual cases.
 
 | Binding | Required value before execution |
 |---|---|
-| Source commit | Not yet bound; exact clean committed revision required |
-| Integration commit / result | Not yet bound; local integrator evidence required |
-| Android build identifier / SHA-256 / artifact path | Not yet bound; actual debug development artifact required |
-| Android application ID / version / build type | Not yet bound; inspect the assembled artifact, do not infer production identity |
-| Metro bundle / launch command | Not yet bound; must use the same source revision and local configuration as the build |
-| Backend | Not yet bound; isolated local PostgreSQL 17 Supabase, never production for pre-migration QA |
-| Backend schema / fixtures | Not yet bound; both reviewed AP-02/AP-03 migrations plus synthetic test fixtures required |
+| Source commit | `42f317d66baa171d5fc5f80d6810ed9c31c46277` |
+| Integration commit / result | `7cdf598d4fb7a93a882c09448b67807409e669e3`; verified application/SQL and build-tooling integration, matching source tree |
+| Android enabled APK | `42f317d-enabled.apk`, SHA-256 `C749F4CBC22EDFC5081A4DF92A09D5F7D9DE3AEBB5327774C26C905D67512FA1` |
+| Android disabled APK | `42f317d-disabled.apk`, SHA-256 `F3D0DAB0CF47B5A124A2B2C219ADB76A8FF5E60BBEE1B7B29319CE61E1682226` |
+| Artifact directory | `C:\Users\dani2\AppData\Local\AdaptivPush\release-evidence\2026-09-14` |
+| Android application ID / version / build type | Inspected `com.dani.sch.tempapp`, version `1.0.0`/code `1`, debug signing, compiled/target API 36, minimum API 24. Existing local identity, not production identity. |
+| Embedded bundles | Enabled SHA-256 `f3e71beb43081b466441b2bb2798d187fd58f6adafa60b368f88004957bcc0fc`; disabled `46e4d5a9f708280de3c8fce2c44096e6ba257f9c39b02972dd388a26ca8c4b22`; both present and verified distinct |
+| Backend | Local fault proxy `http://127.0.0.1:54329` -> local Supabase `http://127.0.0.1:54321`; `supabase_db_AdaptivPush`, PostgreSQL 17.6 |
+| Backend schema / fixtures | Fresh four-migration local reset; both reviewed durable migrations; 52 catalog names; synthetic A has three programs, B is empty |
 | Main local QA flags | `EXPO_PUBLIC_AP02_DURABLE_WRITER=true`, `EXPO_PUBLIC_AP03_ATOMIC_WRITER=true` |
 | Disabled-writer QA variant | Same revision/backend; both flags `false`; separate identified bundle configuration |
 | iOS build / signing / hardware | Unavailable at drafting; obtain an actual identified development build and physical device before claiming iOS passes |
@@ -29,15 +30,83 @@ against production while its durable-record migrations remain unapplied.
 
 ## Setup and evidence responsibilities
 
-The coordinator supplies the built artifact, its SHA-256, the exact launch
-command, reachable local backend address, and synthetic fixture manifest before
-releasing this checklist. Install that artifact on the physical device using the
-local Android installer or the verified `adb install -r` command, then launch the
-identified app. Do not uninstall or clear application storage between recovery
-steps. If a development server is required, use only the coordinator's bound
-command from the committed checkout. A cold launch with Metro unavailable also
-requires a locally available bundle; a missing development bundle is an
-environment failure, not evidence that workout recovery passed.
+### Launch this candidate
+
+No Android device was attached at handoff. Connect a physical phone, enable USB
+debugging, and authorize this computer. Run these PowerShell commands from
+`C:\workout-app\AdaptivPush`. Do not clear app storage during recovery cases.
+
+1. Choose passwords you can type on the phone, through the secure local prompts:
+
+   ```powershell
+   & "$env:LOCALAPPDATA\AdaptivPush\release-auth\Set-ApManualPassword.ps1" -Account A
+   & "$env:LOCALAPPDATA\AdaptivPush\release-auth\Set-ApManualPassword.ps1" -Account B
+   ```
+
+   The emails are `apqa-a@example.test` and `apqa-b@example.test`. Both accounts
+   already exist and their sign-ins were verified nonvisually. Passwords stay in
+   CurrentUser DPAPI storage outside the repo and must not enter the report.
+
+2. The local proxy is already running on port 54329. After a workstation restart,
+   run `npx supabase start`, then keep a separate terminal open running:
+
+   ```powershell
+   node .\scripts\manualQaProxy.mjs
+   ```
+
+   Do not reset the local database now: accounts and fixtures must survive QA.
+
+3. Install the enabled APK, set USB reverse mappings, and start Metro:
+
+   ```powershell
+   .\scripts\Start-ApManualQa.ps1 -ExpectedCommit "42f317d66baa171d5fc5f80d6810ed9c31c46277" -Writers Enabled -FaultProxy
+   ```
+
+   If multiple devices are connected, append `-DeviceSerial <physical-serial>`
+   from `adb devices -l`. Launch the installed `temp-app` after Metro is ready
+   and sign in as A. The launcher validates clean source compatibility, installs
+   with `-r` to preserve data, and uses local configuration without `.env` edits.
+
+4. For M04, stop Metro with Ctrl+C and repeat the command with `-Writers Disabled`.
+   This installs the separate `42f317d-disabled` APK. Restore Enabled before
+   writer cases. Merely editing an environment variable in a running Metro
+   process is insufficient.
+
+For cold launch without Metro, stop Metro and reopen the installed APK; both
+variants have their matching embedded fallback bundle. Keep the proxy running
+for online cases. For offline cold launch set the proxy to `offline`. USB
+reverse still carries traffic in airplane mode, so airplane mode alone does not
+prove backend disconnection while USB is connected.
+
+### Fault controls and synthetic fixtures
+
+The proxy binds loopback, forwards only to local Supabase, and logs no headers
+or payloads. Set a mode in another PowerShell terminal:
+
+```powershell
+Invoke-RestMethod -Method Put -Uri http://127.0.0.1:54329/__qa/mode -ContentType application/json -Body '{"mode":"offline"}'
+```
+
+Use `normal` to reconnect; `lose-next-write` immediately before M11's Finish
+consumes the next successful RPC response; `legacy-reader` simulates missing
+modern reader columns; `missing-schema` simulates PostgREST missing relations.
+Restore `normal` after each case. These labeled error simulations do not prove
+real old-client compatibility. M21's unavailable legacy build/environment stays
+BLOCKED until supplied. Normal forwarding and HTTP 503/400/404 fault modes were
+verified nonvisually. Capture loading during a cold load or outage/retry; no
+unimplemented delay fixture is assumed. M15 uses a second A session to advance
+the active revision; record BLOCKED if that environment is unavailable.
+
+A has `AP QA Loads` (active V2, four weeks/two days, three sets per slot across
+external zero/bodyweight/assistance/unknown kinds), `AP QA Exact Archive` (V2
+archive with six elapsed days and the original start retained), and
+`AP QA Legacy Approximate` (V1 approximate week 2, four trainable reader days).
+B has no programs. Generated/manual installation cases create their own
+programs and may archive the initial active fixture; restore the named load
+fixture for M07. Create actual partial history through M05/M06 before M16.
+Safe fixture identities are in `manual-accounts-manifest.json` and
+`manual-program-fixtures.json` in the artifact directory. The local fixture
+scripts preserve existing fixture programs on repeated runs.
 
 Keep the workstation and phone on the same permitted network, or use an
 explicitly configured USB reverse mapping. A physical phone cannot reach the
@@ -149,7 +218,7 @@ criteria, no crash, no unexpected account data, and no duplicate or lost record.
 ### M10 - Offline entry and reconnection
 
 - Preconditions: Open cached workout while signed in; coordinator confirms backend interruption can be separated from Metro availability.
-- Actions: Disable backend connectivity; edit and log a valid set. Navigate away/back and kill/reopen while offline with an available bundle. Try Finish Workout > Finish offline; read the pending message. Reconnect and use the final build's supplied retry/resume action; reopen History.
+- Actions: Disable backend connectivity; edit and log a valid set. Navigate away/back and kill/reopen while offline with an available bundle. Try Finish Workout > Finish offline; read the pending message. Reconnect, press Retry Sync > Finish, and reopen History.
 - Expected visible behavior: Exact draft remains available offline. Pending/unavailable status does not claim completion. After reconnection the submission reaches one truthful success or a clear recoverable conflict; no lost values or endless silent spinner.
 - Persistence/pass: No remote completion during confirmed offline period; one finalization after successful reconciliation. A coordinator-supported same-operation retry must retain original submitted content.
 - Evidence/blocking: Network state, pending message, recovered values and final History plus coordinator receipt comparison; blocks migration.
@@ -157,7 +226,7 @@ criteria, no crash, no unexpected account data, and no duplicate or lost record.
 ### M11 - Lost response and pending submission recovery
 
 - Preconditions: Coordinator arms the synthetic lost-response fixture for a finalization; original server success may precede client acknowledgment.
-- Actions: Enter/log a valid set; Finish Workout > Finish; interrupt as instructed when the response is withheld. Kill/reopen, inspect pending state, then retry through the final build's recovery control. Attempt to edit the submitted set while pending.
+- Actions: Enter/log a valid set; Finish Workout > Finish; wait for the withheld-response outcome. Kill/reopen, inspect pending state, then press Retry Sync > Finish. Attempt to edit the submitted set while pending.
 - Expected visible behavior: App distinguishes pending acknowledgment from confirmed completion. Submitted content is protected until resolved. Retry ends with the original success and one visible workout, not an endless conflict or a second workout.
 - Persistence/pass: Coordinator verifies the same operation payload/identity and single receipt; no duplicate set, finalization, or altered submitted value. No manual database manipulation by the tester is required.
 - Evidence/blocking: Pending-to-recovered recording and redacted coordinator identity result; blocks migration.
@@ -244,8 +313,8 @@ criteria, no crash, no unexpected account data, and no duplicate or lost record.
 
 ### M22 - Loading, empty, unavailable, retry, and error states
 
-- Preconditions: Empty B; populated A; coordinator-controlled delayed response and backend outage.
-- Actions: Visit Plan and Archived Programs as empty B. As A, delay loading then restore network; repeat with failure, press Try Again/Retry/Refresh as displayed; search for a nonexistent exercise in Add Exercise, then clear the search. Review pending/partial/conflict/success evidence from M06/M10/M15/M05.
+- Preconditions: Empty B; populated A; local proxy normal/offline controls and a cold-load recording.
+- Actions: Visit Plan and Archived Programs as empty B. As A, record a cold load, then repeat with the proxy offline; restore normal mode and press Try Again/Retry/Refresh as displayed; search for a nonexistent exercise in Add Exercise, then clear the search. Review pending/partial/conflict/success evidence from M06/M10/M15/M05.
 - Expected visible behavior: Loading resolves; empty has an actionable explanation; outage is not mislabeled empty; retry can recover; no-result search clears correctly. Each pending, conflict, partial and success state has truthful text and usable controls.
 - Persistence/pass: Reads/retries do not lose or duplicate work. Pass requires evidence for every named state; cross-reference the existing case recording instead of repeating it.
 - Evidence/blocking: State-to-case evidence index and any missing state recording; blocks migration.
@@ -345,15 +414,17 @@ owner must cover conflicts, replay, pending age, failures and outcome coverage.
 Only then may the authorized production writer rollout occur and release be
 recorded. Passing manual QA alone does not satisfy the remaining production work.
 
-At drafting, exact build/revision/backend binding and fixture readiness are
-unfinished. Repository app identity is `temp-app` / `tempapp`; `app.json` supplies
-no real Android package or iOS bundle identifier, and no `eas.json` is known.
-Actual release project identity, distribution channel, signing, deployment
-ownership, monitoring configuration/owner and real rollout mechanism must be
-verified by the coordinator, not invented by the tester. iOS build/hardware,
-legacy build, supported minimum OS declarations and physical Android availability
-must be explicitly resolved. The coordinator must replace this draft paragraph
-with exact verified remaining blockers before handoff.
+The Android candidate, local backend, accounts and fault controls are ready.
+Remaining external blockers are physical Android results (no attached device),
+an identified legacy build and its real compatibility environment, declared OS
+and platform support, and iOS native build/signing/hardware if iOS is in scope.
+Repository `app.json` still declares `temp-app`/`tempapp` without production
+package/bundle or EAS project identity; `eas.json` is absent. The generated local
+Android package does not supply store identity, release signing, deployment
+ownership or a distribution channel. Named persisted payload-free monitoring
+and alerts for conflicts, replay, pending age, failures and outcome coverage,
+and the actual rollout/rollback mechanism remain unestablished. These gates
+cannot be invented by the tester.
 
 No fresh pre-migration production recovery point or production migration is
 claimed by this document. Those operations follow the user's pre-migration

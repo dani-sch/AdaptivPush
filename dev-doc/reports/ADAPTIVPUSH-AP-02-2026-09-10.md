@@ -179,3 +179,14 @@ manual passes precede the fresh encrypted recovery set and isolated PostgreSQL
 17 restore. Both production writers remain off; real distribution identity,
 signing/deployment ownership, rollback rehearsal and payload-free monitoring
 remain additional release gates. AP-04/AP-05 were not started.
+
+
+### September 14 final pre-QA binding
+
+The complete automated packet passed (59 unit cases and static/build/database
+gates). Clean Android source `42f317d66baa171d5fc5f80d6810ed9c31c46277` is
+integrated at `7cdf598d4fb7a93a882c09448b67807409e669e3`. Separate embedded
+enabled/disabled local APKs are verified. See the [final release report](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md)
+and [bound manual matrix](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-MANUAL-QA-2026-09-14.md).
+No manual pass, fresh production backup/restore, migration or writer enablement
+is claimed. The original dated results above remain historical.

@@ -1,5 +1,138 @@
 # AP-02/AP-03 durable-record release packet - 2026-09-14
 
+## Final pre-QA result — September 14
+
+**INTEGRATION VERIFIED — RELEASE BLOCKED. Agent-executable pre-QA work is complete.**
+The next required input is the user's results in the
+[bound 31-case matrix](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-MANUAL-QA-2026-09-14.md).
+No manual, physical-device, visual or accessibility pass was performed or
+inferred. AP-04/AP-05 were not started. Fresh production backup/restore and the
+two migrations remain deferred until required pre-migration manual passes.
+
+The corrected behaviors are durable identical retries, concurrency-safe receipt
+lookup, frozen workout submissions, actual load/unit/exercise attribution,
+ancestor-completed revision protection, exact elapsed checkpoint restoration,
+legacy provenance, owner isolation and accessible entry controls. A definitive
+stale program rejection clears its pending request for a refreshed attempt;
+a disabled workout writer restores the editable draft. Uncertain workout
+submissions retain their frozen payload until reconciliation.
+
+### Candidate and integration
+
+- Clean source: `42f317d66baa171d5fc5f80d6810ed9c31c46277` on
+  `codex/ap02-ap03-release`.
+- Code/tooling integrator merge: `7cdf598d4fb7a93a882c09448b67807409e669e3` in
+  `C:\workout-app\AdaptivPush-integrator`. Its Git tree equals the candidate
+  tree `86e7a9c8d817f87432ba9651a5efc6ae49717521`.
+- Current-task merge `302ce6efd78a5ea4576f9fb2525f87699ecaef7d` separately passed
+  `npm ci`, all 59 unit cases via catalog/availability/combined commands, strict
+  TypeScript and lint. Application/dependency/SQL/test source is identical
+  across both integration stages; later changes supply verified build tooling.
+  Final documentation merge and clean-state identifiers are in the external
+  `closeout-manifest.json` beside the build manifest.
+- Inspected Android identity: `com.dani.sch.tempapp`, version `1.0.0`/code `1`,
+  standard debug signing; compiled/target API 36, min API 24. This pre-existing
+  local ID does not establish production distribution. No Android was attached.
+- Enabled artifact `42f317d-enabled.apk`, SHA-256
+  `C749F4CBC22EDFC5081A4DF92A09D5F7D9DE3AEBB5327774C26C905D67512FA1`.
+- Disabled artifact `42f317d-disabled.apk`, SHA-256
+  `F3D0DAB0CF47B5A124A2B2C219ADB76A8FF5E60BBEE1B7B29319CE61E1682226`.
+- Both contain `assets/index.android.bundle`. Embedded hashes are enabled
+  `f3e71beb43081b466441b2bb2798d187fd58f6adafa60b368f88004957bcc0fc` and disabled
+  `46e4d5a9f708280de3c8fce2c44096e6ba257f9c39b02972dd388a26ca8c4b22`.
+  They are verified different. Corresponding writer flags are `true/true` and
+  `false/false`, targeting only `127.0.0.1:54329` -> local Supabase port 54321.
+- Exact native command: `scripts/Build-ApManualQa.ps1`. Enabled/disabled debug
+  builds passed in 1m06s/1m08s, each with 436 tasks. The helper forces bundle
+  generation/cache reset between variants and rejects identical APK hashes.
+  Expo 57 suppresses reset-cache under CI; the local build helper now permits
+  reset while retaining noninteractive export/Gradle commands. Earlier rejected
+  candidates are quarantined under `rejected-builds`, not handed off for QA.
+- The bound launcher checks clean source compatibility, installs the chosen
+  APK preserving app storage, sets USB reverse, and starts Metro with matching
+  local flags. Each embedded bundle supplies the native fallback path when
+  Metro is absent. Physical cold-launch success still requires the user's test.
+
+### Complete automated packet
+
+Environment: Windows PowerShell 7.6.5, Node 24.14.0, npm 11.9.0, Expo 57.0.22,
+React Native 0.86.3, React 19.2.3, TypeScript 6.0.3, Supabase CLI 2.117.0,
+Microsoft JDK 17.0.20, Android SDK 36, Docker PostgreSQL image 17.6.1.167.
+All Expo verification suppresses dotenv loading with `EXPO_NO_DOTENV=1`.
+
+| Gate / command | Final result |
+|---|---|
+| `npm ci` | Passed in feature checkout and independently in integrator |
+| `npm run test:catalog` | 9 passed |
+| `npm run test:dependencies` | 1 passed |
+| `npm run test:workouts` | 22 passed |
+| `npm run test:programs` | 15 passed |
+| `npm run test:availability` | 12 passed |
+| `npm run test:ap02-ap03` | 38 component cases; 59 unique cases across the full packet |
+| `npx tsc --noEmit` | Strict TypeScript passed |
+| `npm run lint` | Zero errors; three unchanged unrelated unused-variable warnings (`submitted`, `isDecrease`, `parsePrCount`) |
+| `npx --yes expo-doctor` | 21/21 passed |
+| `npx expo export --platform android --platform ios --output-dir <external-evidence>/941841e-metro-enabled` | Both passed: Android 3825 / iOS 3493 modules; application source equals final candidate. No iOS native/device claim. |
+| `android/gradlew.bat :app:assembleDebug --no-daemon --console=plain` | Standard debug passed (45s, 435 tasks); final embedded variants passed separately above |
+| `npx supabase db reset --local` | Fresh PostgreSQL 17 reset applied the four migrations; manual fixtures seeded afterward |
+| `npx supabase db lint --local` | No schema errors |
+| All three `supabase/tests/*.sql` through `docker exec -i supabase_db_AdaptivPush psql -X -q -U postgres -d postgres -v ON_ERROR_STOP=1` | AP-01 regression, atomicity/isolation and successor-revision suites passed; synthetic transactions rolled back |
+| `node scripts/verifyDurableConcurrency.mjs` | Six real concurrent-session assertions passed, including fixture cleanup |
+| Local account/proxy probes | A authenticates and sees 3 fixture programs; B authenticates and sees 0. Normal forwarding and HTTP 503/400/404 modes verified nonvisually. |
+| PowerShell parser / `node --check` QA scripts | Passed; fixture seeding uses only a fixed local target |
+| `git diff --check` | Passed; repeated during final documentation closeout |
+| Python lint | Not applicable: no Python source changed |
+
+Logs and artifacts are outside Git at
+`C:\Users\dani2\AppData\Local\AdaptivPush\release-evidence\2026-09-14`:
+`final-test-*.log`, `final-typescript.log`, `final-lint.log`,
+`final-expo-doctor.log`, `final-metro.log`, `final-android-debug.log`,
+`final-db-lint.log`, `final-ap_*.log`, `final-concurrency.log`, `integrator-*.log`,
+`42f317d-*-build.log`, `42f317d-build-manifest.json`, manual fixture manifests
+and `closeout-manifest.json`. Build manifests contain no credentials. The local
+account password helper prompts securely outside Git. Proxy simulations do not
+replace real legacy-build/environment or physical-device compatibility proof.
+
+### Production and remaining release gates
+
+Independent read-only inspection reconfirmed `thfxcvxcsfvrzdysdnkq`,
+`ACTIVE_HEALTHY`, `us-east-1`, PostgreSQL 17.6, 16 public tables, ledger exactly
+`20260910175317` and `20260910190000`, and durable schema absent. Direct database
+authentication and backup command preparation work with the DPAPI credential.
+The management-query path's separate permission 42501 does not block that access.
+No production write, fresh backup, restore or migration was performed. Writer
+defaults remain off; this task has not enabled a production writer.
+
+The two pending migration hashes remain the exact LF Git-blob/root-checkout
+SHA-256 values in the full packet table below. Windows CRLF checkout hashes can
+differ; use the reviewed root artifacts and recheck exact bytes before applying.
+The fresh AES-256-GCM/DPAPI recovery set, isolated PostgreSQL 17 restore proof,
+exact dry-run/application, rolled-back production probes and producer rollback
+rehearsal follow the user's manual results. No new backup hashes exist yet.
+
+Remaining blockers: applicable M cases; physical Android and any declared iOS
+build/hardware/accessibility evidence; real legacy build/environment; then
+recovery and production verification; then W cases, production package/bundle,
+EAS/store/signing/distribution/deployment ownership and named payload-free
+monitoring. Temporary app identity is not a production destination. Keep AP
+status partial and writers off until the matrix's full RELEASED condition is met.
+
+### Documentation closeout and next action
+
+The lifecycle rule is in the four requested canonical files. The consumed
+prompt's exact contents and earlier FABLE-5 provenance are preserved at the
+destinations/hashes below. Direct link repair, archive inventory update and TOC
+regeneration cover changed files; no broad audit or replacement execution prompt
+was created. Owning living documents were updated; dated reports and previous
+DEV-LOG entries were preserved with addenda.
+
+The smallest next action is to connect a physical Android phone, follow the
+bound setup, and return test case results. No Supabase authentication step is
+currently required. The preparatory record below remains historical and is
+superseded by this final addendum wherever it says final work is pending.
+
+## Preparatory snapshot retained below
+
 ## Status and evidence boundary
 
 **INTEGRATION VERIFIED — RELEASE BLOCKED** retains the prior September 11

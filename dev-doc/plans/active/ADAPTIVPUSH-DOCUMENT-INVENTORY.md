@@ -206,7 +206,7 @@ original provenance; they describe an earlier file at the same source path.
 
 | Original path / intake title | Preserved destination / successor authority | Provenance and direct references |
 |---|---|---|
-| `dev-doc/plans/active/EXECUTION-PROMPT.md` / AdaptivPush execution intake | [2026-09-14 exact archive](/dev-doc/plans/legacy/2026-09-14-superseded/dev-doc/plans/active/EXECUTION-PROMPT.md); [TODO](/dev-doc/main/TODO.md), [CURRENT-STATE](/dev-doc/main/CURRENT-STATE.md), [execution register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) | Captured from `9d968d56e49483c854219a5d57bee4d375c946bd` on `codex/ap02-ap03-release`; removed from active plans after preservation. Direct current link repaired in `PLAN-INDEX.md`; this inventory records the distinct archival event; generated `TOC.md` requires regeneration at task closeout. Historical inbound locators remain unchanged. |
+| `dev-doc/plans/active/EXECUTION-PROMPT.md` / AdaptivPush execution intake | [2026-09-14 exact archive](/dev-doc/plans/legacy/2026-09-14-superseded/dev-doc/plans/active/EXECUTION-PROMPT.md); [TODO](/dev-doc/main/TODO.md), [CURRENT-STATE](/dev-doc/main/CURRENT-STATE.md), [execution register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) | Captured from `9d968d56e49483c854219a5d57bee4d375c946bd` on `codex/ap02-ap03-release`; removed from active plans after preservation. Direct current link repaired in `PLAN-INDEX.md`; this inventory records the distinct archival event; generated `TOC.md` regenerated at task closeout because files moved/were added. Historical inbound locators remain unchanged. |
 
 The captured working-tree and archived bytes share SHA-256
 `c5d11467f6c388269786e0332488dba7663602a6e2093d52e3165ee8583d5304`.
