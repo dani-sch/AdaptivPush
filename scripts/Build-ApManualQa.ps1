@@ -31,6 +31,7 @@ try {
             Write-Host "PASS $apBuildId native debug with embedded local bundle"
         }
     } finally { Pop-Location }
+    if ($apArtifacts[0].sha256 -eq $apArtifacts[1].sha256) { throw 'Flag variants are identical. Do not hand off cached bundles.' }
     @{commit=$apCommit;platform='Android';backend='http://127.0.0.1:54329';upstream='http://127.0.0.1:54321';applicationId='com.dani.sch.tempapp';versionName='1.0.0';versionCode=1;artifacts=$apArtifacts} |
         ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $apEvidence "$($apCommit.Substring(0,7))-build-manifest.json")
 } finally {

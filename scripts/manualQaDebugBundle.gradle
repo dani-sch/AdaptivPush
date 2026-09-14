@@ -3,6 +3,7 @@
 gradle.beforeProject { project ->
     project.plugins.withId('com.facebook.react') {
         project.extensions.getByName('react').debuggableVariants.set([])
+        project.extensions.getByName('react').extraPackagerArgs.addAll(['--reset-cache'])
         project.tasks.matching { it.name == 'createBundleDebugJsAndAssets' }.configureEach {
             // Public QA flags are environment inputs; always regenerate them.
             outputs.upToDateWhen { false }
