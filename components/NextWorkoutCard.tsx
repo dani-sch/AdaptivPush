@@ -18,6 +18,7 @@ export interface WorkoutSummary {
 }
 
 interface NextWorkoutCardProps {
+  entryIssue?: string | null;
   workout?: WorkoutSummary;
   onPressStart?: () => void;
   onPressCalendar?: () => void;
@@ -78,6 +79,7 @@ const StartWorkoutButton: React.FC<{ onPress?: () => void; styles: ReturnType<ty
 
 // main Component
 export default function NextWorkoutCard({
+  entryIssue,
   workout,
   onPressStart,
   onPressCalendar,
@@ -117,7 +119,8 @@ export default function NextWorkoutCard({
 
         {remainingCount > 0 && <MoreExercisesRow count={remainingCount} styles={styles} />}
 
-        <StartWorkoutButton onPress={onPressStart} styles={styles} />
+        {entryIssue ? <Text style={styles.exercisePrescription}>{entryIssue}</Text>
+          : <StartWorkoutButton onPress={onPressStart} styles={styles} />}
       </View>
     </View>
   );

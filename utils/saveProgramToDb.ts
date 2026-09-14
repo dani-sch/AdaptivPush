@@ -24,7 +24,7 @@ import { programRepository } from '@/features/programs/repository';
 
 import { supabase } from '@/utils/supabase';
 import { isMissingRelationOrColumnError } from '@/utils/profilePreferences';
-import { reportSupabaseFailure, runSupabaseOperation } from '@/utils/supabaseResilience';
+import { OperationFailureError, reportSupabaseFailure, runSupabaseOperation } from '@/utils/supabaseResilience';
 
 const DEFAULT_POLICY_VERSION = 'phase2-baseline';
 const DEFAULT_EVIDENCE_VERSION = 'phase1-evidence-baseline';
@@ -335,9 +335,9 @@ export async function saveProgramToDb(
     active?.id ?? null,
     active?.current_revision ?? null,
   );
-  if (outcome.status === 'validation') throw new Error(outcome.errors.join(' '));
-  if (outcome.status === 'conflict') throw new Error(`Program changed on another device. ${outcome.message}`);
-  if (outcome.status === 'unavailable') throw new Error(outcome.message);
+  if (outcome.status === 'validation') throw new OperationFailureError({ category: 'validation', retryable: false }, outcome.errors.join(' '));
+  if (outcome.status === 'conflict') throw new OperationFailureError({ category: 'conflict', retryable: false }, outcome.message);
+  if (outcome.status === 'unavailable') throw new OperationFailureError(outcome.failure, outcome.message);
   try {
     await persistSessionLengthPreference(userId, params.targetSessionMinutes);
   } catch (preferenceError) {

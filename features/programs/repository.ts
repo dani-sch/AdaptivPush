@@ -1,5 +1,5 @@
 import { supabase } from '@/utils/supabase';
-import { runSupabaseOperation } from '@/utils/supabaseResilience';
+import { OperationFailureError, runSupabaseOperation } from '@/utils/supabaseResilience';
 
 import type { OperationId } from '../kernel/operationId';
 import { requireRollout, rollout } from '../kernel/rollout';
@@ -38,7 +38,8 @@ export const programRepository: ProgramRepository = {
     requireRollout(rollout.atomicProgramWriter, 'Atomic program installation');
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !session || session.user.id !== input.ownerId) {
-      throw new Error('The authenticated account changed. Return to your account before retrying this installation.');
+      if (sessionError) throw sessionError;
+      throw new OperationFailureError({ category: 'authentication_required', retryable: false }, 'The authenticated account changed. Return to your account before retrying this installation.');
     }
     const { data, error } = await runSupabaseOperation(
       (signal) => supabase.rpc('install_program_v2', {

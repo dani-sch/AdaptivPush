@@ -1,4 +1,7 @@
 export type SupabaseFailureCategory =
+  | 'feature_disabled'
+  | 'conflict'
+  | 'validation'
   | 'retryable_service_unavailable'
   | 'timeout'
   | 'offline'
@@ -14,6 +17,14 @@ export interface SupabaseFailure {
   retryable: boolean;
   status?: number;
   code?: string;
+}
+
+/** Carries a sanitized domain outcome through callers that use exceptions. */
+export class OperationFailureError extends Error {
+  readonly name = 'OperationFailureError';
+  constructor(readonly failure: SupabaseFailure, message: string) {
+    super(message);
+  }
 }
 
 type ErrorLike = {
@@ -67,12 +78,22 @@ function safeCode(error: ErrorLike): string | undefined {
 }
 
 export function classifySupabaseError(error: unknown): SupabaseFailure {
+  if (error instanceof OperationFailureError) return error.failure;
   const source = asErrorLike(error);
   const status = numericStatus(source);
   const code = safeCode(source);
   const name = typeof source.name === 'string' ? source.name.toLowerCase() : '';
   const message = typeof source.message === 'string' ? source.message.toLowerCase() : '';
   const combined = `${name} ${code?.toLowerCase() ?? ''} ${message}`;
+
+  if (code === 'ROLLOUT_DISABLED') return { category: 'feature_disabled', retryable: false, code };
+  if (code === 'AP_AUTHENTICATION_REQUIRED') return { category: 'authentication_required', retryable: false, code };
+  if (combined.includes('stale_revision') || combined.includes('idempotency_conflict') || combined.includes('operation_payload_mismatch') || combined.includes('target_unavailable')) {
+    return { category: 'conflict', retryable: false, status, code };
+  }
+  if (code === '22023' || code === '23514' || code === 'AP_VALIDATION' || combined.includes('invalid_input')) {
+    return { category: 'validation', retryable: false, status, code };
+  }
 
   if (
     code === 'SUPABASE_REQUEST_CANCELLED' ||
@@ -124,7 +145,7 @@ export function classifySupabaseError(error: unknown): SupabaseFailure {
     code === 'invalid_jwt' ||
     combined.includes('jwt expired') ||
     combined.includes('session missing') ||
-    combined.includes('not signed in')
+    combined.includes('not signed in') || combined.includes('unauthenticated')
   ) {
     return { category: 'authentication_required', retryable: false, status, code };
   }
@@ -135,17 +156,18 @@ export function classifySupabaseError(error: unknown): SupabaseFailure {
     combined.includes('row-level security') ||
     combined.includes('row level security') ||
     combined.includes('permission denied') ||
-    combined.includes('not authorized')
+    combined.includes('not authorized') || message === 'forbidden'
   ) {
     return { category: 'forbidden', retryable: false, status, code };
   }
 
   if (
+    code === 'PGRST202' ||
     code === 'PGRST204' ||
     code === 'PGRST205' ||
     code === '42P01' ||
     code === '42703' ||
-    combined.includes('schema cache') ||
+    combined.includes('schema cache') || combined.includes('unsupported_schema') ||
     combined.includes('could not find the table') ||
     combined.includes('could not find the column') ||
     combined.includes('does not exist')
@@ -185,6 +207,12 @@ export function supabaseUserMessage(
       : classifySupabaseError(errorOrFailure);
 
   switch (failure.category) {
+    case 'feature_disabled':
+      return 'Saving changes is not enabled in this build. Use an updated build when this feature is released. Your changes are still here.';
+    case 'conflict':
+      return 'Your program changed. Return to Plan and refresh before submitting again. Your unsaved changes are still here.';
+    case 'validation':
+      return 'Check the program or workout inputs before saving. Your unsaved changes are still here.';
     case 'retryable_service_unavailable':
     case 'project_unavailable':
       return SERVICE_UNAVAILABLE_MESSAGE;
@@ -197,7 +225,7 @@ export function supabaseUserMessage(
     case 'forbidden':
       return "You don't have permission to make this change.";
     case 'schema_unavailable':
-      return 'This feature is temporarily unavailable while the app service is updated.';
+      return 'This service needs an update before programs and workouts can be saved. Your changes are still here. Try again after the service update.';
     case 'cancelled':
       return 'The request was cancelled. Your changes are still here.';
     default:

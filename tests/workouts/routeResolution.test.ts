@@ -8,6 +8,7 @@ import {
   resolveProgramWorkout,
   workoutAvailability,
   workoutRouteParams,
+  workoutEntryIssue,
 } from '../../features/workouts/routeResolution';
 import type { CurrentProgram } from '../../types/program';
 
@@ -49,6 +50,16 @@ const program: CurrentProgram = {
 };
 
 const route = workoutRouteParams(program, program.workouts[0]);
+
+test('legacy preview and workout entry agree without manufacturing durable identity', () => {
+  const legacy = { ...program, currentRevisionId: undefined };
+  const day = { ...program.workouts[0], prescriptionRevisionId: undefined, stableDayId: undefined };
+  assert.match(workoutEntryIssue(legacy, day)!, /service update/);
+  assert.equal(day.stableDayId, undefined);
+  assert.equal(workoutEntryIssue(program, program.workouts[0]), null);
+  assert.match(workoutEntryIssue(program, { ...program.workouts[0], prescriptionRevisionId: 'old-revision' })!, /earlier program revision/);
+  assert.match(workoutEntryIssue(program, null)!, /no longer matches/);
+});
 const draft = createWorkoutDraft({
   ownerId,
   programId,

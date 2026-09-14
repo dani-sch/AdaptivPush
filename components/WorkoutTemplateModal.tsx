@@ -7,6 +7,7 @@ import { ExerciseInfoPanel } from '@/components/ExerciseInfoPanel';
 import type { CurrentProgram, ProgramWorkout, WorkoutExercise } from '@/types/program';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
+import { workoutEntryIssue } from '@/features/workouts/routeResolution';
 
 type Props = {
     workout: ProgramWorkout;
@@ -78,6 +79,7 @@ function ExerciseRow({ exercise, idx, onSwap, styles, theme }: {
 }
 
 export function WorkoutTemplateModal({ workout, program, onSwapExercise, onClose, onStart }: Props) {
+    const entryIssue = workoutEntryIssue(program, workout);
     const { theme } = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -115,13 +117,16 @@ export function WorkoutTemplateModal({ workout, program, onSwapExercise, onClose
                             theme={theme}
                         />
                     ))}
+                    {entryIssue && <Text style={styles.headerSubtitle}>{entryIssue}</Text>}
                     <Pressable
                         onPress={onStart}
+                        disabled={!!entryIssue}
+                        accessibilityState={{ disabled: !!entryIssue }}
                         style={({ pressed }) => [styles.startButton, pressed && { opacity: 0.85 }]}
                         accessibilityRole="button"
                         accessibilityLabel={`Start ${workout.name}`}
                     >
-                        <Text style={styles.startButtonText}>Start This Workout</Text>
+                        <Text style={styles.startButtonText}>{entryIssue ? 'Workout unavailable' : 'Start This Workout'}</Text>
                     </Pressable>
                 </ScrollView>
             </View>

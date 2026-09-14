@@ -67,7 +67,7 @@ export type ProgramCommandOutcome =
   | { status: 'replay'; receipt: ProgramInstallationReceipt }
   | { status: 'validation'; errors: string[] }
   | { status: 'conflict'; message: string; activeProgramId: string | null }
-  | { status: 'unavailable'; message: string };
+  | { status: 'unavailable'; message: string; failure: import('@/utils/supabaseResilience').SupabaseFailure };
 
 export interface ProgramExerciseRevisionRequest {
   programId: string;
@@ -95,7 +95,7 @@ export type ProgramExerciseRevisionOutcome =
   | { status: 'revised' | 'replay'; receipt: ProgramExerciseRevisionReceipt }
   | { status: 'validation'; errors: string[] }
   | { status: 'conflict'; message: string }
-  | { status: 'unavailable'; message: string };
+  | { status: 'unavailable'; message: string; failure: import('@/utils/supabaseResilience').SupabaseFailure };
 
 export function normalizeProgramArtifact(
   input: ProgramArtifact & { depthMode?: unknown; entitlement?: unknown },
