@@ -33,11 +33,22 @@ try {
     $env:EXPO_PUBLIC_AP03_ATOMIC_WRITER = $env:EXPO_PUBLIC_AP02_DURABLE_WRITER
     $env:EXPO_PUBLIC_AP_QA_BUILD = "$ExpectedCommit/$Writers"
     $env:REACT_NATIVE_PACKAGER_HOSTNAME = $LanAddress
-    $env:CI = '1'
+    # Expo 57 ignores reset-cache under CI; never carry transforms across variants.
+    $env:CI = $null
     Write-Host "iOS QA $env:EXPO_PUBLIC_AP_QA_BUILD | backend $env:EXPO_PUBLIC_SUPABASE_URL | both writers $env:EXPO_PUBLIC_AP02_DURABLE_WRITER"
     if ($ExportOnly) {
         $apOutput = Join-Path $env:LOCALAPPDATA "AdaptivPush/release-evidence/2026-09-14/ios-remediation/$ExpectedCommit-$Writers"
-        & .\node_modules\.bin\expo.cmd export --platform ios --no-bytecode --no-minify --output-dir $apOutput
+        & .\node_modules\.bin\expo.cmd export --platform ios --clear --no-bytecode --no-minify --output-dir $apOutput
+        if ($LASTEXITCODE -ne 0) { throw 'iOS export failed.' }
+        $apMetadata = Get-Content (Join-Path $apOutput 'metadata.json') -Raw | ConvertFrom-Json
+        $apBundlePath = Join-Path $apOutput $apMetadata.fileMetadata.ios.bundle
+        $apBundle = [IO.File]::ReadAllText($apBundlePath)
+        $apExpected = $env:EXPO_PUBLIC_AP02_DURABLE_WRITER
+        if ($apBundle -notmatch "durableWorkoutWriter:\s*$apExpected\b" -or $apBundle -notmatch "atomicProgramWriter:\s*$apExpected\b" -or -not $apBundle.Contains($env:EXPO_PUBLIC_SUPABASE_URL)) {
+            throw 'Rejected iOS bundle: embedded flags or backend do not match the requested variant.'
+        }
+        [ordered]@{ source=$ExpectedCommit; variant=$Writers; backend=$env:EXPO_PUBLIC_SUPABASE_URL; bothWriters=$apExpected; sha256=(Get-FileHash $apBundlePath).Hash; nativeDevicePass=$false } |
+            ConvertTo-Json | Set-Content (Join-Path $apOutput 'qa-binding.json')
     } else {
         Write-Host "Open exp://${LanAddress}:$MetroPort in a compatible iOS Expo Go. This is a comparison session, not signed native release acceptance."
         & .\node_modules\.bin\expo.cmd start --lan --go --clear --port $MetroPort

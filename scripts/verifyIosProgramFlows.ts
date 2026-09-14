@@ -68,7 +68,7 @@ try {
   const cleanup = spawnSync('docker', ['exec', '-i', 'supabase_db_AdaptivPush', 'psql', '-X', '-qAt', '-U', 'postgres', '-d', 'postgres', '-v', 'ON_ERROR_STOP=1'],
     { encoding: 'utf8', input: `BEGIN; CREATE TEMP TABLE cleanup_owners AS SELECT id FROM auth.users WHERE id IN (${accounts.map((id) => `'${id}'::uuid`).join(',') || 'NULL'}); DELETE FROM public.program_revision_command_receipts WHERE user_id IN (SELECT id FROM cleanup_owners); DELETE FROM public.program_installation_receipts WHERE user_id IN (SELECT id FROM cleanup_owners); DELETE FROM public.program_lifecycle_receipts WHERE user_id IN (SELECT id FROM cleanup_owners); UPDATE public.programs SET current_revision_id=NULL WHERE user_id IN (SELECT id FROM cleanup_owners); DELETE FROM public.program_days WHERE program_id IN (SELECT id FROM public.programs WHERE user_id IN (SELECT id FROM cleanup_owners));
       DELETE FROM public.program_revisions WHERE user_id IN (${accounts.map((id) => `'${id}'::uuid`).join(',') || 'NULL'});
-      
+
       DELETE FROM auth.users WHERE id IN (${accounts.map((id) => `'${id}'::uuid`).join(',') || 'NULL'}); COMMIT;` });
   if (cleanup.status !== 0) throw new Error('Synthetic account cleanup failed; inspect local test accounts.');
 }
