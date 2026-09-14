@@ -1,5 +1,25 @@
 # AdaptivPush — Development Log
 
+
+## 2026-09-14 — Final AP-02/AP-03 pre-QA candidate
+
+Bound clean source `42f317d66baa171d5fc5f80d6810ed9c31c46277`, integrated at
+`7cdf598d4fb7a93a882c09448b67807409e669e3`. Final packet: 59 unique unit tests,
+strict TypeScript, lint (0 errors/3 existing warnings), Expo Doctor 21/21,
+Android/iOS Metro, native debug plus distinct enabled/disabled embedded APKs,
+fresh PostgreSQL 17 reset/lint/three SQL suites/six concurrency assertions.
+A separate clean integrator dependency/test/static run passed. APK cache reuse
+between flag variants was detected and corrected before handoff; rejected
+artifacts are quarantined. Local catalog/accounts/programs/proxy controls are
+prepared. No manual, visual, device or accessibility pass is claimed.
+
+Production remains healthy PostgreSQL 17.6 with only the two AP-01 ledger
+entries. Authentication is ready; fresh backup/restore, production migration and
+writer enablement await the required manual and operational gates. Task-scoped
+archival, direct links, inventory and generated TOC are closed out. See the
+[final evidence](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md)
+and [bound manual matrix](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-MANUAL-QA-2026-09-14.md).
+
 > Chronological record of implemented changes, planning changes, and documentation decisions.  
 > Most recent entries at the top.
 
