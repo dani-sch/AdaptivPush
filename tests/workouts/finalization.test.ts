@@ -13,6 +13,8 @@ import {
 import { finalizeWorkout } from '../../features/workouts/commands';
 import type { WorkoutDraftStore } from '../../features/workouts/draftStore';
 import type { WorkoutRepository } from '../../features/workouts/repository';
+import { RolloutDisabledError } from '../../features/kernel/rollout';
+import { externalActualSets } from '../../features/workouts/actualLoads';
 
 const ownerId = '11111111-1111-4111-8111-111111111111';
 const programDayId = '22222222-2222-4222-8222-222222222222';
@@ -158,6 +160,13 @@ test('invalid exercise identity is rejected rather than skipped', () => {
   assert.match(result.errors.join(' '), /exercise identity/i);
 });
 
+test('an empty workout draft is rejected rather than finalized as abandoned', () => {
+  const result = validateWorkoutDraft({ ...fixtureDraft(), slots: [] });
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(' '), /at least one exercise slot/i);
+});
+
 test('response loss preserves the outbox operation and retry returns one receipt', async () => {
   const saved: ReturnType<typeof fixtureDraft>[] = [];
   const store: WorkoutDraftStore = {
@@ -167,8 +176,12 @@ test('response loss preserves the outbox operation and retry returns one receipt
     remove: async () => undefined,
   };
   let attempts = 0;
+  const submittedEnds: string[] = [];
+  const submittedPayloads: string[] = [];
   const repository: WorkoutRepository = {
-    finalize: async (draft) => {
+    finalize: async (draft, endedAt) => {
+      submittedEnds.push(endedAt);
+      submittedPayloads.push(JSON.stringify({ operation: draft.operationId, revision: draft.revision, slots: draft.slots, endedAt }));
       attempts += 1;
       if (attempts === 1) throw new Error('network unavailable after request');
       return {
@@ -193,7 +206,43 @@ test('response loss preserves the outbox operation and retry returns one receipt
   assert.equal(first.status, 'pending');
   const pending = saved.at(-1)!;
   assert.equal(pending.operationId, draft.operationId);
-  const second = await finalizeWorkout(repository, store, pending, '2026-09-10T12:10:00.000Z');
+  assert.throws(() => updateWorkoutSet(pending, { setId: pending.slots[0].sets[0].setId, reps: 12 }), /submitted/i);
+  // Retry from the mounted screen's stale draft, five minutes later.
+  const second = await finalizeWorkout(repository, store, draft, '2026-09-10T12:15:00.000Z');
+  assert.deepEqual(submittedEnds, ['2026-09-10T12:10:00.000Z', '2026-09-10T12:10:00.000Z']);
+  assert.equal(submittedPayloads[0], submittedPayloads[1]);
   assert.equal(second.status, 'replay');
   assert.equal(saved.at(-1)?.lifecycle, 'finalized');
+});
+
+test('disabled finalization leaves the draft editable without a pending submission', async () => {
+  const draft = updateWorkoutSet(fixtureDraft(), { setId: fixtureDraft().slots[0].sets[0].setId, reps: 8, load: 0, logged: true });
+  let stored = draft;
+  const store: WorkoutDraftStore = { load: async () => stored, loadMatching: async () => stored,
+    save: async (value) => { stored = value; }, remove: async () => undefined };
+  const outcome = await finalizeWorkout({ finalize: async () => { throw new RolloutDisabledError('Writer disabled'); } },
+    store, draft, '2026-09-10T12:10:00.000Z');
+  assert.equal(outcome.status, 'unavailable');
+  assert.deepEqual(stored, draft);
+  assert.doesNotThrow(() => updateWorkoutSet(stored, { setId: stored.slots[0].sets[1].setId, reps: 9 }));
+});
+
+test('explicit zero changes unknown load to external but preserves assistance and bodyweight kinds', () => {
+  for (const kind of ['unknown', 'external', 'assistance', 'bodyweight'] as const) {
+    const draft = fixtureDraft();
+    draft.slots[0].sets[0].loadKind = kind;
+    const updated = updateWorkoutSet(draft, { setId: draft.slots[0].sets[0].setId, load: 0 });
+    assert.equal(updated.slots[0].sets[0].loadKind, kind === 'unknown' ? 'external' : kind);
+    assert.equal(updated.slots[0].sets[0].actualLoad, 0);
+  }
+});
+
+test('legacy PR candidates use pounds and actual exercise attribution, excluding assistance', () => {
+  const draft = fixtureDraft();
+  const set = draft.slots[0].sets[0];
+  Object.assign(set, { logged: true, actualExerciseId: prescribedExerciseId, actualReps: 8, actualLoad: 25, loadKind: 'external', loadUnit: 'kg' });
+  assert.deepEqual(externalActualSets(draft, prescribedExerciseId), [{ weightLb: 25 * 2.2046226218, reps: 8 }]);
+  assert.deepEqual(externalActualSets(draft, replacementExerciseId), []);
+  set.loadKind = 'assistance';
+  assert.deepEqual(externalActualSets(draft, prescribedExerciseId), []);
 });

@@ -85,6 +85,7 @@ export interface WorkoutDraft {
   prescriptionRevisionId: string;
   workoutName: string;
   startedAt: string;
+  finalizationEndedAt?: string;
   timezone: string;
   frozenPrescription: Readonly<FrozenWorkoutPrescription>;
   slots: WorkoutDraftSlot[];
@@ -190,6 +191,7 @@ export function updateWorkoutSet(
     enteredRpeText?: string;
   },
 ): WorkoutDraft {
+  requireEditableWorkout(draft);
   let found = false;
   const slots = draft.slots.map((slot) => ({
     ...slot,
@@ -200,6 +202,8 @@ export function updateWorkoutSet(
         ...set,
         actualReps: update.reps === undefined ? set.actualReps : update.reps,
         actualLoad: update.load === undefined ? set.actualLoad : update.load,
+        loadKind: update.load != null && set.loadKind === 'unknown' ? 'external' as const : set.loadKind,
+        loadUnit: update.load != null && set.loadUnit === 'none' ? 'lb' as const : set.loadUnit,
         actualRpe: update.rpe === undefined ? set.actualRpe : update.rpe,
         logged: update.logged === undefined ? set.logged : update.logged,
         loggedAt: update.loggedAt === undefined ? set.loggedAt : update.loggedAt,
@@ -217,6 +221,7 @@ export function amendWorkoutExercise(
   draft: WorkoutDraft,
   amendment: { slotId: string; replacementExerciseId: string; replacementName?: string; amendedAt: string },
 ): WorkoutDraft {
+  requireEditableWorkout(draft);
   let found = false;
   const slots = draft.slots.map((slot) => {
     if (slot.slotId !== amendment.slotId) return slot;
@@ -246,6 +251,7 @@ export function amendWorkoutExercise(
 }
 
 export function confirmWorkoutRecalibration(draft: WorkoutDraft, slotId: string): WorkoutDraft {
+  requireEditableWorkout(draft);
   const slot = draft.slots.find((candidate) => candidate.slotId === slotId);
   if (!slot) throw new Error('Stable prescription slot was not found in this draft.');
   if (!slot.requiresRecalibration) return draft;
@@ -269,6 +275,7 @@ export function applyWorkoutRecalibrationLoad(
   slotId: string,
   load: number,
 ): WorkoutDraft {
+  requireEditableWorkout(draft);
   if (!Number.isFinite(load) || load < 0) {
     throw new Error('Replacement load must be a nonnegative number.');
   }
@@ -309,10 +316,19 @@ export function classifyWorkoutCompletion(draft: WorkoutDraft): WorkoutCompletio
   return 'partial';
 }
 
+function requireEditableWorkout(draft: WorkoutDraft): void {
+  if (draft.finalizationEndedAt || draft.lifecycle === 'finalized' || draft.lifecycle === 'finalizing') {
+    throw new Error('This workout has been submitted. Retry synchronization before making changes.');
+  }
+}
+
 export function validateWorkoutDraft(draft: WorkoutDraft): { ok: boolean; errors: string[] } {
   const errors: string[] = [];
   if (!draft.ownerId || !draft.programDayId || !draft.prescriptionRevisionId) {
     errors.push('Owner, program day, and prescription revision identity are required.');
+  }
+  if (draft.slots.length === 0) {
+    errors.push('Workout draft must contain at least one exercise slot.');
   }
   const setIds = new Set<string>();
   for (const slot of draft.slots) {

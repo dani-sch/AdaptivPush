@@ -1,6 +1,6 @@
 # AdaptivPush database and migration plan
 
-Status: approved planning direction with AP-01 production baseline/enforcement released and the combined AP-02/AP-03 additive migration integration-verified locally on 2026-09-10. The new migration is not deployed. This document owns physical-data planning, compatibility, authority and database verification. The [master plan](/dev-doc/plans/active/ADAPTIVPUSH-MASTER-PLAN.md) owns domain behavior, the [register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) owns slice gates, and the [implementation status](/dev-doc/plans/active/ADAPTIVPUSH-IMPLEMENTATION-STATUS.md) owns code facts. [D-12](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECORD-2026-09-08.md#d-12--database-rollout) requires additive, slice-owned work. The 28-table packet is a design inventory, not a batch of approved migrations.
+Status: approved planning direction with AP-01 production baseline/enforcement released and prior local integration evidence for the two-migration AP-02/AP-03 packet. Both pending migrations remain unapplied in production; their September 14 corrections require the final current-packet evidence below. This document owns physical-data planning, compatibility, authority and database verification. The [master plan](/dev-doc/plans/active/ADAPTIVPUSH-MASTER-PLAN.md) owns domain behavior, the [register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) owns slice gates, and the [implementation status](/dev-doc/plans/active/ADAPTIVPUSH-IMPLEMENTATION-STATUS.md) owns code facts. [D-12](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECORD-2026-09-08.md#d-12--database-rollout) requires additive, slice-owned work. The 28-table packet is a design inventory, not a batch of approved migrations.
 
 ## Evidence and baseline rules
 
@@ -220,23 +220,44 @@ Each row specifies minimum changes to design, compatibility and rollback. Planne
 | AP-15 Social | DB-12/13/17/18 with shared AP-14 enforcement; typed target checks/audience/block consistency and sanitized feed projection. | No automatic workout/activity upload. Private training independent; delete public projection without erasing personal history. Disable feed/writes independently; reconcile queued actions against current visibility. | Block/unfollow/private parent/deleted reply/race/replay/audience leakage fixtures; local role/projection tests plus operational abuse/moderation and device accessibility checks. |
 | AP-16 Account/privacy/support/release | DB-28; private export object and TTL; idempotent deletion saga/receipt, minimal lawful audit/financial retention, account and distribution tombstones; restricted staff processing. | Legacy metadata timestamps are unprocessed intent, not delivered tickets/completed exports; migrate only with clear status and user visibility. Export excludes secrets/other users. Failure retries don't lose request state; public outputs separately revoked; installed content/provenance follows reviewed policy. | Cross-user export denial, expiring URL, staged deletion/replay/error recovery, attachment privacy and account switch/cache cleanup; end-to-end authenticated export/delete/support receipts and production recovery/release ownership. |
 
-### AP-02/AP-03 implemented migration result — 2026-09-10
+### AP-02/AP-03 two-migration release packet — updated 2026-09-14
 
-`20260910210000_ap02_ap03_durable_workouts_and_program_revisions.sql`
-(SHA-256
-`B0CD723D7D00F31B604168F7FC842CB1DB4117ACD9AE2407E1549029534877F2`)
-implements the two rows above as one shared-identity migration. It was applied
-only to local PostgreSQL 17. Fresh reset, database lint, AP-01 regression and
-AP-02/AP-03 failure/replay/concurrency/RLS SQL all pass in the clean integrator.
+The reviewed packet has exactly two additive migrations, in this order:
 
-The production dashboard still lists only `20260910175317` and
-`20260910190000`; Free has no managed backups. Before this migration can be
-pushed, create a fresh encrypted roles/schema/data logical backup, prove
-decryption and destructive restore/semantic equivalence on PostgreSQL 17, then
-perform the production dry-run. CLI authentication and real-device verification
-are also open. Both producers default off. Recovery disables producers and
-retains additive records; rollback never drops revisions, receipts, sets or
-history and never restores the client multiwrite coordinators.
+1. `20260910210000_ap02_ap03_durable_workouts_and_program_revisions.sql` owns
+   shared immutable identities, atomic installation/finalization, replay receipts,
+   ownership/direct-write authority and archive checkpoints.
+2. `20260911120000_ap03_revision_safe_exercise_swap.sql` owns immutable future
+   exercise swaps with current/completed-work protection.
+
+Both remain local-only and were corrected in place before production application
+on September 14. Corrections cover owner-lock/receipt ordering, external-load
+unit/volume semantics, exact elapsed archive checkpoint placement without
+rewriting original start dates, and completed-slot protection across ancestor
+revisions. Dated AP-02/AP-03 reports retain their earlier hashes and results as
+history; the [current release report](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md)
+owns the final reviewed hashes, local PostgreSQL 17 reset/lint/SQL results and
+current integration evidence. Do not apply an older report's hash to the amended
+migration bytes or infer a current pass from the September 11 integration run.
+
+Production remains at `20260910175317` and `20260910190000`. CLI/database
+authentication for `thfxcvxcsfvrzdysdnkq` is independently verified using the local
+DPAPI-protected mechanism. After current automated/build/integration work and the
+user's required pre-migration device/accessibility passes, reconfirm identity,
+health, PostgreSQL version, ledger and drift; capture fresh roles/schema/data
+logical dumps outside the repository, encrypt with AES-256-GCM and protect the
+key with DPAPI CurrentUser. Prove authenticated decrypt/restore and redacted
+semantic comparison in isolated local PostgreSQL 17 before deleting plaintext.
+Recheck encrypted/key hashes immediately before remote writes. The dry-run must
+list exactly the two migrations above; any identity/ledger/drift or packet
+discrepancy stops the write path. No fresh backup or production migration has
+been performed by the September 14 authentication/pre-QA work.
+
+Both production producers remain off until manual, automated, recovery,
+production verification, distribution, rollback and monitoring gates pass.
+Recovery disables producers and retains additive records; rollback never drops
+revisions, receipts, sets or history, resets production, repairs migration history,
+or restores unsafe client multiwrite coordinators.
 
 ## Compatibility, deletion and rollback procedure
 

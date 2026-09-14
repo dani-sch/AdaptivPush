@@ -14,7 +14,7 @@ import {
   UserRound,
   X,
 } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActionSheetIOS,
   ActivityIndicator,
@@ -45,6 +45,14 @@ import { useTheme, type AppearancePreference } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
 import { PALETTES, type PaletteKey } from '@/constants/palettes';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  classifySupabaseError,
+  reportSupabaseFailure,
+  runSupabaseOperation,
+  supabaseSaveFailureMessage,
+  supabaseUserMessage,
+} from '@/utils/supabaseResilience';
+import { settleIndependentSections, withSavingState } from '@/features/profile/resilience';
 
 const EXPERIENCE_LABELS: Record<TrainingExperience, string> = {
   beginner: 'Beginner',
@@ -259,17 +267,22 @@ const isMissingTableError = (
 const fetchRowsFromTable = async (
   tableName: WorkoutHistoryTable,
   userId: string,
+  signal: AbortSignal,
 ): Promise<{
   rows: WorkoutHistoryRow[];
   error: { code?: string | null; message?: string | null } | null;
 }> => {
   const orderColumn = tableName === 'workout_sessions' ? 'ended_at' : 'completed_at';
 
-  const { data, error } = await supabase
-    .from(tableName)
-    .select('*')
-    .eq('user_id', userId)
-    .order(orderColumn, { ascending: false });
+  const { data, error } = await runSupabaseOperation(
+    (attemptSignal) => supabase
+      .from(tableName)
+      .select('*')
+      .eq('user_id', userId)
+      .order(orderColumn, { ascending: false })
+      .abortSignal(attemptSignal),
+    { kind: 'read', operation: `profile.${tableName}`, signal },
+  );
 
   return {
     rows: (data ?? []) as WorkoutHistoryRow[],
@@ -311,7 +324,17 @@ export default function ProfileScreen() {
   const [daysSincePeriod, setDaysSincePeriod] = useState<string>('');
   const [avgCycleLength, setAvgCycleLength] = useState<string>('28');
   const [cycleSaving, setCycleSaving] = useState(false);
+  const [cycleStatusMessage, setCycleStatusMessage] = useState<string | null>(null);
+  const [cycleStatusType, setCycleStatusType] = useState<'success' | 'error'>('success');
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
+  const profileRef = useRef<UserProfile | null>(null);
+  const profileOwnerRef = useRef<string | null>(null);
+  const profileLoadControllerRef = useRef<AbortController | null>(null);
+  const profileLoadGenerationRef = useRef(0);
+
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
 
   // Load haptics preference on mount
   useEffect(() => {
@@ -321,165 +344,199 @@ export default function ProfileScreen() {
   }, []);
 
   const fetchProfileData = useCallback(async () => {
+    const generation = profileLoadGenerationRef.current + 1;
+    profileLoadGenerationRef.current = generation;
+    profileLoadControllerRef.current?.abort();
+    const controller = new AbortController();
+    profileLoadControllerRef.current = controller;
+    const isCurrent = (ownerId: string) =>
+      !controller.signal.aborted &&
+      generation === profileLoadGenerationRef.current &&
+      profileOwnerRef.current === ownerId;
+
     try {
-      setLoading(true);
+      setLoading(profileRef.current === null);
       setError(null);
 
       const {
-        data: { user },
+        data: { session },
         error: authError,
-      } = await supabase.auth.getUser();
+      } = await runSupabaseOperation(() => supabase.auth.getSession(), {
+        kind: 'auth',
+        operation: 'profile.local_session',
+        signal: controller.signal,
+      });
 
+      const user = session?.user;
       if (authError || !user) {
-        setError('Unable to load profile.');
+        setError('Please sign in again to load your profile.');
+        profileOwnerRef.current = null;
+        profileRef.current = null;
         setProfile(null);
-        setProgress(DEFAULT_PROGRESS);
         return;
       }
 
-      setProfile({
+      if (profileOwnerRef.current !== user.id) {
+        profileOwnerRef.current = user.id;
+        setAvatarUrl(null);
+        setProgress(DEFAULT_PROGRESS);
+      }
+
+      const identity = {
         id: user.id,
         email: user.email || '',
         full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
-      });
+      };
+      profileRef.current = identity;
+      setProfile(identity);
 
-      // Load avatar from user_profile table
-      const { data: profileRow } = await supabase
-        .from('user_profile')
-        .select('avatar_url')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      setAvatarUrl(profileRow?.avatar_url ?? null);
-
-      const { data: adaptationPreferencesData, error: adaptationPreferencesError } = await supabase
-        .from('user_adaptation_preferences')
-        .select(
-          'readiness_enabled, readiness_checkin_mode, cycle_support_enabled, symptom_tracking_enabled, wearables_enabled, wearables_priority',
-        )
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      const parsedAdaptationPreferences = parseUserAdaptationPreferences(adaptationPreferencesData);
-      const readinessPreferences = resolveReadinessPreferences(
-        adaptationPreferencesData,
+      let readinessPreferences = resolveReadinessPreferences(
+        null,
         user.user_metadata?.readiness_preferences,
       );
-      setReadinessSource(readinessPreferences.source);
-      setIsReadinessPromptsEnabled(readinessPreferences.promptsEnabled);
-      setReadinessQuestions({
-        sleep: readinessPreferences.questions.sleep,
-        stress: readinessPreferences.questions.stress,
-        menstrualCycle: readinessPreferences.questions.menstrualCycle,
-      });
+      let parsedAdaptationPreferences = parseUserAdaptationPreferences(null);
 
-      let nextError: string | null = null;
-
-      if (
-        adaptationPreferencesError &&
-        !isMissingRelationOrColumnError(adaptationPreferencesError, 'user_adaptation_preferences')
-      ) {
-        nextError = adaptationPreferencesError.message;
-      }
-
-      const { data: userProfileData, error: userProfileError } = await supabase
-        .from('user_profile')
-        .select('healthkit_enabled, experience_level, cycle_enabled, last_period_start_date, avg_cycle_length_days')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (userProfileError) {
-        if (!isMissingUserProfileSchemaError(userProfileError)) {
-          nextError = userProfileError.message;
+      const adaptationTask = (async () => {
+        const result = await runSupabaseOperation(
+          (signal) => supabase
+            .from('user_adaptation_preferences')
+            .select('readiness_enabled, readiness_checkin_mode, cycle_support_enabled, symptom_tracking_enabled, wearables_enabled, wearables_priority')
+            .eq('user_id', user.id)
+            .abortSignal(signal)
+            .maybeSingle(),
+          { kind: 'read', operation: 'profile.adaptation_preferences', signal: controller.signal },
+        );
+        if (result.error && !isMissingRelationOrColumnError(result.error, 'user_adaptation_preferences')) {
+          throw result.error;
         }
-        setIsAppleHealthConnected(readinessPreferences.source === 'apple');
-      } else {
+        parsedAdaptationPreferences = parseUserAdaptationPreferences(result.data);
+        readinessPreferences = resolveReadinessPreferences(
+          result.data,
+          user.user_metadata?.readiness_preferences,
+        );
+        if (!isCurrent(user.id)) return;
+        setReadinessSource(readinessPreferences.source);
+        setIsReadinessPromptsEnabled(readinessPreferences.promptsEnabled);
+        setReadinessQuestions({
+          sleep: readinessPreferences.questions.sleep,
+          stress: readinessPreferences.questions.stress,
+          menstrualCycle: readinessPreferences.questions.menstrualCycle,
+        });
+      })();
+
+      const userProfileTask = (async () => {
+        const result = await runSupabaseOperation(
+          (signal) => supabase
+            .from('user_profile')
+            .select('avatar_url, healthkit_enabled, experience_level, cycle_enabled, last_period_start_date, avg_cycle_length_days')
+            .eq('user_id', user.id)
+            .abortSignal(signal)
+            .maybeSingle(),
+          { kind: 'read', operation: 'profile.settings', signal: controller.signal },
+        );
+        if (result.error && !isMissingUserProfileSchemaError(result.error)) throw result.error;
+        if (!isCurrent(user.id)) return;
+        setAvatarUrl(result.data?.avatar_url ?? null);
         const healthkitEnabled =
-          typeof userProfileData?.healthkit_enabled === 'boolean'
-            ? userProfileData.healthkit_enabled
+          typeof result.data?.healthkit_enabled === 'boolean'
+            ? result.data.healthkit_enabled
             : readinessPreferences.source === 'apple';
-
         setIsAppleHealthConnected(healthkitEnabled);
-        if (!healthkitEnabled && readinessPreferences.source === 'apple') {
-          setReadinessSource('manual');
-        }
-        if (userProfileData?.experience_level) {
-          setExperienceLevel(userProfileData.experience_level as TrainingExperience);
+        if (!healthkitEnabled && readinessPreferences.source === 'apple') setReadinessSource('manual');
+        if (result.data?.experience_level) {
+          setExperienceLevel(result.data.experience_level as TrainingExperience);
         }
         setCycleEnabled(
-          userProfileData?.cycle_enabled ??
-            parsedAdaptationPreferences.cycle_support_enabled ??
-            false,
+          result.data?.cycle_enabled ?? parsedAdaptationPreferences.cycle_support_enabled ?? false,
         );
-        setAvgCycleLength(String(userProfileData?.avg_cycle_length_days ?? 28));
-        if (userProfileData?.last_period_start_date) {
+        setAvgCycleLength(String(result.data?.avg_cycle_length_days ?? 28));
+        if (result.data?.last_period_start_date) {
           const { daysSincePeriod: dsp } = await import('@/utils/cyclePhase');
-          setDaysSincePeriod(String(dsp(userProfileData.last_period_start_date)));
+          if (isCurrent(user.id)) setDaysSincePeriod(String(dsp(result.data.last_period_start_date)));
+        }
+        return result.data;
+      })();
+
+      const progressTask = (async () => {
+        const [sessionsResult, prResult] = await Promise.all([
+          fetchRowsFromTable('workout_sessions', user.id, controller.signal),
+          runSupabaseOperation(
+            (signal) => supabase
+              .from('personal_records')
+              .select('*', { count: 'exact', head: true })
+              .eq('user_id', user.id)
+              .abortSignal(signal),
+            { kind: 'read', operation: 'profile.personal_records', signal: controller.signal },
+          ),
+        ]);
+        const sessionsMissing = isMissingTableError(sessionsResult.error, 'workout_sessions');
+        if (sessionsResult.error && !sessionsMissing) throw sessionsResult.error;
+        let rows = sessionsResult.rows;
+        if (sessionsMissing || rows.length === 0) {
+          const historyResult = await fetchRowsFromTable('workout_history', user.id, controller.signal);
+          const historyMissing = isMissingTableError(historyResult.error, 'workout_history');
+          if (historyResult.error && !historyMissing) throw historyResult.error;
+          if (historyResult.rows.length > 0) rows = historyResult.rows;
+        }
+        if (prResult.error) throw prResult.error;
+        if (!isCurrent(user.id)) return;
+        setProgress({ workouts: rows.length, weekStreak: computeWeekStreak(rows), prs: prResult.count ?? 0 });
+      })();
+
+      const results = await settleIndependentSections([adaptationTask, userProfileTask, progressTask] as const);
+      if (!isCurrent(user.id)) return;
+      if (results[0].status === 'fulfilled' && results[1].status === 'fulfilled') {
+        const loadedProfileSettings = results[1].value;
+        if (typeof loadedProfileSettings?.healthkit_enabled !== 'boolean') {
+          setIsAppleHealthConnected(readinessPreferences.source === 'apple');
+        }
+        if (typeof loadedProfileSettings?.cycle_enabled !== 'boolean') {
+          setCycleEnabled(parsedAdaptationPreferences.cycle_support_enabled ?? false);
         }
       }
-
-      const sessionsResult = await fetchRowsFromTable('workout_sessions', user.id);
-      const sessionsMissing = isMissingTableError(sessionsResult.error, 'workout_sessions');
-      if (sessionsResult.error && !sessionsMissing) {
-        setError(sessionsResult.error.message ?? 'Failed to load workout progress.');
-        setProgress(DEFAULT_PROGRESS);
-        return;
+      const firstFailure = results.find((result): result is PromiseRejectedResult => result.status === 'rejected');
+      if (firstFailure) {
+        reportSupabaseFailure('profile.partial_load', firstFailure.reason);
+        setError(
+          `${supabaseUserMessage(firstFailure.reason, 'Some profile details could not be refreshed.')} Other profile sections remain available.`,
+        );
       }
-
-      let rows = sessionsResult.rows;
-      const shouldTryLegacyHistory = sessionsMissing || sessionsResult.rows.length === 0;
-      if (shouldTryLegacyHistory) {
-        const historyResult = await fetchRowsFromTable('workout_history', user.id);
-        const historyMissing = isMissingTableError(historyResult.error, 'workout_history');
-
-        if (historyResult.error && !historyMissing) {
-          setError(historyResult.error.message ?? 'Failed to load workout progress.');
-          setProgress(DEFAULT_PROGRESS);
-          return;
-        }
-
-        if (historyResult.rows.length > 0) {
-          rows = historyResult.rows;
-        }
-      }
-
-      const { count: prTotal } = await supabase
-        .from('personal_records')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id);
-
-      setProgress({
-        workouts: rows.length,
-        weekStreak: computeWeekStreak(rows),
-        prs: prTotal ?? 0,
-      });
-      setError(nextError);
     } catch (fetchError) {
-      console.error('Failed to load profile screen:', fetchError);
-      setError('Failed to load profile data.');
-      setProgress(DEFAULT_PROGRESS);
+      if (classifySupabaseError(fetchError).category !== 'cancelled') {
+        reportSupabaseFailure('profile.load', fetchError);
+        setError(supabaseUserMessage(fetchError, 'Unable to load profile data. Try again.'));
+      }
     } finally {
-      setLoading(false);
+      if (generation === profileLoadGenerationRef.current) {
+        setLoading(false);
+        if (profileLoadControllerRef.current === controller) profileLoadControllerRef.current = null;
+      }
     }
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       void fetchProfileData();
+      return () => profileLoadControllerRef.current?.abort();
     }, [fetchProfileData]),
   );
 
   const handleLogout = async () => {
     try {
-      const { error: signOutError } = await supabase.auth.signOut();
+      const { error: signOutError } = await runSupabaseOperation(
+        () => supabase.auth.signOut(),
+        { kind: 'auth', operation: 'auth.sign_out' },
+      );
       if (signOutError) {
-        setError(signOutError.message);
+        reportSupabaseFailure('auth.sign_out', signOutError);
+        setError(supabaseUserMessage(signOutError, 'Unable to log out right now.'));
         return;
       }
 
       router.replace('/');
     } catch (logoutError) {
-      console.error('Logout error:', logoutError);
-      setError('Unable to log out right now.');
+      reportSupabaseFailure('auth.sign_out', logoutError);
+      setError(supabaseUserMessage(logoutError, 'Unable to log out right now.'));
     }
   };
 
@@ -504,15 +561,20 @@ export default function ProfileScreen() {
   };
 
   const handleSaveReadinessSettings = async () => {
-    try {
-      setIsReadinessSaving(true);
-      setReadinessStatusMessage(null);
+    await withSavingState(setIsReadinessSaving, async () => {
+      let completedSteps = 0;
+      try {
+        setReadinessStatusMessage(null);
 
       const {
-        data: { user },
+        data: { session },
         error: authError,
-      } = await supabase.auth.getUser();
+      } = await runSupabaseOperation(() => supabase.auth.getSession(), {
+        kind: 'auth',
+        operation: 'profile.readiness_session',
+      });
 
+      const user = session?.user;
       if (authError || !user) {
         setReadinessStatusType('error');
         setReadinessStatusMessage('Unable to save readiness settings right now.');
@@ -521,23 +583,28 @@ export default function ProfileScreen() {
 
       const normalizedSource: ReadinessSource = isAppleHealthConnected ? readinessSource : 'manual';
 
-      const { error: profileError } = await supabase.from('user_profile').upsert(
-        {
-          user_id: user.id,
-          healthkit_enabled: isAppleHealthConnected,
-        },
-        { onConflict: 'user_id' },
+      const { error: profileError } = await runSupabaseOperation(
+        (signal) => supabase.from('user_profile').upsert(
+          {
+            user_id: user.id,
+            healthkit_enabled: isAppleHealthConnected,
+          },
+          { onConflict: 'user_id' },
+        ).abortSignal(signal),
+        { kind: 'write', operation: 'profile.readiness_profile_save' },
       );
 
       if (profileError && !isMissingUserProfileSchemaError(profileError)) {
         setReadinessStatusType('error');
-        setReadinessStatusMessage(profileError.message);
+        setReadinessStatusMessage(supabaseSaveFailureMessage(profileError, completedSteps));
         return;
       }
+      if (!profileError) completedSteps += 1;
 
-      const { error: adaptationError } = await supabase
-        .from('user_adaptation_preferences')
-        .upsert(
+      const { error: adaptationError } = await runSupabaseOperation(
+        (signal) => supabase
+          .from('user_adaptation_preferences')
+          .upsert(
           buildUserAdaptationPreferencesUpdate({
             userId: user.id,
             readinessSource: normalizedSource,
@@ -546,48 +613,54 @@ export default function ProfileScreen() {
             symptomTrackingEnabled: readinessQuestions.menstrualCycle,
             wearablesEnabled: isAppleHealthConnected,
           }),
-          { onConflict: 'user_id' },
-        );
+            { onConflict: 'user_id' },
+          )
+          .abortSignal(signal),
+        { kind: 'write', operation: 'profile.readiness_preferences_save' },
+      );
 
       if (
         adaptationError &&
         !isMissingRelationOrColumnError(adaptationError, 'user_adaptation_preferences')
       ) {
         setReadinessStatusType('error');
-        setReadinessStatusMessage(adaptationError.message);
+        setReadinessStatusMessage(supabaseSaveFailureMessage(adaptationError, completedSteps));
         return;
       }
+      if (!adaptationError) completedSteps += 1;
 
-      const { error: metadataError } = await supabase.auth.updateUser({
-        data: mergeUserMetadata(user.user_metadata, {
-          readiness_preferences: {
-            source: normalizedSource,
-            promptsEnabled: isReadinessPromptsEnabled,
-            questions: {
-              sleep: readinessQuestions.sleep,
-              stress: readinessQuestions.stress,
-              menstrualCycle: readinessQuestions.menstrualCycle,
+      const { error: metadataError } = await runSupabaseOperation(
+        () => supabase.auth.updateUser({
+          data: mergeUserMetadata(user.user_metadata, {
+            readiness_preferences: {
+              source: normalizedSource,
+              promptsEnabled: isReadinessPromptsEnabled,
+              questions: {
+                sleep: readinessQuestions.sleep,
+                stress: readinessQuestions.stress,
+                menstrualCycle: readinessQuestions.menstrualCycle,
+              },
             },
-          },
+          }),
         }),
-      });
+        { kind: 'write', operation: 'profile.readiness_metadata_save' },
+      );
 
       if (metadataError) {
         setReadinessStatusType('error');
-        setReadinessStatusMessage(metadataError.message);
+        setReadinessStatusMessage(supabaseSaveFailureMessage(metadataError, completedSteps));
         return;
       }
 
       setReadinessSource(normalizedSource);
       setReadinessStatusType('success');
       setReadinessStatusMessage('Readiness settings saved to backend.');
-    } catch (saveError) {
-      console.error('Failed to save readiness settings:', saveError);
-      setReadinessStatusType('error');
-      setReadinessStatusMessage('Failed to save readiness settings.');
-    } finally {
-      setIsReadinessSaving(false);
-    }
+      } catch (saveError) {
+        reportSupabaseFailure('profile.readiness_save', saveError);
+        setReadinessStatusType('error');
+        setReadinessStatusMessage(supabaseSaveFailureMessage(saveError, completedSteps));
+      }
+    });
   };
 
   const handleEditExperienceLevel = () => {
@@ -622,40 +695,69 @@ export default function ProfileScreen() {
   };
 
   const saveExperienceLevel = async (level: TrainingExperience) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    const previous = experienceLevel;
     setExperienceLevel(level);
-    await supabase
-      .from('user_profile')
-      .update({ experience_level: level, updated_at: new Date().toISOString() })
-      .eq('user_id', user.id);
+    try {
+      const { data: { session }, error: sessionError } = await runSupabaseOperation(
+        () => supabase.auth.getSession(),
+        { kind: 'auth', operation: 'profile.experience_session' },
+      );
+      if (sessionError) throw sessionError;
+      if (!session?.user) throw new Error('Not signed in');
+      const { error: updateError } = await runSupabaseOperation(
+        (signal) => supabase
+          .from('user_profile')
+          .update({ experience_level: level, updated_at: new Date().toISOString() })
+          .eq('user_id', session.user.id)
+          .abortSignal(signal),
+        { kind: 'write', operation: 'profile.experience_save' },
+      );
+      if (updateError) throw updateError;
+      setError(null);
+    } catch (saveError) {
+      setExperienceLevel(previous);
+      reportSupabaseFailure('profile.experience_save', saveError);
+      setError(supabaseSaveFailureMessage(saveError));
+    }
   };
 
   const saveCycleSettings = async () => {
-    try {
-      setCycleSaving(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+    await withSavingState(setCycleSaving, async () => {
+      let completedSteps = 0;
+      try {
+        setCycleStatusMessage(null);
+      const { data: { session }, error: sessionError } = await runSupabaseOperation(
+        () => supabase.auth.getSession(),
+        { kind: 'auth', operation: 'profile.cycle_session' },
+      );
+      if (sessionError) throw sessionError;
+      const user = session?.user;
+      if (!user) throw new Error('Not signed in');
 
       const { dateFromDaysAgo } = await import('@/utils/cyclePhase');
       const daysNum = parseInt(daysSincePeriod, 10);
       const periodDate = !isNaN(daysNum) && daysNum >= 0 ? dateFromDaysAgo(daysNum) : null;
       const cycleLen = parseInt(avgCycleLength, 10);
 
-      const { error: cycleProfileError } = await supabase.from('user_profile').update({
-        cycle_enabled: cycleEnabled,
-        last_period_start_date: cycleEnabled ? periodDate : null,
-        avg_cycle_length_days: !isNaN(cycleLen) && cycleLen > 0 ? cycleLen : 28,
-        updated_at: new Date().toISOString(),
-      }).eq('user_id', user.id);
+      const { error: cycleProfileError } = await runSupabaseOperation(
+        (signal) => supabase.from('user_profile').update({
+          cycle_enabled: cycleEnabled,
+          last_period_start_date: cycleEnabled ? periodDate : null,
+          avg_cycle_length_days: !isNaN(cycleLen) && cycleLen > 0 ? cycleLen : 28,
+          updated_at: new Date().toISOString(),
+        }).eq('user_id', user.id).abortSignal(signal),
+        { kind: 'write', operation: 'profile.cycle_profile_save' },
+      );
 
       if (cycleProfileError) {
         throw cycleProfileError;
       }
+      completedSteps += 1;
 
-      const { error: adaptationError } = await supabase
-        .from('user_adaptation_preferences')
-        .upsert(
+      const { error: adaptationError } = await runSupabaseOperation(
+        (signal) => supabase
+          .from('user_adaptation_preferences')
+          .upsert(
           buildUserAdaptationPreferencesUpdate({
             userId: user.id,
             readinessSource,
@@ -664,8 +766,11 @@ export default function ProfileScreen() {
             symptomTrackingEnabled: readinessQuestions.menstrualCycle,
             wearablesEnabled: isAppleHealthConnected,
           }),
-          { onConflict: 'user_id' },
-        );
+            { onConflict: 'user_id' },
+          )
+          .abortSignal(signal),
+        { kind: 'write', operation: 'profile.cycle_preferences_save' },
+      );
 
       if (
         adaptationError &&
@@ -673,9 +778,14 @@ export default function ProfileScreen() {
       ) {
         throw adaptationError;
       }
-    } finally {
-      setCycleSaving(false);
-    }
+      setCycleStatusType('success');
+      setCycleStatusMessage('Cycle settings saved.');
+      } catch (saveError) {
+        reportSupabaseFailure('profile.cycle_save', saveError);
+        setCycleStatusType('error');
+        setCycleStatusMessage(supabaseSaveFailureMessage(saveError, completedSteps));
+      }
+    });
   };
 
   const handleMenuItemPress = (label: MenuLabel) => {
@@ -700,13 +810,17 @@ export default function ProfileScreen() {
     try {
       const url = await uploadAvatar(profile.id);
       if (url) {
-        const { error: upsertError } = await supabase
-          .from('user_profile')
-          .update({ avatar_url: url })
-          .eq('user_id', profile.id);
+        const { error: upsertError } = await runSupabaseOperation(
+          (signal) => supabase
+            .from('user_profile')
+            .update({ avatar_url: url })
+            .eq('user_id', profile.id)
+            .abortSignal(signal),
+          { kind: 'write', operation: 'profile.avatar_url_save' },
+        );
         if (upsertError) {
-          console.error('Profile upsert failed:', upsertError.message);
-          Alert.alert('Error', 'Photo uploaded but failed to save. Please try again.');
+          reportSupabaseFailure('profile.avatar_url_save', upsertError);
+          Alert.alert('Photo not linked', 'The photo uploaded, but your profile could not be updated. Try again to reconcile it.');
           return;
         }
         setAvatarUrl(url);
@@ -888,6 +1002,11 @@ export default function ProfileScreen() {
                 <Text style={styles.cycleSaveBtnText}>{cycleSaving ? 'Saving…' : 'Save'}</Text>
               </Pressable>
             )}
+            {cycleStatusMessage ? (
+              <Text style={{ color: cycleStatusType === 'error' ? theme.errorLight : theme.success, marginTop: 10 }}>
+                {cycleStatusMessage}
+              </Text>
+            ) : null}
           </LinearGradient>
         </View>
 
@@ -979,6 +1098,9 @@ export default function ProfileScreen() {
         {error ? (
           <View style={styles.errorBanner}>
             <Text style={styles.errorText}>{error}</Text>
+            <Pressable onPress={() => void fetchProfileData()}>
+              <Text style={{ color: theme.primaryLight, fontWeight: '700', marginTop: 8 }}>Try Again</Text>
+            </Pressable>
           </View>
         ) : null}
 

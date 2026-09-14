@@ -40,6 +40,12 @@ import {
 import { supabase } from '@/utils/supabase';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
+import {
+  reportSupabaseFailure,
+  runSupabaseOperation,
+  supabaseSaveFailureMessage,
+} from '@/utils/supabaseResilience';
+import { withSavingState } from '@/features/profile/resilience';
 
 // 48 half-hour slots: "12:00 AM" … "11:30 PM"
 const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
@@ -200,10 +206,11 @@ export default function NotificationsScreen() {
   };
 
   const handleSave = async () => {
-    try {
-      setIsSaving(true);
-      setErrorMessage('');
-      setSaveMessage('');
+    await withSavingState(setIsSaving, async () => {
+      let completedSteps = 0;
+      try {
+        setErrorMessage('');
+        setSaveMessage('');
 
       const {
         data: { session },
@@ -232,17 +239,21 @@ export default function NotificationsScreen() {
         pushToken = await getDevicePushToken();
       }
 
-      const { error: saveError } = await supabase.auth.updateUser({
-        data: mergeUserMetadata(session.user.user_metadata, {
-          notification_preferences: nextPreferences,
-          ...(pushToken ? { push_token: pushToken } : {}),
+      const { error: saveError } = await runSupabaseOperation(
+        () => supabase.auth.updateUser({
+          data: mergeUserMetadata(session.user.user_metadata, {
+            notification_preferences: nextPreferences,
+            ...(pushToken ? { push_token: pushToken } : {}),
+          }),
         }),
-      });
+        { kind: 'write', operation: 'profile.notification_settings_save' },
+      );
 
       if (saveError) {
-        setErrorMessage(saveError.message);
+        setErrorMessage(supabaseSaveFailureMessage(saveError));
         return;
       }
+      completedSteps += 1;
 
       // Schedule / cancel local notifications
       await applyNotificationPreferences(nextPreferences);
@@ -253,11 +264,11 @@ export default function NotificationsScreen() {
       } else {
         setSaveMessage('Notification settings saved.');
       }
-    } catch {
-      setErrorMessage('Failed to save notification settings.');
-    } finally {
-      setIsSaving(false);
-    }
+      } catch (saveError) {
+        reportSupabaseFailure('profile.notification_settings_save', saveError);
+        setErrorMessage(supabaseSaveFailureMessage(saveError, completedSteps));
+      }
+    });
   };
 
   return (

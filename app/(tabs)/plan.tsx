@@ -10,11 +10,38 @@ import { GenerateProgramModal } from '@/components/GenerateProgramModal';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
 import { workoutRouteParams } from '@/features/workouts/routeResolution';
+import { reportSupabaseFailure, supabaseSaveFailureMessage } from '@/utils/supabaseResilience';
 
 function LoadingState({ styles }: { styles: ReturnType<typeof createStyles> }) {
     return (
         <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
             <Text style={{ color: styles.label.color }}>Loading program...</Text>
+        </View>
+    );
+}
+
+function UnavailableState({
+    message,
+    onRetry,
+    styles,
+    theme,
+}: {
+    message: string;
+    onRetry: () => void;
+    styles: ReturnType<typeof createStyles>;
+    theme: Theme;
+}) {
+    return (
+        <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 24 }]}>
+            <Text style={{ color: theme.text, textAlign: 'center', lineHeight: 21, marginBottom: 16 }}>
+                {message}
+            </Text>
+            <Pressable
+                onPress={onRetry}
+                style={{ backgroundColor: theme.primary, borderRadius: 14, paddingHorizontal: 24, paddingVertical: 12 }}
+            >
+                <Text style={{ color: theme.white, fontWeight: '700' }}>Try Again</Text>
+            </Pressable>
         </View>
     );
 }
@@ -122,7 +149,16 @@ export default function PlanScreen() {
     const [showMenu, setShowMenu] = useState(false);
     const [showGenModal, setShowGenModal] = useState(false);
 
-    const { program, loading, refresh, swapExercise, endCurrentProgram } = useCurrentProgram();
+    const {
+        program,
+        loading,
+        refreshing,
+        unavailable,
+        availabilityMessage,
+        refresh,
+        swapExercise,
+        endCurrentProgram,
+    } = useCurrentProgram();
 
     useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
@@ -145,6 +181,16 @@ export default function PlanScreen() {
     }, [insets.top]);
 
     if (loading) return <LoadingState styles={styles} />;
+    if (unavailable && !program) {
+        return (
+            <UnavailableState
+                message={availabilityMessage ?? 'Unable to load your program. Try again.'}
+                onRetry={() => void refresh()}
+                styles={styles}
+                theme={theme}
+            />
+        );
+    }
     if (!program)
         return (
             <>
@@ -174,6 +220,18 @@ export default function PlanScreen() {
                 contentContainerStyle={[styles.content, { paddingTop: contentPaddingTop }]}
                 showsVerticalScrollIndicator={false}
             >
+                {unavailable ? (
+                    <View style={{ backgroundColor: theme.mutedBg, borderColor: theme.border, borderWidth: 1, borderRadius: 14, padding: 12, marginBottom: 14 }}>
+                        <Text style={{ color: theme.text, lineHeight: 19 }}>
+                            {availabilityMessage} Showing your last loaded program.
+                        </Text>
+                        <Pressable onPress={() => void refresh()} disabled={refreshing}>
+                            <Text style={{ color: theme.primaryLight, fontWeight: '700', marginTop: 8 }}>
+                                {refreshing ? 'Retrying…' : 'Try Again'}
+                            </Text>
+                        </Pressable>
+                    </View>
+                ) : null}
                 {/* Header */}
                 <View style={styles.headerRow}>
                     <View style={{ flex: 1 }}>
@@ -246,7 +304,8 @@ export default function PlanScreen() {
                                                     await endCurrentProgram();
                                                     setShowMenu(false);
                                                 } catch (e) {
-                                                    console.error(e);
+                                                    reportSupabaseFailure('program.archive', e);
+                                                    Alert.alert('Program not ended', supabaseSaveFailureMessage(e));
                                                     setShowMenu(false);
                                                 }
                                             },

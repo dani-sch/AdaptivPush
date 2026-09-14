@@ -5,6 +5,86 @@
 
 ---
 
+### 2026-09-14 AP-02/AP-03 pre-QA release packet
+
+**Scope**: Bounded durable-record release work on `codex/ap02-ap03-release`,
+starting from `origin/main` baseline `9d968d56`; no AP-04/AP-05 implementation.
+
+**Authentication and production boundary**: Secure Supabase CLI/database access
+to `thfxcvxcsfvrzdysdnkq` was independently verified using the local DPAPI-protected
+helper. Credentials remain outside the repository. No fresh production backup,
+restore or migration was performed in authentication/pre-QA work. Production
+remains at the AP-01 baseline/enforcement ledger and both writers remain off.
+The pending packet contains exactly the two locally corrected migrations
+`20260910210000` and `20260911120000`, in that order.
+
+**Implemented corrections**: Owner-lock replay ordering, exact immutable workout
+submission/end time and pending-edit protection; stable install/lifecycle retry
+requests and owner-pinned installation; ancestor-completed revision protection;
+external-load unit/volume semantics without assistance inflation; exact elapsed
+archive checkpoint without original-start-date rewriting; archive reader
+legacy fallback/account isolation; contextual accessible labels and read-only
+submitted set controls.
+
+**Documentation lifecycle**: Commit `ff29ccf` installs task-scoped lifecycle
+rules in canonical documentation instructions, document/sprint skills and
+AGENTS. The consumed intake prompt was moved byte-for-byte into the September 14
+superseded archive, retaining the distinct earlier FABLE-5 provenance. Direct
+current links and owning inventory were repaired. The task's final file
+inventory changes require TOC regeneration; no broad documentation audit or
+copy of the current chat prompt was created.
+
+**Evidence and next boundary**: The [September 14 release report](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md)
+owns final migration hashes, commits, command/build and current integration
+results. This pre-QA entry claims no final automated pass or new manual result.
+The [manual QA matrix](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-MANUAL-QA-2026-09-14.md)
+must be bound to a clean committed development build and isolated backend.
+User-required pre-migration passes precede fresh encrypted backup/isolated
+PostgreSQL 17 restore and exact two-migration production rollout. Real
+distribution identity, signing/deployment ownership, rollback rehearsal and
+named payload-free monitoring remain writer-enable gates.
+
+---
+
+### 2026-09-14 Supabase availability resilience hardening {#2026-09-14-supabase-availability-resilience}
+
+**Summary**: Diagnosed the reported temporary Auth 502 / project-config failure
+as an external availability event amplified by unbounded client requests,
+sequential profile reads, duplicate mounted program hooks, raw error rendering,
+and transient failures being collapsed into empty program/profile state. Added a
+pure error classifier, sanitized diagnostics, per-operation request deadlines,
+bounded retry for idempotent reads only, owner-scoped cancellation, shared
+program state, partial profile rendering, and explicit retry/save outcomes.
+
+**Policy**: Reads use a 12-second attempt deadline and at most two attempts with
+350 ms exponential backoff plus up to 250 ms jitter. Auth requests use 15
+seconds, writes 18 seconds, and Storage 30 seconds. Writes are never
+automatically retried. Expected classified failures use sanitized development
+warnings rather than `console.error`, so retryable outages do not open React
+Native LogBox. No production infrastructure, schema, RLS, or remote project
+state changed.
+
+**Write integrity**: Generated program installation remains one replay-safe RPC;
+the optional session-length preference now runs only after that atomic success
+and cannot cause installation replay. Existing readiness/cycle/personal-info
+multi-step saves cannot be made atomic without a backend command; they now
+report possible partial completion, retain form input, settle their saving
+state, and require an explicit retry to converge.
+
+**Verification**: availability 12/12; programs 10/10; workouts 19/19; strict
+TypeScript pass; lint zero errors with the same three unrelated warnings.
+Windows cannot perform the required iOS device matrix, so healthy/invalid login,
+injected 502/timeout/offline recovery, profile partial-save recovery, in-flight
+account switching, and offline draft checks remain manual device evidence.
+No sanitized incident-window Supabase logs or request IDs were present locally;
+dashboard 5xx/latency/resource correlation remains an owner operational action.
+
+**Commits**: `8ac2e93`, `5425c38`, `05aa38e`, `ec3587f`, `4beee79`,
+`0cab21d`, `9a081ed`, `4ee3bf1`, and `b07efe6` (plus this documentation
+commit).
+
+---
+
 ### 2026-09-11 AP-02/AP-03 swap, route and recalibration hardening {#2026-09-11-ap-02-ap-03-device-hardening}
 
 **Summary**: Implemented the bounded device-hardening packet on

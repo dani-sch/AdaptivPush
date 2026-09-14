@@ -20,6 +20,7 @@ import { SymbolView } from 'expo-symbols';
 import { supabase } from '@/utils/supabase';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
+import { requireRollout, rollout } from '@/features/kernel/rollout';
 import { createOperationId } from '@/features/kernel/operationId';
 import { installProgram } from '@/features/programs/commands';
 import {
@@ -29,6 +30,7 @@ import {
     type ProgramArtifact,
 } from '@/features/programs/contracts';
 import { programRepository } from '@/features/programs/repository';
+import { reportSupabaseFailure, supabaseSaveFailureMessage } from '@/utils/supabaseResilience';
 
 interface ProgramDay {
     id: string;
@@ -89,10 +91,10 @@ function generateDays(count: number, existingDays: ProgramDay[] = []): ProgramDa
 }
 
 async function requireUserId() {
-    const { data, error } = await supabase.auth.getUser();
+    const { data, error } = await supabase.auth.getSession();
     if (error) throw error;
-    if (!data.user) throw new Error('Not signed in');
-    return data.user.id;
+    if (!data.session?.user) throw new Error('Not signed in');
+    return data.session.user.id;
 }
 
 export default function CreateProgramScreen() {
@@ -240,6 +242,7 @@ export default function CreateProgramScreen() {
 
         try {
             setSaving(true);
+            requireRollout(rollout.atomicProgramWriter, 'Atomic program installation');
 
             const userId = await requireUserId();
 
@@ -281,8 +284,7 @@ export default function CreateProgramScreen() {
                             targetRpe: exercise.target_rpe ?? null,
                             suggestedLoad: exercise.suggested_weight_lb ?? null,
                             loadUnit: 'lb' as const,
-                            loadKind: exercise.suggested_weight_lb === 0 ? 'bodyweight' as const :
-                                exercise.suggested_weight_lb == null ? 'unknown' as const : 'external' as const,
+                            loadKind: exercise.suggested_weight_lb == null ? 'unknown' as const : 'external' as const,
                             loadSide: 'external_total' as const,
                             notes: exercise.notes ?? null,
                         })),
@@ -303,10 +305,10 @@ export default function CreateProgramScreen() {
             Alert.alert('Program created', 'Your custom program has been saved.');
             router.replace('/plan');
         } catch (error: any) {
-            console.error('Error creating custom program:', error);
+            reportSupabaseFailure('program.custom_save', error);
             Alert.alert(
                 'Could not create program',
-                error?.message ?? 'Something went wrong while saving your program.'
+                supabaseSaveFailureMessage(error),
             );
         } finally {
             setSaving(false);

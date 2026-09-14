@@ -17,6 +17,11 @@ import { mergeUserMetadata } from '@/utils/profilePreferences';
 import { supabase } from '@/utils/supabase';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
+import {
+  reportSupabaseFailure,
+  runSupabaseOperation,
+  supabaseSaveFailureMessage,
+} from '@/utils/supabaseResilience';
 
 type SupportActionProps = {
   icon: ReactNode;
@@ -87,10 +92,14 @@ export default function HelpSupportScreen() {
       setSuccessMessage('');
 
       const {
-        data: { user },
+        data: { session },
         error: authError,
-      } = await supabase.auth.getUser();
+      } = await runSupabaseOperation(() => supabase.auth.getSession(), {
+        kind: 'auth',
+        operation: 'profile.support_request_session',
+      });
 
+      const user = session?.user;
       if (authError || !user) {
         setErrorMessage('Unable to submit support request right now.');
         return;
@@ -113,21 +122,24 @@ export default function HelpSupportScreen() {
             : 'featureRequestRequestedAt']: new Date().toISOString(),
       };
 
-      const { error: saveError } = await supabase.auth.updateUser({
-        data: mergeUserMetadata(user.user_metadata, {
-          support_requests: nextRequests,
+      const { error: saveError } = await runSupabaseOperation(
+        () => supabase.auth.updateUser({
+          data: mergeUserMetadata(user.user_metadata, {
+            support_requests: nextRequests,
+          }),
         }),
-      });
+        { kind: 'write', operation: `profile.support_request_${requestType}` },
+      );
 
       if (saveError) {
-        setErrorMessage(saveError.message);
+        setErrorMessage(supabaseSaveFailureMessage(saveError));
         return;
       }
 
       setSuccessMessage('Support request submitted to backend.');
     } catch (requestError) {
-      console.error('Failed to submit support request:', requestError);
-      setErrorMessage('Failed to submit support request.');
+      reportSupabaseFailure(`profile.support_request_${requestType}`, requestError);
+      setErrorMessage(supabaseSaveFailureMessage(requestError));
     } finally {
       setActiveRequest(null);
     }

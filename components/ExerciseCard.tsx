@@ -28,6 +28,8 @@ export interface Exercise {
     imageUrl?: string;
     description?: string;
     requiresRecalibration?: boolean;
+    readOnly?: boolean;
+    loadLabel?: string;
     recalibration?: {
         originalExerciseName: string;
         completedOriginalSets: number[];
@@ -41,6 +43,9 @@ export interface Exercise {
 interface SetRowProps {
     set: WorkoutSet;
     index: number;
+    exerciseName: string;
+    readOnly?: boolean;
+    loadLabel: string;
     onChangeWeight: (val: string) => void;
     onChangeReps: (val: string) => void;
     onChangeRpe: (val: string) => void;
@@ -52,6 +57,9 @@ interface SetRowProps {
 const SetRow: React.FC<SetRowProps> = ({
     set,
     index,
+    exerciseName,
+    readOnly,
+    loadLabel,
     onChangeWeight,
     onChangeReps,
     onChangeRpe,
@@ -64,33 +72,36 @@ const SetRow: React.FC<SetRowProps> = ({
 
         <TextInput
             style={[styles.setInput, set.logged && styles.setInputLogged]}
+            accessibilityLabel={`${exerciseName}, set ${index + 1}, load in ${loadLabel}`}
             value={set.weight}
             onChangeText={onChangeWeight}
             keyboardType="decimal-pad"
             selectTextOnFocus
-            editable={!set.logged}
+            editable={!set.logged && !readOnly}
             placeholderTextColor={theme.placeholder}
             placeholder="—"
         />
 
         <TextInput
             style={[styles.setInput, set.logged && styles.setInputLogged]}
+            accessibilityLabel={`${exerciseName}, set ${index + 1}, repetitions`}
             value={set.reps}
             onChangeText={onChangeReps}
             keyboardType="number-pad"
             selectTextOnFocus
-            editable={!set.logged}
+            editable={!set.logged && !readOnly}
             placeholderTextColor={theme.placeholder}
             placeholder="—"
         />
 
         <TextInput
             style={[styles.setInput, set.logged && styles.setInputLogged]}
+            accessibilityLabel={`${exerciseName}, set ${index + 1}, rating of perceived exertion`}
             value={set.rpe}
             onChangeText={onChangeRpe}
             keyboardType="decimal-pad"
             selectTextOnFocus
-            editable={!set.logged}
+            editable={!set.logged && !readOnly}
             placeholderTextColor={theme.placeholder}
             placeholder="—"
         />
@@ -105,7 +116,11 @@ const SetRow: React.FC<SetRowProps> = ({
                 if (!set.logged) void haptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
                 onToggleLogged();
             }}
-            hitSlop={6}
+            hitSlop={8}
+            disabled={readOnly}
+            accessibilityRole="checkbox"
+            accessibilityLabel={`${exerciseName}, set ${index + 1} logged`}
+            accessibilityState={{ checked: set.logged, disabled: readOnly }}
         >
             <Ionicons
                 name="checkmark"
@@ -150,6 +165,10 @@ export default function ExerciseCard({
                             pressed && { opacity: 0.7 },
                         ]}
                         onPress={onToggleComplete}
+                        disabled={exercise.readOnly}
+                        accessibilityRole="checkbox"
+                        accessibilityLabel={`${exercise.name}, all entered sets logged`}
+                        accessibilityState={{ checked: exercise.completed, disabled: exercise.readOnly }}
                         hitSlop={8}
                     >
                         {exercise.completed && (
@@ -178,6 +197,8 @@ export default function ExerciseCard({
                         <Pressable
                             style={({ pressed }) => [styles.actionButton, showInfo && styles.actionButtonActive, pressed && { opacity: 0.7 }]}
                             onPress={() => setShowInfo(p => !p)}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Information about ${exercise.name}`}
                             hitSlop={6}
                         >
                             <Ionicons name="information-circle-outline" size={16} color={showInfo ? theme.text : theme.text} />
@@ -193,6 +214,9 @@ export default function ExerciseCard({
                     <Pressable
                         style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.7 }]}
                         onPress={onPressSwap}
+                        disabled={exercise.readOnly}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Swap ${exercise.name}`}
                     >
                         <Ionicons name="swap-horizontal" size={16} color={theme.text} />
                         <Text style={styles.actionButtonText}>Swap</Text>
@@ -211,6 +235,7 @@ export default function ExerciseCard({
                     <Pressable
                         style={styles.recalibrationButton}
                         onPress={onConfirmRecalibration}
+                        disabled={exercise.readOnly}
                         accessibilityRole="button"
                         accessibilityLabel={exercise.recalibration?.suggestedCopyLoad != null
                             ? `Use ${exercise.recalibration?.suggestedCopyLoad} pounds for remaining replacement sets in this workout only`
@@ -233,7 +258,7 @@ export default function ExerciseCard({
             <View style={styles.setsTable}>
                 <View style={styles.setRow}>
                     <Text style={styles.setHeaderSet}>SET</Text>
-                    <Text style={styles.setHeaderLabel}>LBS</Text>
+                    <Text style={styles.setHeaderLabel}>{exercise.loadLabel ?? "LBS"}</Text>
                     <Text style={styles.setHeaderLabel}>REPS</Text>
                     <Text style={styles.setHeaderLabel}>RPE</Text>
                     <View style={styles.logButtonPlaceholder} />
@@ -244,6 +269,9 @@ export default function ExerciseCard({
                         key={set.id}
                         set={set}
                         index={idx}
+                        exerciseName={exercise.name}
+                        readOnly={exercise.readOnly}
+                        loadLabel={exercise.loadLabel ?? "pounds"}
                         onChangeWeight={(val) => onUpdateSet(set.id, "weight", val)}
                         onChangeReps={(val) => onUpdateSet(set.id, "reps", val)}
                         onChangeRpe={(val) => onUpdateSet(set.id, "rpe", val)}

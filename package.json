@@ -12,7 +12,10 @@
     "test:dependencies": "tsx --test tests/dependencies/*.test.ts",
     "test:workouts": "tsx --test tests/workouts/*.test.ts",
     "test:programs": "tsx --test tests/programs/*.test.ts",
+    "test:availability": "tsx --test tests/availability/*.test.ts",
     "test:ap02-ap03": "npm run test:dependencies && npm run test:workouts && npm run test:programs",
+    "test:database-concurrency": "node scripts/verifyDurableConcurrency.mjs",
+    "seed:manual-qa": "tsx scripts/seedManualQa.ts",
     "seed:exercises": "tsx scripts/seedExercises.ts"
   },
   "dependencies": {

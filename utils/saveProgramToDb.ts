@@ -24,6 +24,7 @@ import { programRepository } from '@/features/programs/repository';
 
 import { supabase } from '@/utils/supabase';
 import { isMissingRelationOrColumnError } from '@/utils/profilePreferences';
+import { reportSupabaseFailure, runSupabaseOperation } from '@/utils/supabaseResilience';
 
 const DEFAULT_POLICY_VERSION = 'phase2-baseline';
 const DEFAULT_EVIDENCE_VERSION = 'phase1-evidence-baseline';
@@ -256,8 +257,6 @@ export async function saveProgramToDb(
     })),
   );
   const catalogExerciseByLocalId = await resolveCatalogExerciseRequests(catalogRequests);
-  await persistSessionLengthPreference(userId, params.targetSessionMinutes);
-
   let context: Record<string, unknown> | null = null;
   if (programGenerationContextMode === 'create') {
     const profile = await loadProgramContextProfile(userId);
@@ -317,12 +316,16 @@ export async function saveProgramToDb(
     })),
   };
 
-  const { data: active, error: activeError } = await supabase
-    .from('programs')
-    .select('id,current_revision')
-    .eq('user_id', userId)
-    .eq('is_active', true)
-    .maybeSingle<{ id: string; current_revision: number }>();
+  const { data: active, error: activeError } = await runSupabaseOperation(
+    (signal) => supabase
+      .from('programs')
+      .select('id,current_revision')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .abortSignal(signal)
+      .maybeSingle<{ id: string; current_revision: number }>(),
+    { kind: 'read', operation: 'program.active_before_install' },
+  );
   if (activeError) throw activeError;
 
   const outcome = await installProgram(
@@ -335,5 +338,12 @@ export async function saveProgramToDb(
   if (outcome.status === 'validation') throw new Error(outcome.errors.join(' '));
   if (outcome.status === 'conflict') throw new Error(`Program changed on another device. ${outcome.message}`);
   if (outcome.status === 'unavailable') throw new Error(outcome.message);
+  try {
+    await persistSessionLengthPreference(userId, params.targetSessionMinutes);
+  } catch (preferenceError) {
+    // Program installation is already an atomic success. This optional preference
+    // is reconciled on the next explicit save rather than replaying the install.
+    reportSupabaseFailure('profile.session_length_preference_save', preferenceError);
+  }
   return outcome.receipt.programId;
 }

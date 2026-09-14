@@ -22,6 +22,12 @@ import { getReadinessModifier } from "../../utils/progressionEngine";
 import { supabase } from "../../utils/supabase";
 import { computeCyclePhase } from "../../utils/cyclePhase";
 import { workoutRouteParams } from "@/features/workouts/routeResolution";
+import {
+  classifySupabaseError,
+  reportSupabaseFailure,
+  runSupabaseOperation,
+  supabaseUserMessage,
+} from "@/utils/supabaseResilience";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -260,8 +266,9 @@ const CycleSelector: React.FC<{
 const ModalFooterButtons: React.FC<{
   onContinue: () => void;
   onSkip: () => void;
+  busy?: boolean;
   styles: ReturnType<typeof createStyles>;
-}> = ({ onContinue, onSkip, styles }) => {
+}> = ({ onContinue, onSkip, busy = false, styles }) => {
   return (
     <View style={styles.modalFooter}>
       <Pressable
@@ -270,8 +277,9 @@ const ModalFooterButtons: React.FC<{
           pressed && { opacity: 0.8 },
         ]}
         onPress={onContinue}
+        disabled={busy}
       >
-        <Text style={styles.continueButtonText}>Continue</Text>
+        <Text style={styles.continueButtonText}>{busy ? 'Saving…' : 'Continue'}</Text>
       </Pressable>
       <Pressable
         style={({ pressed }) => [
@@ -279,6 +287,7 @@ const ModalFooterButtons: React.FC<{
           pressed && { opacity: 0.7 },
         ]}
         onPress={onSkip}
+        disabled={busy}
       >
         <Text style={styles.skipButtonText}>Skip for now</Text>
       </Pressable>
@@ -336,42 +345,55 @@ const ReadinessCheckInModal: React.FC<{
   const [soreness, setSoreness] = useState<number>(initialSoreness);
   const [motivation, setMotivation] = useState<number>(initialMotivation);
   const [cyclePhase, setCyclePhase] = useState<CyclePhase>(initialCyclePhase);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const handleContinue = async () => {
     try {
+      setSaving(true);
+      setSaveError(null);
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+        error: sessionError,
+      } = await runSupabaseOperation(() => supabase.auth.getSession(), {
+        kind: 'auth',
+        operation: 'home.readiness_session',
+      });
 
-      if (!user) {
-        console.log("[Readiness] No authenticated user");
-        onClose();
+      if (sessionError || !session?.user) {
+        setSaveError('Please sign in again before saving readiness.');
         return;
       }
 
       const score = computeReadinessScore(sleepHours, stressLevel, soreness, motivation);
 
-      await supabase.from("readiness_logs").upsert(
-        {
-          user_id: user.id,
-          log_date: new Date().toISOString().split("T")[0],
-          sleep_hours: sleepHours,
-          sleep_score: computeSleepScore(sleepHours) * 2,
-          stress: stressLevel,
-          soreness,
-          motivation,
-          readiness_score: score,
-          cycle_phase: cyclePhase !== "N/A" ? cyclePhase : null,
-        },
-        { onConflict: "user_id,log_date" }
+      const { error } = await runSupabaseOperation(
+        (signal) => supabase.from("readiness_logs").upsert(
+          {
+            user_id: session.user.id,
+            log_date: new Date().toISOString().split("T")[0],
+            sleep_hours: sleepHours,
+            sleep_score: computeSleepScore(sleepHours) * 2,
+            stress: stressLevel,
+            soreness,
+            motivation,
+            readiness_score: score,
+            cycle_phase: cyclePhase !== "N/A" ? cyclePhase : null,
+          },
+          { onConflict: "user_id,log_date" },
+        ).abortSignal(signal),
+        { kind: 'write', operation: 'home.readiness_save' },
       );
+      if (error) throw error;
 
       onSaved(score, cyclePhase);
+      onClose();
     } catch (e) {
-      console.log("[Readiness] Error saving check-in:", e);
+      reportSupabaseFailure('home.readiness_save', e);
+      setSaveError(supabaseUserMessage(e, 'Unable to save readiness. Your answers are still here.'));
+    } finally {
+      setSaving(false);
     }
-
-    onClose();
   };
 
   const handleSkip = () => {
@@ -460,8 +482,14 @@ const ReadinessCheckInModal: React.FC<{
             <ModalFooterButtons
               onContinue={handleContinue}
               onSkip={handleSkip}
+              busy={saving}
               styles={styles}
             />
+            {saveError ? (
+              <Text style={{ color: theme.errorLight, textAlign: 'center', marginTop: 10 }}>
+                {saveError}
+              </Text>
+            ) : null}
           </ScrollView>
         </View>
       </View>
@@ -572,78 +600,122 @@ export default function HomeScreen() {
 
   const [lastWorkoutDate, setLastWorkoutDate] = useState<string | null>(null);
 
-  const { program, refresh, applyReadinessAdjustmentOnly, advanceToNextWeek } = useCurrentProgram();
+  const {
+    program,
+    refreshing,
+    unavailable,
+    availabilityMessage,
+    actionError,
+    refresh,
+    applyReadinessAdjustmentOnly,
+    advanceToNextWeek,
+  } = useCurrentProgram();
 
-  const fetchLastWorkout = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data } = await supabase
-      .from('workout_sessions')
-      .select('ended_at')
-      .eq('user_id', user.id)
-      .order('ended_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (data?.ended_at) {
-      const formatted = new Date(data.ended_at).toLocaleDateString(undefined, {
-        month: 'short', day: 'numeric',
-      });
-      setLastWorkoutDate(formatted);
-    } else {
-      setLastWorkoutDate(null);
+  const fetchLastWorkout = useCallback(async (signal: AbortSignal) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
+      if (!user) return;
+      const { data, error } = await runSupabaseOperation(
+        (attemptSignal) => supabase
+          .from('workout_sessions')
+          .select('ended_at')
+          .eq('user_id', user.id)
+          .order('ended_at', { ascending: false })
+          .limit(1)
+          .abortSignal(attemptSignal)
+          .maybeSingle(),
+        { kind: 'read', operation: 'home.last_workout', signal },
+      );
+      if (error) throw error;
+      const currentOwnerId = (await supabase.auth.getSession()).data.session?.user.id;
+      if (signal.aborted || currentOwnerId !== user.id) return;
+      if (data?.ended_at) {
+        const formatted = new Date(data.ended_at).toLocaleDateString(undefined, {
+          month: 'short', day: 'numeric',
+        });
+        setLastWorkoutDate(formatted);
+      } else {
+        setLastWorkoutDate(null);
+      }
+    } catch (error) {
+      if (classifySupabaseError(error).category !== 'cancelled') {
+        reportSupabaseFailure('home.last_workout', error);
+      }
     }
   }, []);
 
-  const fetchHomeData = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+  const fetchHomeData = useCallback(async (signal: AbortSignal) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
+      if (!user) return;
 
-    const today = new Date().toISOString().split("T")[0];
-    const { data } = await supabase
-      .from("readiness_logs")
-      .select("readiness_score, sleep_hours, stress, soreness, motivation, cycle_phase")
-      .eq("user_id", user.id)
-      .eq("log_date", today)
-      .maybeSingle();
+      const today = new Date().toISOString().split("T")[0];
+      const { data, error } = await runSupabaseOperation(
+        (attemptSignal) => supabase
+          .from("readiness_logs")
+          .select("readiness_score, sleep_hours, stress, soreness, motivation, cycle_phase")
+          .eq("user_id", user.id)
+          .eq("log_date", today)
+          .abortSignal(attemptSignal)
+          .maybeSingle(),
+        { kind: 'read', operation: 'home.readiness', signal },
+      );
+      if (error) throw error;
+      const currentOwnerId = (await supabase.auth.getSession()).data.session?.user.id;
+      if (signal.aborted || currentOwnerId !== user.id) return;
 
-    if (data?.readiness_score != null) {
-      setReadinessScore(Number(data.readiness_score).toFixed(1));
-      if (data.sleep_hours != null) setTodaySleepHours(Number(data.sleep_hours));
-      if (data.stress != null) setTodayStressLevel(Number(data.stress));
-      if (data.soreness != null) setTodaySoreness(Number(data.soreness));
-      if (data.motivation != null) setTodayMotivation(Number(data.motivation));
-      if (data.cycle_phase) setTodayCyclePhase(data.cycle_phase as CyclePhase);
-    }
+      if (data?.readiness_score != null) {
+        setReadinessScore(Number(data.readiness_score).toFixed(1));
+        if (data.sleep_hours != null) setTodaySleepHours(Number(data.sleep_hours));
+        if (data.stress != null) setTodayStressLevel(Number(data.stress));
+        if (data.soreness != null) setTodaySoreness(Number(data.soreness));
+        if (data.motivation != null) setTodayMotivation(Number(data.motivation));
+        if (data.cycle_phase) setTodayCyclePhase(data.cycle_phase as CyclePhase);
+      }
 
-    // Auto-compute cycle phase from stored profile data if no manual selection today
-    if (!data?.cycle_phase) {
-      const { data: profileData } = await supabase
-        .from('user_profile')
-        .select('cycle_enabled, last_period_start_date, avg_cycle_length_days')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (profileData?.cycle_enabled && profileData?.last_period_start_date) {
-        const phase = computeCyclePhase(
-          profileData.last_period_start_date,
-          profileData.avg_cycle_length_days ?? 28,
+      if (!data?.cycle_phase) {
+        const { data: profileData, error: profileError } = await runSupabaseOperation(
+          (attemptSignal) => supabase
+            .from('user_profile')
+            .select('cycle_enabled, last_period_start_date, avg_cycle_length_days')
+            .eq('user_id', user.id)
+            .abortSignal(attemptSignal)
+            .maybeSingle(),
+          { kind: 'read', operation: 'home.cycle_profile', signal },
         );
-        const phaseMap: Record<string, CyclePhase> = {
-          menstrual:  'Menstruation',
-          follicular: 'Follicular',
-          ovulatory:  'Ovulation',
-          luteal:     'Luteal',
-        };
-        setTodayCyclePhase(phaseMap[phase] ?? 'N/A');
+        if (profileError) throw profileError;
+        const finalOwnerId = (await supabase.auth.getSession()).data.session?.user.id;
+        if (signal.aborted || finalOwnerId !== user.id) return;
+
+        if (profileData?.cycle_enabled && profileData?.last_period_start_date) {
+          const phase = computeCyclePhase(
+            profileData.last_period_start_date,
+            profileData.avg_cycle_length_days ?? 28,
+          );
+          const phaseMap: Record<string, CyclePhase> = {
+            menstrual:  'Menstruation',
+            follicular: 'Follicular',
+            ovulatory:  'Ovulation',
+            luteal:     'Luteal',
+          };
+          setTodayCyclePhase(phaseMap[phase] ?? 'N/A');
+        }
+      }
+    } catch (error) {
+      if (classifySupabaseError(error).category !== 'cancelled') {
+        reportSupabaseFailure('home.data', error);
       }
     }
   }, []);
 
   // Refresh all home data every time the tab comes into focus
   useFocusEffect(useCallback(() => {
-    refresh();
-    fetchLastWorkout();
-    fetchHomeData();
+    const controller = new AbortController();
+    void refresh();
+    void Promise.all([fetchLastWorkout(controller.signal), fetchHomeData(controller.signal)]);
+    return () => controller.abort();
   }, [refresh, fetchLastWorkout, fetchHomeData]));
 
   // workouts[0] is always the next uncompleted workout (hook sorts completed last)
@@ -700,6 +772,23 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         <HeaderDateBlock styles={styles} />
+        {unavailable ? (
+          <View style={{ backgroundColor: theme.mutedBg, borderColor: theme.border, borderWidth: 1, borderRadius: 14, padding: 12, marginHorizontal: 16, marginBottom: 14 }}>
+            <Text style={{ color: theme.text, lineHeight: 19 }}>
+              {availabilityMessage}{program ? ' Showing your last loaded program.' : ''}
+            </Text>
+            <Pressable onPress={() => void refresh()} disabled={refreshing}>
+              <Text style={{ color: theme.primaryLight, fontWeight: '700', marginTop: 8 }}>
+                {refreshing ? 'Retrying…' : 'Try Again'}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+        {actionError ? (
+          <Text style={{ color: theme.errorLight, marginHorizontal: 16, marginBottom: 12 }}>
+            {actionError}
+          </Text>
+        ) : null}
         {program && program.workouts.every((w) => w.isCompleted) && program.workouts.length > 0 ? (
           <>
             <View style={styles.weekCompleteCard}>

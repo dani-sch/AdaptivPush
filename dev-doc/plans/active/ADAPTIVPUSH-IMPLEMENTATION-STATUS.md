@@ -1,6 +1,6 @@
 # AdaptivPush code-backed implementation status
 
-Snapshot: 2026-09-11. This document owns implementation facts and unresolved code defects. The [master plan](/dev-doc/plans/active/ADAPTIVPUSH-MASTER-PLAN.md) owns target product behavior; the [execution register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) owns delivery status and gates; the [database plan](/dev-doc/plans/active/ADAPTIVPUSH-DATABASE-PLAN.md) owns schema evolution. Approved decisions override historical product proposals, but do not make target behavior implemented.
+Snapshot: 2026-09-14 for the bounded AP-02/AP-03 release update; unrelated source observations retain their earlier scope. This document owns implementation facts and unresolved code defects. The [master plan](/dev-doc/plans/active/ADAPTIVPUSH-MASTER-PLAN.md) owns target product behavior; the [execution register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) owns delivery status and gates; the [database plan](/dev-doc/plans/active/ADAPTIVPUSH-DATABASE-PLAN.md) owns schema evolution. Approved decisions override historical product proposals, but do not make target behavior implemented.
 
 ## Evidence boundaries
 
@@ -59,6 +59,28 @@ and static gates, a fresh four-migration reset and all three SQL suites, Expo
 Doctor 21/21, a 3,819-module Metro export and a 435-task native debug assembly.
 Expo Go was observed separately and retains the SDK/native-module remote-notification limitation; physical-device,
 accessibility, old-client and production rollout evidence remains open.
+
+The September 14 release task on `codex/ap02-ap03-release` adds bounded
+corrections to the two still-unapplied AP-02/AP-03 migrations and their client
+commands. Secure CLI/database authentication is independently verified for
+`thfxcvxcsfvrzdysdnkq` through the local DPAPI-protected helper; credentials stay
+outside the repository. No new production backup or production migration is
+claimed. The [current release report](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md)
+owns final command results, commits, hashes and integration evidence; historical
+passes above do not verify this new diff. User physical-device/accessibility
+results remain necessary, followed by fresh encrypted backup/restore, the exact
+two-migration production packet, distribution identity and monitored rollout.
+
+| September 14 corrected behavior | Owning source / verification boundary |
+|---|---|
+| Same-operation concurrent RPC replay checks after obtaining the owner lock, preventing stale pre-lock receipt observations. | Both pending migrations; atomicity/isolation and successor SQL suites. |
+| Finalization freezes its submitted payload/end time; retries reuse it and pending/finalized set controls reject edits. Definitive rejection clears stale retry state so corrected work can be submitted. | Workout contracts, commands, draft store, Next Workout and ExerciseCard; finalization fixtures. |
+| Install and archive/restore retries retain exact durable requests; installation stays pinned to its captured authenticated owner. | Program commands, repository, install/lifecycle stores and manual authoring; installation fixtures. |
+| Future revision swaps protect completed-set lineage from ancestor revisions. | Successor-revision migration and SQL suite; current workout remains frozen. |
+| Actual load kind/unit survives capture; kilogram external volume is converted and assistance/bodyweight are not counted as external-load volume. PR candidates use actual exercise identity and supported external units. | Workout contracts, actual-load helper and durable finalize migration; contract/SQL fixtures. |
+| Exact archive retains elapsed checkpoint placement and the original start date while explicit restart/legacy approximation remain distinct. Legacy provenance cannot be treated as an exact checkpoint. | Program checkpoint helper, hook, lifecycle commands and migration; checkpoint fixtures. |
+| Archived-program reads fall back for legacy schema and discard previous-owner results during account changes. | Archived Programs owner-scoped reader and compatibility path; runtime/device evidence remains required. |
+| Set entry has contextual accessible names/states; submitted controls are read-only with usable targets. | ExerciseCard, Next Workout and archive controls; actual TalkBack/VoiceOver/touch evidence remains user-owned. |
 
 | Label | Meaning |
 |---|---|
@@ -144,6 +166,6 @@ The [database plan](/dev-doc/plans/active/ADAPTIVPUSH-DATABASE-PLAN.md#current-s
 
 The [August live audit](/dev-doc/reports/FABLE-5-LIVE-SUPABASE-AUDIT-2026-08-03.md) records seven-table ownership isolation, avatar policy repair and exercise external-ID remediation. The [development log](/dev-doc/reports/DEV-LOG.md) records authenticated synthetic-user profile/default/context checks, injected context failure cleanup, lint/type checks and cleanup of the synthetic identity. Those results retain their original dates and scope. AP-01.3 and the AP-02/AP-03 local integration evidence supersede their covered database/command gaps, but neither proves mobile accessibility or physical-device offline behavior.
 
-Before AP-01 exit, complete Profile and missing-schema behavior on an Expo device; Quick Setup optional inputs and Generate Program now have bounded Android 16 evidence, and the database/restore/security gates are complete. Before AP-02/AP-03 release, create and restore a fresh encrypted production backup, securely restore CLI authentication, execute the rest of the full device matrix, then dry-run/apply/verify production and enable the default-off flags. Later slices retain their own deterministic, integration, device and production gates.
+Before AP-01 exit, complete Profile and missing-schema behavior on an Expo device; Quick Setup optional inputs and Generate Program have historical bounded Android 16 evidence, and AP-01's database/restore/security gates are complete. For AP-02/AP-03, complete current automated/build/integration evidence, bind the manual build and obtain the user's required passes, then create and restore a fresh encrypted production backup and dry-run/apply/verify exactly the two reviewed migrations. CLI/database authentication is already verified. Production writer enablement additionally requires real distribution identity, signing/deployment ownership, rollback rehearsal and payload-free monitoring. Later slices retain their own deterministic, integration, device and production gates; AP-04/AP-05 are outside this release task.
 
 The original consolidation performed no application/database mutation. Later dated sections above distinguish implemented local code/migrations, released AP-01 production work, and the still-unreleased AP-02/AP-03 production boundary.

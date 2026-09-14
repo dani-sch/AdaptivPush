@@ -24,6 +24,14 @@ import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
 import { mergeUserMetadata } from '@/utils/profilePreferences';
 import { supabase } from '@/utils/supabase';
+import {
+  classifySupabaseError,
+  reportSupabaseFailure,
+  runSupabaseOperation,
+  supabaseSaveFailureMessage,
+  supabaseUserMessage,
+} from '@/utils/supabaseResilience';
+import { withSavingState } from '@/features/profile/resilience';
 
 type FieldProps = {
   label: string;
@@ -119,6 +127,7 @@ export default function PersonalInformationScreen() {
   const [saveMessage, setSaveMessage] = useState('');
 
   useEffect(() => {
+    const controller = new AbortController();
     const loadPersonalInformation = async () => {
       try {
         setIsLoading(true);
@@ -126,10 +135,15 @@ export default function PersonalInformationScreen() {
         setSaveMessage('');
 
         const {
-          data: { user },
+          data: { session },
           error: authError,
-        } = await supabase.auth.getUser();
+        } = await runSupabaseOperation(() => supabase.auth.getSession(), {
+          kind: 'auth',
+          operation: 'profile.personal_information_session',
+          signal: controller.signal,
+        });
 
+        const user = session?.user;
         if (authError || !user) {
           setErrorMessage('Unable to load personal information.');
           return;
@@ -141,34 +155,45 @@ export default function PersonalInformationScreen() {
         setPreferredName(typeof metadata.preferred_name === 'string' ? metadata.preferred_name : '');
         setPhone(typeof metadata.phone === 'string' ? metadata.phone : '');
 
-        const { data: profileData, error: profileError } = await supabase
-          .from('user_profile')
-          .select('date_of_birth')
-          .eq('user_id', user.id)
-          .maybeSingle();
+        const { data: profileData, error: profileError } = await runSupabaseOperation(
+          (signal) => supabase
+            .from('user_profile')
+            .select('date_of_birth')
+            .eq('user_id', user.id)
+            .abortSignal(signal)
+            .maybeSingle(),
+          { kind: 'read', operation: 'profile.personal_information_load', signal: controller.signal },
+        );
 
         if (profileError && !isMissingUserProfileSchemaError(profileError)) {
-          setErrorMessage(profileError.message);
+          setErrorMessage(supabaseUserMessage(profileError, 'Unable to load your birthday.'));
           return;
         }
 
-        setBirthday(profileData?.date_of_birth ? formatBirthdayForInput(profileData.date_of_birth) : '');
+        const currentOwnerId = (await supabase.auth.getSession()).data.session?.user.id;
+        if (!controller.signal.aborted && currentOwnerId === user.id) {
+          setBirthday(profileData?.date_of_birth ? formatBirthdayForInput(profileData.date_of_birth) : '');
+        }
       } catch (loadError) {
-        console.error('Failed to load personal information screen:', loadError);
-        setErrorMessage('Failed to load personal information.');
+        if (classifySupabaseError(loadError).category !== 'cancelled') {
+          reportSupabaseFailure('profile.personal_information_load', loadError);
+          setErrorMessage(supabaseUserMessage(loadError, 'Unable to load personal information.'));
+        }
       } finally {
-        setIsLoading(false);
+        if (!controller.signal.aborted) setIsLoading(false);
       }
     };
 
     void loadPersonalInformation();
+    return () => controller.abort();
   }, []);
 
   const handleSave = async () => {
-    try {
-      setIsSaving(true);
-      setErrorMessage('');
-      setSaveMessage('');
+    await withSavingState(setIsSaving, async () => {
+      let completedSteps = 0;
+      try {
+        setErrorMessage('');
+        setSaveMessage('');
 
       const trimmedBirthday = birthday.trim();
       const parsedBirthday = normalizeBirthdayForStorage(trimmedBirthday);
@@ -179,10 +204,14 @@ export default function PersonalInformationScreen() {
       }
 
       const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser();
+          data: { session },
+          error: authError,
+      } = await runSupabaseOperation(() => supabase.auth.getSession(), {
+        kind: 'auth',
+        operation: 'profile.personal_information_save_session',
+      });
 
+      const user = session?.user;
       if (authError || !user) {
         setErrorMessage('Unable to save changes right now.');
         return;
@@ -194,36 +223,40 @@ export default function PersonalInformationScreen() {
         phone: phone.trim(),
       });
 
-      const { error: metadataError } = await supabase.auth.updateUser({
-        data: metadataPayload,
-      });
+      const { error: metadataError } = await runSupabaseOperation(
+        () => supabase.auth.updateUser({ data: metadataPayload }),
+        { kind: 'write', operation: 'profile.personal_information_metadata_save' },
+      );
 
       if (metadataError) {
-        setErrorMessage(metadataError.message);
+        setErrorMessage(supabaseSaveFailureMessage(metadataError));
         return;
       }
+      completedSteps += 1;
 
-      const { error: profileError } = await supabase.from('user_profile').upsert(
-        {
-          user_id: user.id,
-          date_of_birth: parsedBirthday,
-        },
-        { onConflict: 'user_id' },
+      const { error: profileError } = await runSupabaseOperation(
+        (signal) => supabase.from('user_profile').upsert(
+          {
+            user_id: user.id,
+            date_of_birth: parsedBirthday,
+          },
+          { onConflict: 'user_id' },
+        ).abortSignal(signal),
+        { kind: 'write', operation: 'profile.personal_information_birthday_save' },
       );
 
       if (profileError && !isMissingUserProfileSchemaError(profileError)) {
-        setErrorMessage(profileError.message);
+        setErrorMessage(supabaseSaveFailureMessage(profileError, completedSteps));
         return;
       }
 
       setBirthday(parsedBirthday ? formatBirthdayForInput(parsedBirthday) : '');
       setSaveMessage('Changes saved to backend.');
-    } catch (saveError) {
-      console.error('Failed to save personal information:', saveError);
-      setErrorMessage('Failed to save personal information.');
-    } finally {
-      setIsSaving(false);
-    }
+      } catch (saveError) {
+        reportSupabaseFailure('profile.personal_information_save', saveError);
+        setErrorMessage(supabaseSaveFailureMessage(saveError, completedSteps));
+      }
+    });
   };
 
   return (

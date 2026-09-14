@@ -12,9 +12,11 @@ import {
   confirmWorkoutRecalibration,
   createWorkoutDraft,
   updateWorkoutSet,
+  validateWorkoutDraft,
   type WorkoutDraft,
 } from "@/features/workouts/contracts";
 import { finalizeWorkout } from "@/features/workouts/commands";
+import { externalActualSets } from "@/features/workouts/actualLoads";
 import { workoutDraftStore } from "@/features/workouts/draftStore";
 import {
   draftLookupForRoute,
@@ -23,6 +25,7 @@ import {
   type WorkoutRouteTarget,
 } from "@/features/workouts/routeResolution";
 import { workoutRepository } from "@/features/workouts/repository";
+import { reportSupabaseFailure } from "@/utils/supabaseResilience";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -77,6 +80,8 @@ function draftToExercises(draft: WorkoutDraft, workout?: ProgramWorkout): Exerci
         ? slot.replacementExerciseName ?? "Replacement exercise"
         : current?.name ?? slot.exerciseName ?? "Prescribed exercise",
       prescription: `${slot.prescribedSetCount}×${repDisplay}`,
+      readOnly: Boolean(draft.finalizationEndedAt) || draft.lifecycle === 'finalized',
+      loadLabel: firstSet?.loadUnit === 'kg' ? 'KG' : firstSet?.loadUnit === 'lb' ? 'LBS' : 'LOAD',
       muscleGroup: current?.muscleGroup,
       imageUrl: current?.imageUrl,
       description: current?.description,
@@ -206,6 +211,7 @@ export default function NextWorkoutScreen() {
   const [authLoading, setAuthLoading] = useState(true);
   const [ownerId, setOwnerId] = useState<string | null>(null);
   const [resolutionAttempt, setResolutionAttempt] = useState(0);
+  const [resolvedTargetKey, setResolvedTargetKey] = useState<string | null>(null);
   const [resolutionError, setResolutionError] = useState<string | null>(null);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
@@ -223,6 +229,17 @@ export default function NextWorkoutScreen() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const persistQueueRef = useRef<Promise<void>>(Promise.resolve());
   const hydratedTargetRef = useRef<string | null>(null);
+  const resolutionTargetKey = useMemo(
+    () => JSON.stringify([
+      ownerId,
+      routeTarget.programId,
+      routeTarget.revisionId,
+      routeTarget.stableDayId,
+      routeTarget.programDayId,
+      routeTarget.workoutId,
+    ]),
+    [ownerId, routeTarget],
+  );
 
   const persistDraft = (nextDraft: WorkoutDraft) => {
     const save = persistQueueRef.current
@@ -259,15 +276,14 @@ export default function NextWorkoutScreen() {
   // the network-backed program is still loading, but an unrelated workout never does.
   useEffect(() => {
     let cancelled = false;
-    const targetKey = JSON.stringify([ownerId, routeTarget.programId, routeTarget.revisionId,
-      routeTarget.stableDayId, routeTarget.programDayId, routeTarget.workoutId]);
-    if (hydratedTargetRef.current !== targetKey) {
-      hydratedTargetRef.current = targetKey;
+    if (hydratedTargetRef.current !== resolutionTargetKey) {
+      hydratedTargetRef.current = resolutionTargetKey;
       setDraft(null);
       setExercises([]);
       setResolutionError(null);
       setSyncMessage(null);
       setDraftLoading(true);
+      setResolvedTargetKey(null);
     }
     if (authLoading) return () => { cancelled = true; };
     (async () => {
@@ -277,6 +293,10 @@ export default function NextWorkoutScreen() {
         const lookup = draftLookupForRoute(routeTarget, programWorkout ?? undefined);
         const stored = await workoutDraftStore.loadMatching(ownerId, lookup);
         if (stored) {
+          const validation = validateWorkoutDraft(stored);
+          if (!validation.ok) {
+            throw new Error(`Stored workout draft is invalid. ${validation.errors.join(' ')}`);
+          }
           settled = true;
           if (cancelled) return;
           setDraft(stored);
@@ -291,6 +311,9 @@ export default function NextWorkoutScreen() {
         settled = true;
         if (!program || !programWorkout || !programWorkout.prescriptionRevisionId || !programWorkout.stableDayId) {
           throw new Error('This requested workout is stale, malformed, or no longer belongs to the active prescription.');
+        }
+        if (programWorkout.exercises.length === 0) {
+          throw new Error('This requested workout has no exercise prescription. Refresh the plan and try again.');
         }
         const nextDraft = createWorkoutDraft({
           ownerId,
@@ -321,9 +344,9 @@ export default function NextWorkoutScreen() {
                   plannedRepsMin: min,
                   plannedRepsMax: max,
                   plannedLoad,
-                  loadKind: plannedLoad === 0 ? 'bodyweight' as const : plannedLoad === null ? 'unknown' as const : 'external' as const,
-                  loadUnit: plannedLoad === null ? 'none' as const : 'lb' as const,
-                  loadSide: plannedLoad === null ? 'unknown' as const : 'external_total' as const,
+                  loadKind: exercise.loadKind ?? (exercise.equipment === 'Bodyweight' ? 'bodyweight' : plannedLoad === null ? 'unknown' : 'external'),
+                  loadUnit: exercise.loadUnit ?? (plannedLoad === null ? 'none' : 'lb'),
+                  loadSide: exercise.loadSide ?? 'unknown',
                 };
               }),
             };
@@ -340,21 +363,28 @@ export default function NextWorkoutScreen() {
         settled = true;
         if (!cancelled) setResolutionError(error instanceof Error ? error.message : 'Workout draft is unavailable.');
       } finally {
-        if (!cancelled && settled) setDraftLoading(false);
+        if (!cancelled && settled) {
+          setResolvedTargetKey(resolutionTargetKey);
+          setDraftLoading(false);
+        }
       }
     })();
     return () => { cancelled = true; };
-  }, [authLoading, loading, ownerId, program, programWorkout, resolutionAttempt, routeTarget]);
+  }, [authLoading, loading, ownerId, program, programWorkout, resolutionAttempt, resolutionTargetKey, routeTarget]);
 
   const availability = workoutAvailability({
     authLoading,
-    programLoading: loading || draftLoading,
+    programLoading: loading || draftLoading || resolvedTargetKey !== resolutionTargetKey,
     program,
     programWorkout,
     draft,
     ownerId,
     route: routeTarget,
   });
+  const canFinishWorkout = availability === 'ready'
+    && draft?.ownerId === ownerId
+    && draft.lifecycle !== 'finalized'
+    && !saving;
 
   const programForSwap = useMemo<CurrentProgram | null>(() => {
     if (!program || !draft) return null;
@@ -401,7 +431,7 @@ export default function NextWorkoutScreen() {
     field: keyof WorkoutSet,
     value: string | boolean,
   ) => {
-    if (!draft) return;
+    if (!draft || draft.finalizationEndedAt || saving) return;
     const asNumber = (input: string): number | null => input.trim() === '' ? null : Number(input);
     const update = field === 'weight'
       ? { enteredLoadText: String(value), load: asNumber(String(value)) }
@@ -417,7 +447,7 @@ export default function NextWorkoutScreen() {
   };
 
   const toggleExerciseComplete = (exerciseId: string) => {
-    if (!draft) return;
+    if (!draft || draft.finalizationEndedAt || saving) return;
     const slot = draft.slots.find((candidate) => candidate.slotId === exerciseId);
     if (!slot) return;
     const shouldLog = !slot.sets.every((set) => set.logged);
@@ -445,6 +475,7 @@ export default function NextWorkoutScreen() {
     applyToProgram: boolean;
   }): Promise<WorkoutSwapResult | null> => {
     if (!draft) throw new Error('Workout draft is unavailable.');
+    if (draft.finalizationEndedAt || saving) throw new Error('Retry synchronization before changing this submitted workout.');
     const replacementExerciseId = replacement.exerciseId ?? replacement.id;
     const slot = draft.slots.find((candidate) => candidate.slotId === exerciseId);
     if (!slot || !replacementExerciseId) throw new Error('Replacement identity is unavailable.');
@@ -514,9 +545,10 @@ export default function NextWorkoutScreen() {
 
     try {
       const {
-        data: { user },
+        data: { session },
         error: authErr,
-      } = await supabase.auth.getUser();
+      } = await supabase.auth.getSession();
+      const user = session?.user;
       if (authErr || !user) throw new Error("Not signed in");
       if (!draft || draft.ownerId !== user.id) throw new Error('Workout draft is unavailable for this account.');
       await persistQueueRef.current;
@@ -526,6 +558,8 @@ export default function NextWorkoutScreen() {
         draft,
         new Date().toISOString(),
       );
+      const submittedDraft = await workoutDraftStore.load(draft.ownerId, draft.programDayId);
+      if (submittedDraft?.draftId === draft.draftId) setDraft(submittedDraft);
       if (outcome.status === 'validation') {
         setSaving(false);
         setSyncMessage(outcome.errors.join(' '));
@@ -563,15 +597,15 @@ export default function NextWorkoutScreen() {
       try {
         for (const ex of outcome.status === 'finalized' ? exercises : []) {
           if (!ex.exerciseId) continue;
-          const loggedSets = ex.sets.filter((s) => s.logged && parseInt(s.reps) > 0);
+          const loggedSets = externalActualSets(draft, ex.exerciseId);
           if (loggedSets.length === 0) continue;
 
           // Best set from this workout (highest weight, tiebreak by reps)
           let bestWeight = 0;
           let bestReps = 0;
           for (const s of loggedSets) {
-            const w = parseFloat(s.weight) || 0;
-            const r = parseInt(s.reps) || 0;
+            const w = s.weightLb;
+            const r = s.reps;
             if (w > bestWeight || (w === bestWeight && r > bestReps)) {
               bestWeight = w;
               bestReps = r;
@@ -632,7 +666,7 @@ export default function NextWorkoutScreen() {
         router.back();
       }
     } catch (err) {
-      console.error("[handleFinish] Failed to save workout:", err);
+      reportSupabaseFailure('workout.finish', err);
       setSaving(false);
       Alert.alert(
         "Save Failed",
@@ -775,15 +809,16 @@ export default function NextWorkoutScreen() {
           <Pressable
             style={({ pressed }) => [
               styles.finishButton,
-              pressed && { opacity: 0.85 },
+              !canFinishWorkout && styles.finishButtonDisabled,
+              pressed && canFinishWorkout && { opacity: 0.85 },
             ]}
-            onPress={() => draft?.lifecycle !== 'finalized' && setShowFinishModal(true)}
-            disabled={draft?.lifecycle === 'finalized'}
+            onPress={() => canFinishWorkout && setShowFinishModal(true)}
+            disabled={!canFinishWorkout}
             accessibilityRole="button"
             accessibilityLabel={draft?.lifecycle === 'finalized' ? 'Workout already finalized' : 'Finish workout'}
           >
             <Text style={styles.finishButtonText}>
-              {draft?.lifecycle === 'finalized' ? 'Workout Finalized' : 'Finish Workout'}
+              {draft?.lifecycle === 'finalized' ? 'Workout Finalized' : draft?.finalizationEndedAt ? 'Retry Sync' : 'Finish Workout'}
             </Text>
           </Pressable>
         </ScrollView>
@@ -998,6 +1033,10 @@ function createStyles(theme: Theme) {
       alignItems: "center",
       justifyContent: "center",
       marginTop: 8,
+    },
+    finishButtonDisabled: {
+      backgroundColor: theme.buttonDisabled,
+      opacity: 0.7,
     },
     finishButtonText: {
       color: theme.white,

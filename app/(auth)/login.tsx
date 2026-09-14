@@ -2,9 +2,16 @@ import BackButton from "@/components/ui/BackButton";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { Theme } from "@/constants/themes";
 import { supabase } from "@/utils/supabase";
+import {
+  classifySupabaseError,
+  loginErrorMessage,
+  reportSupabaseFailure,
+  runSupabaseOperation,
+  supabaseUserMessage,
+} from "@/utils/supabaseResilience";
 import { Link, router } from "expo-router";
 import { SymbolView } from "expo-symbols";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Keyboard,
@@ -30,6 +37,7 @@ export default function LoginScreen() {
 
   const [authError, setAuthError] = useState("");
   const [loading, setLoading] = useState(false);
+  const requestControllerRef = useRef<AbortController | null>(null);
 
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -65,39 +73,69 @@ export default function LoginScreen() {
       return;
     }
 
+    const controller = new AbortController();
+    requestControllerRef.current?.abort();
+    requestControllerRef.current = controller;
+
     try {
       setLoading(true);
 
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { data, error } = await runSupabaseOperation(
+        () =>
+          supabase.auth.signInWithPassword({
+            email,
+            password,
+          }),
+        {
+          kind: "auth",
+          operation: "auth.password_sign_in",
+          signal: controller.signal,
+        },
+      );
 
       if (error) {
-        setAuthError(error.message);
+        reportSupabaseFailure("auth.password_sign_in", error);
+        setAuthError(loginErrorMessage(error));
         return;
       }
 
-      const { data: profile, error: profileError } = await supabase
-        .from("user_profile")
-        .select("onboarded")
-        .eq("user_id", data.user.id)
-        .maybeSingle<{ onboarded: boolean | null }>();
+      const { data: profile, error: profileError } = await runSupabaseOperation(
+        (signal) =>
+          supabase
+            .from("user_profile")
+            .select("onboarded")
+            .eq("user_id", data.user.id)
+            .abortSignal(signal)
+            .maybeSingle<{ onboarded: boolean | null }>(),
+        {
+          kind: "read",
+          operation: "auth.profile_route",
+          signal: controller.signal,
+        },
+      );
 
       if (profileError) {
-        setAuthError("We couldn't load your account setup. Please try again.");
+        reportSupabaseFailure("auth.profile_route", profileError);
+        setAuthError(
+          supabaseUserMessage(
+            profileError,
+            "We couldn't load your account setup. Please try again.",
+          ),
+        );
         return;
       }
 
       router.replace(profile?.onboarded ? "/(tabs)/home" : "/quick-setup");
     } catch (error: unknown) {
-      setAuthError(
-        error instanceof Error
-          ? error.message
-          : "Something went wrong. Please try again.",
-      );
+      if (classifySupabaseError(error).category !== "cancelled") {
+        reportSupabaseFailure("auth.password_sign_in", error);
+        setAuthError(loginErrorMessage(error));
+      }
     } finally {
-      setLoading(false);
+      if (requestControllerRef.current === controller) {
+        requestControllerRef.current = null;
+        setLoading(false);
+      }
     }
   };
 
@@ -116,6 +154,7 @@ export default function LoginScreen() {
     });
 
     return () => {
+      requestControllerRef.current?.abort();
       showSub.remove();
       hideSub.remove();
     };

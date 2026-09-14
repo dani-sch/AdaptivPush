@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { ChevronLeft, Archive } from 'lucide-react-native';
@@ -9,6 +9,8 @@ import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
 import { restoreProgram } from '@/features/programs/commands';
 import { programRepository } from '@/features/programs/repository';
+import { isMissingRelationOrColumnError } from '@/utils/profilePreferences';
+import { reportSupabaseFailure, supabaseSaveFailureMessage, supabaseUserMessage } from '@/utils/supabaseResilience';
 
 type ArchivedProgram = {
     id: string;
@@ -38,16 +40,19 @@ export default function ArchivedProgramsScreen() {
     const [programs, setPrograms] = useState<ArchivedProgram[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
+    const loadSequence = useRef(0);
 
     const loadArchivedPrograms = useCallback(async () => {
+        const sequence = ++loadSequence.current;
         try {
             setLoading(true);
             setLoadError(null);
 
             const {
-                data: { user },
+                data: { session },
                 error: authError,
-            } = await supabase.auth.getUser();
+            } = await supabase.auth.getSession();
+            const user = session?.user;
 
             if (authError) throw authError;
             if (!user) {
@@ -55,7 +60,7 @@ export default function ArchivedProgramsScreen() {
                 return;
             }
 
-            const { data, error } = await supabase
+            let { data, error } = await supabase
                 .from('programs')
                 .select('id,name,goal,duration_weeks,start_date,created_at,updated_at,last_active_week,current_revision,archive_checkpoint_provenance')
                 .eq('user_id', user.id)
@@ -63,16 +68,39 @@ export default function ArchivedProgramsScreen() {
                 .order('updated_at', { ascending: false })
                 .returns<ArchivedProgram[]>();
 
+            if (error && (isMissingRelationOrColumnError(error, 'programs', 'current_revision')
+                || isMissingRelationOrColumnError(error, 'programs', 'archive_checkpoint_provenance'))) {
+                const legacy = await supabase.from('programs')
+                    .select('id,name,goal,duration_weeks,start_date,created_at,updated_at,last_active_week')
+                    .eq('user_id', user.id).eq('is_active', false).order('updated_at', { ascending: false });
+                error = legacy.error;
+                data = (legacy.data ?? []).map((row) => ({ ...row, current_revision: 1,
+                    archive_checkpoint_provenance: row.last_active_week == null ? null : 'legacy_approximate' as const }));
+            }
+
             if (error) throw error;
+            if (sequence !== loadSequence.current) return;
+            const { data: { session: latestSession } } = await supabase.auth.getSession();
+            if (latestSession?.user.id !== user.id) return;
             setPrograms(data ?? []);
         } catch (e) {
-            console.error('loadArchivedPrograms error', e);
-            setPrograms([]);
-            setLoadError('Archived programs are unavailable. Check your connection and try again.');
+            if (sequence !== loadSequence.current) return;
+            reportSupabaseFailure('program.archived_load', e);
+            setLoadError(supabaseUserMessage(e, 'Archived programs are unavailable. Try again.'));
         } finally {
-            setLoading(false);
+            if (sequence === loadSequence.current) setLoading(false);
         }
     }, []);
+
+    useEffect(() => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+            loadSequence.current += 1;
+            setPrograms([]);
+            // Defer SDK calls until after the auth callback releases its lock.
+            void Promise.resolve().then(loadArchivedPrograms);
+        });
+        return () => { loadSequence.current += 1; subscription.unsubscribe(); };
+    }, [loadArchivedPrograms]);
 
     useFocusEffect(
         useCallback(() => {
@@ -85,7 +113,8 @@ export default function ArchivedProgramsScreen() {
         mode: 'exact' | 'restart' | 'legacy_approximate',
     ) => {
         try {
-            const { data: { user } } = await supabase.auth.getUser();
+            const { data: { session } } = await supabase.auth.getSession();
+            const user = session?.user;
             if (!user) return;
             const { data: active, error: activeError } = await supabase
                 .from('programs')
@@ -94,15 +123,15 @@ export default function ArchivedProgramsScreen() {
                 .eq('is_active', true)
                 .maybeSingle<{ id: string }>();
             if (activeError) throw activeError;
-            await restoreProgram(programRepository, programId, mode, active?.id ?? null);
+            await restoreProgram(programRepository, user.id, programId, mode, active?.id ?? null);
 
             await loadArchivedPrograms();
             router.back();
         } catch (e) {
-            console.error('unarchiveProgram error', e);
+            reportSupabaseFailure('program.restore', e);
             Alert.alert(
                 'Could not restore program',
-                e instanceof Error ? e.message : 'The program was not changed. Please try again.',
+                supabaseSaveFailureMessage(e),
             );
         }
     };
@@ -139,6 +168,9 @@ export default function ArchivedProgramsScreen() {
                 <View style={styles.headerRow}>
                     <Pressable
                         onPress={() => router.back()}
+                        accessibilityRole="button"
+                        accessibilityLabel="Back to plan"
+                        hitSlop={6}
                         style={({ pressed }) => [styles.iconButton, pressed && { opacity: 0.8 }]}
                     >
                         <ChevronLeft size={20} color={theme.textPrimary} />
