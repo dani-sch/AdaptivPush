@@ -6,7 +6,10 @@ try {
     $apCommit = (git rev-parse HEAD).Trim()
     $apStatus = (& .\node_modules\.bin\supabase.cmd status --output json 2>$null | ConvertFrom-Json)
     if ($apStatus.API_URL -ne 'http://127.0.0.1:54321') { throw 'Expected local Supabase backend.' }
-    $env:EXPO_NO_DOTENV='1'; $env:CI='1'
+    $env:EXPO_NO_DOTENV='1'
+    # Expo 57 export:embed ignores --reset-cache when CI is true. Export and
+    # Gradle are noninteractive already; permit the requested cache reset.
+    $env:CI=$null
     $env:EXPO_PUBLIC_SUPABASE_URL='http://127.0.0.1:54329'
     $env:EXPO_PUBLIC_SUPABASE_KEY=$apStatus.ANON_KEY
     $env:JAVA_HOME='C:\Program Files\Microsoft\jdk-17.0.20.101-hotspot'
