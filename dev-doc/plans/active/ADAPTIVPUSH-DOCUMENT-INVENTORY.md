@@ -117,7 +117,7 @@ Old locators are plain text intentionally. New destinations below are clickable.
 | [research](/dev-doc/plans/active/ADAPTIVPUSH-RESEARCH-TRANSLATION.md) | New source of truth for research; plan index defines scope without duplicate rules |
 | [inventory](/dev-doc/plans/active/ADAPTIVPUSH-DOCUMENT-INVENTORY.md) | New source of truth for inventory; plan index defines scope without duplicate rules |
 
-[PLAN-INDEX](/dev-doc/plans/active/PLAN-INDEX.md) and living spine are active operational support. The research translation is a supporting research owner, not a new product-approval record. The execution prompt is a neutral review/future-intake router.
+[PLAN-INDEX](/dev-doc/plans/active/PLAN-INDEX.md) and living spine are active operational support. The research translation is a supporting research owner, not a new product-approval record. The consolidation execution prompt was a neutral review/future-intake router; its purpose has ended and its separate 2026-09-14 archival is recorded below.
 
 ## Working-tree preservation
 
@@ -194,3 +194,25 @@ SHA-256 values refer to intake working-tree bytes, including the pre-existing us
 ## Consolidation evidence
 
 [Verification report](/dev-doc/reports/ADAPTIVPUSH-PLAN-CONSOLIDATION-VERIFICATION-2026-09-08.md) records checks, limitations, local commits and the unchanged-source/working-tree preservation boundary. It is new historical evidence, not an additional implementation authority.
+
+## Task-scoped archival: 2026-09-14
+
+The AP-02/AP-03 release task consumed the consolidation intake router, whose
+AP-01.1-next and final-review boundary had been superseded by authorized execution.
+The archival trigger is that lifecycle completion. No age-based or repository-wide
+documentation audit was performed. The 61-source inventory, DOC-009 FABLE-5
+classification, 2026-09-08 archive map, and source-byte manifest above retain their
+original provenance; they describe an earlier file at the same source path.
+
+| Original path / intake title | Preserved destination / successor authority | Provenance and direct references |
+|---|---|---|
+| `dev-doc/plans/active/EXECUTION-PROMPT.md` / AdaptivPush execution intake | [2026-09-14 exact archive](/dev-doc/plans/legacy/2026-09-14-superseded/dev-doc/plans/active/EXECUTION-PROMPT.md); [TODO](/dev-doc/main/TODO.md), [CURRENT-STATE](/dev-doc/main/CURRENT-STATE.md), [execution register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) | Captured from `9d968d56e49483c854219a5d57bee4d375c946bd` on `codex/ap02-ap03-release`; removed from active plans after preservation. Direct current link repaired in `PLAN-INDEX.md`; this inventory records the distinct archival event; generated `TOC.md` requires regeneration at task closeout. Historical inbound locators remain unchanged. |
+
+The captured working-tree and archived bytes share SHA-256
+`c5d11467f6c388269786e0332488dba7663602a6e2093d52e3165ee8583d5304`.
+The earlier [FABLE-5 prompt](/dev-doc/plans/legacy/2026-09-08-superseded/dev-doc/plans/active/EXECUTION-PROMPT.md)
+remains untouched with SHA-256
+`80eaee91a674beaf80470266b61497fe3b6cb8dc15940fe79c847220f9244cac`.
+Both historical bodies retain their internal locators. Current execution uses
+the three living successor authorities above; no replacement persistent prompt
+or copy of the current chat request was created.

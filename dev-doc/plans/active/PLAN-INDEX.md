@@ -22,7 +22,7 @@ The living spine summarizes these owners. Historical source plans never override
 
 Approved release sequence: authority/provenance -> durable workouts/programs -> free schedules/progression -> advanced generation/equipment precision -> contextual coaching/recovery -> unlisted publishing/install -> optional health/themes -> operationally gated discovery/community. AP-16 operational obligations close with each relevant consumer.
 
-[Execution handoff](/dev-doc/plans/active/EXECUTION-PROMPT.md) is a neutral intake router, not automatic permission to implement.
+Current execution routes through [TODO](/dev-doc/main/TODO.md), [current state](/dev-doc/main/CURRENT-STATE.md), and the [execution register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md). The consumed consolidation intake is preserved in the [2026-09-14 archive](/dev-doc/plans/legacy/2026-09-14-superseded/dev-doc/plans/active/EXECUTION-PROMPT.md); it is historical provenance, not current execution authority.
 
 ## Retained provenance and archive
 
