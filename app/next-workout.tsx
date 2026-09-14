@@ -16,6 +16,7 @@ import {
   type WorkoutDraft,
 } from "@/features/workouts/contracts";
 import { finalizeWorkout } from "@/features/workouts/commands";
+import { externalActualSets } from "@/features/workouts/actualLoads";
 import { workoutDraftStore } from "@/features/workouts/draftStore";
 import {
   draftLookupForRoute,
@@ -79,6 +80,8 @@ function draftToExercises(draft: WorkoutDraft, workout?: ProgramWorkout): Exerci
         ? slot.replacementExerciseName ?? "Replacement exercise"
         : current?.name ?? slot.exerciseName ?? "Prescribed exercise",
       prescription: `${slot.prescribedSetCount}×${repDisplay}`,
+      readOnly: Boolean(draft.finalizationEndedAt) || draft.lifecycle === 'finalized',
+      loadLabel: firstSet?.loadUnit === 'kg' ? 'KG' : firstSet?.loadUnit === 'lb' ? 'LBS' : 'LOAD',
       muscleGroup: current?.muscleGroup,
       imageUrl: current?.imageUrl,
       description: current?.description,
@@ -341,9 +344,9 @@ export default function NextWorkoutScreen() {
                   plannedRepsMin: min,
                   plannedRepsMax: max,
                   plannedLoad,
-                  loadKind: plannedLoad === 0 ? 'bodyweight' as const : plannedLoad === null ? 'unknown' as const : 'external' as const,
-                  loadUnit: plannedLoad === null ? 'none' as const : 'lb' as const,
-                  loadSide: plannedLoad === null ? 'unknown' as const : 'external_total' as const,
+                  loadKind: exercise.loadKind ?? (exercise.equipment === 'Bodyweight' ? 'bodyweight' : plannedLoad === null ? 'unknown' : 'external'),
+                  loadUnit: exercise.loadUnit ?? (plannedLoad === null ? 'none' : 'lb'),
+                  loadSide: exercise.loadSide ?? 'unknown',
                 };
               }),
             };
@@ -428,7 +431,7 @@ export default function NextWorkoutScreen() {
     field: keyof WorkoutSet,
     value: string | boolean,
   ) => {
-    if (!draft) return;
+    if (!draft || draft.finalizationEndedAt || saving) return;
     const asNumber = (input: string): number | null => input.trim() === '' ? null : Number(input);
     const update = field === 'weight'
       ? { enteredLoadText: String(value), load: asNumber(String(value)) }
@@ -444,7 +447,7 @@ export default function NextWorkoutScreen() {
   };
 
   const toggleExerciseComplete = (exerciseId: string) => {
-    if (!draft) return;
+    if (!draft || draft.finalizationEndedAt || saving) return;
     const slot = draft.slots.find((candidate) => candidate.slotId === exerciseId);
     if (!slot) return;
     const shouldLog = !slot.sets.every((set) => set.logged);
@@ -472,6 +475,7 @@ export default function NextWorkoutScreen() {
     applyToProgram: boolean;
   }): Promise<WorkoutSwapResult | null> => {
     if (!draft) throw new Error('Workout draft is unavailable.');
+    if (draft.finalizationEndedAt || saving) throw new Error('Retry synchronization before changing this submitted workout.');
     const replacementExerciseId = replacement.exerciseId ?? replacement.id;
     const slot = draft.slots.find((candidate) => candidate.slotId === exerciseId);
     if (!slot || !replacementExerciseId) throw new Error('Replacement identity is unavailable.');
@@ -554,6 +558,8 @@ export default function NextWorkoutScreen() {
         draft,
         new Date().toISOString(),
       );
+      const submittedDraft = await workoutDraftStore.load(draft.ownerId, draft.programDayId);
+      if (submittedDraft?.draftId === draft.draftId) setDraft(submittedDraft);
       if (outcome.status === 'validation') {
         setSaving(false);
         setSyncMessage(outcome.errors.join(' '));
@@ -591,15 +597,15 @@ export default function NextWorkoutScreen() {
       try {
         for (const ex of outcome.status === 'finalized' ? exercises : []) {
           if (!ex.exerciseId) continue;
-          const loggedSets = ex.sets.filter((s) => s.logged && parseInt(s.reps) > 0);
+          const loggedSets = externalActualSets(draft, ex.exerciseId);
           if (loggedSets.length === 0) continue;
 
           // Best set from this workout (highest weight, tiebreak by reps)
           let bestWeight = 0;
           let bestReps = 0;
           for (const s of loggedSets) {
-            const w = parseFloat(s.weight) || 0;
-            const r = parseInt(s.reps) || 0;
+            const w = s.weightLb;
+            const r = s.reps;
             if (w > bestWeight || (w === bestWeight && r > bestReps)) {
               bestWeight = w;
               bestReps = r;
@@ -812,7 +818,7 @@ export default function NextWorkoutScreen() {
             accessibilityLabel={draft?.lifecycle === 'finalized' ? 'Workout already finalized' : 'Finish workout'}
           >
             <Text style={styles.finishButtonText}>
-              {draft?.lifecycle === 'finalized' ? 'Workout Finalized' : 'Finish Workout'}
+              {draft?.lifecycle === 'finalized' ? 'Workout Finalized' : draft?.finalizationEndedAt ? 'Retry Sync' : 'Finish Workout'}
             </Text>
           </Pressable>
         </ScrollView>

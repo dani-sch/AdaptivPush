@@ -1,3 +1,4 @@
+import { checkpointWeek } from '@/features/programs/checkpoint';
 import {
     createContext,
     createElement,
@@ -47,6 +48,7 @@ type DbProgram = {
     start_date: string | null; // YYYY-MM-DD
     swap_interval_weeks?: number | null;
     current_revision?: number;
+    archive_checkpoint?: Record<string, unknown> | null;
     current_revision_id?: string | null;
 };
 
@@ -68,6 +70,9 @@ type DbProgramDay = {
         rep_range_max: number;
         target_rpe: number | null;
         suggested_weight_lb: number | null;
+        load_kind?: WorkoutExercise['loadKind'];
+        load_unit?: WorkoutExercise['loadUnit'];
+        load_side?: WorkoutExercise['loadSide'];
         per_set_weights_lb: number[] | null;
         notes: string | null;
         exercises: {
@@ -83,21 +88,6 @@ const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Satu
 
 function clamp(n: number, min: number, max: number) {
     return Math.max(min, Math.min(max, n));
-}
-
-function computeWeekNumber(startDate: string | null, totalWeeks: number) {
-    if (!startDate) return 1;
-
-    // start_date is DATE; treat it as local date
-    const start = new Date(startDate + 'T00:00:00');
-    const now = new Date();
-
-    const diffMs = now.getTime() - start.getTime();
-    if (diffMs < 0) return 1;
-
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    const week = Math.floor(diffDays / 7) + 1;
-    return clamp(week, 1, totalWeeks);
 }
 
 function todayISODate() {
@@ -176,7 +166,7 @@ function useCurrentProgramState() {
             const currentProgramResult = await runSupabaseOperation(
                 (signal) => supabase
                     .from('programs')
-                    .select('id,name,goal,duration_weeks,start_date,swap_interval_weeks,current_revision,current_revision_id')
+                    .select('id,name,goal,duration_weeks,start_date,swap_interval_weeks,current_revision,current_revision_id,archive_checkpoint')
                     .eq('user_id', requestOwnerId)
                     .eq('is_active', true)
                     .order('created_at', { ascending: false })
@@ -237,7 +227,7 @@ function useCurrentProgramState() {
                 return;
             }
 
-            const currentWeek = computeWeekNumber(prog.start_date, prog.duration_weeks);
+            const currentWeek = checkpointWeek(prog.start_date, prog.duration_weeks, prog.archive_checkpoint, todayISODate());
 
             // Get THIS WEEK's program_days with nested exercises
             let currentDaysQuery = supabase
@@ -255,6 +245,9 @@ function useCurrentProgramState() {
           program_day_exercises!program_day_exercises_program_day_id_fkey (
             id,
             stable_slot_id,
+            load_kind,
+            load_unit,
+            load_side,
             position,
             set_count,
             rep_range_min,
@@ -444,6 +437,9 @@ function useCurrentProgramState() {
                                 reps: `${pde.rep_range_min}-${pde.rep_range_max}`,
                                 weight: pde.suggested_weight_lb ?? undefined,
                                 perSetWeights: pde.per_set_weights_lb ?? undefined,
+                                loadKind: pde.load_kind,
+                                loadUnit: pde.load_unit,
+                                loadSide: pde.load_side,
                                 targetRpe: pde.target_rpe ?? undefined,
                                 muscleGroup: (ex?.primary_muscle as any) ?? undefined,
                                 equipment: (ex?.equipment as any) ?? undefined,
@@ -824,6 +820,7 @@ function useCurrentProgramState() {
         if (!programId) return;
         await archiveProgram(
             programRepository,
+            await requireUserId(),
             programId,
             program.currentRevision,
             program.currentWeek,

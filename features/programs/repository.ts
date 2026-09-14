@@ -12,6 +12,7 @@ import type {
 
 export interface ProgramRepository {
   install(input: {
+    ownerId: string;
     operationId: OperationId;
     artifact: ProgramArtifact;
     expectedActiveProgramId: string | null;
@@ -35,6 +36,10 @@ export interface ProgramRepository {
 export const programRepository: ProgramRepository = {
   async install(input) {
     requireRollout(rollout.atomicProgramWriter, 'Atomic program installation');
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !session || session.user.id !== input.ownerId) {
+      throw new Error('The authenticated account changed. Return to your account before retrying this installation.');
+    }
     const { data, error } = await runSupabaseOperation(
       (signal) => supabase.rpc('install_program_v2', {
         p_payload: {
@@ -43,7 +48,7 @@ export const programRepository: ProgramRepository = {
           expectedActiveProgramId: input.expectedActiveProgramId,
           expectedActiveRevision: input.expectedActiveRevision,
         },
-      }).abortSignal(signal),
+      }).setHeader('Authorization', `Bearer ${session.access_token}`).abortSignal(signal),
       { kind: 'write', operation: 'program.install' },
     );
     if (error) throw error;

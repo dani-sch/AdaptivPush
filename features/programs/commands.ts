@@ -1,4 +1,4 @@
-import { createOperationId } from '../kernel/operationId';
+import { runPendingProgramLifecycle } from './lifecycleStore';
 import {
   normalizeProgramArtifact,
   type ProgramArtifact,
@@ -43,8 +43,9 @@ export async function installProgram(
   );
   try {
     const receipt = await repository.install({
+      ownerId,
       operationId: pending.operationId,
-      artifact,
+      artifact: pending.artifact ?? artifact,
       expectedActiveProgramId: pending.expectedActiveProgramId,
       expectedActiveRevision: pending.expectedActiveRevision,
     });
@@ -53,6 +54,9 @@ export async function installProgram(
   } catch (error) {
     const message = errorMessage(error);
     if (message.toLowerCase().includes('stale_revision')) {
+      // The server rejected this transaction before committing. A refreshed
+      // explicit retry must be allowed to capture the new active revision.
+      await clearPendingProgramInstall(ownerId, pending.operationId, pending.artifactCanonical);
       return { status: 'conflict', message: 'Your active program changed on another device. Refresh and try again.', activeProgramId: null };
     }
     reportSupabaseFailure('program.install', error);
@@ -62,30 +66,30 @@ export async function installProgram(
 
 export async function archiveProgram(
   repository: ProgramRepository,
+  ownerId: string,
   programId: string,
   expectedRevision: number,
   currentWeek: number,
 ): Promise<Record<string, unknown>> {
-  return repository.archive({
-    operationId: createOperationId(),
+  return runPendingProgramLifecycle(ownerId, `archive/${programId}/${expectedRevision}`, {
     programId,
     expectedRevision,
     checkpoint: { kind: 'revision_checkpoint', revision: expectedRevision, week: currentWeek },
-  });
+  }, (pending) => repository.archive({ ...pending.request, operationId: pending.operationId }));
 }
 
 export async function restoreProgram(
   repository: ProgramRepository,
+  ownerId: string,
   programId: string,
   mode: 'exact' | 'restart' | 'legacy_approximate',
   expectedActiveProgramId: string | null,
 ): Promise<Record<string, unknown>> {
-  return repository.restore({
-    operationId: createOperationId(),
+  return runPendingProgramLifecycle(ownerId, `restore/${programId}/${mode}`, {
     programId,
     mode,
     expectedActiveProgramId,
-  });
+  }, (pending) => repository.restore({ ...pending.request, operationId: pending.operationId }));
 }
 
 export async function executeProgramExerciseRevision(

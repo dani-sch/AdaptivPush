@@ -1,3 +1,4 @@
+import type { LoadKind, LoadUnit, LoadSide } from '@/features/workouts/contracts';
 import type { ExplanationMetadata } from '@/types/evidence';
 
 export type MuscleGroup =
@@ -30,6 +31,9 @@ export type WorkoutExercise = {
     sets?: number;
     reps?: string;
     weight?: number;
+    loadKind?: LoadKind;
+    loadUnit?: LoadUnit;
+    loadSide?: LoadSide;
     /** Per-set weight overrides (lb). When present, set i uses perSetWeights[i] instead of weight. */
     perSetWeights?: number[];
     targetRpe?: number | null;

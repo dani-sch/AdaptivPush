@@ -20,6 +20,7 @@ import { SymbolView } from 'expo-symbols';
 import { supabase } from '@/utils/supabase';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
+import { requireRollout, rollout } from '@/features/kernel/rollout';
 import { createOperationId } from '@/features/kernel/operationId';
 import { installProgram } from '@/features/programs/commands';
 import {
@@ -241,6 +242,7 @@ export default function CreateProgramScreen() {
 
         try {
             setSaving(true);
+            requireRollout(rollout.atomicProgramWriter, 'Atomic program installation');
 
             const userId = await requireUserId();
 
@@ -282,8 +284,7 @@ export default function CreateProgramScreen() {
                             targetRpe: exercise.target_rpe ?? null,
                             suggestedLoad: exercise.suggested_weight_lb ?? null,
                             loadUnit: 'lb' as const,
-                            loadKind: exercise.suggested_weight_lb === 0 ? 'bodyweight' as const :
-                                exercise.suggested_weight_lb == null ? 'unknown' as const : 'external' as const,
+                            loadKind: exercise.suggested_weight_lb == null ? 'unknown' as const : 'external' as const,
                             loadSide: 'external_total' as const,
                             notes: exercise.notes ?? null,
                         })),
