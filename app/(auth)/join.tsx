@@ -7,6 +7,7 @@ import { supabase } from "@/utils/supabase";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { Theme } from "@/constants/themes";
 import BackButton from '@/components/ui/BackButton';
+import { reportSupabaseFailure, runSupabaseOperation, supabaseUserMessage } from '@/utils/supabaseResilience';
 
 export default function JoinScreen() {
     const { theme } = useTheme();
@@ -81,18 +82,22 @@ export default function JoinScreen() {
             return;
         }
 
-        const { data, error}  = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-                data: {
-                    full_name: fullName,
+        const { data, error} = await runSupabaseOperation(
+            () => supabase.auth.signUp({
+                email,
+                password,
+                options: {
+                    data: {
+                        full_name: fullName,
+                    },
                 },
-            },
-        });
+            }),
+            { kind: 'auth', operation: 'auth.sign_up' },
+        );
 
         if (error) {
-            setAuthError(error.message);
+            reportSupabaseFailure('auth.sign_up', error);
+            setAuthError(supabaseUserMessage(error, 'Unable to create your account right now. Try again.'));
             return;
         }
 
