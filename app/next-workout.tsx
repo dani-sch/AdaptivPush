@@ -572,16 +572,10 @@ export default function NextWorkoutScreen() {
       }
       if (outcome.status === 'pending' || outcome.status === 'conflict' || outcome.status === 'unavailable') {
         setSaving(false);
-        setSyncMessage(
-          outcome.status === 'pending'
-            ? 'Saved on this device. Synchronization is pending; retry when connected.'
-            : outcome.message,
-        );
+        setSyncMessage(outcome.message);
         Alert.alert(
-          outcome.status === 'pending' ? 'Workout saved offline' : 'Workout needs attention',
-          outcome.status === 'pending'
-            ? 'Your exact draft is safe on this device and has not been marked complete.'
-            : outcome.message,
+          outcome.status === 'pending' ? 'Workout awaiting sync' : 'Workout needs attention',
+          outcome.message,
         );
         return;
       }

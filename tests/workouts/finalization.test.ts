@@ -227,6 +227,22 @@ test('disabled finalization leaves the draft editable without a pending submissi
   assert.doesNotThrow(() => updateWorkoutSet(stored, { setId: stored.slots[0].sets[1].setId, reps: 9 }));
 });
 
+test('missing RPC rejects accurately and preserves editing unless an earlier submission is uncertain', async () => {
+  for (const priorPending of [false, true]) {
+    const draft = updateWorkoutSet(fixtureDraft(), { setId: fixtureDraft().slots[0].sets[0].setId, reps: 8, load: 0, logged: true });
+    if (priorPending) { draft.finalizationEndedAt = '2026-09-10T12:10:00.000Z'; draft.lifecycle = 'failed'; }
+    let stored = draft;
+    const store: WorkoutDraftStore = { load: async () => stored, loadMatching: async () => stored,
+      save: async (value) => { stored = value; }, remove: async () => undefined };
+    const outcome = await finalizeWorkout({ finalize: async () => { throw { code: 'PGRST202' }; } }, store, draft, '2026-09-10T12:12:00.000Z');
+    assert.equal(outcome.status, 'unavailable');
+    if (outcome.status === 'unavailable') assert.match(outcome.message, /service.*update/i);
+    assert.equal(stored.finalizationEndedAt, draft.finalizationEndedAt);
+    if (priorPending) assert.throws(() => updateWorkoutSet(stored, { setId: stored.slots[0].sets[1].setId, reps: 9 }), /submitted/i);
+    else assert.doesNotThrow(() => updateWorkoutSet(stored, { setId: stored.slots[0].sets[1].setId, reps: 9 }));
+  }
+});
+
 test('explicit zero changes unknown load to external but preserves assistance and bodyweight kinds', () => {
   for (const kind of ['unknown', 'external', 'assistance', 'bodyweight'] as const) {
     const draft = fixtureDraft();

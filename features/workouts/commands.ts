@@ -7,7 +7,7 @@ import {
   type WorkoutFinalizationReceipt,
   validateWorkoutDraft,
 } from './contracts';
-import { reportSupabaseFailure, supabaseUserMessage } from '@/utils/supabaseResilience';
+import { classifySupabaseError, reportSupabaseFailure, supabaseUserMessage } from '@/utils/supabaseResilience';
 
 function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -51,6 +51,14 @@ export async function finalizeWorkout(
       return { status: 'unavailable', message: error.message };
     }
     const rawMessage = errorMessage(error);
+    const failure = classifySupabaseError(error);
+    if (['schema_unavailable', 'authentication_required', 'forbidden', 'validation'].includes(failure.category)) {
+      // Do not unlock a prior uncertain submission when this retry is rejected.
+      const message = supabaseUserMessage(error, 'Your draft could not be submitted.');
+      await store.save(draft.finalizationEndedAt ? { ...draft, lastError: message } : draft);
+      reportSupabaseFailure('workout.finalize', error);
+      return { status: 'unavailable', message };
+    }
     const lower = rawMessage.toLowerCase();
     const lifecycle = lower.includes('stale_revision') || lower.includes('conflict') ? 'conflict' : 'failed';
     const message = lifecycle === 'conflict'

@@ -199,6 +199,7 @@ export function supabaseUserMessage(
   errorOrFailure: unknown | SupabaseFailure,
   fallback = 'Something went wrong. Please try again.',
 ): string {
+  if (errorOrFailure instanceof OperationFailureError) return errorOrFailure.message;
   const failure =
     typeof errorOrFailure === 'object' &&
     errorOrFailure !== null &&
