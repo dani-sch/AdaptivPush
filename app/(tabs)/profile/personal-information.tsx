@@ -31,6 +31,7 @@ import {
   supabaseSaveFailureMessage,
   supabaseUserMessage,
 } from '@/utils/supabaseResilience';
+import { withSavingState } from '@/features/profile/resilience';
 
 type FieldProps = {
   label: string;
@@ -188,11 +189,11 @@ export default function PersonalInformationScreen() {
   }, []);
 
   const handleSave = async () => {
-    let completedSteps = 0;
-    try {
-      setIsSaving(true);
-      setErrorMessage('');
-      setSaveMessage('');
+    await withSavingState(setIsSaving, async () => {
+      let completedSteps = 0;
+      try {
+        setErrorMessage('');
+        setSaveMessage('');
 
       const trimmedBirthday = birthday.trim();
       const parsedBirthday = normalizeBirthdayForStorage(trimmedBirthday);
@@ -251,12 +252,11 @@ export default function PersonalInformationScreen() {
 
       setBirthday(parsedBirthday ? formatBirthdayForInput(parsedBirthday) : '');
       setSaveMessage('Changes saved to backend.');
-    } catch (saveError) {
-      reportSupabaseFailure('profile.personal_information_save', saveError);
-      setErrorMessage(supabaseSaveFailureMessage(saveError, completedSteps));
-    } finally {
-      setIsSaving(false);
-    }
+      } catch (saveError) {
+        reportSupabaseFailure('profile.personal_information_save', saveError);
+        setErrorMessage(supabaseSaveFailureMessage(saveError, completedSteps));
+      }
+    });
   };
 
   return (

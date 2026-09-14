@@ -34,6 +34,7 @@ import {
   supabaseSaveFailureMessage,
   supabaseUserMessage,
 } from '@/utils/supabaseResilience';
+import { withSavingState } from '@/features/profile/resilience';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
 
@@ -189,10 +190,10 @@ export default function PrivacyDataScreen() {
   }, []);
 
   const handleSave = async () => {
-    try {
-      setIsSaving(true);
-      setErrorMessage('');
-      setSaveMessage('');
+    await withSavingState(setIsSaving, async () => {
+      try {
+        setErrorMessage('');
+        setSaveMessage('');
 
       const {
           data: { session },
@@ -229,12 +230,11 @@ export default function PrivacyDataScreen() {
       }
 
       setSaveMessage('Privacy controls saved to backend.');
-    } catch (saveError) {
-      reportSupabaseFailure('profile.privacy_save', saveError);
-      setErrorMessage(supabaseSaveFailureMessage(saveError));
-    } finally {
-      setIsSaving(false);
-    }
+      } catch (saveError) {
+        reportSupabaseFailure('profile.privacy_save', saveError);
+        setErrorMessage(supabaseSaveFailureMessage(saveError));
+      }
+    });
   };
 
   const handleDataRequest = async (requestType: 'export' | 'deletion') => {

@@ -45,6 +45,7 @@ import {
   runSupabaseOperation,
   supabaseSaveFailureMessage,
 } from '@/utils/supabaseResilience';
+import { withSavingState } from '@/features/profile/resilience';
 
 // 48 half-hour slots: "12:00 AM" … "11:30 PM"
 const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
@@ -205,11 +206,11 @@ export default function NotificationsScreen() {
   };
 
   const handleSave = async () => {
-    let completedSteps = 0;
-    try {
-      setIsSaving(true);
-      setErrorMessage('');
-      setSaveMessage('');
+    await withSavingState(setIsSaving, async () => {
+      let completedSteps = 0;
+      try {
+        setErrorMessage('');
+        setSaveMessage('');
 
       const {
         data: { session },
@@ -263,12 +264,11 @@ export default function NotificationsScreen() {
       } else {
         setSaveMessage('Notification settings saved.');
       }
-    } catch (saveError) {
-      reportSupabaseFailure('profile.notification_settings_save', saveError);
-      setErrorMessage(supabaseSaveFailureMessage(saveError, completedSteps));
-    } finally {
-      setIsSaving(false);
-    }
+      } catch (saveError) {
+        reportSupabaseFailure('profile.notification_settings_save', saveError);
+        setErrorMessage(supabaseSaveFailureMessage(saveError, completedSteps));
+      }
+    });
   };
 
   return (

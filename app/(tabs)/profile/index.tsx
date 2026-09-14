@@ -52,6 +52,7 @@ import {
   supabaseSaveFailureMessage,
   supabaseUserMessage,
 } from '@/utils/supabaseResilience';
+import { settleIndependentSections, withSavingState } from '@/features/profile/resilience';
 
 const EXPERIENCE_LABELS: Record<TrainingExperience, string> = {
   beginner: 'Beginner',
@@ -482,7 +483,7 @@ export default function ProfileScreen() {
         setProgress({ workouts: rows.length, weekStreak: computeWeekStreak(rows), prs: prResult.count ?? 0 });
       })();
 
-      const results = await Promise.allSettled([adaptationTask, userProfileTask, progressTask]);
+      const results = await settleIndependentSections([adaptationTask, userProfileTask, progressTask] as const);
       if (!isCurrent(user.id)) return;
       if (results[0].status === 'fulfilled' && results[1].status === 'fulfilled') {
         const loadedProfileSettings = results[1].value;
@@ -560,10 +561,10 @@ export default function ProfileScreen() {
   };
 
   const handleSaveReadinessSettings = async () => {
-    let completedSteps = 0;
-    try {
-      setIsReadinessSaving(true);
-      setReadinessStatusMessage(null);
+    await withSavingState(setIsReadinessSaving, async () => {
+      let completedSteps = 0;
+      try {
+        setReadinessStatusMessage(null);
 
       const {
         data: { session },
@@ -654,13 +655,12 @@ export default function ProfileScreen() {
       setReadinessSource(normalizedSource);
       setReadinessStatusType('success');
       setReadinessStatusMessage('Readiness settings saved to backend.');
-    } catch (saveError) {
-      reportSupabaseFailure('profile.readiness_save', saveError);
-      setReadinessStatusType('error');
-      setReadinessStatusMessage(supabaseSaveFailureMessage(saveError, completedSteps));
-    } finally {
-      setIsReadinessSaving(false);
-    }
+      } catch (saveError) {
+        reportSupabaseFailure('profile.readiness_save', saveError);
+        setReadinessStatusType('error');
+        setReadinessStatusMessage(supabaseSaveFailureMessage(saveError, completedSteps));
+      }
+    });
   };
 
   const handleEditExperienceLevel = () => {
@@ -722,10 +722,10 @@ export default function ProfileScreen() {
   };
 
   const saveCycleSettings = async () => {
-    let completedSteps = 0;
-    try {
-      setCycleSaving(true);
-      setCycleStatusMessage(null);
+    await withSavingState(setCycleSaving, async () => {
+      let completedSteps = 0;
+      try {
+        setCycleStatusMessage(null);
       const { data: { session }, error: sessionError } = await runSupabaseOperation(
         () => supabase.auth.getSession(),
         { kind: 'auth', operation: 'profile.cycle_session' },
@@ -780,13 +780,12 @@ export default function ProfileScreen() {
       }
       setCycleStatusType('success');
       setCycleStatusMessage('Cycle settings saved.');
-    } catch (saveError) {
-      reportSupabaseFailure('profile.cycle_save', saveError);
-      setCycleStatusType('error');
-      setCycleStatusMessage(supabaseSaveFailureMessage(saveError, completedSteps));
-    } finally {
-      setCycleSaving(false);
-    }
+      } catch (saveError) {
+        reportSupabaseFailure('profile.cycle_save', saveError);
+        setCycleStatusType('error');
+        setCycleStatusMessage(supabaseSaveFailureMessage(saveError, completedSteps));
+      }
+    });
   };
 
   const handleMenuItemPress = (label: MenuLabel) => {
