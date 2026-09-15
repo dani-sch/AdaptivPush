@@ -20,7 +20,12 @@ import { supabase } from '@/utils/supabase';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
 import { isCatalogExerciseId, type CatalogExerciseId } from '@/features/catalog/contracts';
-import { OptionalValueCache, SingleFlightGate } from '@/features/workouts/swapInteraction';
+import {
+    interactionNow,
+    OptionalValueCache,
+    reportDevelopmentInteraction,
+    SingleFlightGate,
+} from '@/features/workouts/swapInteraction';
 
 interface SwapOption extends WorkoutExercise {
     catalogExerciseId?: CatalogExerciseId;
@@ -137,6 +142,9 @@ export function SwapExerciseModal({ program, exerciseId, onClose, onSwap, embedd
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const historyCacheRef = useRef(new OptionalValueCache<string, LoadSuggestion>());
     const applyGateRef = useRef(new SingleFlightGate());
+    const selectionStartedAtRef = useRef<number | null>(null);
+    const scopeStartedAtRef = useRef<number | null>(null);
+    const applyStartedAtRef = useRef<number | null>(null);
 
     const currentExercise = useMemo(() => {
         for (const workout of program.workouts) {
@@ -295,17 +303,34 @@ export function SwapExerciseModal({ program, exerciseId, onClose, onSwap, embedd
     }, [loadHistorySuggestion, selectedExercise]);
 
     const handleSelect = useCallback((id: string) => {
+        selectionStartedAtRef.current = interactionNow();
         setApplyError(null);
         setSelectedExerciseId((selected) => selected === id ? null : id);
     }, []);
+
+    useEffect(() => {
+        reportDevelopmentInteraction('selection-commit', selectionStartedAtRef.current);
+        selectionStartedAtRef.current = null;
+    }, [selectedExerciseId]);
 
     const handleToggleInfo = useCallback((id: string) => {
         setExpandedId((expanded) => expanded === id ? null : id);
     }, []);
 
+    const handleScope = useCallback((nextScope: 'workout_only' | 'rest_of_program') => {
+        scopeStartedAtRef.current = interactionNow();
+        setScope(nextScope);
+    }, []);
+
+    useEffect(() => {
+        reportDevelopmentInteraction('scope-commit', scopeStartedAtRef.current);
+        scopeStartedAtRef.current = null;
+    }, [scope]);
+
     const handleSwap = async () => {
         const catalogExerciseId = selectedExercise?.catalogExerciseId;
         if (!selectedExercise || !isCatalogExerciseId(catalogExerciseId) || !applyGateRef.current.tryEnter()) return;
+        applyStartedAtRef.current = interactionNow();
         setApplying(true);
         setApplyError(null);
         try {
@@ -334,6 +359,12 @@ export function SwapExerciseModal({ program, exerciseId, onClose, onSwap, embedd
             setApplying(false);
         }
     };
+
+    useEffect(() => {
+        if (!applying) return;
+        reportDevelopmentInteraction('apply-saving-commit', applyStartedAtRef.current);
+        applyStartedAtRef.current = null;
+    }, [applying]);
 
     const renderExercise = useCallback(({ item }: { item: SwapOption }) => (
         <ExerciseOptionRow
@@ -422,7 +453,7 @@ export function SwapExerciseModal({ program, exerciseId, onClose, onSwap, embedd
                             scope === 'workout_only' && styles.scopeButtonSelected,
                             pressed && styles.rowPressed,
                         ]}
-                        onPress={() => setScope('workout_only')}
+                        onPress={() => handleScope('workout_only')}
                         hitSlop={4}
                         accessibilityRole="radio"
                         accessibilityState={{ checked: scope === 'workout_only' }}
@@ -436,7 +467,7 @@ export function SwapExerciseModal({ program, exerciseId, onClose, onSwap, embedd
                             scope === 'rest_of_program' && styles.scopeButtonSelected,
                             pressed && styles.rowPressed,
                         ]}
-                        onPress={() => setScope('rest_of_program')}
+                        onPress={() => handleScope('rest_of_program')}
                         hitSlop={4}
                         accessibilityRole="radio"
                         accessibilityState={{ checked: scope === 'rest_of_program' }}

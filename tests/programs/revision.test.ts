@@ -78,14 +78,13 @@ test('future revision failure leaves a distinct unavailable outcome', async () =
   });
 });
 
-test('final occurrence explains that one-workout scope is still available', async () => {
+test('no later workouts is a deterministic no-change result rather than a retry failure', async () => {
   const outcome = await executeProgramExerciseRevision(
     repository(async () => { throw new Error('invalid_input: no eligible future uncompleted prescriptions'); }),
     operationId,
     request,
   );
-  assert.equal(outcome.status, 'validation');
-  if (outcome.status === 'validation') assert.match(outcome.errors.join(' '), /This workout only/i);
+  assert.deepEqual(outcome, { status: 'no_change', reason: 'no_future_workouts' });
 });
 
 test('incomplete revision identity is rejected before the repository call', async () => {

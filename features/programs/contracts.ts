@@ -93,6 +93,7 @@ export interface ProgramExerciseRevisionReceipt {
 
 export type ProgramExerciseRevisionOutcome =
   | { status: 'revised' | 'replay'; receipt: ProgramExerciseRevisionReceipt }
+  | { status: 'no_change'; reason: 'no_future_workouts' }
   | { status: 'validation'; errors: string[] }
   | { status: 'conflict'; message: string }
   | { status: 'unavailable'; message: string; failure: import('@/utils/supabaseResilience').SupabaseFailure };

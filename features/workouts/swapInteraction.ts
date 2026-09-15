@@ -39,3 +39,12 @@ export class SingleFlightGate {
     return this.active;
   }
 }
+
+export function interactionNow(): number {
+  return globalThis.performance?.now?.() ?? Date.now();
+}
+
+export function reportDevelopmentInteraction(name: string, startedAt: number | null): void {
+  if (startedAt === null || typeof __DEV__ === 'undefined' || !__DEV__) return;
+  console.debug(`[swap-performance] ${name}: ${(interactionNow() - startedAt).toFixed(1)}ms`);
+}
