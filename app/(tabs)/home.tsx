@@ -1,3 +1,4 @@
+import { occurrenceAction, occurrenceState } from '@/features/workouts/effectiveOccurrence';
 import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
 import { router, useFocusEffect } from "expo-router";
@@ -72,12 +73,14 @@ const HeaderDateBlock: React.FC<{ styles: ReturnType<typeof createStyles> }> = (
 const NextWorkoutSection: React.FC<{
   entryIssue?: string | null;
   hasActiveDraft?: boolean;
+  actionLabel?: string;
   workout?: WorkoutSummary;
   onPressStart?: () => void;
-}> = ({ workout, onPressStart, entryIssue, hasActiveDraft }) => {
+}> = ({ workout, onPressStart, entryIssue, hasActiveDraft, actionLabel }) => {
   return (
     <NextWorkoutCard
       entryIssue={entryIssue}
+      actionLabel={actionLabel}
       hasActiveDraft={hasActiveDraft}
       workout={workout}
       onPressStart={onPressStart}
@@ -609,6 +612,7 @@ export default function HomeScreen() {
   >(null);
   const [swapNudgeDismissed, setSwapNudgeDismissed] = useState(false);
 
+  const [lastWorkoutId, setLastWorkoutId] = useState<string | null>(null);
   const [lastWorkoutDate, setLastWorkoutDate] = useState<string | null>(null);
   const [loadedDraft, setLoadedDraft] = useState<WorkoutDraft | null>(null);
   const homeFocusGenerationRef = useRef(0);
@@ -630,7 +634,7 @@ export default function HomeScreen() {
       const { data, error } = await runSupabaseOperation(
         (attemptSignal) => supabase
           .from('workout_sessions')
-          .select('ended_at')
+          .select('id,ended_at')
           .eq('user_id', requestOwnerId)
           .order('ended_at', { ascending: false })
           .limit(1)
@@ -640,6 +644,7 @@ export default function HomeScreen() {
       );
       if (error) throw error;
       if (signal.aborted) return;
+      setLastWorkoutId(data?.id ?? null);
       if (data?.ended_at) {
         const formatted = new Date(data.ended_at).toLocaleDateString(undefined, {
           month: 'short', day: 'numeric',
@@ -776,7 +781,12 @@ export default function HomeScreen() {
       }
     : undefined;
 
+  const homeState = occurrenceState(loadedDraft);
   const handleStartWorkout = () => {
+    if (loadedDraft?.finalizedReceipt) {
+      router.push({ pathname: '/edit-workout', params: { sessionId: loadedDraft.finalizedReceipt.sessionId } });
+      return;
+    }
     if (!program || !nextWorkout || workoutEntryIssue(program, nextWorkout)) return;
     router.push({
       pathname: "/next-workout",
@@ -865,12 +875,16 @@ export default function HomeScreen() {
           </>
         ) : (
           <NextWorkoutSection
+            actionLabel={occurrenceAction(homeState)}
             entryIssue={workoutEntryIssue(program, nextWorkout ?? null)}
             hasActiveDraft={activeDraft !== null}
             workout={nextWorkoutSummary}
             onPressStart={handleStartWorkout}
           />
         )}
+        {lastWorkoutId ? <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/edit-workout', params: { sessionId: lastWorkoutId } })} style={{ padding: 16 }}>
+          <Text style={{ color: theme.primary, fontWeight: '700' }}>Last Workout · {lastWorkoutDate} · View or Update Workout</Text>
+        </Pressable> : null}
         <StatsRow
           readiness={readinessScore ?? '--'}
           lastWorkout={lastWorkoutDate}

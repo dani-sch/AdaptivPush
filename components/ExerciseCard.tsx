@@ -150,10 +150,11 @@ const SetRow: React.FC<SetRowProps> = ({
 interface ExerciseCardProps {
     renderSetControls?: (set: WorkoutSet) => React.ReactNode;
     onAddSet?: () => void;
+    onSkipExercise?: () => void;
     exercise: Exercise;
     onUpdateSet: (setId: string, field: keyof WorkoutSet, value: string | boolean) => void;
     onToggleComplete: () => void;
-    onPressHistory: () => void;
+    onPressHistory?: () => void;
     onPressSwap: () => void;
 }
 
@@ -165,6 +166,7 @@ export default function ExerciseCard({
     onPressSwap,
     renderSetControls,
     onAddSet,
+    onSkipExercise,
 }: ExerciseCardProps) {
     const { theme } = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
@@ -181,7 +183,7 @@ export default function ExerciseCard({
                             pressed && { opacity: 0.7 },
                         ]}
                         onPress={onToggleComplete}
-                        disabled={exercise.readOnly}
+                        disabled={exercise.readOnly || exercise.editingCompleted}
                         accessibilityRole="checkbox"
                         accessibilityLabel={`${exercise.name}, all entered sets logged`}
                         accessibilityState={{ checked: exercise.completed, disabled: exercise.readOnly }}
@@ -218,14 +220,14 @@ export default function ExerciseCard({
                             <Ionicons name="information-circle-outline" size={16} color={showInfo ? theme.text : theme.text} />
                         </Pressable>
                     )}
-                    <Pressable
+                    {onPressHistory ? <Pressable
                         style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.7 }]}
                         onPress={onPressHistory}
                     >
                         <Ionicons name="time-outline" size={16} color={theme.text} />
                         <Text style={styles.actionButtonText}>History</Text>
-                    </Pressable>
-                    <Pressable
+                    </Pressable> : null}
+                    {!exercise.editingCompleted && !exercise.readOnly ? <Pressable
                         style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.7 }]}
                         onPress={onPressSwap}
                         disabled={exercise.readOnly}
@@ -234,7 +236,7 @@ export default function ExerciseCard({
                     >
                         <Ionicons name="swap-horizontal" size={16} color={theme.text} />
                         <Text style={styles.actionButtonText}>Swap</Text>
-                    </Pressable>
+                    </Pressable> : null}
                 </View>
             </View>
             {showInfo && (
@@ -272,7 +274,7 @@ export default function ExerciseCard({
                 ))}
             </View>
             {!exercise.readOnly ? <View>
-              <Pressable style={styles.setAction} onPress={() => exercise.sets.filter(s => !s.logged).forEach(s => onUpdateSet(s.id, 'outcome', 'skipped'))} accessibilityRole="button">
+              <Pressable style={styles.setAction} onPress={onSkipExercise ?? (() => exercise.sets.filter(s => !s.logged).forEach(s => onUpdateSet(s.id, 'outcome', 'skipped')))} accessibilityRole="button">
                 <Text style={styles.actionButtonText}>Skip remaining exercise</Text>
               </Pressable>
               {onAddSet ? <Pressable style={styles.setAction} onPress={onAddSet} accessibilityRole="button"><Text style={styles.actionButtonText}>Add extra set</Text></Pressable> : null}

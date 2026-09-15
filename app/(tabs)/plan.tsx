@@ -431,7 +431,8 @@ export default function PlanScreen() {
                         onClose={() => setSelectedWorkout(null)}
                         onStart={() => {
                             setSelectedWorkout(null);
-                            router.push({ pathname: '/next-workout', params: workoutRouteParams(program, selectedWorkoutObj) });
+                            if (selectedWorkoutObj.sessionId) router.push({ pathname: '/edit-workout', params: { sessionId: selectedWorkoutObj.sessionId } });
+                            else router.push({ pathname: '/next-workout', params: workoutRouteParams(program, selectedWorkoutObj) });
                         }}
                     />
                 </Modal>

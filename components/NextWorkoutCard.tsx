@@ -23,6 +23,7 @@ export interface WorkoutSummary {
 interface NextWorkoutCardProps {
   entryIssue?: string | null;
   hasActiveDraft?: boolean;
+  actionLabel?: string;
   workout?: WorkoutSummary;
   onPressStart?: () => void;
   onPressCalendar?: () => void;
@@ -64,10 +65,12 @@ const ExerciseRow: React.FC<{ exercise: ExerciseItem; styles: ReturnType<typeof 
 // subcomponent: Start Workout Button
 const StartWorkoutButton: React.FC<{
   continuing: boolean;
+  label?: string;
   onPress?: () => void;
   styles: ReturnType<typeof createStyles>;
 }> = ({
   continuing,
+  label,
   onPress,
   styles,
 }) => (
@@ -75,9 +78,9 @@ const StartWorkoutButton: React.FC<{
     onPress={onPress}
     style={({ pressed }) => [styles.startButton, pressed && { opacity: 0.8 }]}
     accessibilityRole="button"
-    accessibilityLabel={continuing ? "Continue workout" : "Start workout"}
+    accessibilityLabel={label ?? (continuing ? "Continue workout" : "Start workout")}
   >
-    <Text style={styles.startButtonText}>{continuing ? "Continue Workout" : "Start Workout"}</Text>
+    <Text style={styles.startButtonText}>{label ?? (continuing ? "Continue Workout" : "Start Workout")}</Text>
   </Pressable>
 );
 
@@ -85,6 +88,7 @@ const StartWorkoutButton: React.FC<{
 export default function NextWorkoutCard({
   entryIssue,
   hasActiveDraft = false,
+  actionLabel,
   workout,
   onPressStart,
   onPressCalendar,
@@ -146,7 +150,7 @@ export default function NextWorkoutCard({
         )}
 
         {entryIssue ? <Text style={styles.exercisePrescription}>{entryIssue}</Text>
-          : <StartWorkoutButton continuing={hasActiveDraft} onPress={onPressStart} styles={styles} />}
+          : <StartWorkoutButton label={actionLabel} continuing={hasActiveDraft} onPress={onPressStart} styles={styles} />}
       </View>
     </View>
   );

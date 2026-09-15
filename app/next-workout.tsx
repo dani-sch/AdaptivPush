@@ -258,6 +258,12 @@ export default function NextWorkoutScreen() {
         if (!ownerId) throw new Error('Sign in to restore this workout draft.');
         const lookup = draftLookupForRoute(routeTarget, programWorkout ?? undefined);
         const stored = await workoutDraftStore.loadMatching(ownerId, lookup);
+        const completedSessionId = programWorkout?.sessionId ?? stored?.finalizedReceipt?.sessionId;
+        if (completedSessionId) {
+          settled = true;
+          if (!cancelled) router.replace({ pathname: '/edit-workout', params: { sessionId: completedSessionId } });
+          return;
+        }
         if (stored) {
           const validation = validateWorkoutDraft(stored);
           if (!validation.ok) {
@@ -431,6 +437,14 @@ export default function NextWorkoutScreen() {
     }
   };
 
+  const skipExercise = (exerciseId: string) => {
+    if (!draft || draft.finalizationEndedAt || draft.lifecycle === 'finalized' || saving) return;
+    let next = draft;
+    for (const set of draft.slots.find(s => s.slotId === exerciseId)?.sets ?? []) {
+      if (!set.logged) next = updateWorkoutSet(next, { setId: set.setId, outcome: 'skipped' });
+    }
+    setDraft(next); setExercises(draftToExercises(next, programWorkout ?? undefined)); void persistDraft(next);
+  };
   const toggleExerciseComplete = (exerciseId: string) => {
     if (!draft || draft.finalizationEndedAt || draft.lifecycle === 'finalized' || saving) return;
     const slot = draft.slots.find((candidate) => candidate.slotId === exerciseId);
@@ -584,6 +598,7 @@ export default function NextWorkoutScreen() {
       replacementLoadKind: replacement.equipment === 'Bodyweight' ? 'bodyweight' : replacement.loadSuggestion?.kind,
     });
     if (scope === 'rest_of_program') {
+      if (pendingSwapRef.current) throw new Error('Retry the pending program update before applying another future swap.');
       const activeWorkout = program?.workouts.find(
         (workout) => workout.stableDayId === draft.stableDayId,
       );
@@ -601,7 +616,7 @@ export default function NextWorkoutScreen() {
         currentStableSlotId: slot.slotId,
         originalExerciseId: original.exerciseId!,
         replacementExerciseId,
-        scope: 'future_after_current' as const,
+        scope: 'selected_and_future' as const,
       };
       const pending: PendingWorkoutSwap = {
         pendingId: createOperationId(),
@@ -937,6 +952,7 @@ export default function NextWorkoutScreen() {
           ) : null}
           {exercises.map((exercise) => (
             <ExerciseCard
+              onSkipExercise={() => skipExercise(exercise.id)}
               key={exercise.id}
               exercise={exercise}
               onUpdateSet={(setId, field, value) =>
