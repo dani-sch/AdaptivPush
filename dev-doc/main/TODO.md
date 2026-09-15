@@ -3,6 +3,7 @@
 ## [CURRENT] Resume from the preserved September 15 implementation
 
 - [COMPLETE] Reconcile the master plan, register, code status, database, traceability, research scope and living summaries with the hosted rollout and latest local workout lifecycle. Approved decisions and later-slice order remain unchanged.
+- [COMPLETE] Consolidate all prior branch tips in draft PR #56, verify the integration tree, and retire seven redundant local branches plus the hosted-rollout remote branch. [Git and verification evidence](/dev-doc/reports/DEV-LOG.md#2026-09-15---reconciled-progress-integration-and-draft-pr-closeout).
 - [CURRENT] Continue the unified workout lifecycle acceptance below. Preserve stable day/slot identity, exact retry operations, performed-set history, explicit partial outcomes, shared completed cards and capability-aware corrections. Do not restart AP-01 inspection or rebuild the existing atomic persistence modules.
 - [OPEN] Finish authenticated and physical iPhone acceptance; separately authorize and verify the two local-only migrations before hosted rollout. Git publication in draft PR #56 does not deploy them.
 

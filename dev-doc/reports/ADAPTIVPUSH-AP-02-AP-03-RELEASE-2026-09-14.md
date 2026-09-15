@@ -1,5 +1,8 @@
 # AP-02/AP-03 durable-record release packet - 2026-09-14
 
+> Scope note added at September 15 documentation closeout: this report's hosted authorization and evidence cover the baseline packet through `20260915151000`. The later `20260915190000` / `20260915210000` migrations remain local-only under the [lifecycle evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-LIFECYCLE-2026-09-15.md). Use [TODO](/dev-doc/main/TODO.md) for current acceptance; Git publication in draft PR #56 is not authorization for those migrations.
+
+
 ## September 15 final result - hosted deployed, phone acceptance open
 
 **The actual hosted database is updated and both ordinary Expo writers are

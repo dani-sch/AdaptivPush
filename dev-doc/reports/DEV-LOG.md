@@ -1,5 +1,38 @@
 # AdaptivPush — Development Log
 
+## 2026-09-15 - Reconciled progress, integration and draft PR closeout
+
+### Preserved implementation and direction
+
+Reconciled September 11-15 source/history and the owning evidence. The deployed AP-01/AP-02/AP-03 baseline, rollout recovery and writer enablement remain distinct from the two local-only September 15 lifecycle migrations. Effective occurrence projections, stable-lineage repeat swaps, explicit set outcomes, partial finalization, shared completed cards, capability-aware corrections and conservative incomplete-work handling remain implemented. AP-04/AP-05 broader authority, authenticated lifecycle acceptance and physical iPhone regression remain open. No hosted operation was performed by this closeout.
+
+Updated the master plan, execution register, code status, database/traceability/research owners, living summaries and startup/navigation documentation. Removed obsolete instructions to restart AP-01 or treat atomic saves, durable drafts and tests as absent. Historical reports, approved decisions and source archives remain preserved; older status paragraphs now route to their dated evidence instead of competing with current execution. No temporary document was consumed or moved, so the inventory/archive map and generated TOC did not require regeneration.
+
+### Verification and integration
+
+Starting source was `36aa329` on `codex/exercise-swap-workout-corrections`; `origin/main` was `9d968d5`. Documentation commits `da8504a` and `e3634bd` were integrated with the existing checkpoint history at `d8f4502`. That merge changed files relative to its first parent and matched the reviewed feature tree exactly.
+
+Both the feature checkout and `C:/workout-app/AdaptivPush-integrator` passed `npm run test:ap02-ap03` (75), `npm run test:availability` (13), `npm run test:catalog` (9), `npx tsc --noEmit` and `npm run lint` (zero errors; three pre-existing unused-variable warnings). Total: 97 tests per checkout. Internal documentation targets and `git diff --check` passed. This task changed documentation only; no Python-side change required Ruff. Prior local SQL/concurrency/export/browser evidence remains in the lifecycle report and was not rerun here. No final-chain fresh reset, authenticated/device pass or new hosted proof is claimed.
+
+### Git preservation and cleanup
+
+Fast-forwarded the existing `codex/ap02-ap03-release` PR branch to the integrated result and pushed it without force. Updated [draft PR #56](https://github.com/dani-sch/AdaptivPush/pull/56) with the complete behavior, migration boundary, verification, limitations and evidence summary. Reused the existing draft to keep the review history together.
+
+Each removed branch tip was verified as an ancestor of the published PR branch before deletion:
+
+| Retired local branch | Preserved tip |
+|---|---|
+| `codex/ap02-ap03-build-checkpoint-20260914` | `302ce6e` |
+| `codex/ap02-ap03-docs-checkpoint-20260914` | `7cdf598` |
+| `codex/ap02-ap03-ios-scope-checkpoint-20260914` | `709c40c` |
+| `codex/ap02-ap03-release-checkpoint-20260914` | `1b6364b` |
+| `codex/ap02-ap03-hosted-rollout` | `75146c9` |
+| `codex/exercise-swap-workout-corrections` | `e3634bd` |
+| `codex/supabase-resilience` | `53ce4b2` |
+
+Removed the redundant remote `codex/ap02-ap03-hosted-rollout` only after ancestry and open-PR checks. Pruned obsolete remote-tracking/worktree metadata; no stale worktree registration remained. Retained `main`, the active draft-PR branch and the configured `integrator` worktree. Local environment, dependencies, ignored tooling and recovery material were preserved. No reset, force-push, dropped commit or empty checkpoint commit was used. This final evidence entry is committed after the integrated application checks; final publication is a documentation-only fast-forward.
+
+
 ## 2026-09-15 - Scoped swaps and completed-workout corrections
 
 Commit `e8163b9` locally adds one consistent program/workout swap flow with selected-workout and rest-of-program scopes, logged-set preservation, natural replacement-load validation and durable partial-update recovery. It also adds explicit editing of finalized durable workouts with owner/revision/idempotency-safe atomic correction, same-session effective totals/completion/record refresh and internal before/after audit.

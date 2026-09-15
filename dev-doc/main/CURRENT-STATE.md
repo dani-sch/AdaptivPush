@@ -31,3 +31,7 @@ Physical iPhone cold launch, five-action UI/reopen acceptance and accessibility 
 ## Other product state
 
 AP-01.3 production baseline and lookup-only catalog authority remain released. Shared catalog reads and trusted curation are preserved. Current auth, planning, workout history, archive, notifications and theme paths exist; dated scheduling, mixed-history progression authority and broader adaptation lifecycle remain partial. The [implementation status](/dev-doc/plans/active/ADAPTIVPUSH-IMPLEMENTATION-STATUS.md) owns code detail, and the [register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) owns later scope. Historical observations remain in the dated reports and [DEV-LOG](/dev-doc/reports/DEV-LOG.md). No unrelated migrations or historical avatar deletions were performed.
+
+## Current review and continuation
+
+The active published review is [draft PR #56](https://github.com/dani-sch/AdaptivPush/pull/56) on `codex/ap02-ap03-release`; `integrator` retains the matching integration tree. Prior checkpoint and feature tips are preserved in that history. [DEV-LOG](/dev-doc/reports/DEV-LOG.md) owns verification and branch-retirement evidence. Resume from the current task board and preserve the local-versus-hosted migration boundary above.
