@@ -62,20 +62,18 @@ try {
     expectedRevisionId: install.revisionId, currentStableDayId: days[0], currentStableSlotId: slots[0],
     originalExerciseId: exercises[0], replacementExerciseId: exercises[1], includeCurrentDay: false };
   const revised = await race(`public.revise_program_exercise_v2(${json(revisionRequest)})`);
-  await rpc(`public.revise_program_exercise_v2(${json({ ...revisionRequest, operationId: randomUUID(), expectedRevision: 2,
-    expectedRevisionId: revised.revisionId, replacementExerciseId: exercises[2] })})`).catch((error) => {
-      // All eligible future uncompleted slots changed in revision 2. The only
-      // remaining original future slot was completed under revision 1.
-      assert.match(error.message, /no eligible future uncompleted/);
-      return null;
-    }).then((receipt) => { assert.equal(receipt, null, 'completed slot from an ancestor revision was changed'); });
+  const repeated = await race(`public.revise_program_exercise_v2(${json({ ...revisionRequest, operationId: randomUUID(), expectedRevision: 2,
+    expectedRevisionId: revised.revisionId, replacementExerciseId: exercises[2] })})`);
+  assert.equal(repeated.revision, 3);
+  assert.equal(await sql(`SELECT pde.exercise_id FROM public.program_day_exercises pde JOIN public.program_days pd ON pd.id=pde.program_day_id WHERE pd.program_revision_id='${repeated.revisionId}' AND pd.stable_day_id='${days[1]}'`), exercises[0]);
+  assert.equal(await sql(`SELECT pde.exercise_id FROM public.program_day_exercises pde JOIN public.program_days pd ON pd.id=pde.program_day_id WHERE pd.program_revision_id='${repeated.revisionId}' AND pd.stable_day_id='${days[2]}'`), exercises[2]);
   console.log('PASS successor retries replay; ancestor-completed prescriptions stay protected');
-  const archived = await race(`public.archive_program_v2('${randomUUID()}','${install.programId}',2,'{"week":1}')`);
+  const archived = await race(`public.archive_program_v2('${randomUUID()}','${install.programId}',3,'{"week":1}')`);
   assert.equal(archived.action, 'archive');
   await race(`public.restore_program_v2('${randomUUID()}','${install.programId}','exact',NULL)`);
   console.log('PASS concurrent archive and exact restore replay');
   const replacements = await Promise.allSettled([0, 1].map(() => rpc(`public.install_program_v2(${json({ operationId: randomUUID(),
-    expectedActiveProgramId: install.programId, expectedActiveRevision: 2, artifact })})`)));
+    expectedActiveProgramId: install.programId, expectedActiveRevision: 3, artifact })})`)));
   assert.equal(replacements.filter((r) => r.status === 'fulfilled').length, 1);
   const rejected = replacements.find((r) => r.status === 'rejected');
   assert.match(rejected.reason.message, /stale_revision/);

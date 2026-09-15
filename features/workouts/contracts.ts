@@ -19,6 +19,7 @@ export type WorkoutCompletionClass =
 export type LoadKind = 'external' | 'bodyweight' | 'assistance' | 'unknown';
 export type LoadUnit = 'lb' | 'kg' | 'none';
 export type LoadSide = 'external_total' | 'per_hand' | 'combined' | 'unilateral' | 'unknown';
+export type SetOutcome = 'performed' | 'skipped' | 'not_attempted';
 
 export interface FrozenPrescriptionSet {
   setId: string;
@@ -45,10 +46,14 @@ export interface FrozenWorkoutPrescription {
   programDayId: string;
   workoutName: string;
   slots: readonly FrozenPrescriptionSlot[];
+  effectiveSlots?: WorkoutDraftSlot[];
+  setOutcomes?: { setId: string; slotId: string; order: number; outcome: SetOutcome }[];
 }
 
 export interface WorkoutActualSet extends FrozenPrescriptionSet {
+  outcome?: SetOutcome;
   actualExerciseId: string;
+  actualExerciseName?: string;
   actualReps: number | null;
   actualLoad: number | null;
   actualRpe: number | null;
@@ -161,10 +166,12 @@ export function createWorkoutDraft(input: {
       sets: slot.sets.map((set) => ({
         ...structuredClone(set),
         actualExerciseId: slot.prescribedExerciseId,
+        actualExerciseName: slot.exerciseName,
         actualReps: null,
         actualLoad: null,
         actualRpe: null,
         logged: false,
+        outcome: 'not_attempted',
         loggedAt: null,
         enteredLoadText: set.plannedLoad === null ? '' : String(set.plannedLoad),
         enteredRepsText: '',
@@ -184,6 +191,7 @@ export function updateWorkoutSet(
     load?: number | null;
     rpe?: number | null;
     logged?: boolean;
+    outcome?: SetOutcome;
     loggedAt?: string | null;
     enteredLoadText?: string;
     enteredRepsText?: string;
@@ -210,6 +218,17 @@ export function updateWorkoutSet(
         enteredRepsText: update.enteredRepsText === undefined ? set.enteredRepsText : update.enteredRepsText,
         enteredRpeText: update.enteredRpeText === undefined ? set.enteredRpeText : update.enteredRpeText,
       };
+      next.outcome = update.outcome ?? (update.logged === undefined ? set.outcome ?? (set.logged ? 'performed' : 'not_attempted') : update.logged ? 'performed' : 'not_attempted');
+      next.logged = next.outcome === 'performed';
+      if (next.outcome === 'skipped') {
+        next.actualReps = null;
+        next.actualLoad = null;
+        next.actualRpe = null;
+        next.enteredLoadText = '';
+        next.enteredRepsText = '';
+        next.enteredRpeText = '';
+        next.loggedAt = null;
+      }
       if (next.logged) {
         if (!Number.isInteger(next.actualReps) || (next.actualReps ?? 0) <= 0) {
           throw new Error('Enter positive whole-number reps before logging this set.');
@@ -252,6 +271,7 @@ export function amendWorkoutExercise(
           : {
               ...set,
               actualExerciseId: amendment.replacementExerciseId,
+              actualExerciseName: amendment.replacementName,
               actualLoad: null,
               enteredLoadText: '',
               loadKind: amendment.replacementLoadKind ?? 'unknown' as const,
@@ -313,4 +333,25 @@ export function validateWorkoutDraft(draft: WorkoutDraft): { ok: boolean; errors
     }
   }
   return { ok: errors.length === 0, errors };
+}
+
+export function workoutFinalizationPayload(draft: WorkoutDraft, endedAt: string): Record<string, unknown> {
+  const started = new Date(draft.startedAt).getTime();
+  const ended = new Date(endedAt).getTime();
+  return {
+    operationId: draft.operationId,
+    draftId: draft.draftId,
+    schemaVersion: draft.schemaVersion,
+    policyVersion: draft.policyVersion,
+    revision: draft.revision,
+    programDayId: draft.programDayId,
+    prescriptionRevisionId: draft.prescriptionRevisionId,
+    workoutName: draft.workoutName,
+    startedAt: draft.startedAt,
+    endedAt,
+    durationMin: Math.max(0, Math.round((ended - started) / 60_000)),
+    timezone: draft.timezone,
+    frozenPrescription: { ...draft.frozenPrescription, effectiveSlots: draft.slots },
+    slots: draft.slots,
+  };
 }

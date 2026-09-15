@@ -163,6 +163,7 @@ export default function PlanScreen() {
     useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
     const completedCount = program?.workouts.filter((w) => w.isCompleted).length ?? 0;
+    const partialCount = program?.workouts.filter(w => w.isFinalized && !w.isCompleted).length ?? 0;
     const totalCount = program?.workouts.length ?? 0;
 
     const progressPct = useMemo(() => {
@@ -345,7 +346,7 @@ export default function PlanScreen() {
                             <View style={styles.rowBetween}>
                                 <Text style={styles.summaryTitle}>Week {program.currentWeek}</Text>
                                 <Text style={styles.summaryMeta}>
-                                    {completedCount}/{totalCount} completed
+                                    {completedCount}/{totalCount} complete · {partialCount} partial
                                 </Text>
                             </View>
 
@@ -431,7 +432,8 @@ export default function PlanScreen() {
                         onClose={() => setSelectedWorkout(null)}
                         onStart={() => {
                             setSelectedWorkout(null);
-                            router.push({ pathname: '/next-workout', params: workoutRouteParams(program, selectedWorkoutObj) });
+                            if (selectedWorkoutObj.sessionId) router.push({ pathname: '/edit-workout', params: { sessionId: selectedWorkoutObj.sessionId } });
+                            else router.push({ pathname: '/next-workout', params: workoutRouteParams(program, selectedWorkoutObj) });
                         }}
                     />
                 </Modal>

@@ -9,18 +9,26 @@ The approved [decision record](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECO
 The [September 14 release packet](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md)
 owns the hosted AP-02/AP-03 baseline. The later [September 15 scoped-swap and
 correction report](/dev-doc/reports/ADAPTIVPUSH-SWAP-CORRECTION-2026-09-15.md)
-owns local commit `e8163b9` and migration `20260915190000`. That migration is
-not hosted, and the earlier production authorization is not reusable. Physical
-iPhone/end-to-end visual acceptance remains open. AP-04/AP-05 broader work is
-not implemented by this extension.
+owns the initial correction extension and its local reset. The later
+[September 15 lifecycle report](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-LIFECYCLE-2026-09-15.md)
+owns effective occurrences, repeat swaps, explicit outcomes, partial finalization,
+shared completed cards and capability-aware viewing. Both `20260915190000` and
+`20260915210000` are local-only. Its latest checks passed 75 AP-02/AP-03 tests,
+13 availability tests, four SQL suites plus the legacy variant, six concurrency
+checks, database lint, TypeScript, application lint and web export/smoke. The
+final migration packet was applied to the existing local database, not freshly
+reset. No fresh hosted or authenticated device check is claimed here. Earlier
+production permission and current Git publication permission do not authorize
+these migrations. Physical iPhone/18-step acceptance remains open. AP-04/AP-05
+broader work is not implemented by this extension.
 
 | Affected acceptance | September 15 local extension / remaining evidence |
 |---|---|
-| AC-TR-008/009/011 | Correction retries reuse the exact owner/session operation; stale revisions conflict; one finalized session is updated atomically and its effective partial/complete/abandoned result is recomputed. Physical response-loss, navigation and visual correction remain open. |
-| AC-TR-012/013/014 | Both entry points expose selected-workout/rest-of-program scope; logged sets keep actual identity/load, unlogged replacements do not copy load, and wider-operation pending state supports Retry/Keep this workout only. Physical final-week, keyboard, mixed-set, account-switch and accessibility evidence remains open. |
-| AC-TR-016/024 | Selected-workout scope creates an immutable successor for exactly one stable day/slot; rest-of-program keeps completed history fixed. Migration/SQL proof is local only; hosted and old-client evidence remains open. |
+| AC-TR-008/009/010/011 | Exact correction replay/stale conflict, explicit performed/skipped/not-attempted outcomes, required-slot completion and finalized partial reconciliation have local evidence. Actual performed rows remain separate from effective snapshots. Correction updates one audited session without advancement. Active workout-only state is device-local until finalization; finalized snapshots reconstruct across devices. Physical response-loss/restart and edit/cancel/save acceptance remain open. |
+| AC-TR-012/013/014 | Stable original slot lineage supports repeat wider swaps while protecting completed ancestors and preserving performed exercise/load. Selected-only scope remains exact. Home actions, full exercise expansion, completed-route draft prevention and History modal/rapid-tap guards have local coverage. Physical timing, final-week, keyboard, mixed-set, account-switch and accessibility evidence remains open. |
+| AC-TR-016/024 | Immutable selected-occurrence successors and full-program effective occurrence reconciliation have local evidence. Plan distinguishes complete/reduced fulfillment from finalized partial work. Missing correction capability retains viewing and disables Update/Save; version 2 is local-only. Hosted and old-client/device evidence remains open. |
 | AC-TR-021/017/018/023 | Restore archive, end/archive, start workout and generate program remain the four user-confirmed baseline flows to preserve. This extension claims no fresh physical-device regression pass. |
-| AC-TR-042/044/045 and AP-16 release obligations | Correction retains explicit load kinds/units, updates correction-aware record effects and preserves unmapped legacy records. Broader history union/cohort behavior, physical iPhone/E2E visual acceptance, fresh recovery and explicit production authorization remain open. |
+| AC-TR-039/040/042/044/045 and AP-16 release obligations | Missing/partial coverage conservatively holds the existing programmed load even with high readiness. Only performed actual rows count for volume/PRs; correction updates session-owned record effects and resets existing derived receipts without adding a worker. This is partial local counterexample evidence, not calibrated AP-05 progression or cohort/history completion. Physical acceptance, fresh recovery and explicit production authorization remain open. |
 
 Each TR row is a stable requirement and has a correspondingly numbered acceptance scenario: TR-001 maps to AC-TR-001. The acceptance column states that scenario's trigger and observable expected result. Its section supplies the owning AP slice; the row supplies the decision, contract, database authority, current code seam, and required evidence. Search an AP ID, D ID, table, source alias, TR ID, or AC ID to traverse the same chain in reverse. Code references identify files to inspect or evolve, including incomplete paths; they do not assert the target contract is implemented.
 
@@ -115,12 +123,13 @@ device evidence are not inferred from the database release.
 
 ## AP-02 — Durable workout records
 
-Hosted finalization evidence is retained from the earlier release. Commit
-`e8163b9` locally verifies correction validation/replay/stale conflict and the
-new swap boundaries; its additive migration is not hosted. AC-TR-008/011/012
-gain local correction/scope evidence, while AC-TR-009/013/014 retain physical
-iPhone, restart, keyboard/accessibility and end-to-end visual portions. See the
-[September 15 evidence](/dev-doc/reports/ADAPTIVPUSH-SWAP-CORRECTION-2026-09-15.md).
+Hosted finalization evidence is retained from the earlier release. The
+[lifecycle evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-LIFECYCLE-2026-09-15.md)
+extends the [scoped-swap evidence](/dev-doc/reports/ADAPTIVPUSH-SWAP-CORRECTION-2026-09-15.md)
+with explicit outcomes, partial finalization, effective snapshot reconstruction
+and capability-aware completed viewing. AC-TR-008/010/011/012 gain local evidence;
+AC-TR-009/013/014 retain physical restart, keyboard/accessibility and end-to-end
+portions. Neither local migration is hosted.
 
 | Requirement / legacy locator | Disposition and decision | Behavior / contract; database authority; code | Acceptance scenario and expected evidence |
 |---|---|---|---|
@@ -135,12 +144,12 @@ iPhone, restart, keyboard/accessibility and end-to-end visual portions. See the
 
 ## AP-03 — Durable programs, identity, and free onboarding
 
-The immutable installer/revision/archive baseline is hosted. Commit `e8163b9`
-locally adds exact selected-occurrence scope alongside the wider successor
-revision command and preserves the four user-confirmed archive/end/start/generate
-flows as regression requirements. The new migration is not hosted; physical
-iPhone/E2E visual and old-client acceptance remain open. See the [September 15
-evidence](/dev-doc/reports/ADAPTIVPUSH-SWAP-CORRECTION-2026-09-15.md).
+The immutable installer/revision/archive baseline is hosted. The local extension
+adds exact selected-occurrence scope, repeat wider swaps through original slot
+lineage and shared effective occurrence views; it preserves the four user-confirmed
+archive/end/start/generate flows as regression requirements. Both newer migrations
+remain local-only; physical iPhone/E2E and old-client acceptance remain open. See
+the [lifecycle evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-LIFECYCLE-2026-09-15.md).
 
 | Requirement / legacy locator | Disposition and decision | Behavior / contract; database authority; code | Acceptance scenario and expected evidence |
 |---|---|---|---|
@@ -174,6 +183,12 @@ evidence](/dev-doc/reports/ADAPTIVPUSH-SWAP-CORRECTION-2026-09-15.md).
 | TR-038 · LM G notifications; LR S8; OR rest notifications | revised · D-02/13 | Reminders consume accepted schedule revision, local timezone, rest kind, saved time/quiet hours and OS permission. local adapter; OPS. | AC-TR-038: move workout, cross DST and enter quiet hours; cancel obsolete alert, deliver only eligible reminder, disclose denied/unsupported channel. P/U |
 
 ## AP-05 — Free progression, history, and explanations
+
+The [lifecycle report](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-LIFECYCLE-2026-09-15.md)
+adds local counterexample evidence for AC-TR-039/040: missing or partial required
+coverage holds the current suggestion and legacy next programmed load. It does
+not close the versioned policy/calibration, authoritative progression worker,
+mixed-history union or comparable-equipment acceptance scenarios below.
 
 | Requirement / legacy locator | Disposition and decision | Behavior / contract; database authority; code | Acceptance scenario and expected evidence |
 |---|---|---|---|

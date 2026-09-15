@@ -208,36 +208,6 @@ SELECT set_config(
   true
 );
 
-SELECT set_config(
-  'adaptivpush.workout_receipt_1',
-  public.finalize_workout_v2(current_setting('adaptivpush.workout_payload')::jsonb)::text,
-  true
-);
-
-DO $assert_workout$
-DECLARE replay jsonb;
-BEGIN
-  replay := public.finalize_workout_v2(current_setting('adaptivpush.workout_payload')::jsonb);
-  IF replay->>'sessionId' <> (current_setting('adaptivpush.workout_receipt_1')::jsonb->>'sessionId')
-     OR (replay->>'replayed')::boolean IS NOT TRUE THEN
-    RAISE EXCEPTION 'response-loss replay did not return original workout receipt';
-  END IF;
-  IF (SELECT count(*) FROM public.workout_sessions WHERE operation_id=current_setting('adaptivpush.workout_op_1')::uuid) <> 1
-     OR (SELECT count(*) FROM public.workout_exercise_sets WHERE session_id=(replay->>'sessionId')::uuid) <> 1 THEN
-    RAISE EXCEPTION 'workout replay duplicated session or sets';
-  END IF;
-  IF (SELECT count(*) FROM public.workout_receipt_effects WHERE workout_session_id=(replay->>'sessionId')::uuid) <> 3 THEN
-    RAISE EXCEPTION 'durable receipt effects were missing or duplicated';
-  END IF;
-  IF (SELECT completion_class FROM public.workout_sessions WHERE id=(replay->>'sessionId')::uuid) <> 'partial' THEN
-    RAISE EXCEPTION 'one of four sets was not classified partial';
-  END IF;
-  IF (SELECT load_value FROM public.workout_exercise_sets WHERE session_id=(replay->>'sessionId')::uuid) IS DISTINCT FROM 0::numeric THEN
-    RAISE EXCEPTION 'zero load did not round trip as zero';
-  END IF;
-END
-$assert_workout$;
-
 DO $assert_mid_transaction_failure$
 DECLARE payload jsonb;
 DECLARE failed boolean := false;
@@ -268,6 +238,43 @@ BEGIN
   END IF;
 END
 $assert_mid_transaction_failure$;
+
+SAVEPOINT workout_cases;
+SELECT set_config(
+  'adaptivpush.workout_receipt_1',
+  public.finalize_workout_v2(current_setting('adaptivpush.workout_payload')::jsonb)::text,
+  true
+);
+
+DO $assert_workout$
+DECLARE replay jsonb; duplicate_denied boolean := false;
+BEGIN
+  replay := public.finalize_workout_v2(current_setting('adaptivpush.workout_payload')::jsonb);
+  IF replay->>'sessionId' <> (current_setting('adaptivpush.workout_receipt_1')::jsonb->>'sessionId')
+     OR (replay->>'replayed')::boolean IS NOT TRUE THEN
+    RAISE EXCEPTION 'response-loss replay did not return original workout receipt';
+  END IF;
+  BEGIN
+    PERFORM public.finalize_workout_v2(jsonb_set(current_setting('adaptivpush.workout_payload')::jsonb, '{operationId}', to_jsonb(gen_random_uuid())));
+  EXCEPTION WHEN OTHERS THEN duplicate_denied := SQLERRM LIKE '%already finalized%'; END;
+  IF NOT duplicate_denied THEN RAISE EXCEPTION 'different operation duplicated finalized occurrence'; END IF;
+  IF (SELECT count(*) FROM public.workout_sessions WHERE operation_id=current_setting('adaptivpush.workout_op_1')::uuid) <> 1
+     OR (SELECT count(*) FROM public.workout_exercise_sets WHERE session_id=(replay->>'sessionId')::uuid) <> 1 THEN
+    RAISE EXCEPTION 'workout replay duplicated session or sets';
+  END IF;
+  IF (SELECT count(*) FROM public.workout_receipt_effects WHERE workout_session_id=(replay->>'sessionId')::uuid) <> 3 THEN
+    RAISE EXCEPTION 'durable receipt effects were missing or duplicated';
+  END IF;
+  IF (SELECT completion_class FROM public.workout_sessions WHERE id=(replay->>'sessionId')::uuid) <> 'partial' THEN
+    RAISE EXCEPTION 'one of four sets was not classified partial';
+  END IF;
+  IF (SELECT load_value FROM public.workout_exercise_sets WHERE session_id=(replay->>'sessionId')::uuid) IS DISTINCT FROM 0::numeric THEN
+    RAISE EXCEPTION 'zero load did not round trip as zero';
+  END IF;
+END
+$assert_workout$;
+
+
 
 DO $assert_archive_restore$
 DECLARE original_start date;
@@ -335,6 +342,7 @@ BEGIN
 END
 $assert_owner_isolation$;
 
+ROLLBACK TO SAVEPOINT workout_cases;
 RESET ROLE;
 SELECT set_config('request.jwt.claim.sub', current_setting('adaptivpush.user_1'), true);
 SET LOCAL ROLE authenticated;
@@ -350,20 +358,26 @@ BEGIN
   payload := jsonb_set(current_setting('adaptivpush.workout_payload')::jsonb, '{operationId}', to_jsonb(gen_random_uuid()));
   payload := jsonb_set(payload, '{slots,0,sets,0,loadKind}', '"assistance"');
   payload := jsonb_set(payload, '{slots,0,sets,0,actualLoad}', '25');
+  BEGIN
   v_test_receipt := public.finalize_workout_v2(payload);
   IF (SELECT total_volume_lb FROM public.workout_sessions WHERE id=(v_test_receipt->>'sessionId')::uuid) <> 0
     OR (SELECT load_value FROM public.workout_exercise_sets WHERE session_id=(v_test_receipt->>'sessionId')::uuid) <> 25
     OR (SELECT load_kind FROM public.workout_exercise_sets WHERE session_id=(v_test_receipt->>'sessionId')::uuid) <> 'assistance' THEN
     RAISE EXCEPTION 'assistance was misclassified as external volume';
   END IF;
+  RAISE SQLSTATE 'ZX001';
+  EXCEPTION WHEN SQLSTATE 'ZX001' THEN NULL; END;
   payload := jsonb_set(payload, '{operationId}', to_jsonb(gen_random_uuid()));
   payload := jsonb_set(payload, '{slots,0,sets,0,loadKind}', '"external"');
   payload := jsonb_set(payload, '{slots,0,sets,0,loadUnit}', '"kg"');
+  BEGIN
   v_test_receipt := public.finalize_workout_v2(payload);
   IF abs((SELECT weight_lb FROM public.workout_exercise_sets WHERE session_id=(v_test_receipt->>'sessionId')::uuid) - 55.115565545) > 0.01
     OR (SELECT load_value FROM public.workout_exercise_sets WHERE session_id=(v_test_receipt->>'sessionId')::uuid) <> 25 THEN
     RAISE EXCEPTION 'kilograms were relabeled as pounds or raw load was changed';
   END IF;
+  RAISE SQLSTATE 'ZX001';
+  EXCEPTION WHEN SQLSTATE 'ZX001' THEN NULL; END;
   PERFORM public.archive_program_v2('90000000-0000-4000-8000-000000000050', current_setting('adaptivpush.program_1')::uuid, 1, '{"week":1}');
 END
 $assert_release_payloads$;

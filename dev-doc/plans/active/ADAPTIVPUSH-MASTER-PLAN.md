@@ -2,7 +2,7 @@
 
 ## Navigation and ownership
 
-This is the canonical implementation contract for AdaptivPush. It translates [approved decisions D-01–D-14](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECORD-2026-09-08.md) into bounded product and engineering behavior. The approved record owns product decisions and supersedes conflicting historical proposals. This plan does not authorize implementation during the consolidation review.
+This is the canonical implementation contract for AdaptivPush. It translates [approved decisions D-01–D-14](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECORD-2026-09-08.md) into bounded product and engineering behavior. The approved record owns product decisions and supersedes conflicting historical proposals. Consolidation review completed on September 9; bounded implementation is active under the current register. This plan alone does not authorize a hosted mutation or release.
 
 Supporting owners: [execution register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) for AP slice status/dependencies/gates; [implementation status](/dev-doc/plans/active/ADAPTIVPUSH-IMPLEMENTATION-STATUS.md) for current code facts; [database plan](/dev-doc/plans/active/ADAPTIVPUSH-DATABASE-PLAN.md) for schema/authority/backfills; [traceability](/dev-doc/plans/active/ADAPTIVPUSH-TRACEABILITY.md) for individual requirement dispositions and acceptance scenarios; [research translation](/dev-doc/plans/active/ADAPTIVPUSH-RESEARCH-TRANSLATION.md) for evidence scope/calibration; [inventory](/dev-doc/plans/active/ADAPTIVPUSH-DOCUMENT-INVENTORY.md) for archival provenance. Other documents summarize and link; they do not redefine these responsibilities.
 
@@ -22,7 +22,7 @@ The base product must remain usable without a wearable, subscription, public ide
 | H | Versioned provisional heuristic or engineering operational default derived for implementation; test and calibrate. |
 | REQUIRES INSPECTION | Unknown external state, unverified source, threshold calibration, platform/operational choice or fact requiring evidence. Never silently convert to implemented or approved. |
 
-All detailed technical shapes in this plan are implementation design under D-11/12, not claims that these entities already exist. Exact fitness numbers in retained sources remain H under D-10. This plan does not create clinical guidance, a medical diagnosis, a claim of ownership over routines, or verified legal/platform compliance.
+Detailed technical shapes are implementation design under D-11/12. The current status/register distinguish implemented contracts from proposed entities; do not recreate implemented foundations from an older plan snapshot. Exact fitness numbers in retained sources remain H under D-10. This plan does not create clinical guidance, a medical diagnosis, a claim of ownership over routines, or verified legal/platform compliance.
 
 <a id="mp-02-capability-boundaries"></a>
 ## 2. Complete capability and downgrade contract
@@ -47,7 +47,7 @@ Access resolution is `supported build/schema AND rollout enabled AND required co
 <a id="mp-03-architecture"></a>
 ## 3. Current and target architecture
 
-CODE: routes/screens call Supabase directly, `hooks/useCurrentProgram.ts` combines reads, swaps, progression, date advancement and archiving, `utils/programGenerator.ts` builds programs, and `utils/saveProgramToDb.ts` orchestrates multiple writes. Theme/auth use local storage, but a durable workout outbox is not implemented. The status document gives exact source evidence and defects.
+CODE (September 15): `features/catalog/`, `features/kernel/`, `features/programs/` and `features/workouts/` implement the first modular boundaries. Generated/manual programs use a validated atomic installer; workouts use owner-scoped frozen drafts, durable pending operations and atomic finalization receipts. Scoped swaps and completed corrections extend those boundaries locally. `hooks/useCurrentProgram.ts` remains a compatibility facade with legacy progression/date behavior; some screen reads remain direct. The status document separates current code, hosted support and unverified device behavior.
 
 ```mermaid
 flowchart LR
@@ -55,10 +55,12 @@ flowchart LR
   Screens --> DB[Supabase Auth / Postgres / Storage]
   Hook --> DB
   Modal[Generation modal] --> Generator[Local generator and catalog]
-  Modal --> Save[Multiwrite save coordinator]
+  Modal --> Save[Validated atomic program command]
   Save --> DB
-  Workout[Workout screen] --> Overlay[Independent readiness / cycle overlay]
-  Workout --> DB
+  Workout[Workout screen] --> Draft[Frozen owner-scoped draft and pending operation]
+  Draft --> Finalize[Atomic finalize command and receipt]
+  Finalize --> DB
+  Screens --> Occurrence[Shared effective occurrence projection]
 ```
 
 Target (arrows mean allowed calls/imports):
@@ -92,7 +94,7 @@ flowchart TD
 | Cosmetics/entitlements | Token runtime/catalog/packages and separately trusted capability verification | Cosmetic application cannot mutate training; billing adapter cannot decide program semantics |
 | Account/privacy/support | Identity recovery, request fulfillment, deletion coordination, service receipts | Narrow backend authority; accountable operational owner and audit |
 
-New modules are proposed under `features/<capsule>/`; existing hook remains a compatibility facade while each consumer is extracted. Do not create every directory upfront. Shared UI primitives are introduced with their screen consumer, preserving current theme/palette behavior. No central catch-all types file or giant service layer.
+Additional modules belong under `features/<capsule>/`; reuse existing catalog/kernel/program/workout capsules and keep the hook as a compatibility facade while each later consumer is extracted. Do not create every directory upfront. Shared UI primitives are introduced with their screen consumer, preserving current theme/palette behavior. No central catch-all types file or giant service layer.
 
 <a id="mp-04-contracts"></a>
 ## 4. Stable domain contracts and invariants
@@ -217,7 +219,7 @@ Selection first filters equipment/exclusions/skill/comfort/available loads; then
 <a id="mp-09-workouts-progression"></a>
 ## 9. Workouts, history, and progression state machines
 
-Workout: `planned -> in_progress(durable frozen draft) -> pending_finalize -> finalized(full|partial)`; errors branch to retry/auth/conflict with draft preserved. Abandon/cancel is explicit and does not mark a occurrence completed. A finalized receipt triggers fulfillment/PR/progression once. Later correction preserves audit and recalculates derived projections. Invalid route never silently substitutes another session.
+Workout: `planned -> in_progress(durable frozen draft) -> pending_finalize -> finalized(full|partial)`; errors branch to retry/auth/conflict with draft preserved. Finalized lifecycle and prescription fulfillment are separate: partial work closes the occurrence without full/reduced credit and must not reopen as Start Workout. Sets explicitly distinguish performed, skipped and not attempted; only performed rows contribute volume or records. Completed view reconstructs the full frozen prescription and actuals through shared cards, including missing work and extras. Correction preserves the session and audit, recomputes completion/volume/records, and invalidates derived-effect receipts without advancement. A receipt is not proof that a new background progression worker exists. Missing correction capability keeps viewing available. Invalid routes never substitute another session.
 
 History unions supported legacy and new records by stable source identity and deduplicates confirmed duplicates. Do not choose all-new once any new row exists, fabricate missing sets, or represent query failure as empty history. Descriptive load/reps/volume/PR views remain free, identify incomparable cohorts and partial coverage, and preserve original unit semantics.
 
@@ -344,12 +346,12 @@ Observe operation success/failure/replay, pending age/conflicts, incomplete reco
 
 Release order is D-13 and the AP register: AP-01 authority/provenance; AP-02/03 durable records; AP-04/05 free schedule/progression; AP-06/07 advanced generation/equipment precision; AP-08/09/10 coaching; AP-11 unlisted distribution; independent AP-12/13 adapters/cosmetics; AP-14/15 operationally gated public/community. Relevant AP-16 account/privacy/purchase/accessibility/release obligations close with each consumer, not at the end. Pure contract/test work may run in safe parallel lanes; shared hook/screen writes need coordination.
 
-Every slice is done only when its user-visible outcome, failure/retry/rejection states, free/downgrade/offline/privacy/accessibility behavior, migration compatibility and rollback pass the smallest meaningful local gate and required actual integration/device gate. Record exact environment/commit/schema/policy/fixture results and limitations, link AC-TR acceptance and evidence, then update status. Planned tests are not executable existing tests: the baseline only provides app lint and TypeScript tools, with no application test script. No new runtime/security/database/device verification was performed here.
+Every slice is done only when its user-visible outcome, failure/retry/rejection states, free/downgrade/offline/privacy/accessibility behavior, migration compatibility and rollback pass the smallest meaningful local gate and required actual integration/device gate. Record exact environment/commit/schema/policy/fixture results and limitations, link AC-TR acceptance and evidence, then update status. Existing package scripts cover catalog, dependencies, workouts, programs, availability and database concurrency; SQL fixtures live in `supabase/tests/`. Future slice tests remain proposed until implemented. Dated reports own executed evidence; this documentation reconciliation does not imply a fresh hosted or device pass.
 
 | Risk / REQUIRES INSPECTION | Owner and required evidence |
 |---|---|
-| Effective catalog grants, core RLS/function/lineage consistency | AP-01 read-only inventory followed by authorized isolated role/transaction tests; no exploitability claim from permissive policy text alone |
-| Ledger/dashboard drift, migration 001 incompatibility, backup/restore | AP-01 supported baseline and successful restoration before production mutation |
+| Effective catalog grants, core RLS/function/lineage consistency | AP-01 catalog authority released; hosted AP-02/AP-03 ownership checks evidenced. Verify each new local extension before its separately authorized rollout. |
+| Ledger/dashboard drift, migration 001 incompatibility, backup/restore | Supported baseline and prior recovery are complete; future rollout must inspect the current ledger and restore-test fresh recovery, never replay retained 001–017. |
 | Partial writes, ambiguous IDs, mixed legacy history and archive checkpoints | AP-02/03/05 full fault matrix, conservative unknown provenance and old/new readers |
 | Actual Quick Setup/Profile/Generate and missing-schema fallback | AP-01 Expo-capable device/simulator proof; historical service-level results insufficient |
 | Fitness thresholds and source bibliography | AP-05–10 deterministic counterexamples, user/outcome calibration and qualified safety/source review; research strength separate from confidence |
@@ -358,4 +360,4 @@ Every slice is done only when its user-visible outcome, failure/retry/rejection 
 | Legal terms, deletion/retention/takedown and staffing | AP-11/14–16 qualified review and named operations/capacity drill before relevant launch |
 | Integration workflow | `integrator` was configured and clean AP-02/AP-03 integration gates passed on 2026-09-10; each later slice still requires its own integration proof |
 
-Current execution position: AP-01.3 database authority is released; AP-02/AP-03 are integration-verified behind default-off flags and await their fresh production recovery, device and rollout gates. AP-04/AP-05 follow only after that release boundary. This plan remains behavioral authority, not permission to deploy, migrate or publish.
+Current execution position: AP-01.3 and the AP-02/AP-03 hosted baseline are deployed, with normal local writer flags enabled under the September 15 authorization. Physical iPhone acceptance remains open. The September 15 lifecycle extension is locally verified: stable-slot occurrence projection, repeatable scoped swaps, explicit performed/skipped/not-attempted outcomes, partial finalization, shared completed workout cards and capability-aware corrections. Migrations `20260915190000` and `20260915210000` are local-only. [Lifecycle evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-LIFECYCLE-2026-09-15.md) records the exact checks and outstanding authenticated/device acceptance. Missing required work holds progression; broader AP-04 scheduling and AP-05 progression authority remain queued. The current user instruction authorizes Git publication in a draft PR, not deployment of the two newer migrations.

@@ -1,3 +1,4 @@
+import { createCompletedNavigation } from '@/features/workouts/effectiveOccurrence';
 import { ExerciseHistoryModal } from '@/components/ExerciseHistoryModal';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -9,10 +10,11 @@ import {
   TrendingUp,
   X,
 } from 'lucide-react-native';
-import { type ReactNode, useCallback, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -312,6 +314,12 @@ export default function HistoryScreen() {
   const [error, setError] = useState<string | null>(null);
 
   // Session detail sheet state
+  const [pendingEdit] = useState(createCompletedNavigation);
+  const navigateAfterDismiss = useCallback(() => {
+    const sessionId = pendingEdit.dismiss();
+    if (!sessionId) return;
+    router.push({ pathname: '/edit-workout', params: { sessionId } });
+  }, [pendingEdit]);
   const [detailWorkout, setDetailWorkout] = useState<WorkoutEntry | null>(null);
   const [sessionExercises, setSessionExercises] = useState<SessionExercise[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -319,6 +327,20 @@ export default function HistoryScreen() {
   // Exercise history modal state (drill-down from detail sheet)
   const [historyExerciseId, setHistoryExerciseId] = useState<string | null>(null);
   const [historyExerciseName, setHistoryExerciseName] = useState<string | null>(null);
+
+  const editWorkout = () => {
+    if (!detailWorkout || !pendingEdit.request(detailWorkout.id)) return;
+    setHistoryExerciseId(null);
+    setHistoryExerciseName(null);
+    setSessionExercises([]);
+    setDetailWorkout(null);
+  };
+  useEffect(() => {
+    if (Platform.OS === 'ios' || detailWorkout || !pendingEdit.pending()) return;
+    // Android/web use an unanimated dismissal; the next frame follows its committed removal.
+    const frame = requestAnimationFrame(navigateAfterDismiss);
+    return () => cancelAnimationFrame(frame);
+  }, [detailWorkout, navigateAfterDismiss, pendingEdit]);
 
   // PR count from personal_records table
   const [prCount, setPrCount] = useState(0);
@@ -329,6 +351,7 @@ export default function HistoryScreen() {
   const [prLoading, setPrLoading] = useState(false);
 
   const handleOpenDetail = async (workout: WorkoutEntry) => {
+    pendingEdit.reset();
     setDetailWorkout(workout);
     setSessionExercises([]);
     setDetailLoading(true);
@@ -627,7 +650,8 @@ export default function HistoryScreen() {
       <Modal
         visible={detailWorkout !== null}
         transparent
-        animationType="slide"
+        animationType={Platform.OS === 'ios' ? 'slide' : 'none'}
+        onDismiss={navigateAfterDismiss}
         onRequestClose={historyExerciseId !== null ? handleCloseExerciseHistory : handleCloseDetail}
       >
         {/* Session detail sheet */}
@@ -644,7 +668,7 @@ export default function HistoryScreen() {
               </View>
               <Pressable
                 style={styles.editWorkoutBtn}
-                onPress={() => detailWorkout && router.push({ pathname: '/edit-workout', params: { sessionId: detailWorkout.id } })}
+                onPress={editWorkout}
                 accessibilityRole="button"
                 accessibilityLabel="Edit completed workout"
               >

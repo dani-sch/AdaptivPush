@@ -6,6 +6,27 @@ This supplement owns research-to-product interpretation, evidence limitations an
 
 Evidence strength below follows the supplied synthesis, with limitations retained. Numerical examples in the report are provisional H implementation inputs, not universally validated prescriptions. Recommendation confidence measures input coverage/fit, independently of evidence strength. All safety-sensitive wording requires appropriate qualified review before production. The original report contains opaque citation/entity tokens; never display those as usable citations or treat an imported reference title as verified.
 
+## Implementation progress boundary — 2026-09-15
+
+The [workout lifecycle evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-LIFECYCLE-2026-09-15.md)
+records a conservative implementation of the RT-01/11/13 and RH-02 incomplete-work
+counterexamples: explicit performed/skipped/not-attempted outcomes preserve what
+actually happened; required prescribed-slot coverage distinguishes partial from
+complete/reduced work; missing or partial evidence holds the current progression
+suggestion even with high readiness. The legacy hook preserves the existing next
+programmed load when coverage is incomplete. Only performed actual rows contribute
+volume and PRs. Corrections recompute effective session facts without advancing
+the program, and missing legacy prescription context remains unknown.
+
+These are local data-integrity and conservative fallback checks. They do not
+calibrate a progression threshold, validate a personalized training algorithm,
+introduce repeated-partial adaptation or missed-work debt, or finish AP-05's
+authoritative progression/cohort work. The two supporting migrations remain
+local-only; authenticated/device acceptance and authorized hosted rollout are
+still open. No new literature search, source verification, expert review or
+research-strength claim was made. The numerical heuristic and bibliography
+review obligations below remain unchanged.
+
 ## Research-to-product matrix
 
 | ID / source section and bibliography numbers | Evidence strength and scope/caveat | Product translation / owner and acceptance |

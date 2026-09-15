@@ -25,6 +25,7 @@ export interface CompletedWorkoutCorrectionRequest {
   sessionId: string;
   expectedRevision: number;
   sets: CompletedWorkoutSetCorrection[];
+  setOutcomes?: { setId: string; slotId: string; order: number; outcome: 'performed' | 'skipped' | 'not_attempted' }[];
 }
 
 export interface CompletedWorkoutCorrectionReceipt {

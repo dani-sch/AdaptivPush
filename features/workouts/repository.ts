@@ -8,26 +8,8 @@ export interface WorkoutRepository {
   finalize(draft: WorkoutDraft, endedAt: string): Promise<WorkoutFinalizationReceipt>;
 }
 
-export function workoutFinalizationPayload(draft: WorkoutDraft, endedAt: string): Record<string, unknown> {
-  const started = new Date(draft.startedAt).getTime();
-  const ended = new Date(endedAt).getTime();
-  return {
-    operationId: draft.operationId,
-    draftId: draft.draftId,
-    schemaVersion: draft.schemaVersion,
-    policyVersion: draft.policyVersion,
-    revision: draft.revision,
-    programDayId: draft.programDayId,
-    prescriptionRevisionId: draft.prescriptionRevisionId,
-    workoutName: draft.workoutName,
-    startedAt: draft.startedAt,
-    endedAt,
-    durationMin: Math.max(0, Math.round((ended - started) / 60_000)),
-    timezone: draft.timezone,
-    frozenPrescription: draft.frozenPrescription,
-    slots: draft.slots,
-  };
-}
+import { workoutFinalizationPayload } from './contracts';
+export { workoutFinalizationPayload } from './contracts';
 
 export const workoutRepository: WorkoutRepository = {
   async finalize(draft, endedAt) {

@@ -1,3 +1,4 @@
+import { draftToExercises } from '@/features/workouts/workoutPresentation';
 import { haptic, Haptics } from "@/utils/haptic";
 import { ExerciseHistoryModal } from "@/components/ExerciseHistoryModal";
 import { SwapExerciseModal } from "@/components/SwapExerciseModal";
@@ -35,6 +36,7 @@ import {
 } from '@/features/workouts/swapOperationStore';
 import {
   isNoFutureWorkoutsDetail,
+  confirmedSwapMessage,
   workoutOnlyReconciliationStep,
   workoutSwapSyncDisposition,
 } from '@/features/workouts/swapRecovery';
@@ -62,47 +64,6 @@ import type { Theme } from "@/constants/themes";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function draftToExercises(draft: WorkoutDraft, workout?: ProgramWorkout): Exercise[] {
-  return draft.slots.map((slot) => {
-    const current = workout?.exercises.find((exercise) => exercise.stableSlotId === slot.slotId);
-    const frozen = draft.frozenPrescription.slots.find((candidate) => candidate.slotId === slot.slotId);
-    const originalExerciseName = frozen?.exerciseName ?? current?.name ?? 'the original exercise';
-    const firstSet = slot.sets[0];
-    const frozenRepDisplay = firstSet
-      ? firstSet.plannedRepsMin === firstSet.plannedRepsMax
-        ? String(firstSet.plannedRepsMin)
-        : `${firstSet.plannedRepsMin}–${firstSet.plannedRepsMax}`
-      : 'prescribed reps';
-    const repDisplay = current?.reps?.replace("-", "–") ?? frozenRepDisplay;
-    return {
-      id: slot.slotId,
-      exerciseId: slot.actualExerciseId,
-      name: slot.actualExerciseId !== slot.prescribedExerciseId
-        ? slot.replacementExerciseName ?? "Replacement exercise"
-        : current?.name ?? slot.exerciseName ?? "Prescribed exercise",
-      prescription: `${slot.prescribedSetCount}×${repDisplay}`,
-      readOnly: Boolean(draft.finalizationEndedAt) || draft.lifecycle === 'finalized',
-      loadLabel: firstSet?.loadUnit === 'kg' ? 'KG' : firstSet?.loadUnit === 'lb' ? 'LBS' : 'LOAD',
-      muscleGroup: current?.muscleGroup,
-      imageUrl: current?.imageUrl,
-      description: current?.description,
-      sets: slot.sets.map((set) => ({
-        id: set.setId,
-        weight: set.enteredLoadText,
-        reps: set.enteredRepsText,
-        rpe: set.enteredRpeText,
-        logged: set.logged,
-        exerciseName: set.actualExerciseId === slot.actualExerciseId
-          ? slot.replacementExerciseName ?? current?.name ?? slot.exerciseName
-          : originalExerciseName,
-      })),
-      completed: slot.sets.length > 0 && slot.sets.every((set) => set.logged),
-      loadSuggestion: slot.loadSuggestion
-        ? `Previous ${slot.loadSuggestion.kind === 'assistance' ? 'assistance' : 'load'} for this exercise: ${slot.loadSuggestion.value} ${slot.loadSuggestion.unit}`
-        : undefined,
-    };
-  });
-}
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -147,7 +108,7 @@ const FinishModal: React.FC<{
       <View style={styles.modalContainer}>
         <Text style={styles.modalTitle}>Finish Workout?</Text>
         <Text style={styles.modalBody}>
-          {completedCount}/{totalCount} exercises completed ·{" "}
+          Finish with {completedCount} of {totalCount} sets completed? Unfinished sets will be saved as not completed. {" "}
           {formatTime(elapsed)}
         </Text>
         <View style={styles.modalButtons}>
@@ -298,6 +259,12 @@ export default function NextWorkoutScreen() {
         if (!ownerId) throw new Error('Sign in to restore this workout draft.');
         const lookup = draftLookupForRoute(routeTarget, programWorkout ?? undefined);
         const stored = await workoutDraftStore.loadMatching(ownerId, lookup);
+        const completedSessionId = programWorkout?.sessionId ?? stored?.finalizedReceipt?.sessionId;
+        if (completedSessionId) {
+          settled = true;
+          if (!cancelled) router.replace({ pathname: '/edit-workout', params: { sessionId: completedSessionId } });
+          return;
+        }
         if (stored) {
           const validation = validateWorkoutDraft(stored);
           if (!validation.ok) {
@@ -451,7 +418,7 @@ export default function NextWorkoutScreen() {
     field: keyof WorkoutSet,
     value: string | boolean,
   ) => {
-    if (!draft || draft.finalizationEndedAt || saving) return;
+    if (!draft || draft.finalizationEndedAt || draft.lifecycle === 'finalized' || saving) return;
     try {
       const asNumber = (input: string): number | null => input.trim() === '' ? null : Number(input);
       const update = field === 'weight'
@@ -460,6 +427,7 @@ export default function NextWorkoutScreen() {
           ? { enteredRepsText: String(value), reps: asNumber(String(value)) }
           : field === 'rpe'
             ? { enteredRpeText: String(value), rpe: asNumber(String(value)) }
+            : field === 'outcome' ? { outcome: value as import('@/features/workouts/contracts').SetOutcome }
             : { logged: Boolean(value), loggedAt: value ? new Date().toISOString() : null };
       const nextDraft = updateWorkoutSet(draft, { setId, ...update });
       setDraft(nextDraft);
@@ -470,8 +438,16 @@ export default function NextWorkoutScreen() {
     }
   };
 
+  const skipExercise = (exerciseId: string) => {
+    if (!draft || draft.finalizationEndedAt || draft.lifecycle === 'finalized' || saving) return;
+    let next = draft;
+    for (const set of draft.slots.find(s => s.slotId === exerciseId)?.sets ?? []) {
+      if (!set.logged) next = updateWorkoutSet(next, { setId: set.setId, outcome: 'skipped' });
+    }
+    setDraft(next); setExercises(draftToExercises(next, programWorkout ?? undefined)); void persistDraft(next);
+  };
   const toggleExerciseComplete = (exerciseId: string) => {
-    if (!draft || draft.finalizationEndedAt || saving) return;
+    if (!draft || draft.finalizationEndedAt || draft.lifecycle === 'finalized' || saving) return;
     const slot = draft.slots.find((candidate) => candidate.slotId === exerciseId);
     if (!slot) return;
     const shouldLog = !slot.sets.every((set) => set.logged);
@@ -525,7 +501,7 @@ export default function NextWorkoutScreen() {
       pending.ownerId, pending.draftId, pending.pendingId, failed,
     )) {
       setCurrentPendingSwap(failed);
-      setSyncMessage('Workout swapped, but the program couldn’t be updated.');
+      setSyncMessage('Exercise swapped here, but future workouts could not be updated. Retry.');
     }
     setProgramUpdating(false);
     reportSupabaseFailure('workout.swap_background', error);
@@ -538,7 +514,7 @@ export default function NextWorkoutScreen() {
     const disposition = workoutSwapSyncDisposition(outcome);
     if (disposition.status === 'confirmed' || disposition.status === 'no_future_workouts') {
       await clearCurrentPendingSwap(pending);
-      setSyncMessage('Exercise swapped for this workout.');
+      setSyncMessage(disposition.status === 'confirmed' && 'receipt' in outcome ? confirmedSwapMessage(outcome.receipt.futureChangedSlotCount) : 'Exercise swapped for this workout.');
       setProgramUpdating(false);
       if (disposition.status === 'confirmed') void refresh();
       return;
@@ -551,7 +527,7 @@ export default function NextWorkoutScreen() {
       failed,
     )) {
       setCurrentPendingSwap(failed);
-      setSyncMessage('Workout swapped, but the program couldn’t be updated.');
+      setSyncMessage('Exercise swapped here, but future workouts could not be updated. Retry.');
     }
     setProgramUpdating(false);
   };
@@ -574,7 +550,7 @@ export default function NextWorkoutScreen() {
         pending.ownerId, pending.draftId, pending.pendingId, failed,
       )) {
         setCurrentPendingSwap(failed);
-        setSyncMessage('Workout swapped, but the program couldn’t be updated.');
+        setSyncMessage('Exercise swapped here, but future workouts could not be updated. Retry.');
       }
       setProgramUpdating(false);
       return;
@@ -623,6 +599,7 @@ export default function NextWorkoutScreen() {
       replacementLoadKind: replacement.equipment === 'Bodyweight' ? 'bodyweight' : replacement.loadSuggestion?.kind,
     });
     if (scope === 'rest_of_program') {
+      if (pendingSwapRef.current) throw new Error('Retry the pending program update before applying another future swap.');
       const activeWorkout = program?.workouts.find(
         (workout) => workout.stableDayId === draft.stableDayId,
       );
@@ -640,7 +617,7 @@ export default function NextWorkoutScreen() {
         currentStableSlotId: slot.slotId,
         originalExerciseId: original.exerciseId!,
         replacementExerciseId,
-        scope: 'future_after_current' as const,
+        scope: 'selected_and_future' as const,
       };
       const pending: PendingWorkoutSwap = {
         pendingId: createOperationId(),
@@ -963,7 +940,7 @@ export default function NextWorkoutScreen() {
           )}
           {pendingSwap && !programUpdating ? (
             <View style={styles.pendingSwapActions} accessibilityRole="summary">
-              <Text style={styles.syncBannerText}>Workout swapped, but the program couldn’t be updated.</Text>
+              <Text style={styles.syncBannerText}>Exercise swapped here, but future workouts could not be updated. Retry.</Text>
               <View style={styles.unavailableActions}>
                 <Pressable style={styles.secondaryButton} onPress={() => void retryPendingSwap()} disabled={programUpdating}>
                   <Text style={styles.secondaryButtonText}>Retry</Text>
@@ -976,6 +953,7 @@ export default function NextWorkoutScreen() {
           ) : null}
           {exercises.map((exercise) => (
             <ExerciseCard
+              onSkipExercise={() => skipExercise(exercise.id)}
               key={exercise.id}
               exercise={exercise}
               onUpdateSet={(setId, field, value) =>
@@ -1021,8 +999,8 @@ export default function NextWorkoutScreen() {
       <FinishModal
         visible={showFinishModal}
         elapsed={elapsed}
-        completedCount={completedCount}
-        totalCount={exercises.length}
+        completedCount={exercises.reduce((sum, ex) => sum + ex.sets.filter(s => s.logged).length, 0)}
+        totalCount={exercises.reduce((sum, ex) => sum + ex.sets.length, 0)}
         saving={saving}
         onConfirm={handleFinish}
         onCancel={() => setShowFinishModal(false)}
