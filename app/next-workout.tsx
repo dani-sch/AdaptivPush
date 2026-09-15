@@ -427,18 +427,22 @@ export default function NextWorkoutScreen() {
     value: string | boolean,
   ) => {
     if (!draft || draft.finalizationEndedAt || saving) return;
-    const asNumber = (input: string): number | null => input.trim() === '' ? null : Number(input);
-    const update = field === 'weight'
-      ? { enteredLoadText: String(value), load: asNumber(String(value)) }
-      : field === 'reps'
-        ? { enteredRepsText: String(value), reps: asNumber(String(value)) }
-        : field === 'rpe'
-          ? { enteredRpeText: String(value), rpe: asNumber(String(value)) }
-          : { logged: Boolean(value), loggedAt: value ? new Date().toISOString() : null };
-    const nextDraft = updateWorkoutSet(draft, { setId, ...update });
-    setDraft(nextDraft);
-    setExercises(draftToExercises(nextDraft, programWorkout ?? undefined));
-    persistDraft(nextDraft);
+    try {
+      const asNumber = (input: string): number | null => input.trim() === '' ? null : Number(input);
+      const update = field === 'weight'
+        ? { enteredLoadText: String(value), load: asNumber(String(value)) }
+        : field === 'reps'
+          ? { enteredRepsText: String(value), reps: asNumber(String(value)) }
+          : field === 'rpe'
+            ? { enteredRpeText: String(value), rpe: asNumber(String(value)) }
+            : { logged: Boolean(value), loggedAt: value ? new Date().toISOString() : null };
+      const nextDraft = updateWorkoutSet(draft, { setId, ...update });
+      setDraft(nextDraft);
+      setExercises(draftToExercises(nextDraft, programWorkout ?? undefined));
+      persistDraft(nextDraft);
+    } catch (error) {
+      Alert.alert('Check this set', error instanceof Error ? error.message : 'Enter valid set details before logging it.');
+    }
   };
 
   const toggleExerciseComplete = (exerciseId: string) => {
@@ -446,18 +450,22 @@ export default function NextWorkoutScreen() {
     const slot = draft.slots.find((candidate) => candidate.slotId === exerciseId);
     if (!slot) return;
     const shouldLog = !slot.sets.every((set) => set.logged);
-    let nextDraft = draft;
-    for (const set of slot.sets) {
-      if (!set.actualReps || set.actualReps <= 0) continue;
-      nextDraft = updateWorkoutSet(nextDraft, {
-        setId: set.setId,
-        logged: shouldLog,
-        loggedAt: shouldLog ? new Date().toISOString() : null,
-      });
+    try {
+      let nextDraft = draft;
+      for (const set of slot.sets) {
+        if (!set.actualReps || set.actualReps <= 0) continue;
+        nextDraft = updateWorkoutSet(nextDraft, {
+          setId: set.setId,
+          logged: shouldLog,
+          loggedAt: shouldLog ? new Date().toISOString() : null,
+        });
+      }
+      setDraft(nextDraft);
+      setExercises(draftToExercises(nextDraft, programWorkout ?? undefined));
+      persistDraft(nextDraft);
+    } catch (error) {
+      Alert.alert('Check these sets', error instanceof Error ? error.message : 'Enter valid set details before logging them.');
     }
-    setDraft(nextDraft);
-    setExercises(draftToExercises(nextDraft, programWorkout ?? undefined));
-    persistDraft(nextDraft);
   };
 
   const applyWorkoutSwap = async ({
