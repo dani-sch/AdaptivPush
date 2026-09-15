@@ -1,5 +1,11 @@
 # AdaptivPush — Development Log
 
+## 2026-09-15 - Scoped swaps and completed-workout corrections
+
+Commit `e8163b9` locally adds one consistent program/workout swap flow with selected-workout and rest-of-program scopes, logged-set preservation, natural replacement-load validation and durable partial-update recovery. It also adds explicit editing of finalized durable workouts with owner/revision/idempotency-safe atomic correction, same-session effective totals/completion/record refresh and internal before/after audit.
+
+Strict TypeScript passed; lint passed with three pre-existing warnings; 50 combined AP-02/AP-03 unit tests passed; local database reset applied every migration; all four committed SQL suites passed through direct `psql`, including the AP-03 legacy variant; and database lint reported no warnings. The unauthenticated Expo web welcome screen also rendered with no error overlay or browser console error after the SSR auth-storage path was made safe. Additive migration `20260915190000` is local-only/not hosted. Earlier rollout authorization does not apply. Authenticated physical iPhone/E2E visual acceptance and fresh regression of restore archive, end/archive, start workout and generate program remain open. [Owning evidence](/dev-doc/reports/ADAPTIVPUSH-SWAP-CORRECTION-2026-09-15.md).
+
 ## 2026-09-14 - iPhone program failure remediation
 
 Preserved the clean existing feature branch and integrated focused code/tooling
