@@ -1,3 +1,4 @@
+import type { LoadKind, LoadUnit, LoadSide } from '@/features/workouts/contracts';
 import type { ExplanationMetadata } from '@/types/evidence';
 
 export type MuscleGroup =
@@ -30,6 +31,15 @@ export type WorkoutExercise = {
     sets?: number;
     reps?: string;
     weight?: number;
+    loadKind?: LoadKind;
+    loadUnit?: LoadUnit;
+    loadSide?: LoadSide;
+    loadSuggestion?: {
+        value: number;
+        unit: 'lb' | 'kg';
+        kind: 'external' | 'assistance';
+        side: LoadSide;
+    };
     /** Per-set weight overrides (lb). When present, set i uses perSetWeights[i] instead of weight. */
     perSetWeights?: number[];
     targetRpe?: number | null;
@@ -57,6 +67,9 @@ export interface GeneratedProgramExplanation extends ExplanationMetadata {
 }
 
 export type ProgramWorkout = {
+    sessionId?: string;
+    isFinalized?: boolean;
+    completionClass?: string;
     id: string;
     stableDayId?: string;
     prescriptionRevisionId?: string;
@@ -64,7 +77,7 @@ export type ProgramWorkout = {
     day: string;            // e.g. "Monday"
     estimatedTime: number;  // minutes
     exercises: WorkoutExercise[];
-    isCompleted?: boolean;  // true if a workout_session exists for this day in the current week
+    isCompleted?: boolean;  // full/reduced prescription fulfillment; partial finalization is separate
 };
 
 export type CurrentProgram = {

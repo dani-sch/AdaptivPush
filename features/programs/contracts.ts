@@ -67,7 +67,7 @@ export type ProgramCommandOutcome =
   | { status: 'replay'; receipt: ProgramInstallationReceipt }
   | { status: 'validation'; errors: string[] }
   | { status: 'conflict'; message: string; activeProgramId: string | null }
-  | { status: 'unavailable'; message: string };
+  | { status: 'unavailable'; message: string; failure: import('@/utils/supabaseResilience').SupabaseFailure };
 
 export interface ProgramExerciseRevisionRequest {
   programId: string;
@@ -77,7 +77,7 @@ export interface ProgramExerciseRevisionRequest {
   currentStableSlotId: string;
   originalExerciseId: string;
   replacementExerciseId: string;
-  includeCurrentDay: boolean;
+  scope: 'selected_only' | 'selected_and_future' | 'future_after_current';
 }
 
 export interface ProgramExerciseRevisionReceipt {
@@ -87,15 +87,17 @@ export interface ProgramExerciseRevisionReceipt {
   revisionId: string;
   revision: number;
   changedSlotCount: number;
+  futureChangedSlotCount?: number;
   revisedAt: string;
   replayed: boolean;
 }
 
 export type ProgramExerciseRevisionOutcome =
   | { status: 'revised' | 'replay'; receipt: ProgramExerciseRevisionReceipt }
+  | { status: 'no_change'; reason: 'no_future_workouts' }
   | { status: 'validation'; errors: string[] }
   | { status: 'conflict'; message: string }
-  | { status: 'unavailable'; message: string };
+  | { status: 'unavailable'; message: string; failure: import('@/utils/supabaseResilience').SupabaseFailure };
 
 export function normalizeProgramArtifact(
   input: ProgramArtifact & { depthMode?: unknown; entitlement?: unknown },

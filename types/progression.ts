@@ -8,6 +8,8 @@ export interface LoggedSet {
 }
 
 export interface ProgressionContext {
+  requiredSetCount?: number;
+  completionClass?: string;
   pdeId: string;                       // program_day_exercises.id being updated
   exerciseName: string;
   currentWeightLb: number;

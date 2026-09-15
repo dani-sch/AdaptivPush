@@ -1,3 +1,4 @@
+import { confirmedSwapMessage } from '@/features/workouts/swapRecovery';
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { X, ArrowLeftRight, Info } from 'lucide-react-native';
@@ -7,11 +8,16 @@ import { ExerciseInfoPanel } from '@/components/ExerciseInfoPanel';
 import type { CurrentProgram, ProgramWorkout, WorkoutExercise } from '@/types/program';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
+import { workoutEntryIssue } from '@/features/workouts/routeResolution';
 
 type Props = {
     workout: ProgramWorkout;
     program: CurrentProgram;
-    onSwapExercise: (args: { exerciseId: string; replacement: WorkoutExercise; applyToProgram: boolean }) => unknown | Promise<unknown>;
+    onSwapExercise: (args: {
+        exerciseId: string;
+        replacement: WorkoutExercise;
+        scope: 'workout_only' | 'rest_of_program';
+    }) => unknown | Promise<unknown>;
     onClose: () => void;
     onStart: () => void;
 };
@@ -78,6 +84,8 @@ function ExerciseRow({ exercise, idx, onSwap, styles, theme }: {
 }
 
 export function WorkoutTemplateModal({ workout, program, onSwapExercise, onClose, onStart }: Props) {
+    const entryIssue = workout.sessionId ? null : workoutEntryIssue(program, workout);
+    const [swapMessage, setSwapMessage] = useState<string | null>(null);
     const { theme } = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -110,18 +118,22 @@ export function WorkoutTemplateModal({ workout, program, onSwapExercise, onClose
                             key={exercise.id}
                             exercise={exercise}
                             idx={idx}
-                            onSwap={() => setSwapExerciseId(exercise.id)}
+                            onSwap={() => { if (!workout.sessionId) setSwapExerciseId(exercise.id); }}
                             styles={styles}
                             theme={theme}
                         />
                     ))}
+                    {swapMessage ? <Text style={styles.headerSubtitle}>{swapMessage}</Text> : null}
+                    {entryIssue && <Text style={styles.headerSubtitle}>{entryIssue}</Text>}
                     <Pressable
                         onPress={onStart}
+                        disabled={!!entryIssue}
+                        accessibilityState={{ disabled: !!entryIssue }}
                         style={({ pressed }) => [styles.startButton, pressed && { opacity: 0.85 }]}
                         accessibilityRole="button"
                         accessibilityLabel={`Start ${workout.name}`}
                     >
-                        <Text style={styles.startButtonText}>Start This Workout</Text>
+                        <Text style={styles.startButtonText}>{workout.sessionId ? 'View or Update Workout' : entryIssue ? 'Workout unavailable' : 'Start This Workout'}</Text>
                     </Pressable>
                 </ScrollView>
             </View>
@@ -137,7 +149,12 @@ export function WorkoutTemplateModal({ workout, program, onSwapExercise, onClose
                                 context="program"
                                 embedded
                                 onClose={() => setSwapExerciseId(null)}
-                                onSwap={onSwapExercise}
+                                onSwap={async args => {
+                                    const result = await onSwapExercise(args);
+                                    const receipt = result && typeof result === 'object' && 'receipt' in result ? result.receipt as { futureChangedSlotCount?: number } : null;
+                                    setSwapMessage(args.scope === 'workout_only' ? 'Exercise swapped for this workout.' : confirmedSwapMessage(receipt?.futureChangedSlotCount));
+                                    return result;
+                                }}
                             />
                         </View>
                     </View>

@@ -1,3 +1,4 @@
+import { createCompletedNavigation } from '@/features/workouts/effectiveOccurrence';
 import { ExerciseHistoryModal } from '@/components/ExerciseHistoryModal';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -9,10 +10,11 @@ import {
   TrendingUp,
   X,
 } from 'lucide-react-native';
-import { type ReactNode, useCallback, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,7 +22,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 
 import { supabase } from '@/utils/supabase';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -61,8 +63,11 @@ interface WorkoutEntry {
 }
 
 interface SessionExerciseSet {
+  setId: string;
   setNumber: number;
-  weightLb: number | null;
+  loadValue: number | null;
+  loadUnit: 'lb' | 'kg' | 'none';
+  loadKind: 'external' | 'bodyweight' | 'assistance' | 'unknown';
   reps: number | null;
   rpe: number | null;
 }
@@ -234,7 +239,10 @@ const fetchSessionExercises = async (sessionId: string): Promise<SessionExercise
     .from('workout_exercise_sets')
     .select(`
       set_number,
-      weight_lb,
+      actual_set_id,
+      load_value,
+      load_unit,
+      load_kind,
       reps,
       rpe,
       exercise_id,
@@ -254,8 +262,11 @@ const fetchSessionExercises = async (sessionId: string): Promise<SessionExercise
       map.set(exId, { exerciseId: exId, name: exName, sets: [] });
     }
     map.get(exId)!.sets.push({
+      setId: row.actual_set_id,
       setNumber: row.set_number,
-      weightLb: row.weight_lb != null ? Number(row.weight_lb) : null,
+      loadValue: row.load_value != null ? Number(row.load_value) : null,
+      loadUnit: row.load_unit,
+      loadKind: row.load_kind,
       reps: row.reps != null ? Number(row.reps) : null,
       rpe: row.rpe != null ? Number(row.rpe) : null,
     });
@@ -303,6 +314,12 @@ export default function HistoryScreen() {
   const [error, setError] = useState<string | null>(null);
 
   // Session detail sheet state
+  const [pendingEdit] = useState(createCompletedNavigation);
+  const navigateAfterDismiss = useCallback(() => {
+    const sessionId = pendingEdit.dismiss();
+    if (!sessionId) return;
+    router.push({ pathname: '/edit-workout', params: { sessionId } });
+  }, [pendingEdit]);
   const [detailWorkout, setDetailWorkout] = useState<WorkoutEntry | null>(null);
   const [sessionExercises, setSessionExercises] = useState<SessionExercise[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -310,6 +327,20 @@ export default function HistoryScreen() {
   // Exercise history modal state (drill-down from detail sheet)
   const [historyExerciseId, setHistoryExerciseId] = useState<string | null>(null);
   const [historyExerciseName, setHistoryExerciseName] = useState<string | null>(null);
+
+  const editWorkout = () => {
+    if (!detailWorkout || !pendingEdit.request(detailWorkout.id)) return;
+    setHistoryExerciseId(null);
+    setHistoryExerciseName(null);
+    setSessionExercises([]);
+    setDetailWorkout(null);
+  };
+  useEffect(() => {
+    if (Platform.OS === 'ios' || detailWorkout || !pendingEdit.pending()) return;
+    // Android/web use an unanimated dismissal; the next frame follows its committed removal.
+    const frame = requestAnimationFrame(navigateAfterDismiss);
+    return () => cancelAnimationFrame(frame);
+  }, [detailWorkout, navigateAfterDismiss, pendingEdit]);
 
   // PR count from personal_records table
   const [prCount, setPrCount] = useState(0);
@@ -320,6 +351,7 @@ export default function HistoryScreen() {
   const [prLoading, setPrLoading] = useState(false);
 
   const handleOpenDetail = async (workout: WorkoutEntry) => {
+    pendingEdit.reset();
     setDetailWorkout(workout);
     setSessionExercises([]);
     setDetailLoading(true);
@@ -419,11 +451,11 @@ export default function HistoryScreen() {
       }
 
       // Fetch PR count directly from personal_records table
-      const { count: prTotal } = await supabase
+      const { data: prRows } = await supabase
         .from('personal_records')
-        .select('*', { count: 'exact', head: true })
+        .select('exercise_id')
         .eq('user_id', user.id);
-      setPrCount(prTotal ?? 0);
+      setPrCount(new Set((prRows ?? []).map(row => row.exercise_id)).size);
 
       const sessionsResult = await fetchRowsFromTable('workout_sessions', user.id);
       const sessionsMissing = isMissingTableError(sessionsResult.error, 'workout_sessions');
@@ -618,7 +650,8 @@ export default function HistoryScreen() {
       <Modal
         visible={detailWorkout !== null}
         transparent
-        animationType="slide"
+        animationType={Platform.OS === 'ios' ? 'slide' : 'none'}
+        onDismiss={navigateAfterDismiss}
         onRequestClose={historyExerciseId !== null ? handleCloseExerciseHistory : handleCloseDetail}
       >
         {/* Session detail sheet */}
@@ -633,6 +666,14 @@ export default function HistoryScreen() {
                   {detailWorkout ? formatWorkoutDate(detailWorkout.completedAt) : ''}
                 </Text>
               </View>
+              <Pressable
+                style={styles.editWorkoutBtn}
+                onPress={editWorkout}
+                accessibilityRole="button"
+                accessibilityLabel="Edit completed workout"
+              >
+                <Text style={styles.editWorkoutText}>Edit workout</Text>
+              </Pressable>
               <Pressable
                 style={styles.sheetCloseBtn}
                 onPress={handleCloseDetail}
@@ -677,10 +718,12 @@ export default function HistoryScreen() {
                     </View>
 
                     {ex.sets.map((s) => (
-                      <Text key={s.setNumber} style={styles.setRow}>
+                      <Text key={s.setId} style={styles.setRow}>
                         {`Set ${s.setNumber}`}
                         {'   '}
-                        {s.weightLb !== null ? `${s.weightLb} lb × ` : ''}
+                        {s.loadKind === 'bodyweight' ? 'Bodyweight × ' : ''}
+                        {s.loadKind === 'assistance' && s.loadValue !== null ? `${s.loadValue} ${s.loadUnit} assistance × ` : ''}
+                        {s.loadKind === 'external' && s.loadValue !== null ? `${s.loadValue} ${s.loadUnit} × ` : ''}
                         {s.reps !== null ? `${s.reps} reps` : '—'}
                         {s.rpe !== null ? `   @ RPE ${s.rpe}` : ''}
                       </Text>
@@ -937,6 +980,16 @@ function createStyles(theme: Theme) {
       borderColor: theme.border,
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    editWorkoutBtn: {
+      minHeight: 40,
+      justifyContent: 'center',
+      paddingHorizontal: 10,
+    },
+    editWorkoutText: {
+      color: theme.primary,
+      fontSize: 13,
+      fontWeight: '800',
     },
     sheetContent: {
       paddingHorizontal: 18,

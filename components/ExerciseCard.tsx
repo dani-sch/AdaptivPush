@@ -10,11 +10,14 @@ import { haptic, Haptics } from "@/utils/haptic";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface WorkoutSet {
+    outcome?: 'performed' | 'skipped' | 'not_attempted';
+    loadUnit?: string;
     id: string;
     weight: string;
     reps: string;
     rpe: string;
     logged: boolean;
+    exerciseName?: string;
 }
 
 export interface Exercise {
@@ -27,13 +30,10 @@ export interface Exercise {
     muscleGroup?: MuscleGroup;
     imageUrl?: string;
     description?: string;
-    requiresRecalibration?: boolean;
-    recalibration?: {
-        originalExerciseName: string;
-        completedOriginalSets: number[];
-        remainingReplacementSets: number[];
-        suggestedCopyLoad: number | null;
-    };
+    readOnly?: boolean;
+    editingCompleted?: boolean;
+    loadLabel?: string;
+    loadSuggestion?: string;
 }
 
 // ─── SetRow ───────────────────────────────────────────────────────────────────
@@ -41,10 +41,16 @@ export interface Exercise {
 interface SetRowProps {
     set: WorkoutSet;
     index: number;
+    exerciseName: string;
+    readOnly?: boolean;
+    loadLabel: string;
     onChangeWeight: (val: string) => void;
     onChangeReps: (val: string) => void;
     onChangeRpe: (val: string) => void;
     onToggleLogged: () => void;
+    onToggleSkipped: () => void;
+    editingCompleted?: boolean;
+    controls?: React.ReactNode;
     styles: ReturnType<typeof createStyles>;
     theme: Theme;
 }
@@ -52,45 +58,58 @@ interface SetRowProps {
 const SetRow: React.FC<SetRowProps> = ({
     set,
     index,
+    exerciseName,
+    readOnly,
+    loadLabel,
     onChangeWeight,
     onChangeReps,
     onChangeRpe,
     onToggleLogged,
+    onToggleSkipped,
+    editingCompleted,
+    controls,
     styles,
     theme,
 }) => (
-    <View style={[styles.setRow, set.logged && styles.setRowLogged]}>
+    <View>
+      {set.exerciseName && set.exerciseName !== exerciseName ? (
+        <Text style={styles.actualExerciseLabel}>Set {index + 1}: {set.exerciseName}</Text>
+      ) : null}
+      <View style={[styles.setRow, set.logged && styles.setRowLogged]}>
         <Text style={styles.setNumber}>{index + 1}</Text>
 
         <TextInput
             style={[styles.setInput, set.logged && styles.setInputLogged]}
+            accessibilityLabel={`${exerciseName}, set ${index + 1}, load in ${loadLabel}`}
             value={set.weight}
             onChangeText={onChangeWeight}
             keyboardType="decimal-pad"
             selectTextOnFocus
-            editable={!set.logged}
+            editable={(!set.logged || editingCompleted) && !readOnly && set.outcome !== 'skipped'}
             placeholderTextColor={theme.placeholder}
             placeholder="—"
         />
 
         <TextInput
             style={[styles.setInput, set.logged && styles.setInputLogged]}
+            accessibilityLabel={`${exerciseName}, set ${index + 1}, repetitions`}
             value={set.reps}
             onChangeText={onChangeReps}
             keyboardType="number-pad"
             selectTextOnFocus
-            editable={!set.logged}
+            editable={(!set.logged || editingCompleted) && !readOnly && set.outcome !== 'skipped'}
             placeholderTextColor={theme.placeholder}
             placeholder="—"
         />
 
         <TextInput
             style={[styles.setInput, set.logged && styles.setInputLogged]}
+            accessibilityLabel={`${exerciseName}, set ${index + 1}, rating of perceived exertion`}
             value={set.rpe}
             onChangeText={onChangeRpe}
             keyboardType="decimal-pad"
             selectTextOnFocus
-            editable={!set.logged}
+            editable={(!set.logged || editingCompleted) && !readOnly && set.outcome !== 'skipped'}
             placeholderTextColor={theme.placeholder}
             placeholder="—"
         />
@@ -105,7 +124,11 @@ const SetRow: React.FC<SetRowProps> = ({
                 if (!set.logged) void haptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
                 onToggleLogged();
             }}
-            hitSlop={6}
+            hitSlop={8}
+            disabled={readOnly}
+            accessibilityRole="checkbox"
+            accessibilityLabel={`${exerciseName}, set ${index + 1} logged`}
+            accessibilityState={{ checked: set.logged, disabled: readOnly }}
         >
             <Ionicons
                 name="checkmark"
@@ -113,18 +136,26 @@ const SetRow: React.FC<SetRowProps> = ({
                 color={set.logged ? theme.white : theme.placeholder}
             />
         </Pressable>
+      </View>
+      <Text style={styles.actualExerciseLabel}>{set.outcome === 'skipped' ? 'Skipped' : set.logged ? `Performed · ${set.loadUnit ?? loadLabel}` : 'Not attempted'}</Text>
+      {!readOnly && !set.logged ? <Pressable onPress={onToggleSkipped} accessibilityRole="button" style={styles.setAction}>
+        <Text style={styles.actionButtonText}>{set.outcome === 'skipped' ? 'Undo skip' : 'Skip set'}</Text>
+      </Pressable> : null}
+      {controls}
     </View>
 );
 
 // ─── ExerciseCard ─────────────────────────────────────────────────────────────
 
 interface ExerciseCardProps {
+    renderSetControls?: (set: WorkoutSet) => React.ReactNode;
+    onAddSet?: () => void;
+    onSkipExercise?: () => void;
     exercise: Exercise;
     onUpdateSet: (setId: string, field: keyof WorkoutSet, value: string | boolean) => void;
     onToggleComplete: () => void;
-    onPressHistory: () => void;
+    onPressHistory?: () => void;
     onPressSwap: () => void;
-    onConfirmRecalibration?: () => void;
 }
 
 export default function ExerciseCard({
@@ -133,7 +164,9 @@ export default function ExerciseCard({
     onToggleComplete,
     onPressHistory,
     onPressSwap,
-    onConfirmRecalibration,
+    renderSetControls,
+    onAddSet,
+    onSkipExercise,
 }: ExerciseCardProps) {
     const { theme } = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
@@ -150,6 +183,10 @@ export default function ExerciseCard({
                             pressed && { opacity: 0.7 },
                         ]}
                         onPress={onToggleComplete}
+                        disabled={exercise.readOnly || exercise.editingCompleted}
+                        accessibilityRole="checkbox"
+                        accessibilityLabel={`${exercise.name}, all entered sets logged`}
+                        accessibilityState={{ checked: exercise.completed, disabled: exercise.readOnly }}
                         hitSlop={8}
                     >
                         {exercise.completed && (
@@ -168,9 +205,7 @@ export default function ExerciseCard({
                             {exercise.name}
                         </Text>
                         <Text style={styles.prescription}>{exercise.prescription}</Text>
-                        {exercise.requiresRecalibration && (
-                            <Text style={styles.recalibrationText}>Action needed: choose replacement loads</Text>
-                        )}
+                        {exercise.loadSuggestion ? <Text style={styles.loadSuggestion}>{exercise.loadSuggestion}</Text> : null}
                     </View>
                 </View>
                 <View style={styles.actions}>
@@ -178,53 +213,32 @@ export default function ExerciseCard({
                         <Pressable
                             style={({ pressed }) => [styles.actionButton, showInfo && styles.actionButtonActive, pressed && { opacity: 0.7 }]}
                             onPress={() => setShowInfo(p => !p)}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Information about ${exercise.name}`}
                             hitSlop={6}
                         >
                             <Ionicons name="information-circle-outline" size={16} color={showInfo ? theme.text : theme.text} />
                         </Pressable>
                     )}
-                    <Pressable
+                    {onPressHistory ? <Pressable
                         style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.7 }]}
                         onPress={onPressHistory}
                     >
                         <Ionicons name="time-outline" size={16} color={theme.text} />
                         <Text style={styles.actionButtonText}>History</Text>
-                    </Pressable>
-                    <Pressable
+                    </Pressable> : null}
+                    {!exercise.editingCompleted && !exercise.readOnly ? <Pressable
                         style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.7 }]}
                         onPress={onPressSwap}
+                        disabled={exercise.readOnly}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Swap ${exercise.name}`}
                     >
                         <Ionicons name="swap-horizontal" size={16} color={theme.text} />
                         <Text style={styles.actionButtonText}>Swap</Text>
-                    </Pressable>
+                    </Pressable> : null}
                 </View>
             </View>
-            {exercise.requiresRecalibration && onConfirmRecalibration && (
-                <View style={styles.recalibrationPanel} accessibilityRole="summary">
-                    <Text style={styles.recalibrationExplanation}>
-                        {exercise.recalibration?.completedOriginalSets.length
-                            ? `Completed ${exercise.recalibration.completedOriginalSets.length === 1 ? 'set' : 'sets'} ${exercise.recalibration.completedOriginalSets.join(', ')} remain recorded under ${exercise.recalibration.originalExerciseName}. `
-                            : ''}
-                        {`Unlogged ${exercise.recalibration?.remainingReplacementSets.length === 1 ? 'set' : 'sets'} ${exercise.recalibration?.remainingReplacementSets.join(', ') ?? ''} need a load for ${exercise.name}. This changes only this workout; future prescriptions are separate.`}
-                    </Text>
-                    <Text style={styles.recalibrationHint}>You can enter a different load in each remaining set.</Text>
-                    <Pressable
-                        style={styles.recalibrationButton}
-                        onPress={onConfirmRecalibration}
-                        accessibilityRole="button"
-                        accessibilityLabel={exercise.recalibration?.suggestedCopyLoad != null
-                            ? `Use ${exercise.recalibration?.suggestedCopyLoad} pounds for remaining replacement sets in this workout only`
-                            : `Confirm manually entered loads for remaining ${exercise.name} sets in this workout only`}
-                    >
-                        <Text style={styles.recalibrationButtonText}>
-                            {exercise.recalibration?.suggestedCopyLoad != null
-                                ? `Use ${exercise.recalibration?.suggestedCopyLoad} lb for remaining sets ${exercise.recalibration?.remainingReplacementSets.join(', ')}`
-                                : 'Confirm manually entered replacement loads'}
-                        </Text>
-                    </Pressable>
-                </View>
-            )}
-
             {showInfo && (
                 <ExerciseInfoPanel imageUrl={exercise.imageUrl} description={exercise.description} />
             )}
@@ -233,7 +247,7 @@ export default function ExerciseCard({
             <View style={styles.setsTable}>
                 <View style={styles.setRow}>
                     <Text style={styles.setHeaderSet}>SET</Text>
-                    <Text style={styles.setHeaderLabel}>LBS</Text>
+                    <Text style={styles.setHeaderLabel}>{exercise.loadLabel ?? "LBS"}</Text>
                     <Text style={styles.setHeaderLabel}>REPS</Text>
                     <Text style={styles.setHeaderLabel}>RPE</Text>
                     <View style={styles.logButtonPlaceholder} />
@@ -244,15 +258,27 @@ export default function ExerciseCard({
                         key={set.id}
                         set={set}
                         index={idx}
+                        exerciseName={exercise.name}
+                        readOnly={exercise.readOnly}
+                        editingCompleted={exercise.editingCompleted}
+                        controls={renderSetControls?.(set)}
+                        loadLabel={exercise.loadLabel ?? "pounds"}
                         onChangeWeight={(val) => onUpdateSet(set.id, "weight", val)}
                         onChangeReps={(val) => onUpdateSet(set.id, "reps", val)}
                         onChangeRpe={(val) => onUpdateSet(set.id, "rpe", val)}
                         onToggleLogged={() => onUpdateSet(set.id, "logged", !set.logged)}
+                        onToggleSkipped={() => onUpdateSet(set.id, 'outcome', set.outcome === 'skipped' ? 'not_attempted' : 'skipped')}
                         styles={styles}
                         theme={theme}
                     />
                 ))}
             </View>
+            {!exercise.readOnly ? <View>
+              <Pressable style={styles.setAction} onPress={onSkipExercise ?? (() => exercise.sets.filter(s => !s.logged).forEach(s => onUpdateSet(s.id, 'outcome', 'skipped')))} accessibilityRole="button">
+                <Text style={styles.actionButtonText}>Skip remaining exercise</Text>
+              </Pressable>
+              {onAddSet ? <Pressable style={styles.setAction} onPress={onAddSet} accessibilityRole="button"><Text style={styles.actionButtonText}>Add extra set</Text></Pressable> : null}
+            </View> : null}
         </View>
     );
 }
@@ -261,6 +287,7 @@ export default function ExerciseCard({
 
 function createStyles(theme: Theme) {
     return StyleSheet.create({
+        setAction: { minHeight: 44, justifyContent: 'center' },
         card: {
             backgroundColor: theme.cardBg,
             borderRadius: 20,
@@ -320,40 +347,17 @@ function createStyles(theme: Theme) {
             fontSize: 13,
             fontWeight: "500",
         },
-        recalibrationText: {
+        loadSuggestion: {
             color: theme.secondaryLight,
             fontSize: 12,
             fontWeight: "600",
             marginTop: 3,
         },
-        recalibrationButton: {
-            minHeight: 48,
-            borderRadius: 10,
-            borderWidth: 1,
-            borderColor: theme.secondaryLight,
-            alignItems: "center",
-            justifyContent: "center",
-            marginBottom: 10,
-            paddingHorizontal: 12,
-        },
-        recalibrationButtonText: { color: theme.textPrimary, fontSize: 13, fontWeight: "700" },
-        recalibrationPanel: {
-            borderWidth: 1,
-            borderColor: theme.border,
-            borderRadius: 14,
-            padding: 12,
-            marginBottom: 14,
-            gap: 8,
-        },
-        recalibrationExplanation: {
-            color: theme.textPrimary,
-            fontSize: 13,
-            lineHeight: 19,
-        },
-        recalibrationHint: {
+        actualExerciseLabel: {
             color: theme.text,
             fontSize: 12,
-            lineHeight: 18,
+            fontWeight: "600",
+            marginTop: 8,
         },
 
         actions: {

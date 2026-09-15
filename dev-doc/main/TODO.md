@@ -1,5 +1,12 @@
 # AdaptivPush active task board
 
+## [CURRENT] Resume from the preserved September 15 implementation
+
+- [COMPLETE] Reconcile the master plan, register, code status, database, traceability, research scope and living summaries with the hosted rollout and latest local workout lifecycle. Approved decisions and later-slice order remain unchanged.
+- [COMPLETE] Consolidate all prior branch tips in draft PR #56, verify the integration tree, and retire seven redundant local branches plus the hosted-rollout remote branch. [Git and verification evidence](/dev-doc/reports/DEV-LOG.md#2026-09-15---reconciled-progress-integration-and-draft-pr-closeout).
+- [CURRENT] Continue the unified workout lifecycle acceptance below. Preserve stable day/slot identity, exact retry operations, performed-set history, explicit partial outcomes, shared completed cards and capability-aware corrections. Do not restart AP-01 inspection or rebuild the existing atomic persistence modules.
+- [OPEN] Finish authenticated and physical iPhone acceptance; separately authorize and verify the two local-only migrations before hosted rollout. Git publication in draft PR #56 does not deploy them.
+
 ## [COMPLETE] Documentation consolidation
 
 - [COMPLETE] Inventory 61 source documents and preserve 12 superseded authorities plus 12 prior operational snapshots.
@@ -36,22 +43,33 @@
 - [COMPLETE] Configure the `integrator` worktree and pass the later AP-02/AP-03 clean integration gates.
 - [OPEN] Provide an Expo-capable device for the remaining AP-01 application compatibility matrix.
 
-## [INTEGRATION VERIFIED — RELEASE BLOCKED] AP-02/AP-03 — Durable records
+## [HOSTED DEPLOYED; PHONE ACCEPTANCE OPEN] AP-02/AP-03
 
-- [COMPLETE] Add versioned workout/program contracts, stable identities, frozen prescriptions and actual-versus-planned/load semantics.
-- [COMPLETE] Add owner-scoped durable pending stores and replay-safe common repositories/commands.
-- [COMPLETE] Add one additive migration with immutable program revisions, one-active-per-owner, exact V2 checkpoints, transactional program install and workout finalize RPCs, direct-write denial and durable receipt effects.
-- [COMPLETE] Route generated/manual program saves and Next Workout through the common commands; remove false completion and visible development-program behavior.
-- [COMPLETE] Pass focused contract tests, AP-01 regression SQL, AP-02/AP-03 atomicity/isolation SQL, fresh reset, database lint, strict types, lint and clean integrator verification.
-- [COMPLETE] Establish a local Android 16 native development build and prove generated save fails before server mutation with the writer off, then installs one complete schema-v2 hierarchy with it on.
-- [COMPLETE] Locally verify the bounded swap/route matrix on Android 16: Home and Plan entry, current-only zero/partial swaps, completed-set attribution, explicit recalibration, future immutable successor revision, reload, background/foreground, kill/reopen, cold offline recovery, stale route and actual account switching.
-- [COMPLETE] Declare Expo-compatible `@react-navigation/native`, align SDK patch dependencies, pass Metro export and native debug build, and confirm no duplicate navigation core.
-- [COMPLETE] Merge the bounded hardening packet as integrator commit `54e5a39` and rerun focused/static, Expo Doctor, fresh-reset/SQL, 3,819-module Metro and 435-task native debug assembly gates there.
-- [OPEN] Complete physical-device Expo/development-build comparison, manual program, archive/restore, old-client, dynamic type, TalkBack and theme coverage.
-- [BLOCKED] Securely reauthenticate the Supabase CLI, create a fresh encrypted production logical backup, prove PostgreSQL 17 decrypt/restore equivalence, then dry-run/apply/verify the production migration. Dashboard confirms Free has no managed backup.
-- [OPEN] Enable `EXPO_PUBLIC_AP02_DURABLE_WRITER` and `EXPO_PUBLIC_AP03_ATOMIC_WRITER` only after all release gates pass; monitor conflicts/replays/outcome coverage without sensitive payloads.
+- [COMPLETE] Preserve existing work on `codex/ap02-ap03-hosted-rollout`; use focused commits and integrator `8917bfd` for code verification.
+- [COMPLETE] Verify expected project/PG17 identity, ledger, exact reviewed hashes and dry-run. Explain baseline replay normalization; preserve all hosted objects.
+- [COMPLETE] Recover the Docker Linux engine, capture fresh encrypted consistent snapshot and DPAPI key, restore in network isolation, and match all 48 relation fingerprints plus schema/security.
+- [COMPLETE] Deploy `20260910210000`, `20260911120000` and `20260915151000` atomically with their ledger entries, bounded locks and before/after original-data checks.
+- [COMPLETE] Verify hosted install/finalize/archive/restore/revision functions, owner isolation, anonymous denial, immutable legacy successors, provenance, atomic failure and replay using rolled-back probes. All 47 original non-ledger relations still match.
+- [COMPLETE] Enable both writer flags in normal `.env`, clear/restart Metro and inspect the actual iOS bundle: correct hosted URL, true/true flags and no privileged key. Remove duplicated save recovery text.
+- [COMPLETE] Pass 66 unique unit cases, TypeScript/lint, four SQL variants, six concurrent assertions and independent integrator checks.
+- [OPEN: POST-DEPLOYMENT] User runs `npm start`, scans its ordinary QR and checks Home/Plan start, generated save, custom save, archive/end and restore/start, then reopens to check persistence. Existing account; no separate QA setup or signing prerequisite.
+- [OPEN] Physical iPhone startup/accessibility acceptance. Preserve and disclose the 32 pre-existing empty non-rest days; missing prescriptions cannot be reconstructed safely from these rows.
 
-Evidence: [AP-02](/dev-doc/reports/ADAPTIVPUSH-AP-02-2026-09-10.md) and [AP-03](/dev-doc/reports/ADAPTIVPUSH-AP-03-2026-09-10.md).
+The user's September 15 authorization replaces earlier pre-migration local/manual/native-signing gates. Physical iPhone cold launch, five-action UI/reopen acceptance and accessibility remain unverified. Thirty-two pre-existing non-rest days have no exercises (five in active programs); they were preserved, not populated with invented prescriptions. Complete persisted workouts can use their database identities; empty legacy days remain unstartable. AP-04/AP-05 remain out of scope. Evidence and recovery procedure: [release report](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md) and [manual checklist](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-MANUAL-QA-2026-09-14.md).
+
+## [LOCAL VERIFIED; HOSTED ROLLOUT NOT AUTHORIZED] Unified workout lifecycle
+
+- [COMPLETE] Share effective occurrence projection across Home, Plan/full-program, active cards and durable completed view/edit; preserve stable slots, performed identities and full frozen prescriptions.
+- [COMPLETE] Make repeat swaps follow stable original slot lineage, keep exact retry recovery and scope-specific outcomes, and protect finalized occurrences.
+- [COMPLETE] Add skip/undo and skip-exercise controls, partial finalization confirmation, explicit Home lifecycle actions and direct durable Last Workout access.
+- [COMPLETE] Reuse exercise cards for completed view/edit, support per-exercise extra sets and whole-edit Cancel, distinguish missing correction support from ownership, and sequence History dismissal before navigation.
+- [COMPLETE] Hold progression on incomplete required work; corrections recompute completion/volume/records and invalidate existing derived-effect receipts without advancing the program.
+- [LOCAL VERIFIED] 75 AP-02/AP-03 tests plus 13 availability tests, strict TypeScript, lint (three existing warnings), four SQL suites plus legacy variant, concurrent-request checks, database lint, Expo web export and unauthenticated browser smoke.
+- [OPEN] Authenticated acceptance: both swap entry points/scopes, second swap, partial finalize/reopen, correction Save/Cancel/retry/conflict, record totals and History dismissal. Physical iPhone keyboard, VoiceOver, dynamic text and reopening remain unverified.
+- [OPEN] Recheck restore archived programs, end/archive, start and generate on the physical candidate; prior confirmations remain baseline evidence.
+- [BLOCKED: HOSTED AUTHORIZATION REQUIRED] Neither modified migration `20260915190000` nor new migration `20260915210000` is authorized for hosted deployment. A future authorized rollout must verify project identity, recoverability, exact migration hashes, owner/security behavior and hosted capabilities before release.
+
+Evidence: [workout lifecycle verification](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-LIFECYCLE-2026-09-15.md). Earlier [swap/correction evidence](/dev-doc/reports/ADAPTIVPUSH-SWAP-CORRECTION-2026-09-15.md) remains historical provenance.
 
 ## [NEXT AFTER RELEASE] Bounded implementation
 

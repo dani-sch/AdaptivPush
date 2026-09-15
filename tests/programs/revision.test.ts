@@ -18,7 +18,7 @@ const request: ProgramExerciseRevisionRequest = {
   currentStableSlotId: '50000000-0000-4000-8000-000000000001',
   originalExerciseId: '60000000-0000-4000-8000-000000000001',
   replacementExerciseId: '60000000-0000-4000-8000-000000000002',
-  includeCurrentDay: false,
+  scope: 'future_after_current',
 };
 const receipt: ProgramExerciseRevisionReceipt = {
   operationId,
@@ -73,8 +73,18 @@ test('future revision failure leaves a distinct unavailable outcome', async () =
   );
   assert.deepEqual(outcome, {
     status: 'unavailable',
+    failure: { category: 'offline', retryable: true, status: undefined, code: undefined },
     message: 'You appear to be offline. Check your connection and try again.',
   });
+});
+
+test('no later workouts is a deterministic no-change result rather than a retry failure', async () => {
+  const outcome = await executeProgramExerciseRevision(
+    repository(async () => { throw new Error('invalid_input: no eligible future uncompleted prescriptions'); }),
+    operationId,
+    request,
+  );
+  assert.deepEqual(outcome, { status: 'no_change', reason: 'no_future_workouts' });
 });
 
 test('incomplete revision identity is rejected before the repository call', async () => {

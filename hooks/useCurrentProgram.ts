@@ -1,3 +1,7 @@
+import { workoutDraftStore } from '@/features/workouts/draftStore';
+import { amendWorkoutExercise } from '@/features/workouts/contracts';
+import { resolveProgramOccurrences } from '@/features/workouts/resolveProgramOccurrences';
+import { checkpointWeek } from '@/features/programs/checkpoint';
 import {
     createContext,
     createElement,
@@ -22,6 +26,7 @@ import { programRepository } from '@/features/programs/repository';
 import { isMissingRelationOrColumnError } from '@/utils/profilePreferences';
 import {
     classifySupabaseError,
+    OperationFailureError,
     reportSupabaseFailure,
     runSupabaseOperation,
     supabaseUserMessage,
@@ -35,8 +40,8 @@ import {
 type SwapArgs = {
     exerciseId: string;
     replacement: WorkoutExercise;
-    applyToProgram: boolean;
-    scope?: 'selected_and_future' | 'future_after_current';
+    scope: 'workout_only' | 'rest_of_program';
+    startedWorkout?: boolean;
 };
 
 type DbProgram = {
@@ -47,6 +52,7 @@ type DbProgram = {
     start_date: string | null; // YYYY-MM-DD
     swap_interval_weeks?: number | null;
     current_revision?: number;
+    archive_checkpoint?: Record<string, unknown> | null;
     current_revision_id?: string | null;
 };
 
@@ -68,6 +74,9 @@ type DbProgramDay = {
         rep_range_max: number;
         target_rpe: number | null;
         suggested_weight_lb: number | null;
+        load_kind?: WorkoutExercise['loadKind'];
+        load_unit?: WorkoutExercise['loadUnit'];
+        load_side?: WorkoutExercise['loadSide'];
         per_set_weights_lb: number[] | null;
         notes: string | null;
         exercises: {
@@ -83,21 +92,6 @@ const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Satu
 
 function clamp(n: number, min: number, max: number) {
     return Math.max(min, Math.min(max, n));
-}
-
-function computeWeekNumber(startDate: string | null, totalWeeks: number) {
-    if (!startDate) return 1;
-
-    // start_date is DATE; treat it as local date
-    const start = new Date(startDate + 'T00:00:00');
-    const now = new Date();
-
-    const diffMs = now.getTime() - start.getTime();
-    if (diffMs < 0) return 1;
-
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    const week = Math.floor(diffDays / 7) + 1;
-    return clamp(week, 1, totalWeeks);
 }
 
 function todayISODate() {
@@ -123,6 +117,7 @@ function useCurrentProgramState() {
     const [unavailable, setUnavailable] = useState(false);
     const [failureCategory, setFailureCategory] = useState<SupabaseFailureCategory | null>(null);
     const [actionError, setActionError] = useState<string | null>(null);
+    const [ownerId, setOwnerId] = useState<string | null>(null);
 
     const prevWeekRef = useRef<number>(0);
     const applyProgressionRef = useRef<(() => Promise<void>) | undefined>(undefined);
@@ -158,6 +153,7 @@ function useCurrentProgramState() {
             const user = session?.user;
             if (!user) {
                 ownerIdRef.current = null;
+                setOwnerId(null);
                 setProgram(null);
                 programRef.current = null;
                 setUnavailable(false);
@@ -165,6 +161,7 @@ function useCurrentProgramState() {
                 return;
             }
             const requestOwnerId = user.id;
+            setOwnerId(requestOwnerId);
             if (ownerIdRef.current !== requestOwnerId) {
                 ownerIdRef.current = requestOwnerId;
                 programRef.current = null;
@@ -176,7 +173,7 @@ function useCurrentProgramState() {
             const currentProgramResult = await runSupabaseOperation(
                 (signal) => supabase
                     .from('programs')
-                    .select('id,name,goal,duration_weeks,start_date,swap_interval_weeks,current_revision,current_revision_id')
+                    .select('id,name,goal,duration_weeks,start_date,swap_interval_weeks,current_revision,current_revision_id,archive_checkpoint')
                     .eq('user_id', requestOwnerId)
                     .eq('is_active', true)
                     .order('created_at', { ascending: false })
@@ -237,7 +234,7 @@ function useCurrentProgramState() {
                 return;
             }
 
-            const currentWeek = computeWeekNumber(prog.start_date, prog.duration_weeks);
+            const currentWeek = checkpointWeek(prog.start_date, prog.duration_weeks, prog.archive_checkpoint, todayISODate());
 
             // Get THIS WEEK's program_days with nested exercises
             let currentDaysQuery = supabase
@@ -255,6 +252,9 @@ function useCurrentProgramState() {
           program_day_exercises!program_day_exercises_program_day_id_fkey (
             id,
             stable_slot_id,
+            load_kind,
+            load_unit,
+            load_side,
             position,
             set_count,
             rep_range_min,
@@ -444,6 +444,9 @@ function useCurrentProgramState() {
                                 reps: `${pde.rep_range_min}-${pde.rep_range_max}`,
                                 weight: pde.suggested_weight_lb ?? undefined,
                                 perSetWeights: pde.per_set_weights_lb ?? undefined,
+                                loadKind: pde.load_kind,
+                                loadUnit: pde.load_unit,
+                                loadSide: pde.load_side,
                                 targetRpe: pde.target_rpe ?? undefined,
                                 muscleGroup: (ex?.primary_muscle as any) ?? undefined,
                                 equipment: (ex?.equipment as any) ?? undefined,
@@ -489,8 +492,10 @@ function useCurrentProgramState() {
             if (!canApplyOwnerScopedResult(requestOwnerId, ownerIdRef.current, controller.signal.aborted)) {
                 return;
             }
-            setProgram(mapped);
-            programRef.current = mapped;
+            const resolved = await resolveProgramOccurrences(mapped, requestOwnerId);
+            if (!canApplyOwnerScopedResult(requestOwnerId, ownerIdRef.current, controller.signal.aborted)) return;
+            setProgram(resolved);
+            programRef.current = resolved;
             setUnavailable(false);
             setFailureCategory(null);
 
@@ -523,6 +528,7 @@ function useCurrentProgramState() {
             if (nextOwnerId === ownerIdRef.current) return;
             refreshControllerRef.current?.abort();
             ownerIdRef.current = nextOwnerId;
+            setOwnerId(nextOwnerId);
             programRef.current = null;
             setProgram(null);
             setUnavailable(false);
@@ -595,7 +601,7 @@ function useCurrentProgramState() {
                 // First find the most recent session_id, then get all sets from that session.
                 const { data: latestSession, error: latestSessionError } = await supabase
                     .from('workout_exercise_sets')
-                    .select('session_id, workout_sessions!inner(user_id)')
+                    .select('session_id, workout_sessions!inner(user_id,completion_class)')
                     .eq('exercise_id', pde.exercise_id)
                     .eq('workout_sessions.user_id', userId)
                     .order('created_at', { ascending: false })
@@ -640,6 +646,8 @@ function useCurrentProgramState() {
                     currentTargetRPE: pde.target_rpe,
                     experienceLevel,
                     lastSessionSets,
+                    requiredSetCount: pde.set_count,
+                    completionClass: (latestSession?.[0] as any)?.workout_sessions?.completion_class ?? 'legacy_unknown',
                     readinessScore:  null, // Readiness is applied as UI overlay only, not baked into progression
                 };
 
@@ -658,7 +666,9 @@ function useCurrentProgramState() {
                     (s) => s.reps < pde.rep_range_min
                 );
 
-                const allHitMax   = setsHitMax.length === lastSessionSets.length && lastSessionSets.length > 0;
+                const fullCoverage = (latestSession?.[0] as any)?.workout_sessions?.completion_class === 'complete'
+                    && lastSessionSets.length >= pde.set_count;
+                const allHitMax   = fullCoverage && setsHitMax.length === lastSessionSets.length && lastSessionSets.length > 0;
                 const allMissedMin = setsMissedMin.length === lastSessionSets.length && lastSessionSets.length > 0;
                 const someMissedMin = setsMissedMin.length > 0 && lastSessionSets.length > 0;
 
@@ -669,9 +679,9 @@ function useCurrentProgramState() {
                 let perSetWeightsLb: number[] | null = null;
                 let newUniformWeight: number;
 
-                if (lastSessionSets.length === 0) {
-                    // No data — hold
-                    newUniformWeight = baselineWeight;
+                if (lastSessionSets.length === 0 || !fullCoverage) {
+                    // Missing required work holds the existing recommendation, including after correction.
+                    newUniformWeight = pde.suggested_weight_lb ?? baselineWeight;
                 } else if (allHitMax) {
                     // Every set hit repMax with good RPE → increase weight
                     newUniformWeight = Math.max(0, Math.round((baselineWeight + increment) / 2.5) * 2.5);
@@ -731,11 +741,10 @@ function useCurrentProgramState() {
     applyProgressionRef.current = applyProgressionToNextWeek;
 
     const swapExercise = useCallback(
-        async ({ exerciseId, replacement, applyToProgram, scope = 'selected_and_future' }: SwapArgs) => {
+        async ({ exerciseId, replacement, scope, startedWorkout = false }: SwapArgs) => {
             // in the mapping above, exerciseId is the program_day_exercises row id (pde.id)
             // replacement.id should be the exercises.id from the exercises table
             if (!program) return;
-            const pdeId = exerciseId;
             const newExerciseId = replacement.exerciseId ?? replacement.id;
             if (!isCatalogExerciseId(newExerciseId)) {
                 throw new Error(
@@ -743,7 +752,7 @@ function useCurrentProgramState() {
                 );
             }
 
-            if (program.currentRevisionId && applyToProgram) {
+            if (program.currentRevisionId) {
                 const workout = program.workouts.find((candidate) => candidate.exercises.some(
                     (exercise) => exercise.id === exerciseId || exercise.stableSlotId === exerciseId,
                 ));
@@ -754,6 +763,17 @@ function useCurrentProgramState() {
                     throw new Error('Stable program revision identity is unavailable for this exercise.');
                 }
                 const ownerId = await requireUserId();
+                const active = await workoutDraftStore.loadMatching(ownerId, { programId: program.id, stableDayId: workout.stableDayId, programDayId: workout.id });
+                if (active?.finalizationEndedAt || active?.lifecycle === 'finalized' || workout.sessionId) throw new Error('Open the completed workout to update it.');
+                const amended = active ? amendWorkoutExercise(active, { slotId: original.stableSlotId,
+                    replacementExerciseId: newExerciseId, replacementName: replacement.name,
+                    amendedAt: new Date().toISOString(), replacementLoadKind: replacement.equipment === 'Bodyweight' ? 'bodyweight' : 'unknown',
+                }) : null;
+                if (amended && scope === 'workout_only') {
+                    await workoutDraftStore.save(amended);
+                    await refresh();
+                    return { status: 'no_change' as const, reason: 'no_future_workouts' as const };
+                }
                 const outcome = await reviseProgramExercise(programRepository, ownerId, {
                     programId: program.id,
                     expectedRevision: program.currentRevision,
@@ -762,59 +782,19 @@ function useCurrentProgramState() {
                     currentStableSlotId: original.stableSlotId,
                     originalExerciseId: original.exerciseId,
                     replacementExerciseId: newExerciseId,
-                    includeCurrentDay: scope === 'selected_and_future',
+                    scope: scope === 'workout_only'
+                        ? 'selected_only'
+                        : startedWorkout ? 'future_after_current' : 'selected_and_future',
                 });
-                if (outcome.status === 'validation') throw new Error(outcome.errors.join(' '));
-                if (outcome.status === 'conflict' || outcome.status === 'unavailable') throw new Error(outcome.message);
+                if (outcome.status === 'validation') throw new OperationFailureError({ category: 'validation', retryable: false }, outcome.errors.join(' '));
+                if (outcome.status === 'conflict') throw new OperationFailureError({ category: 'conflict', retryable: false }, outcome.message);
+                if (outcome.status === 'unavailable') throw new OperationFailureError(outcome.failure, outcome.message);
+                if (amended) await workoutDraftStore.save(amended);
                 await refresh();
                 return outcome;
             }
 
-            // find the PDE row to know the “original exercise” and parent program_day_id
-            const { data: pdeRow, error: pdeErr } = await supabase
-                .from('program_day_exercises')
-                .select('id, program_day_id, exercise_id')
-                .eq('id', pdeId)
-                .single<{ id: string; program_day_id: string; exercise_id: string }>();
-
-            if (pdeErr) throw pdeErr;
-
-            if (!applyToProgram) {
-                // update only this one row
-                const { error: updErr } = await supabase
-                    .from('program_day_exercises')
-                    .update({ exercise_id: newExerciseId, updated_at: new Date().toISOString() })
-                    .eq('id', pdeId);
-
-                if (updErr) throw updErr;
-                await refresh();
-                return;
-            }
-
-            // applyToProgram = true means: replace this exercise everywhere in the program
-            // Ww need to update all PDE rows in this program that currently reference old exercise_id
-            const oldExerciseId = pdeRow.exercise_id;
-
-            // get all program_day ids for this program (across all weeks)
-            const { data: allDays, error: allDaysErr } = await supabase
-                .from('program_days')
-                .select('id')
-                .eq('program_id', program.id);
-
-            if (allDaysErr) throw allDaysErr;
-
-            const dayIds = (allDays ?? []).map((d) => d.id);
-            if (dayIds.length === 0) return;
-
-            const { error: bulkErr } = await supabase
-                .from('program_day_exercises')
-                .update({ exercise_id: newExerciseId, updated_at: new Date().toISOString() })
-                .in('program_day_id', dayIds)
-                .eq('exercise_id', oldExerciseId);
-
-            if (bulkErr) throw bulkErr;
-
-            await refresh();
+            throw new Error('Revision-safe exercise swaps are unavailable for this program. Refresh it before trying again.');
         },
         [program, refresh],
     );
@@ -824,6 +804,7 @@ function useCurrentProgramState() {
         if (!programId) return;
         await archiveProgram(
             programRepository,
+            await requireUserId(),
             programId,
             program.currentRevision,
             program.currentWeek,
@@ -1124,6 +1105,7 @@ function useCurrentProgramState() {
         failureCategory,
         availabilityMessage,
         actionError,
+        ownerId,
         refresh,
         retry: refresh,
         swapExercise,

@@ -1,6 +1,6 @@
 # AdaptivPush database and migration plan
 
-Status: approved planning direction with AP-01 production baseline/enforcement released and the combined AP-02/AP-03 additive migration integration-verified locally on 2026-09-10. The new migration is not deployed. This document owns physical-data planning, compatibility, authority and database verification. The [master plan](/dev-doc/plans/active/ADAPTIVPUSH-MASTER-PLAN.md) owns domain behavior, the [register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) owns slice gates, and the [implementation status](/dev-doc/plans/active/ADAPTIVPUSH-IMPLEMENTATION-STATUS.md) owns code facts. [D-12](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECORD-2026-09-08.md#d-12--database-rollout) requires additive, slice-owned work. The 28-table packet is a design inventory, not a batch of approved migrations.
+Status: approved planning direction with AP-01 production baseline/enforcement and the three-migration AP-02/AP-03 packet deployed. The additive `20260915190000_workout_swap_scope_and_completed_corrections.sql` and `20260915210000_effective_workout_occurrences.sql` extensions are locally verified only; neither is hosted, and earlier rollout or current Git publication authorization does not authorize applying them. This document owns physical-data planning, compatibility, authority and database verification. The [master plan](/dev-doc/plans/active/ADAPTIVPUSH-MASTER-PLAN.md) owns domain behavior, the [register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) owns slice gates, and the [implementation status](/dev-doc/plans/active/ADAPTIVPUSH-IMPLEMENTATION-STATUS.md) owns code facts. [D-12](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECORD-2026-09-08.md#d-12--database-rollout) requires additive, slice-owned work. The 28-table packet is a design inventory, not a batch of approved migrations.
 
 ## Evidence and baseline rules
 
@@ -63,13 +63,15 @@ evidence are in [the September 10 AP-01 artifact](/dev-doc/reports/ADAPTIVPUSH-A
 | Existing table/surface | Source and actual application use | Important current limits / owning slices |
 |---|---|---|
 | `user_profile` | [schema](/lib/adaptivpush_database_schema.md); migrations 006–007; Quick Setup/Profile read/write. | Broad `equipment_profile` JSON and `healthkit_enabled` are not precision-equipment contracts or separate health consent. Depth mode is checked; additional time/goal/unit/symptom validation needs inspection. AP-03/06/07/08/12/16. |
-| `programs` | Core active mutable root; migration 003 adds `last_active_week`. | No immutable revision/checkpoint/occurrence/installation model. One-active-per-user invariant is not established by this schema reference. Client deactivation and activation race. AP-03/04/11. |
-| `program_days` | Week/day/order, `is_rest_day`, `is_deload_week` exist in reference. | Main generated-save/load paths omit rest/deload fields. Relative days are not dated scheduled occurrences. AP-03/04. |
-| `program_day_exercises` | Mutable prescriptions; suggested pounds and optional per-set JSON. | No stable prescription-slot revision/equipment comparison identity; numeric/order/set uniqueness and relational lineage need audit. AP-02/03/05/07. |
+| `programs` | Hosted active root with schema/lifecycle/current revision, checkpoint and one-active-owner enforcement from the AP-02/AP-03 packet. | Revisions are immutable and command-owned. Dated schedule occurrence placement remains AP-04; the local selected-occurrence extension is not hosted. AP-03/04/11. |
+| `program_days` | Hosted revision-scoped relative day identity with stable day ID, week/day/order, rest and deload fields. | Relative days are still not dated scheduled occurrences. Local `20260915190000` copies immutable successors and targets one stable day for selected-only swap. AP-03/04. |
+| `program_day_exercises` | Hosted immutable revision-scoped prescriptions with stable slot/catalog identity and explicit load metadata. | Direct mutation is denied. Local selected-occurrence scope changes one day/slot; `20260915210000` uses original stable slot lineage for repeated wider swaps after exercise identity changes and protects completed ancestor occurrences. AP-02/03/05/07. |
 | `exercises` | Shared catalog, unique name; image/external-ID changes 002/004/005/017; timestamped baseline plus authority migration. | Production ordinary roles are SELECT-only with one public read policy; service-role/postgres curation remains. Generated/dev saves resolve before mutation and seeding uses admin authority. Fifty-one existing rows still lack external IDs and normalized-name collisions remain explicit resolver concerns. AP-03/06. |
-| `workout_sessions` | Actual finish/history table. | No durable operation/finalization/partial/occurrence contract. Existing `checkin_id` references **legacy `readiness_logs`**, per audit; never repoint in place. AP-02/04/08. |
-| `workout_exercise_sets` | Actual per-set history table. | Pound-only numeric values, no stable slot or explicit zero/unknown/assistance/side semantics; parent owner access and indexes need baseline capture. AP-02/05/07. |
-| `personal_records` | Actual PR read/write surface. | `exercise_id` is text in reference; map and validate without assuming every value is a valid catalog UUID. Current finish writer omits `session_id`; legacy attribution cannot be invented. AP-05. |
+| `workout_sessions` | Hosted durable finish/history table with finalization receipt, lifecycle, completion and prescription identity. Local `20260915190000` adds monotonic `correction_revision` and `corrected_at`; `20260915210000` preserves effective occurrence snapshots and guards occurrence finalization uniqueness. | Local finalization/correction checks required prescribed-slot coverage; a finalized partial remains a finished occurrence without counting as full/reduced fulfillment. Correction updates the same session without advancement. Both extensions require authorized rollout/recovery proof. Existing `checkin_id` still references legacy `readiness_logs`; never repoint in place. AP-02/04/08. |
+| `workout_exercise_sets` | Hosted durable actual-set history with stable set/slot identity and explicit load kind/unit/side. The local correction command atomically replaces one session's effective performed sets from a validated payload. | Only performed rows contribute volume/PRs. Explicit `performed`, `skipped` and `not_attempted` outcomes are retained in snapshots without nonperformed actual rows. Later swaps preserve actual exercise/load, including intermediate replacements; correction validates lineage, identity/order and reps/load/RPE. AP-02/05/07. |
+| `personal_records` | Hosted actual PR surface with session linkage available for durable finalization. The local correction command deletes/rebuilds only correction-aware records owned by the corrected session. | Legacy rows without session identity remain readable and are never guessed or deleted. Broader cross-session/cohort recomputation remains AP-05/AP-07 work. |
+| `workout_correction_receipts` | Local-only `20260915190000`: owner-scoped operation receipt with request hash, base/result revision and stable session identity; authenticated owner SELECT only, command writes. | Unique `(user_id, operation_id)` supports exact replay and payload-mismatch rejection. Not hosted; no production behavior may depend on it yet. AP-02. |
+| `workout_correction_audit` | Local-only `20260915190000`: internal before/after session-and-set snapshots for each accepted correction. Ordinary client table access is revoked. | One audit row per owner operation; retained as internal correction history and subject to future account-retention policy. Not hosted. AP-02/AP-16. |
 | `readiness_logs` | Active Home/Workout legacy capture/read surface. | Preserve original scale/date/provenance during v2 adoption. Do not manufacture accepted adaptation decisions from a score. AP-08. |
 | `user_adaptation_preferences` | Migration 008; compatibility writes and reads. | Ownership policies from 015; toggles do not prove engine adoption. Separate UI depth, aggressiveness, consent and entitlement. AP-08. |
 | `evidence_display_preferences` | Migration 014; onboarding seeds defaults. | Ownership policies from 015; no full consumer UI. Safety/material uncertainty must remain accessible regardless of presentation preference. AP-06/08. |
@@ -203,7 +205,7 @@ Each row specifies minimum changes to design, compatibility and rollback. Planne
 | Slice | Additive contracts / constraints / indexes / authority | Backfill, compatibility and safe rollback | Smallest local gate and integration/release gate |
 |---|---|---|---|
 | AP-01 Security and baseline | Catalog read/trusted-write grants/policies; baseline snapshot of core and adaptation RLS; no unrelated tables. Cover RPC execute/schema/sequence permissions and service search path. | Compare supported baseline against 001–017; retain remediation SQL evidence. Replace catalog caller dependency before restriction. Fallback cannot re-open catalog mutation. | Local role/grant matrix with synthetic identities and current-client save fixture; then authorized effective API checks, device compatibility, drift report and restore-tested backup before production schema change. |
-| AP-02 Durable workouts | `workout_sessions`: operation ID, schema version, draft/finalized/partial outcome, revision, prescription snapshot/reference nullable, source time/timezone, actual summary. `workout_exercise_sets`: stable slot/set ID, valid reps/load/RPE, load kind/unit/side; unique session/set; parent lineage and owner indexes. One transactional finalize command; derived PR/progression decoupled from capture. | Existing sessions marked legacy outcome unknown where completeness cannot be proven. Preserve `weight_lb`, don't infer zero from null. Device durable draft/outbox captures before network; old clients use legacy format, cannot mutate finalized v2. Disable new start rollout on failure, keep stored drafts/history and retry receipts. | Kill/restart/offline/replay/two-device finalize and invalid set fixtures; local transaction all-or-nothing/partial proof and cross-user denial; real device reconnect and old/new history compatibility. |
+| AP-02 Durable workouts | Hosted finalization contract plus local-only `20260915190000` and `20260915210000`: audited revision-checked correction, explicit outcomes/effective snapshots, required-slot completion, occurrence uniqueness and read-only capability 2. Owner, expected revision, stable session/set/prescription/exercise identity, request hash and load/reps/RPE semantics are transactionally validated. | Finalized partial work remains finalized without claiming full/reduced fulfillment. Correction replaces effective performed sets in the same session, recomputes completion/volume and correction-aware records, then resets derived receipts without adding a worker or advancing the program. Unlinked legacy records and exact pending operations survive. Missing capability disables editing while retaining viewing. | Local outcome/coverage/replay/stale/cross-owner/audit/occurrence SQL and concurrency checks pass. Fresh reset of the final packet, physical iPhone/E2E recovery and an authorized hosted recovery/deploy/security packet remain open. |
 | AP-03 Programs/identity | DB-01; program `current_revision`, lifecycle/schema/origin/checkpoint fields; slot IDs; context revision link; snapshot/hash consistency. Unique active program per owner after preflight reconciliation; transactional complete-save-and-activate. | Capture present facts with provenance `migration_snapshot`; no invented original structure. Preserve start_date/last_active_week and context defaults. Full old/new save failures, restart versus exact resume explicit. Rollback leaves revisions readable and disables unsafe editing; never delete prior active program as recovery. | Inject failures at profile/context/catalog/day/prescription/activation boundaries; race activation and replay; local command/constraint tests, authenticated mobile create/generate/archive/restore and legacy fallback. |
 
 | AP-04 Schedules/rest/manual | DB-02/03/04; DB-23 optional projection; program schedule pointer, session occurrence/fulfillment FK; kind/status/date/timezone checks, fixed completed/in-progress constraint, unique effective fulfillment and schedule revision. | Start_date remains historical. User confirms first placement; infer only clearly labeled tentative dates. Legacy completed links do not imply exact dated fulfillment. Schedule flag cutover per program; rollback manual preview/current approved snapshot, no silent debt. | Pure date/DST/timezone/week-boundary/partial/pause/swaps/replay fixtures; local atomic revision swap and duplicate fulfillment denial; device calendar/offline conflicts and accessible rest/consistency UI. |
@@ -220,23 +222,55 @@ Each row specifies minimum changes to design, compatibility and rollback. Planne
 | AP-15 Social | DB-12/13/17/18 with shared AP-14 enforcement; typed target checks/audience/block consistency and sanitized feed projection. | No automatic workout/activity upload. Private training independent; delete public projection without erasing personal history. Disable feed/writes independently; reconcile queued actions against current visibility. | Block/unfollow/private parent/deleted reply/race/replay/audience leakage fixtures; local role/projection tests plus operational abuse/moderation and device accessibility checks. |
 | AP-16 Account/privacy/support/release | DB-28; private export object and TTL; idempotent deletion saga/receipt, minimal lawful audit/financial retention, account and distribution tombstones; restricted staff processing. | Legacy metadata timestamps are unprocessed intent, not delivered tickets/completed exports; migrate only with clear status and user visibility. Export excludes secrets/other users. Failure retries don't lose request state; public outputs separately revoked; installed content/provenance follows reviewed policy. | Cross-user export denial, expiring URL, staged deletion/replay/error recovery, attachment privacy and account switch/cache cleanup; end-to-end authenticated export/delete/support receipts and production recovery/release ownership. |
 
-### AP-02/AP-03 implemented migration result — 2026-09-10
+### AP-02/AP-03 deployed packet and local lifecycle extensions — updated 2026-09-15
 
-`20260910210000_ap02_ap03_durable_workouts_and_program_revisions.sql`
-(SHA-256
-`B0CD723D7D00F31B604168F7FC842CB1DB4117ACD9AE2407E1549029534877F2`)
-implements the two rows above as one shared-identity migration. It was applied
-only to local PostgreSQL 17. Fresh reset, database lint, AP-01 regression and
-AP-02/AP-03 failure/replay/concurrency/RLS SQL all pass in the clean integrator.
+The hosted project contains the verified baseline and AP-02/AP-03 migrations
+`20260910175317`, `20260910190000`, `20260910210000`, `20260911120000` and
+`20260915151000`. Both writers are enabled in the normal local `.env` according
+to retained deployment evidence; this documentation pass makes no fresh hosted
+or environment verification claim. Their recovery, deployment and writer evidence remains owned
+by the [September 14 release report](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md).
 
-The production dashboard still lists only `20260910175317` and
-`20260910190000`; Free has no managed backups. Before this migration can be
-pushed, create a fresh encrypted roles/schema/data logical backup, prove
-decryption and destructive restore/semantic equivalence on PostgreSQL 17, then
-perform the production dry-run. CLI authentication and real-device verification
-are also open. Both producers default off. Recovery disables producers and
-retains additive records; rollback never drops revisions, receipts, sets or
-history and never restores the client multiwrite coordinators.
+The later extension contains two ordered, additive, local-only migrations:
+
+1. `20260915190000_workout_swap_scope_and_completed_corrections.sql` adds correction revision/timestamp fields, owner replay receipts, internal before/after audit, the selected-occurrence immutable successor command and `correct_completed_workout_v1`. Its later local revision validates/persists explicit set outcomes and computes completion from required prescribed-slot coverage.
+2. `20260915210000_effective_workout_occurrences.sql` adds stable-lineage repeated wider swaps, occurrence finalization uniqueness, intermediate performed-exercise acceptance and effective snapshot preservation. Its read-only authenticated `workout_correction_capability_v1()` returns version `2`.
+
+Both commands retain owner/revision/exact-operation validation. Correction updates
+the same finalized session, recomputes volume/completion and correction-aware
+records, and resets existing progression/analytics effect receipts for later
+evaluation. It never finalizes another session or advances a program. No new
+background effect consumer or broader AP-05 authority is claimed. Finalized
+snapshots reconstruct effective occurrences across devices; active workout-only
+changes remain durable on their current device until finalization. Missing
+legacy prescription context stays explicit. Missing correction capability keeps
+completed viewing usable while disabling Update/Save; it is distinct from
+ownership/not-found errors.
+
+The [scoped-swap report](/dev-doc/reports/ADAPTIVPUSH-SWAP-CORRECTION-2026-09-15.md)
+retains the earlier local reset through `20260915190000`. The newer
+[lifecycle report](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-LIFECYCLE-2026-09-15.md)
+records replacement of changed local functions and application of the second
+migration in the existing named Docker database, not a fresh reset of the final
+two-migration packet. Its passing evidence is strict TypeScript; lint with three
+existing warnings; 75 AP-02/AP-03 tests; 13 availability tests; four SQL suites
+and the AP-03 legacy variant; six concurrency/replay/isolation/cleanup checks;
+database lint; a 35-route web export; and an unauthenticated welcome-screen
+smoke. Authenticated 18-step acceptance, physical iPhone, offline recovery and
+accessibility remain open.
+
+No hosted backup, restore, dry-run, migration, grant/RLS probe or post-deployment
+check was performed for either local-only migration. The older rollout authorization
+does not carry forward, and commit/push/draft-PR permission is not database
+rollout permission. Before any production write, obtain explicit authorization;
+reconfirm the app-linked project, health, PostgreSQL version, ledger, drift and
+exact migration bytes; capture a fresh encrypted recoverable backup; validate
+against an isolated PostgreSQL 17 restore; deploy only the reviewed ordered
+packet, refresh the API schema cache, verify capability `2`, and run the
+correction/swap owner, replay, stale-revision and compatibility checks. A discrepancy stops the write
+path. Recovery disables the new producer while retaining revisions, receipts,
+sets, history and pending local operations; it never drops additive records,
+resets production or repairs migration history as routine rollback.
 
 ## Compatibility, deletion and rollback procedure
 
@@ -252,4 +286,4 @@ history and never restores the client multiwrite coordinators.
 
 Every future slice attaches a schema/grant diff, constraint/index rationale, migration and backfill dry-run report, role/lineage/idempotency fixture results, old/new-client matrix, rollout/rollback rehearsal and redacted integration/device evidence to the register. Suggested artifact names are `dev-doc/reports/AP-<slice>-<purpose>-<date>.md`; they do not yet exist merely because this plan names them. Logs record operation/revision/policy IDs and error classes, not raw health symptoms, private generation snapshots, support bodies, share capabilities or purchase receipts.
 
-`REQUIRES INSPECTION` remains: effective catalog grants/API exposure; complete current core RLS/grant/function inventory; supported ledger drift and CLI environment; present backup/restore capability; actual legacy table/data availability; invalid numeric/FK/duplicate-active records; repeated readiness index definitions and query plans; same-owner cross-program consistency; private export infrastructure; store/provider product/restore ownership; retention/legal policy and public-operations staffing. No table-count, security, backup, device or migration gate is closed by documentation alone.
+AP-01.3 and the hosted AP-02/AP-03 packet already established catalog authority, a supported five-entry ledger, recovery rehearsals and command isolation; this pass does not reopen those historical accomplishments. `REQUIRES INSPECTION` before the next hosted extension means fresh project/ledger/schema/grant drift and recovery verification for the exact two-migration packet, followed by capability 2 and owner/replay checks. Broader legacy reconciliation, readiness index/query behavior, future-slice parent consistency, private exports, provider product/restore ownership, retention policy and operations staffing remain with their owning slices. The 32 pre-existing empty non-rest days (five active) remain preserved and unstartable rather than receiving invented prescriptions. Authenticated device acceptance is still open; documentation alone closes no runtime gate.

@@ -12,7 +12,7 @@ export interface PendingProgramExerciseRevision {
 }
 
 function key(ownerId: string, request: ProgramExerciseRevisionRequest): string {
-  return `${PREFIX}/${ownerId}/${request.programId}/${request.expectedRevisionId}/${request.currentStableSlotId}/${request.replacementExerciseId}/${request.includeCurrentDay ? 'inclusive' : 'future'}`;
+  return `${PREFIX}/${ownerId}/${request.programId}/${request.expectedRevisionId}/${request.currentStableSlotId}/${request.replacementExerciseId}/${request.scope}`;
 }
 
 export async function getOrCreatePendingProgramExerciseRevision(

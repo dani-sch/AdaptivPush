@@ -6,6 +6,30 @@ The approved [decision record](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECO
 
 ## Reading the crosswalk in either direction
 
+The [September 14 release packet](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md)
+owns the hosted AP-02/AP-03 baseline. The later [September 15 scoped-swap and
+correction report](/dev-doc/reports/ADAPTIVPUSH-SWAP-CORRECTION-2026-09-15.md)
+owns the initial correction extension and its local reset. The later
+[September 15 lifecycle report](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-LIFECYCLE-2026-09-15.md)
+owns effective occurrences, repeat swaps, explicit outcomes, partial finalization,
+shared completed cards and capability-aware viewing. Both `20260915190000` and
+`20260915210000` are local-only. Its latest checks passed 75 AP-02/AP-03 tests,
+13 availability tests, four SQL suites plus the legacy variant, six concurrency
+checks, database lint, TypeScript, application lint and web export/smoke. The
+final migration packet was applied to the existing local database, not freshly
+reset. No fresh hosted or authenticated device check is claimed here. Earlier
+production permission and current Git publication permission do not authorize
+these migrations. Physical iPhone/18-step acceptance remains open. AP-04/AP-05
+broader work is not implemented by this extension.
+
+| Affected acceptance | September 15 local extension / remaining evidence |
+|---|---|
+| AC-TR-008/009/010/011 | Exact correction replay/stale conflict, explicit performed/skipped/not-attempted outcomes, required-slot completion and finalized partial reconciliation have local evidence. Actual performed rows remain separate from effective snapshots. Correction updates one audited session without advancement. Active workout-only state is device-local until finalization; finalized snapshots reconstruct across devices. Physical response-loss/restart and edit/cancel/save acceptance remain open. |
+| AC-TR-012/013/014 | Stable original slot lineage supports repeat wider swaps while protecting completed ancestors and preserving performed exercise/load. Selected-only scope remains exact. Home actions, full exercise expansion, completed-route draft prevention and History modal/rapid-tap guards have local coverage. Physical timing, final-week, keyboard, mixed-set, account-switch and accessibility evidence remains open. |
+| AC-TR-016/024 | Immutable selected-occurrence successors and full-program effective occurrence reconciliation have local evidence. Plan distinguishes complete/reduced fulfillment from finalized partial work. Missing correction capability retains viewing and disables Update/Save; version 2 is local-only. Hosted and old-client/device evidence remains open. |
+| AC-TR-021/017/018/023 | Restore archive, end/archive, start workout and generate program remain the four user-confirmed baseline flows to preserve. This extension claims no fresh physical-device regression pass. |
+| AC-TR-039/040/042/044/045 and AP-16 release obligations | Missing/partial coverage conservatively holds the existing programmed load even with high readiness. Only performed actual rows count for volume/PRs; correction updates session-owned record effects and resets existing derived receipts without adding a worker. This is partial local counterexample evidence, not calibrated AP-05 progression or cohort/history completion. Physical acceptance, fresh recovery and explicit production authorization remain open. |
+
 Each TR row is a stable requirement and has a correspondingly numbered acceptance scenario: TR-001 maps to AC-TR-001. The acceptance column states that scenario's trigger and observable expected result. Its section supplies the owning AP slice; the row supplies the decision, contract, database authority, current code seam, and required evidence. Search an AP ID, D ID, table, source alias, TR ID, or AC ID to traverse the same chain in reverse. Code references identify files to inspect or evolve, including incomplete paths; they do not assert the target contract is implemented.
 
 Disposition vocabulary: **retained** preserves the requirement; **revised** preserves intent with explicitly changed behavior; **replaced** substitutes a different model; **deferred** excludes it from the named release until its listed gate; **rejected** excludes the proposed behavior. Repeated source wording maps to one row rather than creating several authorities. Historical status/checklists are evidence claims, not new requirements or proof of current completion.
@@ -99,30 +123,33 @@ device evidence are not inferred from the database release.
 
 ## AP-02 — Durable workout records
 
-2026-09-10 evidence status: contract, client, local persistence, atomic command,
-fault/replay/RLS and clean integration checks pass behind a default-off flag.
-AC-TR-008/010/011/012 are locally satisfied; AC-TR-009/013/014 retain their
-physical-device portions. Production backup/restore, migration rollout and
-authenticated old/new-client smoke remain open. See [AP-02 evidence](/dev-doc/reports/ADAPTIVPUSH-AP-02-2026-09-10.md).
+Hosted finalization evidence is retained from the earlier release. The
+[lifecycle evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-LIFECYCLE-2026-09-15.md)
+extends the [scoped-swap evidence](/dev-doc/reports/ADAPTIVPUSH-SWAP-CORRECTION-2026-09-15.md)
+with explicit outcomes, partial finalization, effective snapshot reconstruction
+and capability-aware completed viewing. AC-TR-008/010/011/012 gain local evidence;
+AC-TR-009/013/014 retain physical restart, keyboard/accessibility and end-to-end
+portions. Neither local migration is hosted.
 
 | Requirement / legacy locator | Disposition and decision | Behavior / contract; database authority; code | Acceptance scenario and expected evidence |
 |---|---|---|---|
-| TR-008 · LM G Next Workout; LR S6 completion; DP session-before-sets finding | revised · D-11/12 | CompletedWorkout: draft/finalizing/finalized distinction; atomic finalization of accepted prescription, sets and occurrence fulfillment. workout_sessions, workout_exercise_sets; command; WORK. | AC-TR-008: fail after session creation/before sets; no finalized completion or progression appears; retry same operation creates one result. I |
+| TR-008 · LM G Next Workout; LR S6 completion; DP session-before-sets finding | revised · D-11/12 | CompletedWorkout: draft/finalizing/finalized distinction; atomic finalization plus owner/revision/idempotency-safe correction of the same finalized session. workout_sessions, workout_exercise_sets, correction receipt/audit; command; WORK. | AC-TR-008: fail after session creation/before sets or lose a correction response; retry same operation creates one session/result, while correction updates that session once with an audit. I |
 | TR-009 · LM K offline save; OR behavior contract; DP durable drafts | retained · D-01/11 | Owner durable local workout draft/outbox; stable set and operation IDs; WORK. | AC-TR-009: kill app offline after entering actual sets, relaunch and resume exact draft; sync duplicate requests without duplicate sets. I/U |
 | TR-010 · DP frozen prescription; D-05 start semantics | revised · D-05/11 | WorkoutPrescription freezes on start; accepted amendment creates revision, never overwrites entered sets. program revision, workout snapshot; WORK/READY. | AC-TR-010: readiness response or cross-device edit arrives mid-workout; entered work and frozen target remain intact until explicit amendment. P/I/U |
-| TR-011 · LM K partial workouts; DP progression accounting defect | revised · D-01/02 | Completion class records complete/reduced/partial/abandoned separately from saved records; no inferred full completion from logged-set count. sessions/sets; WORK. | AC-TR-011: one successful set of four persists as partial and cannot fulfill full prescription or trigger success progression. P/I |
-| TR-012 · PF 8C; LM G swap; DP substitution bugs | revised · D-01/11 | Temporary replacement has scoped slot identity and actual exercise/load; future replacement is separate revision; command/owner; CAT/WORK/PROG. | AC-TR-012: swap after two sets; preserve their original identity, require new load calibration, do not carry incompatible sets or rewrite completed weeks. P/I/U |
+| TR-011 · LM K partial workouts; DP progression accounting defect | revised · D-01/02 | Completion class records complete/reduced/partial/abandoned separately from saved records; finalized correction recomputes effective classification without replaying advancement. sessions/sets; WORK. | AC-TR-011: one successful set of four persists as partial; add/remove corrected sets recomputes effective outcome without a duplicate session or second program advancement. P/I |
+| TR-012 · PF 8C; LM G swap; DP substitution bugs | revised · D-01/11 | Both entry points use replacement -> selected-workout/rest-of-program scope -> Apply. Logged sets retain actual exercise/load; selected-only and wider scopes use immutable revision commands; recovery distinguishes local/pending/remote state. CAT/WORK/PROG. | AC-TR-012: after two sets, selected-only changes only remaining selected work and later days stay fixed; wider scope also changes later uncompleted occurrences; response loss exposes Retry/Keep this workout only; completed history never changes. P/I/U |
 | TR-013 · DP stale workout route; LM D/G navigation | revised · D-02/11 | Requested occurrence/prescription identity is explicit; unavailable target is error state. TODAY/WORK. | AC-TR-013: stale or invalid route never silently opens next workout; show target unavailable and explicit alternate selection. U |
 | TR-014 · PF 10; IP 3D; LM G workout timer | retained · D-01/11 | Actual elapsed timer and preference-controlled haptics on saved set/swap/completion; local adapter; WORK/PROF. | AC-TR-014: disable haptics and background/resume workout; timestamps remain consistent and unsupported feedback has no effect on saving. U |
 | TR-015 · PF 10 rest timer; IP 3D note | deferred · D-13 | Rest timer and background expiry feedback are later AP-02 enhancement, separate from existing elapsed timer; local. | AC-TR-015: current release never labels elapsed timer as rest timer; future timer must handle background expiry, permission denial, mute, and duplicate alerts. DOC/U |
 
 ## AP-03 — Durable programs, identity, and free onboarding
 
-2026-09-10 evidence status: immutable revision/identity, common generated/manual
-installer, atomic failure/concurrency/replay, one-active-owner, checkpoint and
-clean integration checks pass behind a default-off flag. Device portions of the
-onboarding/archive/overview/offline acceptance rows and production rollout remain
-open. See [AP-03 evidence](/dev-doc/reports/ADAPTIVPUSH-AP-03-2026-09-10.md).
+The immutable installer/revision/archive baseline is hosted. The local extension
+adds exact selected-occurrence scope, repeat wider swaps through original slot
+lineage and shared effective occurrence views; it preserves the four user-confirmed
+archive/end/start/generate flows as regression requirements. Both newer migrations
+remain local-only; physical iPhone/E2E and old-client acceptance remain open. See
+the [lifecycle evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-LIFECYCLE-2026-09-15.md).
 
 | Requirement / legacy locator | Disposition and decision | Behavior / contract; database authority; code | Acceptance scenario and expected evidence |
 |---|---|---|---|
@@ -134,7 +161,7 @@ open. See [AP-03 evidence](/dev-doc/reports/ADAPTIVPUSH-AP-03-2026-09-10.md).
 | TR-021 · PF 4; IP 1C; LR archive semantics | revised · D-02/11 | Archive checkpoint includes revision/occurrences and completed context; distinguish resume/restart; legacy last_active_week never promises exact day. programs/DB-01/02/03; PROG. | AC-TR-021: archive at start/middle/end and resume later; preserve completed history, preview new placement, no start_date backdating or invented day checkpoint. I/U |
 | TR-022 · IP 2D; DP optional naming | retained · D-01 | Optional custom name with generated fallback; programs.name; GEN/PROG. | AC-TR-022: blank name uses default, custom name persists, back from preview preserves inputs without saving. U/I |
 | TR-023 · LM G Advanced-only manual editor; LR manual builder decision | revised · D-01 | Free explicit manual authoring path; common validation and save contract; PROG. | AC-TR-023: free user opens build-manually, saves and trains custom program using durable common installer; no subscription or depth-mode lock. U/I |
-| TR-024 · LM C.2/G Plan and Overview; UI U3 | retained · D-01/11 | Plan/overview distinguish active/archive, stable version, goals, volume/rest/order/rationale, safe edit scopes; context owner reads; PROG/GEN/TRUST. | AC-TR-024: legacy program without context shows unknown rationale; new plan shows actual persisted preview; no fabricated evidence or dev-only CTA. U/I |
+| TR-024 · LM C.2/G Plan and Overview; UI U3 | retained · D-01/11 | Plan/overview distinguish active/archive, stable version, goals, volume/rest/order/rationale and explicit selected-workout/rest-of-program edit scopes; context owner reads; PROG/GEN/TRUST. | AC-TR-024: program-screen swap persists only the selected occurrence when chosen, wider scope changes eligible remaining occurrences, and no fabricated evidence or dev-only CTA appears. U/I |
 | TR-025 · D-01 downgrade; OR entitlements | retained · D-01 | Saved programs, accepted schedules/prescriptions, explanations, equipment data and history survive downgrade; entitlement controls future automation only. PROG/PROF. | AC-TR-025: revoke premium during program and reopen offline; same accepted workout is trainable and previous explanations viewable. U/I |
 
 ## AP-04 — Dated schedules, rest, manual control, and consistency
@@ -157,6 +184,12 @@ open. See [AP-03 evidence](/dev-doc/reports/ADAPTIVPUSH-AP-03-2026-09-10.md).
 
 ## AP-05 — Free progression, history, and explanations
 
+The [lifecycle report](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-LIFECYCLE-2026-09-15.md)
+adds local counterexample evidence for AC-TR-039/040: missing or partial required
+coverage holds the current suggestion and legacy next programmed load. It does
+not close the versioned policy/calibration, authoritative progression worker,
+mixed-history union or comparable-equipment acceptance scenarios below.
+
 | Requirement / legacy locator | Disposition and decision | Behavior / contract; database authority; code | Acceptance scenario and expected evidence |
 |---|---|---|---|
 | TR-039 · PF 0; LM F.6; LR S6; DP progression | revised · D-01/10 | Basic double progression default product policy; compare all accepted work sets and comparable exposures, not logged subset; sessions/sets/prescription; WORK. | AC-TR-039: reps within range hold; all required top-range sets permit candidate increase under declared success policy; omitted sets never qualify. P/V |
@@ -165,7 +198,7 @@ open. See [AP-03 evidence](/dev-doc/reports/ADAPTIVPUSH-AP-03-2026-09-10.md).
 | TR-042 · OR bodyweight, assistance, barbells, cables, machines, dumbbells | revised · D-01/10 | LoadQuantity preserves actual unit and per-hand/total/assistance semantics; sparse/uncomparable history requests calibration. sessions/sets; WORK. | AC-TR-042: bodyweight and assisted exercises never treat lower assistance as regression; kg/lb and per-hand logs retain exact actual input. P/I |
 | TR-043 · DP future progression overwrites deload; LM F.8 | revised · D-05/10 | Progression reads phase/frozen baseline, applies once through revision-aware command; no read-triggered writes or compounding cycle factor. DB-01; WORK/PROG. | AC-TR-043: replay progression and load same program twice; no second increase; scheduled/accepted deload remains lighter. P/I |
 | TR-044 · LM C.7/G History; DP mixed legacy fallback | revised · D-01/12 | Union legacy and new sessions with stable dedup; actual sets remain history truth; HIST. | AC-TR-044: one legacy-only and one new-format session both remain visible with distinct provenance; linked migration duplicate shown once. P/I/U |
-| TR-045 · LM C.7 PR/exercise history; DP machine identity | revised · D-01/10 | PRs and estimated strength derive comparable exercise/equipment/execution data, display uncertainty; personal_records/sets; HIST/WORK. | AC-TR-045: different machine or ROM does not claim same-load PR; deleted/corrected source set recomputes derived record with audit. P/I |
+| TR-045 · LM C.7 PR/exercise history; DP machine identity | revised · D-01/10 | PRs and estimated strength derive comparable exercise/equipment/execution data, display uncertainty; correction-aware source records recompute from effective sets with internal audit. personal_records/sets; HIST/WORK. | AC-TR-045: different machine or ROM does not claim same-load PR; corrected source sets recompute the session-owned record once, preserve unlinked legacy rows and do not double-count. P/I |
 | TR-046 · LM C.7/I; EE/EI J; UI U4 | revised · D-01/10 | Free descriptive history/workload/progression and applied decisions; premium interpretation separate. Insight source/policy/window/watermark; HIST/TRUST. | AC-TR-046: sparse/zero-PR/mixed-unit history shows honest unknowns and text summaries, not confident causal fatigue diagnosis. P/U/V |
 | TR-047 · LM I fields/reuse; EE phase 1/7; LR evidence route | retained · D-10 | EvidenceRef: key, strength, claim scope, source links, caveats, rule type/version, confidence separate; shared registry. TRUST. | AC-TR-047: same rule in generator, Home, workout, FAQ, recovery and history resolves same explanation; invalid/missing key shows no false badge. P/U/V |
 | TR-048 · LM C.6 recovery; EE/EI H/I; UI U5 | revised · D-01/10 | Warm-up/ramp sets/task mobility, optional cooldown/active recovery; comfort distinct from proven recovery; no mandatory stretching/cold immersion. TRUST/GEN. | AC-TR-048: lower/upper/full-body and rest-day views offer relevant modules, caveats and no cure/injury-prevention guarantee; experts review safety wording. U/V |

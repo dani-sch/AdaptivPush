@@ -3,7 +3,7 @@
 Read [overview](/dev-doc/main/OVERVIEW.md) first, then [plan index](/dev-doc/plans/active/PLAN-INDEX.md).
 
 - `main/`: concise current architecture/state/roadmap/task/routing summaries.
-- `plans/active/`: neutral canonical planning owners and execution intake.
+- `plans/active/`: canonical planning owners; current execution routes through TODO, CURRENT-STATE and the execution register.
 - `plans/legacy/`: visibly superseded or executed historical plans, with preserved originals, replacements and provenance map.
 - `reports/`: dated execution/audit evidence and development logs.
 
