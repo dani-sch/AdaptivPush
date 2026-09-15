@@ -1,3 +1,6 @@
+import { workoutDraftStore } from '@/features/workouts/draftStore';
+import { amendWorkoutExercise } from '@/features/workouts/contracts';
+import { resolveProgramOccurrences } from '@/features/workouts/resolveProgramOccurrences';
 import { checkpointWeek } from '@/features/programs/checkpoint';
 import {
     createContext,
@@ -377,7 +380,6 @@ function useCurrentProgramState() {
                         .eq('user_id', requestOwnerId)
                         .in('program_day_id', dayIds)
                         .eq('lifecycle', 'finalized')
-                        .in('completion_class', ['complete', 'reduced'])
                         .abortSignal(signal),
                     {
                         kind: 'read',
@@ -489,8 +491,10 @@ function useCurrentProgramState() {
             if (!canApplyOwnerScopedResult(requestOwnerId, ownerIdRef.current, controller.signal.aborted)) {
                 return;
             }
-            setProgram(mapped);
-            programRef.current = mapped;
+            const resolved = await resolveProgramOccurrences(mapped, requestOwnerId);
+            if (!canApplyOwnerScopedResult(requestOwnerId, ownerIdRef.current, controller.signal.aborted)) return;
+            setProgram(resolved);
+            programRef.current = resolved;
             setUnavailable(false);
             setFailureCategory(null);
 
@@ -596,7 +600,7 @@ function useCurrentProgramState() {
                 // First find the most recent session_id, then get all sets from that session.
                 const { data: latestSession, error: latestSessionError } = await supabase
                     .from('workout_exercise_sets')
-                    .select('session_id, workout_sessions!inner(user_id)')
+                    .select('session_id, workout_sessions!inner(user_id,completion_class)')
                     .eq('exercise_id', pde.exercise_id)
                     .eq('workout_sessions.user_id', userId)
                     .order('created_at', { ascending: false })
@@ -641,6 +645,8 @@ function useCurrentProgramState() {
                     currentTargetRPE: pde.target_rpe,
                     experienceLevel,
                     lastSessionSets,
+                    requiredSetCount: pde.set_count,
+                    completionClass: (latestSession?.[0] as any)?.workout_sessions?.completion_class ?? 'legacy_unknown',
                     readinessScore:  null, // Readiness is applied as UI overlay only, not baked into progression
                 };
 
@@ -659,7 +665,9 @@ function useCurrentProgramState() {
                     (s) => s.reps < pde.rep_range_min
                 );
 
-                const allHitMax   = setsHitMax.length === lastSessionSets.length && lastSessionSets.length > 0;
+                const fullCoverage = (latestSession?.[0] as any)?.workout_sessions?.completion_class === 'complete'
+                    && lastSessionSets.length >= pde.set_count;
+                const allHitMax   = fullCoverage && setsHitMax.length === lastSessionSets.length && lastSessionSets.length > 0;
                 const allMissedMin = setsMissedMin.length === lastSessionSets.length && lastSessionSets.length > 0;
                 const someMissedMin = setsMissedMin.length > 0 && lastSessionSets.length > 0;
 
@@ -754,6 +762,17 @@ function useCurrentProgramState() {
                     throw new Error('Stable program revision identity is unavailable for this exercise.');
                 }
                 const ownerId = await requireUserId();
+                const active = await workoutDraftStore.loadMatching(ownerId, { programId: program.id, stableDayId: workout.stableDayId, programDayId: workout.id });
+                if (active?.finalizationEndedAt || active?.lifecycle === 'finalized' || workout.sessionId) throw new Error('Open the completed workout to update it.');
+                const amended = active ? amendWorkoutExercise(active, { slotId: original.stableSlotId,
+                    replacementExerciseId: newExerciseId, replacementName: replacement.name,
+                    amendedAt: new Date().toISOString(), replacementLoadKind: replacement.equipment === 'Bodyweight' ? 'bodyweight' : 'unknown',
+                }) : null;
+                if (amended && scope === 'workout_only') {
+                    await workoutDraftStore.save(amended);
+                    await refresh();
+                    return { status: 'no_change' as const, reason: 'no_future_workouts' as const };
+                }
                 const outcome = await reviseProgramExercise(programRepository, ownerId, {
                     programId: program.id,
                     expectedRevision: program.currentRevision,
@@ -769,6 +788,7 @@ function useCurrentProgramState() {
                 if (outcome.status === 'validation') throw new OperationFailureError({ category: 'validation', retryable: false }, outcome.errors.join(' '));
                 if (outcome.status === 'conflict') throw new OperationFailureError({ category: 'conflict', retryable: false }, outcome.message);
                 if (outcome.status === 'unavailable') throw new OperationFailureError(outcome.failure, outcome.message);
+                if (amended) await workoutDraftStore.save(amended);
                 await refresh();
                 return outcome;
             }

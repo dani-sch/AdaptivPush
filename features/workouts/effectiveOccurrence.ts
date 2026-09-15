@@ -15,6 +15,18 @@ export function occurrenceAction(state: OccurrenceState, canCorrect = true): str
     : state === 'pending_sync' ? 'Retry Sync' : state === 'in_progress' ? 'Continue Workout' : 'Start Workout';
 }
 
+/** A modal dismissal admits exactly one route push, including repeated native callbacks. */
+export function createCompletedNavigation() {
+  let target: string | null = null;
+  let busy = false;
+  return {
+    request(sessionId: string) { if (busy) return false; busy = true; target = sessionId; return true; },
+    dismiss() { const result = target; target = null; return result; },
+    pending() { return target !== null; },
+    reset() { target = null; busy = false; },
+  };
+}
+
 export interface OccurrenceSet extends CompletedWorkoutSetCorrection {
   outcome: SetOutcome;
   prescribed: boolean;
@@ -37,12 +49,12 @@ export function projectCompletedOccurrence(
   const exercises: OccurrenceExercise[] = (snapshot?.slots ?? []).map(slot => {
     const effective: WorkoutDraftSlot | undefined = snapshot?.effectiveSlots?.find(s => s.slotId === slot.slotId);
     const exerciseId = effective?.actualExerciseId ?? slot.prescribedExerciseId;
-    const first = slot.sets[0];
+    const first = slot.sets?.[0];
     return {
       slotId: slot.slotId, exerciseId,
       name: names.get(exerciseId) ?? effective?.replacementExerciseName ?? slot.exerciseName ?? 'Prescribed exercise',
       prescription: `${slot.prescribedSetCount} × ${first ? `${first.plannedRepsMin}–${first.plannedRepsMax}` : 'prescribed reps'}`,
-      sets: slot.sets.map(set => {
+      sets: (slot.sets ?? []).map(set => {
         const actual = actuals.find(a => a.actualSetId === set.setId
           || (a.prescriptionSlotId === slot.slotId && a.order === set.order));
         if (actual) consumed.add(actual.actualSetId);
@@ -68,5 +80,5 @@ export function projectCompletedOccurrence(
     }
     exercise.sets.push({ ...actual, outcome: 'performed', prescribed: false });
   }
-  return { exercises, missingPrescription: !snapshot?.slots?.length };
+  return { exercises, missingPrescription: !snapshot?.slots?.length || snapshot.slots.some(s => !s.sets?.length) };
 }

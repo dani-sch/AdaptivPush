@@ -93,7 +93,7 @@ BEGIN
 
   SELECT * INTO v_program FROM public.programs WHERE id = v_program_id FOR UPDATE;
   IF NOT FOUND OR v_program.user_id <> v_user_id THEN RAISE EXCEPTION 'forbidden'; END IF;
-  IF NOT v_program.is_active OR v_program.lifecycle <> 'active' OR v_program.schema_version < 2 THEN
+  IF NOT v_program.is_active OR v_program.lifecycle <> 'active' OR v_program.current_revision_id IS NULL THEN
     RAISE EXCEPTION 'invalid_input: active schema-v2 program required';
   END IF;
   IF v_program.current_revision <> v_expected_revision
@@ -245,6 +245,7 @@ DECLARE
   v_after jsonb;
   v_planned_count integer;
   v_set_count integer;
+  v_covered_count integer;
   v_total_volume numeric := 0;
   v_completion text;
   v_result_revision integer;
@@ -310,6 +311,17 @@ BEGIN
     END IF;
   END LOOP;
 
+  IF p_payload ? 'setOutcomes' THEN
+    IF jsonb_typeof(p_payload->'setOutcomes') <> 'array' THEN RAISE EXCEPTION 'invalid_input: set outcomes'; END IF;
+    FOR v_set IN SELECT value FROM jsonb_array_elements(p_payload->'setOutcomes') LOOP
+      IF COALESCE(v_set->>'outcome', '') NOT IN ('performed', 'skipped', 'not_attempted') OR NOT EXISTS (
+        SELECT 1 FROM jsonb_array_elements(v_session.prescription_snapshot->'slots') slot,
+          jsonb_array_elements(slot->'sets') planned
+        WHERE slot->>'slotId' = v_set->>'slotId' AND planned->>'setId' = v_set->>'setId'
+          AND planned->>'order' = v_set->>'order'
+      ) THEN RAISE EXCEPTION 'invalid_input: outcome prescription lineage'; END IF;
+    END LOOP;
+  END IF;
   DELETE FROM public.workout_exercise_sets WHERE session_id = v_session_id;
   FOR v_set IN SELECT value FROM jsonb_array_elements(p_payload->'sets') LOOP
     INSERT INTO public.workout_exercise_sets (
@@ -334,13 +346,22 @@ BEGIN
   INTO v_set_count, v_total_volume FROM public.workout_exercise_sets WHERE session_id = v_session_id;
   SELECT COALESCE(sum((slot->>'prescribedSetCount')::integer), 0) INTO v_planned_count
   FROM jsonb_array_elements(COALESCE(v_session.prescription_snapshot->'slots', '[]'::jsonb)) slot;
+  SELECT count(*) INTO v_covered_count FROM public.program_day_exercises pde,
+    generate_series(1, pde.set_count) required(set_order)
+  WHERE pde.program_day_id = v_session.program_day_id AND EXISTS (
+    SELECT 1 FROM public.workout_exercise_sets wes WHERE wes.session_id = v_session_id
+      AND wes.prescription_slot_id = pde.stable_slot_id AND wes.order_index = required.set_order
+  );
   v_completion := CASE WHEN v_set_count = 0 THEN 'abandoned'
-    WHEN v_planned_count > 0 AND v_set_count = v_planned_count THEN 'complete'
+    WHEN v_planned_count > 0 AND v_covered_count = v_planned_count THEN 'complete'
     WHEN v_planned_count = 0 THEN 'legacy_unknown' ELSE 'partial' END;
   v_result_revision := v_expected_revision + 1;
   UPDATE public.workout_sessions SET total_volume_lb = v_total_volume,
     completion_class = v_completion, correction_revision = v_result_revision,
-    corrected_at = now(), pr_count = 0
+    corrected_at = now(), pr_count = 0,
+    prescription_snapshot = CASE WHEN p_payload ? 'setOutcomes' THEN
+      jsonb_set(COALESCE(prescription_snapshot, '{}'::jsonb), '{setOutcomes}', p_payload->'setOutcomes', true)
+      ELSE prescription_snapshot END
   WHERE id = v_session_id;
   -- Rebuild only correction-aware PR rows owned by this session. Legacy rows
   -- without a session identity stay readable and are never guessed/deleted.

@@ -17,7 +17,7 @@ export async function loadCompletedWorkout(client: SupabaseClient, ownerId: stri
   let canCorrect = false;
   // A read-only capability function confirms the RPC and snapshot-outcome contract together.
   const capability = await client.rpc('workout_correction_capability_v1');
-  if (!capability.error) canCorrect = capability.data === 2 && session.correction_revision !== undefined;
+  if (!capability.error) canCorrect = capability.data === 2 && session.correction_revision !== undefined && session.lifecycle === 'finalized';
   else if (classifySupabaseError(capability.error).category !== 'schema_unavailable') {
     // History remains readable during a capability/network failure.
     console.warn('[workout.capability]', capability.error.code);

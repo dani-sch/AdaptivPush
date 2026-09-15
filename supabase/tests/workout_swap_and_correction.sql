@@ -61,13 +61,42 @@ BEGIN
       THEN RAISE EXCEPTION 'swap changed prescribed sets'; END IF;
 END $assert_occurrence$;
 
+-- The source slot was already replaced for this occurrence. Future matching follows
+-- its immutable slot lineage, and replaying a second swap must not create a revision.
+SELECT set_config('adaptivpush.repeat_payload', jsonb_build_object(
+  'operationId', '95000000-0000-4000-8000-000000000010', 'programId', current_setting('adaptivpush.program'),
+  'expectedRevision', 2, 'expectedRevisionId', current_setting('adaptivpush.revision_2'),
+  'currentStableDayId', current_setting('adaptivpush.day_1'), 'currentStableSlotId', current_setting('adaptivpush.slot_1'),
+  'originalExerciseId', current_setting('adaptivpush.exercise_2'), 'replacementExerciseId', current_setting('adaptivpush.exercise_1'), 'includeCurrentDay', true
+)::text, true);
+SELECT set_config('adaptivpush.repeat_receipt', public.revise_program_exercise_v2(current_setting('adaptivpush.repeat_payload')::jsonb)::text, true);
+SELECT set_config('adaptivpush.repeat_payload', jsonb_build_object(
+  'operationId', '95000000-0000-4000-8000-000000000011', 'programId', current_setting('adaptivpush.program'),
+  'expectedRevision', 3, 'expectedRevisionId', current_setting('adaptivpush.repeat_receipt')::jsonb->>'revisionId',
+  'currentStableDayId', current_setting('adaptivpush.day_1'), 'currentStableSlotId', current_setting('adaptivpush.slot_1'),
+  'originalExerciseId', current_setting('adaptivpush.exercise_1'), 'replacementExerciseId', current_setting('adaptivpush.exercise_2'), 'includeCurrentDay', true
+)::text, true);
+SELECT set_config('adaptivpush.repeat_receipt', public.revise_program_exercise_v2(current_setting('adaptivpush.repeat_payload')::jsonb)::text, true);
+SELECT set_config('adaptivpush.revision_2', current_setting('adaptivpush.repeat_receipt')::jsonb->>'revisionId', true);
+DO $repeat_swap$
+BEGIN
+  IF NOT (public.revise_program_exercise_v2(current_setting('adaptivpush.repeat_payload')::jsonb)->>'replayed')::boolean THEN RAISE EXCEPTION 'repeat swap replay failed'; END IF;
+  IF (SELECT current_revision FROM public.programs WHERE id=current_setting('adaptivpush.program')::uuid) <> 4 THEN RAISE EXCEPTION 'duplicate swap revision'; END IF;
+  IF EXISTS (SELECT 1 FROM public.program_day_exercises pde WHERE pde.program_revision_id=current_setting('adaptivpush.revision_2')::uuid AND exercise_id<>current_setting('adaptivpush.exercise_2')::uuid) THEN RAISE EXCEPTION 'second swap did not reach future slots'; END IF;
+END $repeat_swap$;
+
 SELECT set_config('adaptivpush.session_receipt', public.finalize_workout_v2(jsonb_build_object(
   'operationId', '95000000-0000-4000-8000-000000000003', 'draftId', '96000000-0000-4000-8000-000000000001',
   'schemaVersion', 2, 'revision', 1,
   'programDayId', (SELECT id FROM public.program_days WHERE program_revision_id=current_setting('adaptivpush.revision_2')::uuid AND stable_day_id=current_setting('adaptivpush.day_1')::uuid),
   'prescriptionRevisionId', current_setting('adaptivpush.revision_2'), 'workoutName', 'Week 1',
   'startedAt', '2026-09-15T12:00:00Z', 'endedAt', '2026-09-15T12:20:00Z', 'durationMin', 20, 'timezone', 'America/New_York',
-  'frozenPrescription', jsonb_build_object('slots', jsonb_build_array(jsonb_build_object('prescribedSetCount', 2))),
+  'frozenPrescription', jsonb_build_object('slots', jsonb_build_array(jsonb_build_object(
+    'slotId', current_setting('adaptivpush.slot_1'), 'prescribedExerciseId', current_setting('adaptivpush.exercise_2'), 'prescribedSetCount', 2,
+    'sets', jsonb_build_array(
+      jsonb_build_object('setId', '97000000-0000-4000-8000-000000000001', 'order', 1),
+      jsonb_build_object('setId', '97000000-0000-4000-8000-000000000002', 'order', 2)
+    )))),
   'slots', jsonb_build_array(jsonb_build_object(
     'slotId', current_setting('adaptivpush.slot_1'), 'prescribedExerciseId', current_setting('adaptivpush.exercise_2'), 'actualExerciseId', current_setting('adaptivpush.exercise_2'), 'prescribedSetCount', 2,
     'sets', jsonb_build_array(jsonb_build_object('setId', '97000000-0000-4000-8000-000000000001', 'order', 1, 'logged', true, 'actualExerciseId', current_setting('adaptivpush.exercise_2'), 'actualReps', 8, 'actualLoad', 20, 'loadUnit', 'kg', 'loadKind', 'external', 'loadSide', 'external_total', 'actualRpe', 8, 'loggedAt', '2026-09-15T12:10:00Z'))
@@ -106,6 +135,25 @@ BEGIN
     RAISE EXCEPTION 'correction audit was not written exactly once';
   END IF;
 END $assert_internal_audit$;
+-- One extra performed set cannot replace an unperformed prescribed slot.
+SELECT set_config('adaptivpush.partial_correction', jsonb_build_object(
+  'schemaVersion', 1, 'operationId', '95000000-0000-4000-8000-000000000012', 'sessionId', current_setting('adaptivpush.session'), 'expectedRevision', 1,
+  'sets', jsonb_build_array(
+    current_setting('adaptivpush.correction_payload')::jsonb->'sets'->0,
+    jsonb_set(jsonb_set(current_setting('adaptivpush.correction_payload')::jsonb->'sets'->1, '{order}', '3'), '{actualSetId}', '"97000000-0000-4000-8000-000000000003"')
+  ),
+  'setOutcomes', jsonb_build_array(jsonb_build_object('setId', '97000000-0000-4000-8000-000000000002', 'slotId', current_setting('adaptivpush.slot_1'), 'order', 2, 'outcome', 'skipped'))
+)::text, true);
+SELECT public.correct_completed_workout_v1(current_setting('adaptivpush.partial_correction')::jsonb);
+DO $partial_outcomes$
+BEGIN
+  IF (SELECT completion_class FROM public.workout_sessions WHERE id=current_setting('adaptivpush.session')::uuid) <> 'partial' THEN RAISE EXCEPTION 'extra set hid incomplete prescribed work'; END IF;
+  IF (SELECT prescription_snapshot->'setOutcomes'->0->>'outcome' FROM public.workout_sessions WHERE id=current_setting('adaptivpush.session')::uuid) <> 'skipped' THEN RAISE EXCEPTION 'skip not persisted'; END IF;
+  IF (SELECT count(*) FROM public.workout_sessions WHERE user_id=current_setting('adaptivpush.user_1')::uuid) <> 1 THEN RAISE EXCEPTION 'correction duplicated session'; END IF;
+  IF (SELECT current_revision FROM public.programs WHERE id=current_setting('adaptivpush.program')::uuid) <> 4 THEN RAISE EXCEPTION 'correction replayed advancement'; END IF;
+  IF public.workout_correction_capability_v1() <> 2 THEN RAISE EXCEPTION 'capability version mismatch'; END IF;
+END $partial_outcomes$;
+
 SELECT set_config('request.jwt.claim.sub', current_setting('adaptivpush.user_2'), true);
 SET LOCAL ROLE authenticated;
 DO $assert_owner$

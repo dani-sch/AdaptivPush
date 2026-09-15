@@ -53,6 +53,7 @@ export interface FrozenWorkoutPrescription {
 export interface WorkoutActualSet extends FrozenPrescriptionSet {
   outcome?: SetOutcome;
   actualExerciseId: string;
+  actualExerciseName?: string;
   actualReps: number | null;
   actualLoad: number | null;
   actualRpe: number | null;
@@ -165,6 +166,7 @@ export function createWorkoutDraft(input: {
       sets: slot.sets.map((set) => ({
         ...structuredClone(set),
         actualExerciseId: slot.prescribedExerciseId,
+        actualExerciseName: slot.exerciseName,
         actualReps: null,
         actualLoad: null,
         actualRpe: null,
@@ -269,6 +271,7 @@ export function amendWorkoutExercise(
           : {
               ...set,
               actualExerciseId: amendment.replacementExerciseId,
+              actualExerciseName: amendment.replacementName,
               actualLoad: null,
               enteredLoadText: '',
               loadKind: amendment.replacementLoadKind ?? 'unknown' as const,
@@ -330,4 +333,25 @@ export function validateWorkoutDraft(draft: WorkoutDraft): { ok: boolean; errors
     }
   }
   return { ok: errors.length === 0, errors };
+}
+
+export function workoutFinalizationPayload(draft: WorkoutDraft, endedAt: string): Record<string, unknown> {
+  const started = new Date(draft.startedAt).getTime();
+  const ended = new Date(endedAt).getTime();
+  return {
+    operationId: draft.operationId,
+    draftId: draft.draftId,
+    schemaVersion: draft.schemaVersion,
+    policyVersion: draft.policyVersion,
+    revision: draft.revision,
+    programDayId: draft.programDayId,
+    prescriptionRevisionId: draft.prescriptionRevisionId,
+    workoutName: draft.workoutName,
+    startedAt: draft.startedAt,
+    endedAt,
+    durationMin: Math.max(0, Math.round((ended - started) / 60_000)),
+    timezone: draft.timezone,
+    frozenPrescription: { ...draft.frozenPrescription, effectiveSlots: draft.slots },
+    slots: draft.slots,
+  };
 }

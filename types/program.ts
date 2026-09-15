@@ -67,6 +67,7 @@ export interface GeneratedProgramExplanation extends ExplanationMetadata {
 }
 
 export type ProgramWorkout = {
+    sessionId?: string;
     id: string;
     stableDayId?: string;
     prescriptionRevisionId?: string;

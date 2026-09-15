@@ -34,6 +34,9 @@ export async function correctCompletedWorkout(
     }
     const failure = classifySupabaseError(error);
     reportSupabaseFailure('workout.correct_completed', error);
+    if (failure.category === 'schema_unavailable') {
+      return { status: 'unavailable', message: 'This workout can be viewed, but updates are temporarily unavailable.' };
+    }
     const message = supabaseUserMessage(
       error,
       'The update could not be confirmed. Your exact changes are saved on this device; retry to reconcile the same request.',

@@ -34,9 +34,9 @@ export function draftToExercises(draft: WorkoutDraft, workout?: ProgramWorkout):
         logged: set.logged,
         outcome: set.outcome ?? (set.logged ? 'performed' : 'not_attempted'),
         loadUnit: set.loadUnit,
-        exerciseName: set.actualExerciseId === slot.actualExerciseId
+        exerciseName: set.actualExerciseName ?? (set.actualExerciseId === slot.actualExerciseId
           ? slot.replacementExerciseName ?? current?.name ?? slot.exerciseName
-          : originalExerciseName,
+          : originalExerciseName),
       })),
       completed: slot.sets.length > 0 && slot.sets.every((set) => set.logged),
       loadSuggestion: slot.loadSuggestion
