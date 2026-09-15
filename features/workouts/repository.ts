@@ -24,7 +24,7 @@ export function workoutFinalizationPayload(draft: WorkoutDraft, endedAt: string)
     endedAt,
     durationMin: Math.max(0, Math.round((ended - started) / 60_000)),
     timezone: draft.timezone,
-    frozenPrescription: draft.frozenPrescription,
+    frozenPrescription: { ...draft.frozenPrescription, effectiveSlots: draft.slots },
     slots: draft.slots,
   };
 }

@@ -10,6 +10,8 @@ import { haptic, Haptics } from "@/utils/haptic";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface WorkoutSet {
+    outcome?: 'performed' | 'skipped' | 'not_attempted';
+    loadUnit?: string;
     id: string;
     weight: string;
     reps: string;
@@ -29,6 +31,7 @@ export interface Exercise {
     imageUrl?: string;
     description?: string;
     readOnly?: boolean;
+    editingCompleted?: boolean;
     loadLabel?: string;
     loadSuggestion?: string;
 }
@@ -45,6 +48,9 @@ interface SetRowProps {
     onChangeReps: (val: string) => void;
     onChangeRpe: (val: string) => void;
     onToggleLogged: () => void;
+    onToggleSkipped: () => void;
+    editingCompleted?: boolean;
+    controls?: React.ReactNode;
     styles: ReturnType<typeof createStyles>;
     theme: Theme;
 }
@@ -59,6 +65,9 @@ const SetRow: React.FC<SetRowProps> = ({
     onChangeReps,
     onChangeRpe,
     onToggleLogged,
+    onToggleSkipped,
+    editingCompleted,
+    controls,
     styles,
     theme,
 }) => (
@@ -76,7 +85,7 @@ const SetRow: React.FC<SetRowProps> = ({
             onChangeText={onChangeWeight}
             keyboardType="decimal-pad"
             selectTextOnFocus
-            editable={!set.logged && !readOnly}
+            editable={(!set.logged || editingCompleted) && !readOnly && set.outcome !== 'skipped'}
             placeholderTextColor={theme.placeholder}
             placeholder="—"
         />
@@ -88,7 +97,7 @@ const SetRow: React.FC<SetRowProps> = ({
             onChangeText={onChangeReps}
             keyboardType="number-pad"
             selectTextOnFocus
-            editable={!set.logged && !readOnly}
+            editable={(!set.logged || editingCompleted) && !readOnly && set.outcome !== 'skipped'}
             placeholderTextColor={theme.placeholder}
             placeholder="—"
         />
@@ -100,7 +109,7 @@ const SetRow: React.FC<SetRowProps> = ({
             onChangeText={onChangeRpe}
             keyboardType="decimal-pad"
             selectTextOnFocus
-            editable={!set.logged && !readOnly}
+            editable={(!set.logged || editingCompleted) && !readOnly && set.outcome !== 'skipped'}
             placeholderTextColor={theme.placeholder}
             placeholder="—"
         />
@@ -128,12 +137,19 @@ const SetRow: React.FC<SetRowProps> = ({
             />
         </Pressable>
       </View>
+      <Text style={styles.actualExerciseLabel}>{set.outcome === 'skipped' ? 'Skipped' : set.logged ? `Performed · ${set.loadUnit ?? loadLabel}` : 'Not attempted'}</Text>
+      {!readOnly && !set.logged ? <Pressable onPress={onToggleSkipped} accessibilityRole="button" style={styles.setAction}>
+        <Text style={styles.actionButtonText}>{set.outcome === 'skipped' ? 'Undo skip' : 'Skip set'}</Text>
+      </Pressable> : null}
+      {controls}
     </View>
 );
 
 // ─── ExerciseCard ─────────────────────────────────────────────────────────────
 
 interface ExerciseCardProps {
+    renderSetControls?: (set: WorkoutSet) => React.ReactNode;
+    onAddSet?: () => void;
     exercise: Exercise;
     onUpdateSet: (setId: string, field: keyof WorkoutSet, value: string | boolean) => void;
     onToggleComplete: () => void;
@@ -147,6 +163,8 @@ export default function ExerciseCard({
     onToggleComplete,
     onPressHistory,
     onPressSwap,
+    renderSetControls,
+    onAddSet,
 }: ExerciseCardProps) {
     const { theme } = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
@@ -240,16 +258,25 @@ export default function ExerciseCard({
                         index={idx}
                         exerciseName={exercise.name}
                         readOnly={exercise.readOnly}
+                        editingCompleted={exercise.editingCompleted}
+                        controls={renderSetControls?.(set)}
                         loadLabel={exercise.loadLabel ?? "pounds"}
                         onChangeWeight={(val) => onUpdateSet(set.id, "weight", val)}
                         onChangeReps={(val) => onUpdateSet(set.id, "reps", val)}
                         onChangeRpe={(val) => onUpdateSet(set.id, "rpe", val)}
                         onToggleLogged={() => onUpdateSet(set.id, "logged", !set.logged)}
+                        onToggleSkipped={() => onUpdateSet(set.id, 'outcome', set.outcome === 'skipped' ? 'not_attempted' : 'skipped')}
                         styles={styles}
                         theme={theme}
                     />
                 ))}
             </View>
+            {!exercise.readOnly ? <View>
+              <Pressable style={styles.setAction} onPress={() => exercise.sets.filter(s => !s.logged).forEach(s => onUpdateSet(s.id, 'outcome', 'skipped'))} accessibilityRole="button">
+                <Text style={styles.actionButtonText}>Skip remaining exercise</Text>
+              </Pressable>
+              {onAddSet ? <Pressable style={styles.setAction} onPress={onAddSet} accessibilityRole="button"><Text style={styles.actionButtonText}>Add extra set</Text></Pressable> : null}
+            </View> : null}
         </View>
     );
 }
@@ -258,6 +285,7 @@ export default function ExerciseCard({
 
 function createStyles(theme: Theme) {
     return StyleSheet.create({
+        setAction: { minHeight: 44, justifyContent: 'center' },
         card: {
             backgroundColor: theme.cardBg,
             borderRadius: 20,

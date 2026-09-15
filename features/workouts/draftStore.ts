@@ -102,7 +102,7 @@ export const workoutDraftStore: WorkoutDraftStore = {
       }));
       if (serialized) {
         const draft = JSON.parse(serialized) as WorkoutDraft;
-        if (activeWorkoutDraftMatches(draft, ownerId, lookup)) {
+        if (workoutDraftMatches(draft, ownerId, { programId: lookup.programId, stableDayId: lookup.stableDayId })) {
           return draft;
         }
       }

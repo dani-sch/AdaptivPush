@@ -64,7 +64,8 @@ export function effectiveCurrentWorkout(
   draft: WorkoutDraft | null,
 ): ProgramWorkout | null {
   if (!workout) return null;
-  const activeDraft = matchingActiveWorkoutDraft(program, workout, ownerId, draft);
+  const activeDraft = program && ownerId && draft && validateWorkoutDraft(draft).ok
+    && draft.ownerId === ownerId && draft.programId === program.id && draft.stableDayId === workout.stableDayId ? draft : null;
   if (!program || !activeDraft) return workout;
 
   return {
