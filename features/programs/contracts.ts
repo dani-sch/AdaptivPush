@@ -77,7 +77,7 @@ export interface ProgramExerciseRevisionRequest {
   currentStableSlotId: string;
   originalExerciseId: string;
   replacementExerciseId: string;
-  includeCurrentDay: boolean;
+  scope: 'selected_only' | 'selected_and_future' | 'future_after_current';
 }
 
 export interface ProgramExerciseRevisionReceipt {
@@ -93,6 +93,7 @@ export interface ProgramExerciseRevisionReceipt {
 
 export type ProgramExerciseRevisionOutcome =
   | { status: 'revised' | 'replay'; receipt: ProgramExerciseRevisionReceipt }
+  | { status: 'no_change'; reason: 'no_future_workouts' }
   | { status: 'validation'; errors: string[] }
   | { status: 'conflict'; message: string }
   | { status: 'unavailable'; message: string; failure: import('@/utils/supabaseResilience').SupabaseFailure };

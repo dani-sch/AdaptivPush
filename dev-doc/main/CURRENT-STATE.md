@@ -1,6 +1,18 @@
 # AdaptivPush current state
 
-## Current AP-02/AP-03 boundary
+## Current scoped-swap and workout-correction boundary
+
+Commits `8fff2b2`, `ae56b7f` and `eaca4f6` repair the locally implemented exercise-swap flow. A pure owner/program/stable-day projection makes a valid active draft authoritative on Home, so workout-only replacements and Continue Workout use the exact existing draft. Home's first-three exercise preview expands/collapses with stable keys and accessibility state. The swap catalog is virtualized with memoized rows and ID-only selection; optional history is prefetched and never blocks Apply; duplicate Apply taps are synchronously gated. Wider program synchronization begins only after the exact operation and current draft are durable, runs outside the immediate visual path, and uses user-focused copy.
+
+A deterministic no-future-workouts result now clears Retry state and treats the current-workout swap as successful. Genuine response loss retains the exact operation. A newer workout-only choice immediately wins the draft display while the older wider request is reconciled; a confirmed older request is compensated against its returned revision, and generation plus pending identity guards prevent stale completion handlers from overwriting newer UI state. Logged sets retain their performed exercise/load identity and only unlogged sets move.
+
+Finalized durable workouts now expose Edit workout from workout completion/history. The correction flow supports explicit Save changes/Cancel, set add/remove, performed exercise, reps, RPE and load/unit corrections, durable retry recovery, stale-revision conflicts and an internal before/after audit. The server command updates the existing session atomically and recomputes its effective completion, volume and correction-aware record effects without creating a second session or replaying program advancement.
+
+Additive migration `20260915190000_workout_swap_scope_and_completed_corrections.sql` is **local-only and not present on the hosted project**. The authorization used for the earlier AP-02/AP-03 rollout does not authorize this new production change. Strict TypeScript passed; lint passed with the same three pre-existing warnings; 60 combined AP-02/AP-03 tests passed; and 10 focused repair cases passed. Normal Expo web startup and an unauthenticated welcome-screen smoke passed with no error overlay or captured console error. The earlier local database reset, four SQL suites and database lint remain valid because this repair changes no SQL. Physical-iPhone interaction percentiles and authenticated acceptance remain open. [The September 15 evidence report](/dev-doc/reports/ADAPTIVPUSH-SWAP-CORRECTION-2026-09-15.md) owns the exact scope and limits.
+
+Physical iPhone and end-to-end visual acceptance remain open, including keyboard/accessibility, both entry points/scopes, final-week behavior, recovery and completed-workout correction. Restore archived programs, end/archive programs, start workouts and generate new programs remain the four user-confirmed baseline flows to preserve; this task did not claim a fresh physical-device regression pass for them.
+
+## Existing hosted AP-02/AP-03 boundary
 
 The hosted AP-02/AP-03 packet is deployed to `thfxcvxcsfvrzdysdnkq`. The normal `.env` enables both writers, and the freshly served iOS bundle verifies the expected hosted backend, public client key and true/true flags with no privileged key. The user authorized this rollout after agent-run recovery and technical checks, replacing earlier pre-migration local/manual/QA-account, signing, standalone-build and distribution requirements. Physical acceptance follows deployment with the existing account through ordinary `npm start` and its Expo Go QR.
 
@@ -10,7 +22,7 @@ Fresh encrypted AES-256-GCM/DPAPI recovery passed PostgreSQL 17 isolated restore
 
 The original Docker startup blocker recovered after delayed supported restart. Current authentication, backup, restore and deployment are complete; no user Docker repair or reconfirmation is needed. The [release report](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md) owns hashes, source/integration commits, commands, limitations and recovery custody.
 
-## Verification and acceptance
+## Hosted packet verification and acceptance
 
 Focused tests (66 unique cases), strict TypeScript and lint passed; lint retains three unrelated existing warnings. SQL atomicity/isolation, installed and migrated-legacy revision variants, hosted RPC exposure/anonymous denial, original-data fingerprints and six concurrent-session assertions passed. Integrator code merge `8917bfd` independently passed application tests, availability, TypeScript and lint.
 

@@ -10,7 +10,7 @@
 | Category | Files |
 |----------|-------|
 | Project Root | 4 |
-| Tests | 13 |
+| Tests | 14 |
 | Top-level Scripts | 33 |
 | Automation Scripts | 24 |
 | Tool Scripts | 27 |
@@ -21,7 +21,7 @@
 | Skills | 62 |
 | Agents | 17 |
 | Commands | 8 |
-| **Total** | **246** |
+| **Total** | **247** |
 
 ---
 
@@ -59,6 +59,7 @@ _Test suite_
     │   ├── revision.test.ts — import assert from 'node:assert/strict';
     │   └── rollout.test.ts — import assert from 'node:assert/strict';
     └── workouts/
+        ├── correction.test.ts — import assert from 'node:assert/strict';
         ├── finalization.test.ts — import assert from 'node:assert/strict';
         ├── persistedSession.test.ts — import assert from 'node:assert/strict';
         └── routeResolution.test.ts — import assert from 'node:assert/strict';

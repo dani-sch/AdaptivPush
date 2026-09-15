@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
 import { router, useFocusEffect } from "expo-router";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   Dimensions,
   Modal,
@@ -22,6 +22,13 @@ import { getReadinessModifier } from "../../utils/progressionEngine";
 import { supabase } from "../../utils/supabase";
 import { computeCyclePhase } from "../../utils/cyclePhase";
 import { workoutEntryIssue, workoutRouteParams } from "@/features/workouts/routeResolution";
+import { workoutDraftStore } from "@/features/workouts/draftStore";
+import {
+  effectiveCurrentWorkout,
+  matchingActiveWorkoutDraft,
+  workoutRouteParamsForDraft,
+} from "@/features/workouts/effectiveCurrentWorkout";
+import type { WorkoutDraft } from "@/features/workouts/contracts";
 import {
   classifySupabaseError,
   reportSupabaseFailure,
@@ -64,12 +71,14 @@ const HeaderDateBlock: React.FC<{ styles: ReturnType<typeof createStyles> }> = (
 
 const NextWorkoutSection: React.FC<{
   entryIssue?: string | null;
+  hasActiveDraft?: boolean;
   workout?: WorkoutSummary;
   onPressStart?: () => void;
-}> = ({ workout, onPressStart, entryIssue }) => {
+}> = ({ workout, onPressStart, entryIssue, hasActiveDraft }) => {
   return (
     <NextWorkoutCard
       entryIssue={entryIssue}
+      hasActiveDraft={hasActiveDraft}
       workout={workout}
       onPressStart={onPressStart}
       onPressCalendar={() => console.log("Calendar pressed")}
@@ -601,6 +610,8 @@ export default function HomeScreen() {
   const [swapNudgeDismissed, setSwapNudgeDismissed] = useState(false);
 
   const [lastWorkoutDate, setLastWorkoutDate] = useState<string | null>(null);
+  const [loadedDraft, setLoadedDraft] = useState<WorkoutDraft | null>(null);
+  const homeFocusGenerationRef = useRef(0);
 
   const {
     program,
@@ -608,21 +619,19 @@ export default function HomeScreen() {
     unavailable,
     availabilityMessage,
     actionError,
+    ownerId,
     refresh,
     applyReadinessAdjustmentOnly,
     advanceToNextWeek,
   } = useCurrentProgram();
 
-  const fetchLastWorkout = useCallback(async (signal: AbortSignal) => {
+  const fetchLastWorkout = useCallback(async (requestOwnerId: string, signal: AbortSignal) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const user = session?.user;
-      if (!user) return;
       const { data, error } = await runSupabaseOperation(
         (attemptSignal) => supabase
           .from('workout_sessions')
           .select('ended_at')
-          .eq('user_id', user.id)
+          .eq('user_id', requestOwnerId)
           .order('ended_at', { ascending: false })
           .limit(1)
           .abortSignal(attemptSignal)
@@ -630,8 +639,7 @@ export default function HomeScreen() {
         { kind: 'read', operation: 'home.last_workout', signal },
       );
       if (error) throw error;
-      const currentOwnerId = (await supabase.auth.getSession()).data.session?.user.id;
-      if (signal.aborted || currentOwnerId !== user.id) return;
+      if (signal.aborted) return;
       if (data?.ended_at) {
         const formatted = new Date(data.ended_at).toLocaleDateString(undefined, {
           month: 'short', day: 'numeric',
@@ -647,26 +655,33 @@ export default function HomeScreen() {
     }
   }, []);
 
-  const fetchHomeData = useCallback(async (signal: AbortSignal) => {
+  const fetchHomeData = useCallback(async (requestOwnerId: string, signal: AbortSignal) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const user = session?.user;
-      if (!user) return;
-
       const today = new Date().toISOString().split("T")[0];
-      const { data, error } = await runSupabaseOperation(
-        (attemptSignal) => supabase
-          .from("readiness_logs")
-          .select("readiness_score, sleep_hours, stress, soreness, motivation, cycle_phase")
-          .eq("user_id", user.id)
-          .eq("log_date", today)
-          .abortSignal(attemptSignal)
-          .maybeSingle(),
-        { kind: 'read', operation: 'home.readiness', signal },
-      );
+      const [{ data, error }, { data: profileData, error: profileError }] = await Promise.all([
+        runSupabaseOperation(
+          (attemptSignal) => supabase
+            .from("readiness_logs")
+            .select("readiness_score, sleep_hours, stress, soreness, motivation, cycle_phase")
+            .eq("user_id", requestOwnerId)
+            .eq("log_date", today)
+            .abortSignal(attemptSignal)
+            .maybeSingle(),
+          { kind: 'read', operation: 'home.readiness', signal },
+        ),
+        runSupabaseOperation(
+          (attemptSignal) => supabase
+            .from('user_profile')
+            .select('cycle_enabled, last_period_start_date, avg_cycle_length_days')
+            .eq('user_id', requestOwnerId)
+            .abortSignal(attemptSignal)
+            .maybeSingle(),
+          { kind: 'read', operation: 'home.cycle_profile', signal },
+        ),
+      ]);
       if (error) throw error;
-      const currentOwnerId = (await supabase.auth.getSession()).data.session?.user.id;
-      if (signal.aborted || currentOwnerId !== user.id) return;
+      if (profileError) throw profileError;
+      if (signal.aborted) return;
 
       if (data?.readiness_score != null) {
         setReadinessScore(Number(data.readiness_score).toFixed(1));
@@ -678,19 +693,6 @@ export default function HomeScreen() {
       }
 
       if (!data?.cycle_phase) {
-        const { data: profileData, error: profileError } = await runSupabaseOperation(
-          (attemptSignal) => supabase
-            .from('user_profile')
-            .select('cycle_enabled, last_period_start_date, avg_cycle_length_days')
-            .eq('user_id', user.id)
-            .abortSignal(attemptSignal)
-            .maybeSingle(),
-          { kind: 'read', operation: 'home.cycle_profile', signal },
-        );
-        if (profileError) throw profileError;
-        const finalOwnerId = (await supabase.auth.getSession()).data.session?.user.id;
-        if (signal.aborted || finalOwnerId !== user.id) return;
-
         if (profileData?.cycle_enabled && profileData?.last_period_start_date) {
           const phase = computeCyclePhase(
             profileData.last_period_start_date,
@@ -714,19 +716,60 @@ export default function HomeScreen() {
 
   // Refresh all home data every time the tab comes into focus
   useFocusEffect(useCallback(() => {
+    const generation = homeFocusGenerationRef.current + 1;
+    homeFocusGenerationRef.current = generation;
     const controller = new AbortController();
     void refresh();
-    void Promise.all([fetchLastWorkout(controller.signal), fetchHomeData(controller.signal)]);
-    return () => controller.abort();
-  }, [refresh, fetchLastWorkout, fetchHomeData]));
+    if (ownerId) {
+      void Promise.all([
+        fetchLastWorkout(ownerId, controller.signal),
+        fetchHomeData(ownerId, controller.signal),
+      ]);
+    }
+    return () => {
+      controller.abort();
+      if (homeFocusGenerationRef.current === generation) {
+        homeFocusGenerationRef.current += 1;
+      }
+    };
+  }, [refresh, fetchLastWorkout, fetchHomeData, ownerId]));
 
   // workouts[0] is always the next uncompleted workout (hook sorts completed last)
   const nextWorkout = program?.workouts.find((w) => !w.isCompleted);
-  const nextWorkoutSummary: WorkoutSummary | undefined = nextWorkout
+
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    if (!ownerId || !program || !nextWorkout?.stableDayId) {
+      setLoadedDraft(null);
+      return () => { active = false; };
+    }
+    const requestedOwnerId = ownerId;
+    const requestedProgramId = program.id;
+    void workoutDraftStore.loadMatching(ownerId, {
+      programId: program.id,
+      prescriptionRevisionId: nextWorkout.prescriptionRevisionId,
+      stableDayId: nextWorkout.stableDayId,
+      programDayId: nextWorkout.id,
+    }).then((draft) => {
+      if (active && requestedOwnerId === ownerId && requestedProgramId === program.id) {
+        setLoadedDraft(draft);
+      }
+    }).catch((error) => {
+      reportSupabaseFailure('home.workout_draft', error);
+      if (active) setLoadedDraft(null);
+    });
+    return () => { active = false; };
+  }, [nextWorkout, ownerId, program]));
+
+  const activeDraft = matchingActiveWorkoutDraft(program, nextWorkout ?? null, ownerId, loadedDraft);
+  const effectiveWorkout = effectiveCurrentWorkout(program, nextWorkout ?? null, ownerId, loadedDraft);
+  const nextWorkoutSummary: WorkoutSummary | undefined = effectiveWorkout
     ? {
-        name: nextWorkout.name,
-        durationMinutes: nextWorkout.estimatedTime || 60,
-        exercises: nextWorkout.exercises.map((ex) => ({
+        id: effectiveWorkout.stableDayId ?? effectiveWorkout.id,
+        name: effectiveWorkout.name,
+        durationMinutes: effectiveWorkout.estimatedTime || 60,
+        exercises: effectiveWorkout.exercises.map((ex) => ({
+          id: ex.stableSlotId ?? ex.id,
           name: ex.name,
           prescription: `${ex.sets ?? 3}×${(ex.reps ?? "8-12").replace("-", "–")}`,
         })),
@@ -735,7 +778,12 @@ export default function HomeScreen() {
 
   const handleStartWorkout = () => {
     if (!program || !nextWorkout || workoutEntryIssue(program, nextWorkout)) return;
-    router.push({ pathname: "/next-workout", params: workoutRouteParams(program, nextWorkout) });
+    router.push({
+      pathname: "/next-workout",
+      params: activeDraft
+        ? workoutRouteParamsForDraft(activeDraft)
+        : workoutRouteParams(program, nextWorkout),
+    });
   };
 
   const handleOpenReadinessModal = () => {
@@ -818,6 +866,7 @@ export default function HomeScreen() {
         ) : (
           <NextWorkoutSection
             entryIssue={workoutEntryIssue(program, nextWorkout ?? null)}
+            hasActiveDraft={activeDraft !== null}
             workout={nextWorkoutSummary}
             onPressStart={handleStartWorkout}
           />

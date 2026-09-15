@@ -50,6 +50,24 @@
 
 The user's September 15 authorization replaces earlier pre-migration local/manual/native-signing gates. Physical iPhone cold launch, five-action UI/reopen acceptance and accessibility remain unverified. Thirty-two pre-existing non-rest days have no exercises (five in active programs); they were preserved, not populated with invented prescriptions. Complete persisted workouts can use their database identities; empty legacy days remain unstartable. AP-04/AP-05 remain out of scope. Evidence and recovery procedure: [release report](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md) and [manual checklist](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-MANUAL-QA-2026-09-14.md).
 
+## [LOCAL VERIFIED; HOSTED ROLLOUT NOT AUTHORIZED] Scoped swaps and completed-workout corrections
+
+- [COMPLETE] Make a matching active draft authoritative on Home, display Continue Workout, route to the exact draft, and add accessible exercise expansion/collapse.
+- [COMPLETE] Virtualize and memoize replacement rows, keep selection ID-only, prefetch optional history off the Apply path, add development-only interaction marks, and guard duplicate taps.
+- [COMPLETE] Treat no-future-workouts as deterministic success, keep exact response-loss recovery, safely compensate a confirmed superseded wider request, and replace internal synchronization language with user-focused copy.
+- [LOCAL VERIFIED] Strict TypeScript, lint with three pre-existing warnings, 60 combined tests, 10 focused repair cases, diff check, normal Expo startup and unauthenticated browser smoke. Physical-iPhone p95 and authenticated acceptance remain open.
+- [COMPLETE] Use the same replacement -> scope -> Apply swap flow from workout and program entry points, defaulting to This workout only.
+- [COMPLETE] Persist selected-occurrence overrides without direct prescription mutation; keep logged-set identity/load fixed and apply rest-of-program changes only to remaining and later uncompleted work.
+- [COMPLETE] Persist partial/uncertain swap state with accurate local/remote/pending copy, Retry and Keep this workout only recovery.
+- [COMPLETE] Add completed-workout editing for exercise, load/unit, reps, RPE and set add/remove with Save changes, Cancel and unsaved-navigation choices.
+- [COMPLETE] Add an owner-authorized, revision-checked, replay-safe atomic correction command, correction receipts and internal before/after audit; refresh effective session totals/completion/record effects without a duplicate session or program-advancement replay.
+- [COMPLETE] Pass strict TypeScript, lint with three pre-existing warnings, 50 combined AP-02/AP-03 unit tests, local reset with every migration, direct-`psql` execution of all four SQL suites plus the AP-03 legacy variant, and database lint with no warnings.
+- [OPEN] Physical iPhone/end-to-end visual acceptance: both swap entry points/scopes, zero/some/all logged sets, final-week/no-later-occurrence messaging, restart/response-loss/account recovery, keyboard/accessibility, and completed-workout Save/Cancel/repeat correction.
+- [OPEN] Re-run the four user-confirmed flows on the physical candidate: restore archived programs, end/archive programs, start workouts and generate new programs. They remain preserved baseline behavior, not a newly claimed device pass.
+- [BLOCKED: NEW AUTHORIZATION REQUIRED] Migration `20260915190000_workout_swap_scope_and_completed_corrections.sql` is local-only/not hosted. Before any rollout, obtain explicit production authorization and repeat project identity, recovery, isolated-restore, exact migration, security and post-deployment verification; do not infer authorization from the earlier rollout.
+
+Evidence: [September 15 scoped swap/correction report](/dev-doc/reports/ADAPTIVPUSH-SWAP-CORRECTION-2026-09-15.md).
+
 ## [NEXT AFTER RELEASE] Bounded implementation
 
 Release AP-02/03 durable records -> AP-04/05 schedules/free progression -> AP-06/07 advanced generation/equipment -> AP-08/09/10 coaching -> AP-11 unlisted -> optional AP-12/13 -> operationally gated AP-14/15. Relevant AP-16 privacy/purchase/support/accessibility gates are embedded throughout. [Register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) owns details.

@@ -34,6 +34,12 @@ export type WorkoutExercise = {
     loadKind?: LoadKind;
     loadUnit?: LoadUnit;
     loadSide?: LoadSide;
+    loadSuggestion?: {
+        value: number;
+        unit: 'lb' | 'kg';
+        kind: 'external' | 'assistance';
+        side: LoadSide;
+    };
     /** Per-set weight overrides (lb). When present, set i uses perSetWeights[i] instead of weight. */
     perSetWeights?: number[];
     targetRpe?: number | null;

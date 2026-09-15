@@ -3,9 +3,7 @@ import test from 'node:test';
 
 import {
   amendWorkoutExercise,
-  applyWorkoutRecalibrationLoad,
   classifyWorkoutCompletion,
-  confirmWorkoutRecalibration,
   createWorkoutDraft,
   updateWorkoutSet,
   validateWorkoutDraft,
@@ -68,7 +66,7 @@ test('zero load remains an explicit zero and one of four sets is partial', () =>
   assert.equal(validateWorkoutDraft(draft).ok, true);
 });
 
-test('a temporary swap preserves completed set identity and requires recalibration', () => {
+test('a temporary swap preserves completed set identity and clears only unlogged loads', () => {
   const logged = updateWorkoutSet(fixtureDraft(), {
     setId: '77777777-7777-4777-8777-777777777770',
     reps: 6,
@@ -86,23 +84,15 @@ test('a temporary swap preserves completed set identity and requires recalibrati
   assert.equal(swapped.slots[0].sets[0].setId, logged.slots[0].sets[0].setId);
   assert.equal(swapped.slots[0].sets[0].actualLoad, 100);
   assert.equal(swapped.slots[0].actualExerciseId, replacementExerciseId);
-  assert.equal(swapped.slots[0].requiresRecalibration, true);
-  assert.equal(swapped.slots[0].sets[1].enteredLoadText, '0');
+  assert.equal(swapped.slots[0].sets[1].enteredLoadText, '');
   assert.equal(swapped.slots[0].sets[1].actualLoad, null);
   assert.equal(swapped.slots[0].sets[1].loadKind, 'unknown');
   assert.equal(swapped.revision, 3);
 
-  const calibrated = applyWorkoutRecalibrationLoad(
-    swapped,
-    '66666666-6666-4666-8666-666666666666',
-    40,
-  );
-  assert.equal(calibrated.slots[0].requiresRecalibration, false);
-  assert.equal(calibrated.slots[0].sets[0].actualLoad, 100);
-  assert.deepEqual(calibrated.slots[0].sets.slice(1).map((set) => set.actualLoad), [40, 40, 40]);
+  assert.deepEqual(swapped.slots[0].sets.slice(1).map((set) => set.actualLoad), [null, null, null]);
 });
 
-test('zero-set swap retains entered values and copies load only after explicit confirmation', () => {
+test('zero-set swap preserves reps and RPE inputs but never copies the original load', () => {
   const typed = updateWorkoutSet(
     updateWorkoutSet(fixtureDraft(), {
       setId: '77777777-7777-4777-8777-777777777770',
@@ -123,24 +113,12 @@ test('zero-set swap retains entered values and copies load only after explicit c
     amendedAt: '2026-09-10T12:06:00.000Z',
   });
 
-  assert.equal(swapped.slots[0].sets[0].enteredLoadText, '25');
+  assert.equal(swapped.slots[0].sets[0].enteredLoadText, '');
   assert.equal(swapped.slots[0].sets[0].enteredRepsText, '9');
   assert.equal(swapped.slots[0].sets[0].enteredRpeText, '8');
   assert.equal(swapped.slots[0].sets[0].actualLoad, null);
   assert.equal(swapped.slots[0].sets[0].actualRpe, 8);
-  assert.throws(
-    () => confirmWorkoutRecalibration(swapped, '66666666-6666-4666-8666-666666666666'),
-    /every remaining set/i,
-  );
-
-  const copied = applyWorkoutRecalibrationLoad(
-    swapped,
-    '66666666-6666-4666-8666-666666666666',
-    30,
-  );
-  assert.equal(copied.slots[0].requiresRecalibration, false);
-  assert.deepEqual(copied.slots[0].sets.map((set) => set.actualLoad), [30, 30, 30, 30]);
-  assert.deepEqual(copied.slots[0].sets.map((set) => set.enteredLoadText), ['30', '30', '30', '30']);
+  assert.deepEqual(swapped.slots[0].sets.map((set) => set.actualLoad), [null, null, null, null]);
 });
 
 test('late prescription data cannot mutate a frozen draft', () => {
@@ -251,6 +229,23 @@ test('explicit zero changes unknown load to external but preserves assistance an
     assert.equal(updated.slots[0].sets[0].loadKind, kind === 'unknown' ? 'external' : kind);
     assert.equal(updated.slots[0].sets[0].actualLoad, 0);
   }
+});
+
+test('logging validates load naturally without a separate recalibration step', () => {
+  const draft = fixtureDraft();
+  draft.slots[0].sets[0].loadKind = 'external';
+  draft.slots[0].sets[0].loadUnit = 'lb';
+  assert.throws(() => updateWorkoutSet(draft, {
+    setId: draft.slots[0].sets[0].setId,
+    reps: 8,
+    logged: true,
+  }), /load before logging/i);
+  assert.doesNotThrow(() => updateWorkoutSet(draft, {
+    setId: draft.slots[0].sets[0].setId,
+    reps: 8,
+    load: 0,
+    logged: true,
+  }));
 });
 
 test('legacy PR candidates use pounds and actual exercise attribution, excluding assistance', () => {

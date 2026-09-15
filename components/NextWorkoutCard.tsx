@@ -1,16 +1,19 @@
 import { SymbolView } from "expo-symbols";
-import React, { useMemo } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react-native";
+import React, { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { Theme } from "@/constants/themes";
+import {
+  visibleWorkoutExercises,
+  type HomeExerciseItem,
+} from "@/features/workouts/homePresentation";
 
 // TypeScript types
-export interface ExerciseItem {
-  name: string;
-  prescription: string;
-}
+export type ExerciseItem = HomeExerciseItem;
 
 export interface WorkoutSummary {
+  id: string;
   name: string;
   durationMinutes: number;
   exercises: ExerciseItem[];
@@ -19,6 +22,7 @@ export interface WorkoutSummary {
 
 interface NextWorkoutCardProps {
   entryIssue?: string | null;
+  hasActiveDraft?: boolean;
   workout?: WorkoutSummary;
   onPressStart?: () => void;
   onPressCalendar?: () => void;
@@ -57,39 +61,41 @@ const ExerciseRow: React.FC<{ exercise: ExerciseItem; styles: ReturnType<typeof 
   </View>
 );
 
-// subcomponent: more Exercises Row
-const MoreExercisesRow: React.FC<{ count: number; styles: ReturnType<typeof createStyles> }> = ({ count, styles }) => (
-  <Text style={styles.moreExercises}>
-    +{count} more exercise{count !== 1 ? "s" : ""}
-  </Text>
-);
-
 // subcomponent: Start Workout Button
-const StartWorkoutButton: React.FC<{ onPress?: () => void; styles: ReturnType<typeof createStyles> }> = ({
+const StartWorkoutButton: React.FC<{
+  continuing: boolean;
+  onPress?: () => void;
+  styles: ReturnType<typeof createStyles>;
+}> = ({
+  continuing,
   onPress,
   styles,
 }) => (
   <Pressable
     onPress={onPress}
     style={({ pressed }) => [styles.startButton, pressed && { opacity: 0.8 }]}
+    accessibilityRole="button"
+    accessibilityLabel={continuing ? "Continue workout" : "Start workout"}
   >
-    <Text style={styles.startButtonText}>Start Workout</Text>
+    <Text style={styles.startButtonText}>{continuing ? "Continue Workout" : "Start Workout"}</Text>
   </Pressable>
 );
 
 // main Component
 export default function NextWorkoutCard({
   entryIssue,
+  hasActiveDraft = false,
   workout,
   onPressStart,
   onPressCalendar,
 }: NextWorkoutCardProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const [expandedWorkoutId, setExpandedWorkoutId] = useState<string | null>(null);
 
   if (!workout) return null;
-  // display first 3 exercise
-  const displayExercises = workout.exercises.slice(0, 3);
+  const expanded = expandedWorkoutId === workout.id;
+  const displayExercises = visibleWorkoutExercises(workout.exercises, expanded);
 
   // calculate remaining exercises
   const totalExercises = workout.exercises.length;
@@ -112,15 +118,35 @@ export default function NextWorkoutCard({
         />
 
         <View style={styles.exerciseList}>
-          {displayExercises.map((exercise, index) => (
-            <ExerciseRow key={index} exercise={exercise} styles={styles} />
+          {displayExercises.map((exercise) => (
+            <ExerciseRow key={exercise.id} exercise={exercise} styles={styles} />
           ))}
         </View>
 
-        {remainingCount > 0 && <MoreExercisesRow count={remainingCount} styles={styles} />}
+        {remainingCount > 0 && (
+          <Pressable
+            onPress={() => setExpandedWorkoutId((value) => value === workout.id ? null : workout.id)}
+            style={({ pressed }) => [styles.moreExercisesButton, pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityState={{ expanded }}
+            accessibilityLabel={expanded
+              ? "Show fewer exercises"
+              : `Show ${remainingCount} more exercise${remainingCount === 1 ? "" : "s"}`}
+            hitSlop={8}
+          >
+            <Text style={styles.moreExercises}>
+              {expanded
+                ? "Show fewer exercises"
+                : `Show ${remainingCount} more exercise${remainingCount === 1 ? "" : "s"}`}
+            </Text>
+            {expanded
+              ? <ChevronUp color={theme.white} size={18} />
+              : <ChevronDown color={theme.white} size={18} />}
+          </Pressable>
+        )}
 
         {entryIssue ? <Text style={styles.exercisePrescription}>{entryIssue}</Text>
-          : <StartWorkoutButton onPress={onPressStart} styles={styles} />}
+          : <StartWorkoutButton continuing={hasActiveDraft} onPress={onPressStart} styles={styles} />}
       </View>
     </View>
   );
@@ -213,13 +239,23 @@ function createStyles(theme: Theme) {
       opacity: 0.8,
       marginLeft: 12,
     },
+    moreExercisesButton: {
+      minHeight: 44,
+      flexDirection: "row",
+      alignItems: "center",
+      alignSelf: "flex-start",
+      gap: 6,
+      marginTop: 4,
+      marginBottom: 12,
+    },
     moreExercises: {
       color: theme.white,
       fontSize: 14,
       fontWeight: "500",
+      opacity: 0.85,
+    },
+    pressed: {
       opacity: 0.7,
-      marginTop: 8,
-      marginBottom: 20,
     },
     startButton: {
       backgroundColor: theme.white,

@@ -15,6 +15,7 @@ export interface WorkoutSet {
     reps: string;
     rpe: string;
     logged: boolean;
+    exerciseName?: string;
 }
 
 export interface Exercise {
@@ -27,15 +28,9 @@ export interface Exercise {
     muscleGroup?: MuscleGroup;
     imageUrl?: string;
     description?: string;
-    requiresRecalibration?: boolean;
     readOnly?: boolean;
     loadLabel?: string;
-    recalibration?: {
-        originalExerciseName: string;
-        completedOriginalSets: number[];
-        remainingReplacementSets: number[];
-        suggestedCopyLoad: number | null;
-    };
+    loadSuggestion?: string;
 }
 
 // ─── SetRow ───────────────────────────────────────────────────────────────────
@@ -67,7 +62,11 @@ const SetRow: React.FC<SetRowProps> = ({
     styles,
     theme,
 }) => (
-    <View style={[styles.setRow, set.logged && styles.setRowLogged]}>
+    <View>
+      {set.exerciseName && set.exerciseName !== exerciseName ? (
+        <Text style={styles.actualExerciseLabel}>Set {index + 1}: {set.exerciseName}</Text>
+      ) : null}
+      <View style={[styles.setRow, set.logged && styles.setRowLogged]}>
         <Text style={styles.setNumber}>{index + 1}</Text>
 
         <TextInput
@@ -128,6 +127,7 @@ const SetRow: React.FC<SetRowProps> = ({
                 color={set.logged ? theme.white : theme.placeholder}
             />
         </Pressable>
+      </View>
     </View>
 );
 
@@ -139,7 +139,6 @@ interface ExerciseCardProps {
     onToggleComplete: () => void;
     onPressHistory: () => void;
     onPressSwap: () => void;
-    onConfirmRecalibration?: () => void;
 }
 
 export default function ExerciseCard({
@@ -148,7 +147,6 @@ export default function ExerciseCard({
     onToggleComplete,
     onPressHistory,
     onPressSwap,
-    onConfirmRecalibration,
 }: ExerciseCardProps) {
     const { theme } = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
@@ -187,9 +185,7 @@ export default function ExerciseCard({
                             {exercise.name}
                         </Text>
                         <Text style={styles.prescription}>{exercise.prescription}</Text>
-                        {exercise.requiresRecalibration && (
-                            <Text style={styles.recalibrationText}>Action needed: choose replacement loads</Text>
-                        )}
+                        {exercise.loadSuggestion ? <Text style={styles.loadSuggestion}>{exercise.loadSuggestion}</Text> : null}
                     </View>
                 </View>
                 <View style={styles.actions}>
@@ -223,33 +219,6 @@ export default function ExerciseCard({
                     </Pressable>
                 </View>
             </View>
-            {exercise.requiresRecalibration && onConfirmRecalibration && (
-                <View style={styles.recalibrationPanel} accessibilityRole="summary">
-                    <Text style={styles.recalibrationExplanation}>
-                        {exercise.recalibration?.completedOriginalSets.length
-                            ? `Completed ${exercise.recalibration.completedOriginalSets.length === 1 ? 'set' : 'sets'} ${exercise.recalibration.completedOriginalSets.join(', ')} remain recorded under ${exercise.recalibration.originalExerciseName}. `
-                            : ''}
-                        {`Unlogged ${exercise.recalibration?.remainingReplacementSets.length === 1 ? 'set' : 'sets'} ${exercise.recalibration?.remainingReplacementSets.join(', ') ?? ''} need a load for ${exercise.name}. This changes only this workout; future prescriptions are separate.`}
-                    </Text>
-                    <Text style={styles.recalibrationHint}>You can enter a different load in each remaining set.</Text>
-                    <Pressable
-                        style={styles.recalibrationButton}
-                        onPress={onConfirmRecalibration}
-                        disabled={exercise.readOnly}
-                        accessibilityRole="button"
-                        accessibilityLabel={exercise.recalibration?.suggestedCopyLoad != null
-                            ? `Use ${exercise.recalibration?.suggestedCopyLoad} pounds for remaining replacement sets in this workout only`
-                            : `Confirm manually entered loads for remaining ${exercise.name} sets in this workout only`}
-                    >
-                        <Text style={styles.recalibrationButtonText}>
-                            {exercise.recalibration?.suggestedCopyLoad != null
-                                ? `Use ${exercise.recalibration?.suggestedCopyLoad} lb for remaining sets ${exercise.recalibration?.remainingReplacementSets.join(', ')}`
-                                : 'Confirm manually entered replacement loads'}
-                        </Text>
-                    </Pressable>
-                </View>
-            )}
-
             {showInfo && (
                 <ExerciseInfoPanel imageUrl={exercise.imageUrl} description={exercise.description} />
             )}
@@ -348,40 +317,17 @@ function createStyles(theme: Theme) {
             fontSize: 13,
             fontWeight: "500",
         },
-        recalibrationText: {
+        loadSuggestion: {
             color: theme.secondaryLight,
             fontSize: 12,
             fontWeight: "600",
             marginTop: 3,
         },
-        recalibrationButton: {
-            minHeight: 48,
-            borderRadius: 10,
-            borderWidth: 1,
-            borderColor: theme.secondaryLight,
-            alignItems: "center",
-            justifyContent: "center",
-            marginBottom: 10,
-            paddingHorizontal: 12,
-        },
-        recalibrationButtonText: { color: theme.textPrimary, fontSize: 13, fontWeight: "700" },
-        recalibrationPanel: {
-            borderWidth: 1,
-            borderColor: theme.border,
-            borderRadius: 14,
-            padding: 12,
-            marginBottom: 14,
-            gap: 8,
-        },
-        recalibrationExplanation: {
-            color: theme.textPrimary,
-            fontSize: 13,
-            lineHeight: 19,
-        },
-        recalibrationHint: {
+        actualExerciseLabel: {
             color: theme.text,
             fontSize: 12,
-            lineHeight: 18,
+            fontWeight: "600",
+            marginTop: 8,
         },
 
         actions: {

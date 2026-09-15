@@ -8,8 +8,6 @@ import { notifyPRCelebration } from "@/utils/notifications";
 import { createOperationId } from "@/features/kernel/operationId";
 import {
   amendWorkoutExercise,
-  applyWorkoutRecalibrationLoad,
-  confirmWorkoutRecalibration,
   createWorkoutDraft,
   updateWorkoutSet,
   validateWorkoutDraft,
@@ -25,6 +23,21 @@ import {
   type WorkoutRouteTarget,
 } from "@/features/workouts/routeResolution";
 import { workoutRepository } from "@/features/workouts/repository";
+import { reviseProgramExercise } from '@/features/programs/commands';
+import { programRepository } from '@/features/programs/repository';
+import {
+  clearPendingProgramExerciseRevision,
+  getOrCreatePendingProgramExerciseRevision,
+} from '@/features/programs/revisionStore';
+import {
+  type PendingWorkoutSwap,
+  workoutSwapOperationStore,
+} from '@/features/workouts/swapOperationStore';
+import {
+  isNoFutureWorkoutsDetail,
+  workoutOnlyReconciliationStep,
+  workoutSwapSyncDisposition,
+} from '@/features/workouts/swapRecovery';
 import { reportSupabaseFailure, supabaseUserMessage } from "@/utils/supabaseResilience";
 import { workoutEntryIssue } from '@/features/workouts/routeResolution';
 import { Ionicons } from "@expo/vector-icons";
@@ -54,19 +67,6 @@ function draftToExercises(draft: WorkoutDraft, workout?: ProgramWorkout): Exerci
     const current = workout?.exercises.find((exercise) => exercise.stableSlotId === slot.slotId);
     const frozen = draft.frozenPrescription.slots.find((candidate) => candidate.slotId === slot.slotId);
     const originalExerciseName = frozen?.exerciseName ?? current?.name ?? 'the original exercise';
-    const remainingReplacementSets = slot.sets
-      .filter((set) => !set.logged && set.actualExerciseId === slot.actualExerciseId)
-      .map((set) => set.order);
-    const completedOriginalSets = slot.sets
-      .filter((set) => set.logged && set.actualExerciseId === slot.prescribedExerciseId)
-      .map((set) => set.order);
-    const allLoadsUnconfirmed = slot.sets
-      .filter((set) => !set.logged && set.actualExerciseId === slot.actualExerciseId)
-      .every((set) => set.actualLoad === null);
-    const referenceLoadText = slot.sets.find(
-      (set) => !set.logged && set.actualExerciseId === slot.actualExerciseId && set.enteredLoadText.trim() !== '',
-    )?.enteredLoadText;
-    const referenceLoad = referenceLoadText === undefined ? null : Number(referenceLoadText);
     const firstSet = slot.sets[0];
     const frozenRepDisplay = firstSet
       ? firstSet.plannedRepsMin === firstSet.plannedRepsMax
@@ -92,17 +92,14 @@ function draftToExercises(draft: WorkoutDraft, workout?: ProgramWorkout): Exerci
         reps: set.enteredRepsText,
         rpe: set.enteredRpeText,
         logged: set.logged,
+        exerciseName: set.actualExerciseId === slot.actualExerciseId
+          ? slot.replacementExerciseName ?? current?.name ?? slot.exerciseName
+          : originalExerciseName,
       })),
       completed: slot.sets.length > 0 && slot.sets.every((set) => set.logged),
-      requiresRecalibration: slot.requiresRecalibration,
-      recalibration: slot.requiresRecalibration ? {
-        originalExerciseName,
-        completedOriginalSets,
-        remainingReplacementSets,
-        suggestedCopyLoad: allLoadsUnconfirmed && referenceLoad !== null && Number.isFinite(referenceLoad) && referenceLoad >= 0
-          ? referenceLoad
-          : null,
-      } : undefined,
+      loadSuggestion: slot.loadSuggestion
+        ? `Previous ${slot.loadSuggestion.kind === 'assistance' ? 'assistance' : 'load'} for this exercise: ${slot.loadSuggestion.value} ${slot.loadSuggestion.unit}`
+        : undefined,
     };
   });
 }
@@ -115,7 +112,7 @@ function formatTime(seconds: number): string {
 
 type WorkoutSwapResult = {
   currentDraft: 'saved';
-  futureProgram: 'not_requested' | 'revised' | 'failed';
+  futureProgram: 'not_requested' | 'updating' | 'revised' | 'failed';
   futureMessage?: string;
 };
 
@@ -191,7 +188,7 @@ export default function NextWorkoutScreen() {
     stableDayId?: string;
     programDayId?: string;
   }>();
-  const { program, loading, refresh, swapExercise, failureCategory } = useCurrentProgram();
+  const { program, loading, refresh, failureCategory } = useCurrentProgram();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const routeTarget = useMemo<WorkoutRouteTarget>(() => ({
@@ -218,7 +215,9 @@ export default function NextWorkoutScreen() {
   const [elapsed, setElapsed] = useState(0);
   const [showFinishModal, setShowFinishModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [programUpdating, setProgramUpdating] = useState(false);
   const [swapTargetId, setSwapTargetId] = useState<string | null>(null);
+  const [pendingSwap, setPendingSwap] = useState<PendingWorkoutSwap | null>(null);
   const [prExercises, setPrExercises] = useState<string[]>([]); // exercise names with new PRs
   const [showPrModal, setShowPrModal] = useState(false);
   const [historyExerciseId, setHistoryExerciseId] = useState<string | null>(
@@ -229,6 +228,8 @@ export default function NextWorkoutScreen() {
   );
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const persistQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const pendingSwapRef = useRef<PendingWorkoutSwap | null>(null);
+  const swapSyncGenerationRef = useRef(0);
   const hydratedTargetRef = useRef<string | null>(null);
   const resolutionTargetKey = useMemo(
     () => JSON.stringify([
@@ -241,6 +242,10 @@ export default function NextWorkoutScreen() {
     ]),
     [ownerId, routeTarget],
   );
+
+  useEffect(() => {
+    pendingSwapRef.current = pendingSwap;
+  }, [pendingSwap]);
 
   const persistDraft = (nextDraft: WorkoutDraft) => {
     const save = persistQueueRef.current
@@ -305,6 +310,17 @@ export default function NextWorkoutScreen() {
           setExercises(draftToExercises(stored, programWorkout ?? undefined));
           setWorkoutName(stored.workoutName);
           setResolutionError(null);
+          const recoveredSwap = await workoutSwapOperationStore.load(stored.ownerId, stored.draftId);
+          if (recoveredSwap && isNoFutureWorkoutsDetail(recoveredSwap.lastError)) {
+            await workoutSwapOperationStore.removeIfCurrent(
+              recoveredSwap.ownerId,
+              recoveredSwap.draftId,
+              recoveredSwap.pendingId,
+            );
+            if (!cancelled) setPendingSwap(null);
+          } else if (!cancelled) {
+            setPendingSwap(recoveredSwap);
+          }
           if (stored.lifecycle === 'finalized') setSyncMessage('This workout is already finalized.');
           return;
         }
@@ -436,18 +452,22 @@ export default function NextWorkoutScreen() {
     value: string | boolean,
   ) => {
     if (!draft || draft.finalizationEndedAt || saving) return;
-    const asNumber = (input: string): number | null => input.trim() === '' ? null : Number(input);
-    const update = field === 'weight'
-      ? { enteredLoadText: String(value), load: asNumber(String(value)) }
-      : field === 'reps'
-        ? { enteredRepsText: String(value), reps: asNumber(String(value)) }
-        : field === 'rpe'
-          ? { enteredRpeText: String(value), rpe: asNumber(String(value)) }
-          : { logged: Boolean(value), loggedAt: value ? new Date().toISOString() : null };
-    const nextDraft = updateWorkoutSet(draft, { setId, ...update });
-    setDraft(nextDraft);
-    setExercises(draftToExercises(nextDraft, programWorkout ?? undefined));
-    persistDraft(nextDraft);
+    try {
+      const asNumber = (input: string): number | null => input.trim() === '' ? null : Number(input);
+      const update = field === 'weight'
+        ? { enteredLoadText: String(value), load: asNumber(String(value)) }
+        : field === 'reps'
+          ? { enteredRepsText: String(value), reps: asNumber(String(value)) }
+          : field === 'rpe'
+            ? { enteredRpeText: String(value), rpe: asNumber(String(value)) }
+            : { logged: Boolean(value), loggedAt: value ? new Date().toISOString() : null };
+      const nextDraft = updateWorkoutSet(draft, { setId, ...update });
+      setDraft(nextDraft);
+      setExercises(draftToExercises(nextDraft, programWorkout ?? undefined));
+      persistDraft(nextDraft);
+    } catch (error) {
+      Alert.alert('Check this set', error instanceof Error ? error.message : 'Enter valid set details before logging it.');
+    }
   };
 
   const toggleExerciseComplete = (exerciseId: string) => {
@@ -455,60 +475,154 @@ export default function NextWorkoutScreen() {
     const slot = draft.slots.find((candidate) => candidate.slotId === exerciseId);
     if (!slot) return;
     const shouldLog = !slot.sets.every((set) => set.logged);
-    let nextDraft = draft;
-    for (const set of slot.sets) {
-      if (!set.actualReps || set.actualReps <= 0) continue;
-      nextDraft = updateWorkoutSet(nextDraft, {
-        setId: set.setId,
-        logged: shouldLog,
-        loggedAt: shouldLog ? new Date().toISOString() : null,
-      });
+    try {
+      let nextDraft = draft;
+      for (const set of slot.sets) {
+        if (!set.actualReps || set.actualReps <= 0) continue;
+        nextDraft = updateWorkoutSet(nextDraft, {
+          setId: set.setId,
+          logged: shouldLog,
+          loggedAt: shouldLog ? new Date().toISOString() : null,
+        });
+      }
+      setDraft(nextDraft);
+      setExercises(draftToExercises(nextDraft, programWorkout ?? undefined));
+      persistDraft(nextDraft);
+    } catch (error) {
+      Alert.alert('Check these sets', error instanceof Error ? error.message : 'Enter valid set details before logging them.');
     }
-    setDraft(nextDraft);
-    setExercises(draftToExercises(nextDraft, programWorkout ?? undefined));
-    persistDraft(nextDraft);
+  };
+
+  const setCurrentPendingSwap = (pending: PendingWorkoutSwap | null) => {
+    pendingSwapRef.current = pending;
+    setPendingSwap(pending);
+  };
+
+  const clearCurrentPendingSwap = async (pending: PendingWorkoutSwap): Promise<boolean> => {
+    const removed = await workoutSwapOperationStore.removeIfCurrent(
+      pending.ownerId,
+      pending.draftId,
+      pending.pendingId,
+    );
+    if (removed && pendingSwapRef.current?.pendingId === pending.pendingId) {
+      setCurrentPendingSwap(null);
+    }
+    return removed;
+  };
+
+  const handleUnexpectedSwapSyncFailure = async (
+    pending: PendingWorkoutSwap,
+    generation: number,
+    error: unknown,
+  ) => {
+    if (generation !== swapSyncGenerationRef.current
+      || pendingSwapRef.current?.pendingId !== pending.pendingId) return;
+    const failed = {
+      ...pending,
+      lastError: error instanceof Error ? error.message : 'Unexpected program update failure.',
+    };
+    if (await workoutSwapOperationStore.replaceIfCurrent(
+      pending.ownerId, pending.draftId, pending.pendingId, failed,
+    )) {
+      setCurrentPendingSwap(failed);
+      setSyncMessage('Workout swapped, but the program couldn’t be updated.');
+    }
+    setProgramUpdating(false);
+    reportSupabaseFailure('workout.swap_background', error);
+  };
+
+  const syncPendingProgramSwap = async (pending: PendingWorkoutSwap, generation: number) => {
+    const outcome = await reviseProgramExercise(programRepository, pending.ownerId, pending.request);
+    if (generation !== swapSyncGenerationRef.current
+      || pendingSwapRef.current?.pendingId !== pending.pendingId) return;
+    const disposition = workoutSwapSyncDisposition(outcome);
+    if (disposition.status === 'confirmed' || disposition.status === 'no_future_workouts') {
+      await clearCurrentPendingSwap(pending);
+      setSyncMessage('Exercise swapped for this workout.');
+      setProgramUpdating(false);
+      if (disposition.status === 'confirmed') void refresh();
+      return;
+    }
+    const failed = { ...pending, lastError: disposition.detail };
+    if (await workoutSwapOperationStore.replaceIfCurrent(
+      pending.ownerId,
+      pending.draftId,
+      pending.pendingId,
+      failed,
+    )) {
+      setCurrentPendingSwap(failed);
+      setSyncMessage('Workout swapped, but the program couldn’t be updated.');
+    }
+    setProgramUpdating(false);
+  };
+
+  const reconcileForWorkoutOnly = async (pending: PendingWorkoutSwap, generation: number) => {
+    const outcome = await reviseProgramExercise(programRepository, pending.ownerId, pending.request);
+    if (generation !== swapSyncGenerationRef.current
+      || pendingSwapRef.current?.pendingId !== pending.pendingId) return;
+    const step = workoutOnlyReconciliationStep(pending.mode, pending.request, outcome);
+    if (step.status === 'complete') {
+      await clearCurrentPendingSwap(pending);
+      setSyncMessage('Exercise swapped for this workout.');
+      setProgramUpdating(false);
+      if ('receipt' in outcome) void refresh();
+      return;
+    }
+    if (step.status === 'retry') {
+      const failed = { ...pending, lastError: step.detail };
+      if (await workoutSwapOperationStore.replaceIfCurrent(
+        pending.ownerId, pending.draftId, pending.pendingId, failed,
+      )) {
+        setCurrentPendingSwap(failed);
+        setSyncMessage('Workout swapped, but the program couldn’t be updated.');
+      }
+      setProgramUpdating(false);
+      return;
+    }
+    const reverseRequest = step.request;
+    await getOrCreatePendingProgramExerciseRevision(pending.ownerId, reverseRequest);
+    const compensation: PendingWorkoutSwap = {
+      ...pending,
+      request: reverseRequest,
+      mode: 'compensation',
+      lastError: null,
+    };
+    if (!await workoutSwapOperationStore.replaceIfCurrent(
+      pending.ownerId,
+      pending.draftId,
+      pending.pendingId,
+      compensation,
+    )) return;
+    setCurrentPendingSwap(compensation);
+    await reconcileForWorkoutOnly(compensation, generation);
   };
 
   const applyWorkoutSwap = async ({
     exerciseId,
     replacement,
-    applyToProgram,
+    scope,
   }: {
     exerciseId: string;
     replacement: ProgramWorkout["exercises"][number];
-    applyToProgram: boolean;
+    scope: 'workout_only' | 'rest_of_program';
   }): Promise<WorkoutSwapResult | null> => {
     if (!draft) throw new Error('Workout draft is unavailable.');
     if (draft.finalizationEndedAt || saving) throw new Error('Retry synchronization before changing this submitted workout.');
     const replacementExerciseId = replacement.exerciseId ?? replacement.id;
     const slot = draft.slots.find((candidate) => candidate.slotId === exerciseId);
     if (!slot || !replacementExerciseId) throw new Error('Replacement identity is unavailable.');
-    if (slot.sets.some((set) => set.logged)) {
-      const confirmed = await new Promise<boolean>((resolve) => {
-        Alert.alert(
-          'Recalibrate replacement?',
-          'Completed sets will stay with the original exercise. Unlogged replacement sets will have their load cleared for recalibration.',
-          [
-            { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-            { text: 'Swap and recalibrate', onPress: () => resolve(true) },
-          ],
-          { cancelable: true, onDismiss: () => resolve(false) },
-        );
-      });
-      if (!confirmed) return null;
+    if (slot.sets.every((set) => set.logged)) {
+      throw new Error('All sets for this exercise are already performed. Use Edit workout after finishing to correct history.');
     }
     const nextDraft = amendWorkoutExercise(draft, {
       slotId: exerciseId,
       replacementExerciseId,
       replacementName: replacement.name,
       amendedAt: new Date().toISOString(),
+      loadSuggestion: replacement.loadSuggestion,
+      replacementLoadKind: replacement.equipment === 'Bodyweight' ? 'bodyweight' : replacement.loadSuggestion?.kind,
     });
-    await persistDraft(nextDraft);
-    setDraft(nextDraft);
-    setExercises(draftToExercises(nextDraft, programWorkout ?? undefined));
-    setSyncMessage('Current workout swap saved on this device. Remaining replacement sets need explicit load confirmation.');
-
-    if (applyToProgram) {
+    if (scope === 'rest_of_program') {
       const activeWorkout = program?.workouts.find(
         (workout) => workout.stableDayId === draft.stableDayId,
       );
@@ -516,30 +630,103 @@ export default function NextWorkoutScreen() {
         (exercise) => exercise.stableSlotId === exerciseId || exercise.id === exerciseId,
       );
       if (!original) {
-        const message = 'The active program changed and no longer contains this stable exercise slot.';
-        setSyncMessage(`Current workout swap saved. Future program update failed: ${message}`);
-        return { currentDraft: 'saved', futureProgram: 'failed', futureMessage: message };
+        throw new Error('The active program changed and no longer contains this exercise.');
       }
+      const request = {
+        programId: program!.id,
+        expectedRevision: program!.currentRevision,
+        expectedRevisionId: program!.currentRevisionId!,
+        currentStableDayId: draft.stableDayId,
+        currentStableSlotId: slot.slotId,
+        originalExerciseId: original.exerciseId!,
+        replacementExerciseId,
+        scope: 'future_after_current' as const,
+      };
+      const pending: PendingWorkoutSwap = {
+        pendingId: createOperationId(),
+        ownerId: draft.ownerId,
+        draftId: draft.draftId,
+        slotId: slot.slotId,
+        request,
+        original,
+        replacement,
+        currentSavedAt: new Date().toISOString(),
+        lastError: null,
+        mode: 'program_update',
+      };
+      const programPending = await getOrCreatePendingProgramExerciseRevision(
+        pending.ownerId,
+        pending.request,
+      );
+      await workoutSwapOperationStore.save(pending);
       try {
-        await swapExercise({
-          exerciseId: original?.id ?? exerciseId,
-          replacement,
-          applyToProgram: true,
-          scope: 'future_after_current',
-        });
-        setSyncMessage('Current workout swap saved. A successor program revision updated future uncompleted prescriptions.');
-        return { currentDraft: 'saved', futureProgram: 'revised' };
+        await persistDraft(nextDraft);
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'The future program revision was not updated.';
-        setSyncMessage(`Current workout swap saved. Future program update failed: ${message}`);
-        Alert.alert(
-          'Current workout swapped',
-          `Saved for this workout. Your existing program remains usable, but future prescriptions were not changed. ${message}`,
-        );
-        return { currentDraft: 'saved', futureProgram: 'failed', futureMessage: message };
+        await Promise.all([
+          workoutSwapOperationStore.removeIfCurrent(
+            pending.ownerId, pending.draftId, pending.pendingId,
+          ),
+          clearPendingProgramExerciseRevision(
+            pending.ownerId, pending.request, programPending.operationId,
+          ),
+        ]);
+        throw error;
       }
+      setDraft(nextDraft);
+      setExercises(draftToExercises(nextDraft, programWorkout ?? undefined));
+      setCurrentPendingSwap(pending);
+      setProgramUpdating(true);
+      setSyncMessage('Updating program…');
+      const generation = swapSyncGenerationRef.current + 1;
+      swapSyncGenerationRef.current = generation;
+      void syncPendingProgramSwap(pending, generation).catch(
+        (error) => handleUnexpectedSwapSyncFailure(pending, generation, error),
+      );
+      return { currentDraft: 'saved', futureProgram: 'updating' };
+    }
+    const earlierPending = pendingSwapRef.current;
+    await persistDraft(nextDraft);
+    setDraft(nextDraft);
+    setExercises(draftToExercises(nextDraft, programWorkout ?? undefined));
+    setSyncMessage('Exercise swapped for this workout.');
+    if (earlierPending) {
+      setProgramUpdating(true);
+      setSyncMessage('Updating program…');
+      const generation = swapSyncGenerationRef.current + 1;
+      swapSyncGenerationRef.current = generation;
+      void reconcileForWorkoutOnly(earlierPending, generation).catch(
+        (error) => handleUnexpectedSwapSyncFailure(earlierPending, generation, error),
+      );
     }
     return { currentDraft: 'saved', futureProgram: 'not_requested' };
+  };
+
+  const retryPendingSwap = async () => {
+    if (!pendingSwap || !ownerId || pendingSwap.ownerId !== ownerId) return;
+    setProgramUpdating(true);
+    setSyncMessage('Updating program…');
+    const generation = swapSyncGenerationRef.current + 1;
+    swapSyncGenerationRef.current = generation;
+    if (pendingSwap.mode === 'compensation') {
+      void reconcileForWorkoutOnly(pendingSwap, generation).catch(
+        (error) => handleUnexpectedSwapSyncFailure(pendingSwap, generation, error),
+      );
+    } else {
+      void syncPendingProgramSwap(pendingSwap, generation).catch(
+        (error) => handleUnexpectedSwapSyncFailure(pendingSwap, generation, error),
+      );
+    }
+  };
+
+  const keepThisWorkoutOnly = async () => {
+    if (!pendingSwap || !ownerId || pendingSwap.ownerId !== ownerId) return;
+    setProgramUpdating(true);
+    setSyncMessage('Updating program…');
+    const generation = swapSyncGenerationRef.current + 1;
+    swapSyncGenerationRef.current = generation;
+    void reconcileForWorkoutOnly(pendingSwap, generation).catch(
+      (error) => handleUnexpectedSwapSyncFailure(pendingSwap, generation, error),
+    );
   };
 
   const handleFinish = async () => {
@@ -634,6 +821,7 @@ export default function NextWorkoutScreen() {
               weight_lb: bestWeight,
               reps: bestReps,
               achieved_at: new Date().toISOString(),
+              session_id: receipt.sessionId,
             });
             if (prInsertErr) {
               console.warn(`[PR] Insert failed for ${ex.name}:`, prInsertErr.message);
@@ -773,6 +961,19 @@ export default function NextWorkoutScreen() {
               <Text style={styles.syncBannerText}>{syncMessage}</Text>
             </View>
           )}
+          {pendingSwap && !programUpdating ? (
+            <View style={styles.pendingSwapActions} accessibilityRole="summary">
+              <Text style={styles.syncBannerText}>Workout swapped, but the program couldn’t be updated.</Text>
+              <View style={styles.unavailableActions}>
+                <Pressable style={styles.secondaryButton} onPress={() => void retryPendingSwap()} disabled={programUpdating}>
+                  <Text style={styles.secondaryButtonText}>Retry</Text>
+                </Pressable>
+                <Pressable style={styles.secondaryButton} onPress={() => void keepThisWorkoutOnly()} disabled={programUpdating}>
+                  <Text style={styles.secondaryButtonText}>Keep workout only</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
           {exercises.map((exercise) => (
             <ExerciseCard
               key={exercise.id}
@@ -781,21 +982,6 @@ export default function NextWorkoutScreen() {
                 updateSet(exercise.id, setId, field, value)
               }
               onToggleComplete={() => toggleExerciseComplete(exercise.id)}
-              onConfirmRecalibration={() => {
-                if (!draft) return;
-                try {
-                  const copyLoad = exercise.recalibration?.suggestedCopyLoad;
-                  const nextDraft = copyLoad !== null && copyLoad !== undefined
-                    ? applyWorkoutRecalibrationLoad(draft, exercise.id, copyLoad)
-                    : confirmWorkoutRecalibration(draft, exercise.id);
-                  setDraft(nextDraft);
-                  setExercises(draftToExercises(nextDraft, programWorkout ?? undefined));
-                  persistDraft(nextDraft);
-                  setSyncMessage('Replacement loads confirmed for the remaining sets in this workout only.');
-                } catch (error) {
-                  Alert.alert('Recalibration needed', error instanceof Error ? error.message : 'Enter a replacement load first.');
-                }
-              }}
               onPressHistory={() => {
                 setHistoryExerciseId(exercise.exerciseId ?? null);
                 setHistoryExerciseName(exercise.name);
@@ -807,16 +993,20 @@ export default function NextWorkoutScreen() {
           <Pressable
             style={({ pressed }) => [
               styles.finishButton,
-              !canFinishWorkout && styles.finishButtonDisabled,
-              pressed && canFinishWorkout && { opacity: 0.85 },
+              !canFinishWorkout && draft?.lifecycle !== 'finalized' && styles.finishButtonDisabled,
+              pressed && (canFinishWorkout || draft?.lifecycle === 'finalized') && { opacity: 0.85 },
             ]}
-            onPress={() => canFinishWorkout && setShowFinishModal(true)}
-            disabled={!canFinishWorkout}
+            onPress={() => {
+              if (draft?.lifecycle === 'finalized' && draft.finalizedReceipt?.sessionId) {
+                router.push({ pathname: '/edit-workout', params: { sessionId: draft.finalizedReceipt.sessionId } });
+              } else if (canFinishWorkout) setShowFinishModal(true);
+            }}
+            disabled={!canFinishWorkout && draft?.lifecycle !== 'finalized'}
             accessibilityRole="button"
-            accessibilityLabel={draft?.lifecycle === 'finalized' ? 'Workout already finalized' : 'Finish workout'}
+            accessibilityLabel={draft?.lifecycle === 'finalized' ? 'Edit completed workout' : 'Finish workout'}
           >
             <Text style={styles.finishButtonText}>
-              {draft?.lifecycle === 'finalized' ? 'Workout Finalized' : draft?.finalizationEndedAt ? 'Retry Sync' : 'Finish Workout'}
+              {draft?.lifecycle === 'finalized' ? 'Edit workout' : draft?.finalizationEndedAt ? 'Retry Sync' : 'Finish Workout'}
             </Text>
           </Pressable>
         </ScrollView>
@@ -1024,6 +1214,15 @@ function createStyles(theme: Theme) {
       marginBottom: 10,
     },
     syncBannerText: { color: theme.text, fontSize: 13, lineHeight: 18 },
+    pendingSwapActions: {
+      backgroundColor: theme.cardBg,
+      borderColor: theme.secondaryLight,
+      borderWidth: 1,
+      borderRadius: 12,
+      padding: 12,
+      gap: 10,
+      marginBottom: 10,
+    },
     finishButton: {
       backgroundColor: theme.primary,
       borderRadius: 18,

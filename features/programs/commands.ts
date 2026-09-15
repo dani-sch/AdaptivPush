@@ -110,6 +110,9 @@ export async function executeProgramExerciseRevision(
     if (message.toLowerCase().includes('stale_revision')) {
       return { status: 'conflict', message: 'Your active program changed on another device. Refresh and try again.' };
     }
+    if (message.toLowerCase().includes('no eligible future uncompleted prescriptions')) {
+      return { status: 'no_change', reason: 'no_future_workouts' };
+    }
     reportSupabaseFailure('program.revise_exercise', error);
     return { status: 'unavailable', failure: classifySupabaseError(error), message: supabaseUserMessage(error, 'The future program update could not be confirmed. Keep your draft and retry to reconcile the same request.') };
   }
@@ -122,7 +125,8 @@ export async function reviseProgramExercise(
 ): Promise<ProgramExerciseRevisionOutcome> {
   const pending = await getOrCreatePendingProgramExerciseRevision(ownerId, request);
   const outcome = await executeProgramExerciseRevision(repository, pending.operationId, request);
-  if (outcome.status === 'revised' || outcome.status === 'replay') {
+  if (outcome.status === 'revised' || outcome.status === 'replay'
+    || outcome.status === 'no_change' || outcome.status === 'validation' || outcome.status === 'conflict') {
     await clearPendingProgramExerciseRevision(ownerId, request, pending.operationId);
   }
   return outcome;

@@ -12,7 +12,11 @@ import { workoutEntryIssue } from '@/features/workouts/routeResolution';
 type Props = {
     workout: ProgramWorkout;
     program: CurrentProgram;
-    onSwapExercise: (args: { exerciseId: string; replacement: WorkoutExercise; applyToProgram: boolean }) => unknown | Promise<unknown>;
+    onSwapExercise: (args: {
+        exerciseId: string;
+        replacement: WorkoutExercise;
+        scope: 'workout_only' | 'rest_of_program';
+    }) => unknown | Promise<unknown>;
     onClose: () => void;
     onStart: () => void;
 };
