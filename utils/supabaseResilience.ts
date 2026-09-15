@@ -254,7 +254,9 @@ export function supabaseSaveFailureMessage(error: unknown, completedSteps = 0): 
   const base = supabaseUserMessage(error, 'Unable to save your changes. Please try again.');
   return completedSteps > 0
     ? `${base} Some settings may already have saved; retry to reconcile them.`
-    : `${base} Your unsaved changes are still here.`;
+    : /(?:unsaved )?changes are still here\./i.test(base)
+      ? base
+      : `${base} Your unsaved changes are still here.`;
 }
 
 export interface SupabaseDiagnostic {
