@@ -114,6 +114,7 @@ function useCurrentProgramState() {
     const [unavailable, setUnavailable] = useState(false);
     const [failureCategory, setFailureCategory] = useState<SupabaseFailureCategory | null>(null);
     const [actionError, setActionError] = useState<string | null>(null);
+    const [ownerId, setOwnerId] = useState<string | null>(null);
 
     const prevWeekRef = useRef<number>(0);
     const applyProgressionRef = useRef<(() => Promise<void>) | undefined>(undefined);
@@ -149,6 +150,7 @@ function useCurrentProgramState() {
             const user = session?.user;
             if (!user) {
                 ownerIdRef.current = null;
+                setOwnerId(null);
                 setProgram(null);
                 programRef.current = null;
                 setUnavailable(false);
@@ -156,6 +158,7 @@ function useCurrentProgramState() {
                 return;
             }
             const requestOwnerId = user.id;
+            setOwnerId(requestOwnerId);
             if (ownerIdRef.current !== requestOwnerId) {
                 ownerIdRef.current = requestOwnerId;
                 programRef.current = null;
@@ -520,6 +523,7 @@ function useCurrentProgramState() {
             if (nextOwnerId === ownerIdRef.current) return;
             refreshControllerRef.current?.abort();
             ownerIdRef.current = nextOwnerId;
+            setOwnerId(nextOwnerId);
             programRef.current = null;
             setProgram(null);
             setUnavailable(false);
@@ -1080,6 +1084,7 @@ function useCurrentProgramState() {
         failureCategory,
         availabilityMessage,
         actionError,
+        ownerId,
         refresh,
         retry: refresh,
         swapExercise,
