@@ -159,8 +159,9 @@ export default function EditWorkoutScreen() {
           onPressSwap={() => {}}
           onAddSet={editing ? () => {
             const prior = exercise.sets.at(-1);
-            if (!prior) return;
             setExercises(current => current.map(e => e.slotId !== exercise.slotId ? e : { ...e, sets: [...e.sets, {
+              prescriptionSlotId: prior?.prescriptionSlotId ?? null, prescribedExerciseId: prior?.prescribedExerciseId ?? null,
+              exerciseId: exercise.exerciseId, reps: 0, loadValue: null, loadUnit: 'none', loadKind: 'unknown', loadSide: 'unknown', rpe: null,
               ...prior, actualSetId: createOperationId(), order: Math.max(0, ...e.sets.map(s => s.order)) + 1,
               prescribed: false, outcome: 'not_attempted', loadText: '', repsText: '', rpeText: '', loggedAt: '',
             }] }));

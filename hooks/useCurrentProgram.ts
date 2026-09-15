@@ -678,9 +678,9 @@ function useCurrentProgramState() {
                 let perSetWeightsLb: number[] | null = null;
                 let newUniformWeight: number;
 
-                if (lastSessionSets.length === 0) {
-                    // No data — hold
-                    newUniformWeight = baselineWeight;
+                if (lastSessionSets.length === 0 || !fullCoverage) {
+                    // Missing required work holds the existing recommendation, including after correction.
+                    newUniformWeight = pde.suggested_weight_lb ?? baselineWeight;
                 } else if (allHitMax) {
                     // Every set hit repMax with good RPE → increase weight
                     newUniformWeight = Math.max(0, Math.round((baselineWeight + increment) / 2.5) * 2.5);

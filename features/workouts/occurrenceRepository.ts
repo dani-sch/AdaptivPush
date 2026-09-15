@@ -5,6 +5,13 @@ import { classifySupabaseError } from '@/utils/supabaseResilience';
 
 export const CORRECTIONS_UNAVAILABLE = 'This workout can be viewed, but updates are temporarily unavailable.';
 
+export async function workoutCorrectionsAvailable(client: SupabaseClient): Promise<boolean> {
+  const capability = await client.rpc('workout_correction_capability_v1');
+  if (!capability.error) return capability.data === 2;
+  if (classifySupabaseError(capability.error).category !== 'schema_unavailable') console.warn('[workout.capability]', capability.error.code);
+  return false;
+}
+
 export async function loadCompletedWorkout(client: SupabaseClient, ownerId: string, sessionId: string) {
   // Read stable columns first: an undeployed correction column must never hide history.
   const { data: session, error } = await client.from('workout_sessions').select('*')
@@ -14,14 +21,8 @@ export async function loadCompletedWorkout(client: SupabaseClient, ownerId: stri
   const { data: rows, error: setsError } = await client.from('workout_exercise_sets')
     .select('*').eq('session_id', sessionId).order('set_number');
   if (setsError) throw setsError;
-  let canCorrect = false;
   // A read-only capability function confirms the RPC and snapshot-outcome contract together.
-  const capability = await client.rpc('workout_correction_capability_v1');
-  if (!capability.error) canCorrect = capability.data === 2 && session.correction_revision !== undefined && session.lifecycle === 'finalized';
-  else if (classifySupabaseError(capability.error).category !== 'schema_unavailable') {
-    // History remains readable during a capability/network failure.
-    console.warn('[workout.capability]', capability.error.code);
-  }
+  const canCorrect = await workoutCorrectionsAvailable(client) && session.correction_revision !== undefined && session.lifecycle === 'finalized';
   const sets: CompletedWorkoutSetCorrection[] = (rows ?? []).map(row => ({
     actualSetId: row.actual_set_id ?? row.id, prescriptionSlotId: row.prescription_slot_id ?? null,
     prescribedExerciseId: row.prescribed_exercise_id ?? null, exerciseId: row.exercise_id,

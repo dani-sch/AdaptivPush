@@ -8,6 +8,7 @@ import {
   workoutRouteParamsForDraft,
 } from '../../features/workouts/effectiveCurrentWorkout';
 import type { CurrentProgram } from '../../types/program';
+import { draftToExercises } from '../../features/workouts/workoutPresentation';
 
 const ownerId = '10000000-0000-4000-8000-000000000001';
 const programId = '20000000-0000-4000-8000-000000000001';
@@ -110,4 +111,17 @@ test('Continue Workout routes to the exact existing draft identity', () => {
     stableDayId,
     programDayId,
   });
+});
+
+test('Home and Plan shared projection agrees with active cards after repeated swaps and finalization', () => {
+  let draft = activeDraft();
+  for (const [id, name] of [[replacementExerciseId, 'Decline'], ['70000000-0000-4000-8000-000000000003', 'Incline']]) {
+    draft = amendWorkoutExercise(draft, { slotId: stableSlotId, replacementExerciseId: id, replacementName: name, amendedAt: '' });
+    const projection = effectiveCurrentWorkout(program, program.workouts[0], ownerId, draft)!;
+    assert.equal(projection.exercises[0].name, draftToExercises(draft)[0].name);
+    assert.equal(projection.exercises[0].stableSlotId, stableSlotId);
+  }
+  const finalized = { ...draft, lifecycle: 'finalized' as const };
+  assert.equal(effectiveCurrentWorkout(program, program.workouts[0], ownerId, finalized)?.exercises[0].name, 'Incline');
+  assert.equal(matchingActiveWorkoutDraft(program, program.workouts[0], ownerId, finalized), null);
 });

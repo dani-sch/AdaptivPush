@@ -1,3 +1,4 @@
+import { workoutCorrectionsAvailable } from '@/features/workouts/occurrenceRepository';
 import { occurrenceAction, occurrenceState } from '@/features/workouts/effectiveOccurrence';
 import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
@@ -612,6 +613,7 @@ export default function HomeScreen() {
   >(null);
   const [swapNudgeDismissed, setSwapNudgeDismissed] = useState(false);
 
+  const [canCorrectWorkout, setCanCorrectWorkout] = useState(false);
   const [lastWorkoutId, setLastWorkoutId] = useState<string | null>(null);
   const [lastWorkoutDate, setLastWorkoutDate] = useState<string | null>(null);
   const [loadedDraft, setLoadedDraft] = useState<WorkoutDraft | null>(null);
@@ -644,6 +646,9 @@ export default function HomeScreen() {
       );
       if (error) throw error;
       if (signal.aborted) return;
+      const canCorrect = await workoutCorrectionsAvailable(supabase);
+      if (signal.aborted) return;
+      setCanCorrectWorkout(canCorrect);
       setLastWorkoutId(data?.id ?? null);
       if (data?.ended_at) {
         const formatted = new Date(data.ended_at).toLocaleDateString(undefined, {
@@ -875,7 +880,7 @@ export default function HomeScreen() {
           </>
         ) : (
           <NextWorkoutSection
-            actionLabel={occurrenceAction(homeState)}
+            actionLabel={occurrenceAction(homeState, canCorrectWorkout)}
             entryIssue={workoutEntryIssue(program, nextWorkout ?? null)}
             hasActiveDraft={activeDraft !== null}
             workout={nextWorkoutSummary}
@@ -883,7 +888,7 @@ export default function HomeScreen() {
           />
         )}
         {lastWorkoutId ? <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/edit-workout', params: { sessionId: lastWorkoutId } })} style={{ padding: 16 }}>
-          <Text style={{ color: theme.primary, fontWeight: '700' }}>Last Workout · {lastWorkoutDate} · View or Update Workout</Text>
+          <Text style={{ color: theme.primary, fontWeight: '700' }}>Last Workout · {lastWorkoutDate} · {occurrenceAction('finalized', canCorrectWorkout)}</Text>
         </Pressable> : null}
         <StatsRow
           readiness={readinessScore ?? '--'}

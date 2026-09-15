@@ -247,13 +247,17 @@ SELECT set_config(
 );
 
 DO $assert_workout$
-DECLARE replay jsonb;
+DECLARE replay jsonb; duplicate_denied boolean := false;
 BEGIN
   replay := public.finalize_workout_v2(current_setting('adaptivpush.workout_payload')::jsonb);
   IF replay->>'sessionId' <> (current_setting('adaptivpush.workout_receipt_1')::jsonb->>'sessionId')
      OR (replay->>'replayed')::boolean IS NOT TRUE THEN
     RAISE EXCEPTION 'response-loss replay did not return original workout receipt';
   END IF;
+  BEGIN
+    PERFORM public.finalize_workout_v2(jsonb_set(current_setting('adaptivpush.workout_payload')::jsonb, '{operationId}', to_jsonb(gen_random_uuid())));
+  EXCEPTION WHEN OTHERS THEN duplicate_denied := SQLERRM LIKE '%already finalized%'; END;
+  IF NOT duplicate_denied THEN RAISE EXCEPTION 'different operation duplicated finalized occurrence'; END IF;
   IF (SELECT count(*) FROM public.workout_sessions WHERE operation_id=current_setting('adaptivpush.workout_op_1')::uuid) <> 1
      OR (SELECT count(*) FROM public.workout_exercise_sets WHERE session_id=(replay->>'sessionId')::uuid) <> 1 THEN
     RAISE EXCEPTION 'workout replay duplicated session or sets';
