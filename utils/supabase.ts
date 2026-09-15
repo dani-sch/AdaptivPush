@@ -8,6 +8,13 @@ import { resilientSupabaseFetch } from '@/utils/supabaseResilience'
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!
 const supabaseAuthStorageKey = `sb-${new URL(supabaseUrl).hostname.split('.')[0]}-auth-token`
+const supabaseAuthStorage = typeof window === 'undefined'
+  ? {
+      getItem: async () => null,
+      setItem: async () => undefined,
+      removeItem: async () => undefined,
+    }
+  : AsyncStorage
 
 export const supabase = createClient(
   supabaseUrl,
@@ -17,7 +24,7 @@ export const supabase = createClient(
       fetch: resilientSupabaseFetch,
     },
     auth: {
-      storage: AsyncStorage,
+      storage: supabaseAuthStorage,
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: false,
