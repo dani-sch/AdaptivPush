@@ -24,3 +24,7 @@
 ## Current execution lane
 
 Use bounded Expo/TypeScript/Supabase AP slices from the [register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md). AP-02/AP-03 are deployed and technically verified with both normal Expo writers enabled. The user's authorization replaces earlier pre-migration local/manual/signing gates. Existing-account acceptance now uses `npm start` and its ordinary QR. [Current evidence](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md) owns recovery, migrations and remaining phone/empty-legacy-day limitations. AP-04/AP-05 remain outside this task.
+
+## Current local extension
+
+The September 15 lifecycle extension is locally verified: stable-slot occurrence projection, repeatable scoped swaps, explicit performed/skipped/not-attempted outcomes, partial finalization, shared completed workout cards and capability-aware corrections. Migrations `20260915190000` and `20260915210000` are local-only. [Lifecycle evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-LIFECYCLE-2026-09-15.md) records the exact checks and outstanding authenticated/device acceptance. Missing required work holds progression; broader AP-04 scheduling and AP-05 progression authority remain queued.

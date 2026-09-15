@@ -10,7 +10,7 @@ The local SQL extension anchors repeated future swaps to original stable slot li
 
 Progression is conservative: incomplete/unknown required work holds the existing next load suggestion; it cannot earn an increase merely because every logged set succeeded. Skipped/unattempted work contributes neither volume nor records. No new repeated-partial adaptation algorithm or progression worker is introduced. Corrections recompute completion/volume/records and invalidate the existing progression/analytics receipt effects; subsequent policy evaluation reads corrected evidence. AP-05's broader progression authority remains queued.
 
-Both `20260915190000_workout_swap_scope_and_completed_corrections.sql` (modified, still unhosted) and `20260915210000_effective_workout_occurrences.sql` (new) remain **local-only**. No hosted write, deployment or push was authorized or performed. Authenticated end-to-end and physical iPhone acceptance remain open. [Verification and file inventory](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-LIFECYCLE-2026-09-15.md).
+Both `20260915190000_workout_swap_scope_and_completed_corrections.sql` (modified, still unhosted) and `20260915210000_effective_workout_occurrences.sql` (new) remain **local-only**. No hosted write or deployment was performed for these migrations. The current documentation closeout authorizes commits and publication in draft PR #56; it does not authorize deploying these migrations. Authenticated end-to-end and physical iPhone acceptance remain open. [Verification and file inventory](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-LIFECYCLE-2026-09-15.md).
 
 ## Existing hosted AP-02/AP-03 boundary
 

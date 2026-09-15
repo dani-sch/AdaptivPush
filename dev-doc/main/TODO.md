@@ -1,5 +1,11 @@
 # AdaptivPush active task board
 
+## [CURRENT] Resume from the preserved September 15 implementation
+
+- [COMPLETE] Reconcile the master plan, register, code status, database, traceability, research scope and living summaries with the hosted rollout and latest local workout lifecycle. Approved decisions and later-slice order remain unchanged.
+- [CURRENT] Continue the unified workout lifecycle acceptance below. Preserve stable day/slot identity, exact retry operations, performed-set history, explicit partial outcomes, shared completed cards and capability-aware corrections. Do not restart AP-01 inspection or rebuild the existing atomic persistence modules.
+- [OPEN] Finish authenticated and physical iPhone acceptance; separately authorize and verify the two local-only migrations before hosted rollout. Git publication in draft PR #56 does not deploy them.
+
 ## [COMPLETE] Documentation consolidation
 
 - [COMPLETE] Inventory 61 source documents and preserve 12 superseded authorities plus 12 prior operational snapshots.

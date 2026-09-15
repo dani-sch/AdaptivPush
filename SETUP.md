@@ -1,5 +1,13 @@
 # AdaptivPush Senior Project
 
+## Current project workflow
+
+Read [current state](/dev-doc/main/CURRENT-STATE.md) and [TODO](/dev-doc/main/TODO.md) before changing code. Use `npm ci` for the committed dependency lockfile and `npm start` for the ordinary Expo Go QR. The existing local environment enabled the hosted AP-02/AP-03 writers; environment values and credentials are intentionally untracked. A fresh checkout must configure its own public Supabase client settings and explicit writer flags; absent flags fail closed.
+
+The September 15 swap/correction/occurrence migrations are local-only. Starting Expo or publishing a draft PR does not deploy them. Follow the [database plan](/dev-doc/plans/active/ADAPTIVPUSH-DATABASE-PLAN.md) for the separate rollout boundary.
+
+For work on this repository, use a feature branch against `origin/main`, run the relevant package test scripts plus TypeScript/lint, integrate through the configured `integrator`, and push a draft PR. Never push directly to `main` or force-push. The older general setup walkthrough below is installation background, not release authority.
+
 ## Expo App Setup Instructions - (Contact Nicole with any questions)
 
 To setup your computer to work on this project you're going to need a couple of things:
