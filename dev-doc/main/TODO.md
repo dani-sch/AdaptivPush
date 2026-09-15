@@ -52,6 +52,10 @@ The user's September 15 authorization replaces earlier pre-migration local/manua
 
 ## [LOCAL VERIFIED; HOSTED ROLLOUT NOT AUTHORIZED] Scoped swaps and completed-workout corrections
 
+- [COMPLETE] Make a matching active draft authoritative on Home, display Continue Workout, route to the exact draft, and add accessible exercise expansion/collapse.
+- [COMPLETE] Virtualize and memoize replacement rows, keep selection ID-only, prefetch optional history off the Apply path, add development-only interaction marks, and guard duplicate taps.
+- [COMPLETE] Treat no-future-workouts as deterministic success, keep exact response-loss recovery, safely compensate a confirmed superseded wider request, and replace internal synchronization language with user-focused copy.
+- [LOCAL VERIFIED] Strict TypeScript, lint with three pre-existing warnings, 60 combined tests, 10 focused repair cases, diff check, normal Expo startup and unauthenticated browser smoke. Physical-iPhone p95 and authenticated acceptance remain open.
 - [COMPLETE] Use the same replacement -> scope -> Apply swap flow from workout and program entry points, defaulting to This workout only.
 - [COMPLETE] Persist selected-occurrence overrides without direct prescription mutation; keep logged-set identity/load fixed and apply rest-of-program changes only to remaining and later uncompleted work.
 - [COMPLETE] Persist partial/uncertain swap state with accurate local/remote/pending copy, Retry and Keep this workout only recovery.

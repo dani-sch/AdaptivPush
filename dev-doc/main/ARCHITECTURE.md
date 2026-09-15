@@ -10,6 +10,7 @@
 | Generator | `utils/programGenerator.ts`, `constants/programDefaults.ts`, `lib/exerciseDatabase.ts` | Local fixed splits/random choices and heuristic loads; AP-06/07 |
 | Program persistence | `utils/saveProgramToDb.ts`, `app/create-program.tsx` | Client multiwrites; existing user fix protects context failure only; AP-01/03 |
 | Capture/history | `app/next-workout.tsx`, `utils/fetchExerciseHistory.ts`, history UI | Session precedes sets; mixed-history fallback and identity gaps; AP-02/05 |
+| Current workout projection and swap recovery | `features/workouts/effectiveCurrentWorkout.ts`, `draftStore.ts`, `swapOperationStore.ts`, `swapRecovery.ts` | Owner/program/stable-day matching makes an active draft authoritative on Home and entry; durable wider-scope recovery remains local until the correction migration is authorized and hosted. |
 | Readiness/cycle | Home/Workout, `utils/progressionEngine.ts`, `utils/cyclePhase.ts` | Independent hidden overlay and calendar effects; AP-08/09 |
 | Preferences | `utils/profilePreferences.ts`, `types/database.ts` | Table/metadata compatibility, richer event scaffold not a workflow; AP-01/08 |
 | Theme/evidence | `contexts/ThemeContext.tsx`, theme/palette constants, `types/evidence.ts`, `constants/evidenceRegistry.ts` | Local themes work; evidence consumer/paid package workflow incomplete; AP-05/13 |
