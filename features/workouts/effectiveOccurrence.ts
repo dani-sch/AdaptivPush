@@ -4,6 +4,10 @@ import type { CompletedWorkoutSetCorrection } from './correctionContracts';
 export type WorkoutMode = 'in_progress' | 'completed_view' | 'completed_edit';
 export type OccurrenceState = 'unstarted' | 'in_progress' | 'pending_sync' | 'finalized';
 
+export function isPrescriptionFulfilled(completionClass?: string): boolean {
+  return completionClass === 'complete' || completionClass === 'reduced';
+}
+
 export function occurrenceState(draft: WorkoutDraft | null, sessionId?: string): OccurrenceState {
   if (sessionId || draft?.finalizedReceipt || draft?.lifecycle === 'finalized') return 'finalized';
   if (draft?.finalizationEndedAt) return 'pending_sync';

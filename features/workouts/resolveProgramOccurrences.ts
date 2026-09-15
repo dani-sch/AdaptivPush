@@ -2,7 +2,7 @@ import type { CurrentProgram, ProgramWorkout } from '@/types/program';
 import type { FrozenWorkoutPrescription } from './contracts';
 import { workoutDraftStore } from './draftStore';
 import { effectiveCurrentWorkout } from './effectiveCurrentWorkout';
-import { projectCompletedOccurrence } from './effectiveOccurrence';
+import { isPrescriptionFulfilled, projectCompletedOccurrence } from './effectiveOccurrence';
 import { supabase } from '@/utils/supabase';
 
 /** One reconciliation boundary for Home, Plan and full-program previews. */
@@ -20,7 +20,8 @@ export async function resolveProgramOccurrences(program: CurrentProgram, ownerId
     if (session) {
       const snapshot = session.prescription_snapshot as FrozenWorkoutPrescription | null;
       const projected = projectCompletedOccurrence(snapshot, []);
-      return { ...workout, isCompleted: true, sessionId: session.id,
+      return { ...workout, isFinalized: true, completionClass: session.completion_class,
+        isCompleted: isPrescriptionFulfilled(session.completion_class), sessionId: session.id,
         exercises: projected.missingPrescription ? workout.exercises : projected.exercises.map(e => ({
           id: e.slotId, stableSlotId: e.slotId, exerciseId: e.exerciseId, name: e.name,
           sets: e.sets.length, reps: snapshot?.slots.find(s => s.slotId === e.slotId)?.sets[0]
@@ -32,7 +33,9 @@ export async function resolveProgramOccurrences(program: CurrentProgram, ownerId
       programId: program.id, stableDayId: workout.stableDayId, programDayId: workout.id,
     });
     return { ...effectiveCurrentWorkout(program, workout, ownerId, draft)!,
-      isCompleted: draft?.lifecycle === 'finalized' || workout.isCompleted,
+      isFinalized: draft?.lifecycle === 'finalized' || workout.isFinalized,
+      completionClass: draft?.finalizedReceipt?.completionClass ?? workout.completionClass,
+      isCompleted: draft?.finalizedReceipt ? isPrescriptionFulfilled(draft.finalizedReceipt.completionClass) : workout.isCompleted,
       sessionId: draft?.finalizedReceipt?.sessionId };
   }));
   return { ...program, workouts };

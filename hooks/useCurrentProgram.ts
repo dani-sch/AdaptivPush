@@ -380,6 +380,7 @@ function useCurrentProgramState() {
                         .eq('user_id', requestOwnerId)
                         .in('program_day_id', dayIds)
                         .eq('lifecycle', 'finalized')
+                        .in('completion_class', ['complete', 'reduced'])
                         .abortSignal(signal),
                     {
                         kind: 'read',

@@ -748,7 +748,7 @@ export default function HomeScreen() {
   }, [refresh, fetchLastWorkout, fetchHomeData, ownerId]));
 
   // workouts[0] is always the next uncompleted workout (hook sorts completed last)
-  const nextWorkout = program?.workouts.find((w) => !w.isCompleted);
+  const nextWorkout = program?.workouts.find((w) => !w.isFinalized && !w.isCompleted);
 
   useFocusEffect(useCallback(() => {
     let active = true;
@@ -858,13 +858,13 @@ export default function HomeScreen() {
             {actionError}
           </Text>
         ) : null}
-        {program && program.workouts.every((w) => w.isCompleted) && program.workouts.length > 0 ? (
+        {program && program.workouts.every((w) => w.isFinalized || w.isCompleted) && program.workouts.length > 0 ? (
           <>
             <View style={styles.weekCompleteCard}>
               <Ionicons name="checkmark-circle" size={32} color={theme.primary} />
-              <Text style={styles.weekCompleteTitle}>Week Complete!</Text>
+              <Text style={styles.weekCompleteTitle}>Week Finished</Text>
               <Text style={styles.weekCompleteSubtitle}>
-                All workouts this week are done. Rest up — next week&apos;s plan is ready.
+                All workouts this week have ended. Partial workouts stay marked partial in your history.
               </Text>
             </View>
             {program.currentWeek < program.totalWeeks && (

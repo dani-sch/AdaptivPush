@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { amendWorkoutExercise, createWorkoutDraft, updateWorkoutSet, validateWorkoutDraft, type WorkoutDraft } from '../../features/workouts/contracts';
-import { createCompletedNavigation, occurrenceAction, occurrenceState, projectCompletedOccurrence } from '../../features/workouts/effectiveOccurrence';
+import { createCompletedNavigation, isPrescriptionFulfilled, occurrenceAction, occurrenceState, projectCompletedOccurrence } from '../../features/workouts/effectiveOccurrence';
 import { draftToExercises } from '../../features/workouts/workoutPresentation';
 import { externalActualSets } from '../../features/workouts/actualLoads';
 import { workoutFinalizationPayload } from '../../features/workouts/contracts';
@@ -149,4 +149,12 @@ test('missing correction RPC returns an honest unavailable result and retains ex
   assert.equal(outcome.status, 'unavailable');
   assert.ok('message' in outcome && outcome.message.includes('can be viewed'));
   assert.deepEqual(saved, request);
+});
+
+test('finalization is separate from prescription fulfillment', () => {
+  assert.equal(isPrescriptionFulfilled('partial'), false);
+  assert.equal(isPrescriptionFulfilled('abandoned'), false);
+  assert.equal(isPrescriptionFulfilled('complete'), true);
+  assert.equal(isPrescriptionFulfilled('reduced'), true);
+  assert.equal(occurrenceState(null, 'durable-partial-session'), 'finalized');
 });
