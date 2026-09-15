@@ -29,6 +29,7 @@ DECLARE
   v_successor_revision_id uuid := gen_random_uuid();
   v_new_day_id uuid;
   v_changed integer := 0;
+  v_future_changed integer := 0;
   v_day_changed integer;
   v_snapshot jsonb;
   v_snapshot_hash text;
@@ -217,7 +218,13 @@ BEGIN
 
     SELECT count(*) INTO v_day_changed
     FROM public.program_day_exercises pde
-    WHERE pde.program_day_id = v_new_day_id AND pde.stable_slot_id = ANY(v_target_slots) AND pde.exercise_id = v_replacement_exercise_id;
+    WHERE pde.program_day_id = v_new_day_id AND pde.stable_slot_id = ANY(v_target_slots)
+      AND (v_day.stable_day_id <> v_current_stable_day_id OR pde.stable_slot_id = v_current_stable_slot_id)
+      AND (v_day.week_number, v_day.order_in_week, v_day.day_index) >=
+        (v_source_day.week_number, v_source_day.order_in_week, v_source_day.day_index)
+      AND (v_include_current_day OR v_day.stable_day_id <> v_current_stable_day_id)
+      AND NOT EXISTS (SELECT 1 FROM public.workout_sessions ws JOIN public.program_days completed_day ON completed_day.id = ws.program_day_id WHERE completed_day.program_id = v_program_id AND completed_day.stable_day_id = v_day.stable_day_id);
+    IF v_day.stable_day_id <> v_current_stable_day_id THEN v_future_changed := v_future_changed + v_day_changed; END IF;
     v_changed := v_changed + v_day_changed;
   END LOOP;
 
@@ -297,7 +304,7 @@ BEGIN
     'baseRevisionId', v_expected_revision_id,
     'revisionId', v_successor_revision_id,
     'revision', v_successor_revision,
-    'changedSlotCount', v_changed,
+    'changedSlotCount', v_changed, 'futureChangedSlotCount', v_future_changed,
     'revisedAt', now(),
     'replayed', false
   );

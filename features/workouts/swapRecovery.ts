@@ -75,3 +75,7 @@ export function workoutOnlyReconciliationStep(
   }
   return { status: 'compensate', request: compensationRequest(request, outcome.receipt) };
 }
+
+export function confirmedSwapMessage(futureChangedSlotCount?: number): string {
+  return futureChangedSlotCount === 0 ? 'Exercise swapped for this workout.' : 'Exercise swapped for this and future workouts.';
+}

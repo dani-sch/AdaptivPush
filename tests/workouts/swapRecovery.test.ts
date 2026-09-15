@@ -1,3 +1,4 @@
+import { confirmedSwapMessage } from '../../features/workouts/swapRecovery';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -78,4 +79,9 @@ test('workout-only supersession keeps an uncertain exact operation and compensat
     status: 'compensate',
     request: compensationRequest(request, { revision: 5, revisionId: 'revision-5' }),
   });
+});
+
+test('confirmed final-week swap reports this workout only when no future slots changed', () => {
+  assert.equal(confirmedSwapMessage(0), 'Exercise swapped for this workout.');
+  assert.equal(confirmedSwapMessage(2), 'Exercise swapped for this and future workouts.');
 });

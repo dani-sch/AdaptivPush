@@ -87,6 +87,7 @@ export interface ProgramExerciseRevisionReceipt {
   revisionId: string;
   revision: number;
   changedSlotCount: number;
+  futureChangedSlotCount?: number;
   revisedAt: string;
   replayed: boolean;
 }

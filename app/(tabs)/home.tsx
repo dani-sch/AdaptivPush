@@ -28,6 +28,7 @@ import { workoutDraftStore } from "@/features/workouts/draftStore";
 import {
   effectiveCurrentWorkout,
   matchingActiveWorkoutDraft,
+  matchingOccurrenceWorkoutDraft,
   workoutRouteParamsForDraft,
 } from "@/features/workouts/effectiveCurrentWorkout";
 import type { WorkoutDraft } from "@/features/workouts/contracts";
@@ -614,6 +615,7 @@ export default function HomeScreen() {
   const [swapNudgeDismissed, setSwapNudgeDismissed] = useState(false);
 
   const [canCorrectWorkout, setCanCorrectWorkout] = useState(false);
+  const [lastWorkoutOwner, setLastWorkoutOwner] = useState<string | null>(null);
   const [lastWorkoutId, setLastWorkoutId] = useState<string | null>(null);
   const [lastWorkoutDate, setLastWorkoutDate] = useState<string | null>(null);
   const [loadedDraft, setLoadedDraft] = useState<WorkoutDraft | null>(null);
@@ -649,6 +651,7 @@ export default function HomeScreen() {
       const canCorrect = await workoutCorrectionsAvailable(supabase);
       if (signal.aborted) return;
       setCanCorrectWorkout(canCorrect);
+      setLastWorkoutOwner(requestOwnerId);
       setLastWorkoutId(data?.id ?? null);
       if (data?.ended_at) {
         const formatted = new Date(data.ended_at).toLocaleDateString(undefined, {
@@ -786,10 +789,11 @@ export default function HomeScreen() {
       }
     : undefined;
 
-  const homeState = occurrenceState(loadedDraft);
+  const occurrenceDraft = matchingOccurrenceWorkoutDraft(program, nextWorkout ?? null, ownerId, loadedDraft);
+  const homeState = occurrenceState(occurrenceDraft);
   const handleStartWorkout = () => {
-    if (loadedDraft?.finalizedReceipt) {
-      router.push({ pathname: '/edit-workout', params: { sessionId: loadedDraft.finalizedReceipt.sessionId } });
+    if (occurrenceDraft?.finalizedReceipt) {
+      router.push({ pathname: '/edit-workout', params: { sessionId: occurrenceDraft.finalizedReceipt.sessionId } });
       return;
     }
     if (!program || !nextWorkout || workoutEntryIssue(program, nextWorkout)) return;
@@ -887,12 +891,12 @@ export default function HomeScreen() {
             onPressStart={handleStartWorkout}
           />
         )}
-        {lastWorkoutId ? <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/edit-workout', params: { sessionId: lastWorkoutId } })} style={{ padding: 16 }}>
+        {lastWorkoutId && lastWorkoutOwner === ownerId ? <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/edit-workout', params: { sessionId: lastWorkoutId } })} style={{ padding: 16 }}>
           <Text style={{ color: theme.primary, fontWeight: '700' }}>Last Workout · {lastWorkoutDate} · {occurrenceAction('finalized', canCorrectWorkout)}</Text>
         </Pressable> : null}
         <StatsRow
           readiness={readinessScore ?? '--'}
-          lastWorkout={lastWorkoutDate}
+          lastWorkout={lastWorkoutOwner === ownerId ? lastWorkoutDate : null}
           week={program ? `${program.currentWeek}/${program.totalWeeks}` : null}
           styles={styles}
         />

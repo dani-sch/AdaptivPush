@@ -1,3 +1,4 @@
+import { confirmedSwapMessage } from '@/features/workouts/swapRecovery';
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { X, ArrowLeftRight, Info } from 'lucide-react-native';
@@ -150,7 +151,8 @@ export function WorkoutTemplateModal({ workout, program, onSwapExercise, onClose
                                 onClose={() => setSwapExerciseId(null)}
                                 onSwap={async args => {
                                     const result = await onSwapExercise(args);
-                                    setSwapMessage(args.scope === 'workout_only' ? 'Exercise swapped for this workout.' : 'Exercise swapped for this and future workouts.');
+                                    const receipt = result && typeof result === 'object' && 'receipt' in result ? result.receipt as { futureChangedSlotCount?: number } : null;
+                                    setSwapMessage(args.scope === 'workout_only' ? 'Exercise swapped for this workout.' : confirmedSwapMessage(receipt?.futureChangedSlotCount));
                                     return result;
                                 }}
                             />

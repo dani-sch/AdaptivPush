@@ -36,6 +36,7 @@ import {
 } from '@/features/workouts/swapOperationStore';
 import {
   isNoFutureWorkoutsDetail,
+  confirmedSwapMessage,
   workoutOnlyReconciliationStep,
   workoutSwapSyncDisposition,
 } from '@/features/workouts/swapRecovery';
@@ -513,7 +514,7 @@ export default function NextWorkoutScreen() {
     const disposition = workoutSwapSyncDisposition(outcome);
     if (disposition.status === 'confirmed' || disposition.status === 'no_future_workouts') {
       await clearCurrentPendingSwap(pending);
-      setSyncMessage(disposition.status === 'confirmed' ? 'Exercise swapped for this and future workouts.' : 'Exercise swapped for this workout.');
+      setSyncMessage(disposition.status === 'confirmed' && 'receipt' in outcome ? confirmedSwapMessage(outcome.receipt.futureChangedSlotCount) : 'Exercise swapped for this workout.');
       setProgramUpdating(false);
       if (disposition.status === 'confirmed') void refresh();
       return;

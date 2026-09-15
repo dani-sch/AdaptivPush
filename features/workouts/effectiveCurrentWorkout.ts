@@ -25,6 +25,13 @@ export function matchingActiveWorkoutDraft(
   }) ? draft : null;
 }
 
+export function matchingOccurrenceWorkoutDraft(
+  program: CurrentProgram | null, workout: ProgramWorkout | null, ownerId: string | null, draft: WorkoutDraft | null,
+): WorkoutDraft | null {
+  return program && workout?.stableDayId && ownerId && draft && validateWorkoutDraft(draft).ok
+    && draft.ownerId === ownerId && draft.programId === program.id && draft.stableDayId === workout.stableDayId ? draft : null;
+}
+
 function effectiveExercise(
   program: CurrentProgram,
   workout: ProgramWorkout,
@@ -64,8 +71,7 @@ export function effectiveCurrentWorkout(
   draft: WorkoutDraft | null,
 ): ProgramWorkout | null {
   if (!workout) return null;
-  const activeDraft = program && ownerId && draft && validateWorkoutDraft(draft).ok
-    && draft.ownerId === ownerId && draft.programId === program.id && draft.stableDayId === workout.stableDayId ? draft : null;
+  const activeDraft = matchingOccurrenceWorkoutDraft(program, workout, ownerId, draft);
   if (!program || !activeDraft) return workout;
 
   return {
