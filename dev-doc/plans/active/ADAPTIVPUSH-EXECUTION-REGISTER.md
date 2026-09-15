@@ -1,37 +1,12 @@
 # AdaptivPush modular execution register
 
-## September 15 controlling AP-02/AP-03 execution gate
+## Current AP-02/AP-03 authority and status
 
-**HOSTED ROLLOUT BLOCKED BEFORE FRESH RECOVERY.** Explicit user authorization
-replaces every earlier pre-migration local/manual/QA-account, physical-device,
-Apple-signing, standalone-build and distribution requirement below. After
-agent-run backup/isolated restore and technical verification, apply the in-scope
-hosted packet and enable both normal Expo writers without reconfirmation.
-Existing-account phone acceptance follows deployment through `npm start` and
-its ordinary Expo Go QR. No alternate local user testing environment is required.
+The hosted AP-02/AP-03 packet is deployed to `thfxcvxcsfvrzdysdnkq`. The normal `.env` enables both writers, and the freshly served iOS bundle verifies the expected hosted backend, public client key and true/true flags with no privileged key. The user authorized this rollout after agent-run recovery and technical checks, replacing earlier pre-migration local/manual/QA-account, signing, standalone-build and distribution requirements. Physical acceptance follows deployment with the existing account through ordinary `npm start` and its Expo Go QR.
 
-Fresh expected-project authentication, AP-01-only ledger, missing durable schema,
-migration hashes and exact hosted dry-run are verified. Docker's Linux engine
-fails on its inference socket, so fresh backup/restore and deployment remain
-unperformed. Recover the engine preserving volumes, then resume the authorized
-sequence in the [release report](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md).
-No physical pass is inferred. Earlier dated acceptance inventories remain
-coverage references, not a contrary rollout gate. AP-04/AP-05 remain out of scope.
+Hosted migrations `20260910210000`, `20260911120000`, `20260915151000` and writer enablement are technically verified. Fresh encrypted recovery/isolated restore, exact complete packet rehearsal, data preservation, authentication/owner isolation, atomicity/replay and integration checks passed. [The release report](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md) owns exact evidence. Earlier pre-migration local/manual/signing instructions are superseded; earlier test inventories remain coverage references.
 
-## Authority and status
-
-**Current AP-02/AP-03 platform scope: iOS-first, as directed by the user.**
-The September 14 failure-remediation addendum supplies typed error and workout
-entry fixes, verified local LAN commands, real legacy migration proof, and
-Enabled/Disabled iOS Expo Go comparison bundles. Physical cold-start and UI
-results remain pending. The user reports App Store Expo Go SDK 57 / iOS 26.6.1
-and has not supplied a separate Apple signing route. Expo Go retesting can
-proceed using the current matrix; it does not close signed native acceptance.
-Prepare and bind a signed iOS native candidate and reachable nonproduction test
-backend before physical-iPhone QA. Dynamic Type, VoiceOver and iOS lifecycle
-coverage are required. Existing Android evidence is supplementary; Android
-hardware/testing is not a gate for this iOS release. See the
-[iOS manual QA handoff](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-MANUAL-QA-2026-09-14.md).
+Physical iPhone cold launch, five-action UI/reopen acceptance and accessibility remain unverified. Thirty-two pre-existing non-rest days have no exercises (five in active programs); they were preserved, not populated with invented prescriptions. Complete persisted workouts can use their database identities; empty legacy days remain unstartable. AP-04/AP-05 remain out of scope.
 
 This document owns delivery decomposition, dependencies, status, owner routes, and execution gates. Product decisions belong to [the approved decision record](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECORD-2026-09-08.md); implementation behavior belongs to [the master plan](/dev-doc/plans/active/ADAPTIVPUSH-MASTER-PLAN.md). [Code status](/dev-doc/plans/active/ADAPTIVPUSH-IMPLEMENTATION-STATUS.md) owns observed facts, [database plan](/dev-doc/plans/active/ADAPTIVPUSH-DATABASE-PLAN.md) owns data design, and [traceability](/dev-doc/plans/active/ADAPTIVPUSH-TRACEABILITY.md) owns requirement dispositions and acceptance scenarios.
 
@@ -114,7 +89,7 @@ Critical path for trustworthy free training: `AP-01 -> AP-02 + AP-03 -> AP-04 + 
 
 ## AP-02 — Durable workout capture and finalization
 
-**Status:** INTEGRATION VERIFIED — RELEASE BLOCKED. Prior integration evidence is retained; September 14 changes require their own final verification/integration evidence in the current release report. Remaining gates are user device/accessibility results, fresh production backup/restore, exact two-migration rollout, real distribution identity and monitoring. CLI/database authentication is verified. **Owner:** typescript-agent, security-agent for finalize command, test-agent for fault injection. **Outcome:** logged sets survive restart and Finish cannot create false completion or duplicates.
+**Status:** HOSTED DEPLOYED; physical iPhone acceptance remains open. September 15 recovery, three-migration atomic deployment and normal Expo writer enablement are verified; current authority above supersedes older pre-migration gates. **Owner:** typescript-agent, security-agent for finalize command, test-agent for fault injection. **Outcome:** logged sets survive restart and Finish cannot create false completion or duplicates.
 
 - **Scope:** durable account-scoped drafts, frozen accepted prescription, stable actual exercise/set IDs, explicit partial/full outcomes, atomic idempotent finalize, PR/fulfillment projections after success. Excludes advanced adaptation and new program generation.
 - **Current files:** `features/workouts/*`, `features/kernel/*`, `app/next-workout.tsx`, `components/ExerciseCard.tsx`, `hooks/useCurrentProgram.ts`, `app/workout-history.tsx`, the AP-02/AP-03 two-migration packet and SQL suites, `types/database.ts`, `types/program.ts`.
@@ -128,7 +103,7 @@ Critical path for trustworthy free training: `AP-01 -> AP-02 + AP-03 -> AP-04 + 
 
 ## AP-03 — Durable program installation, revisions, and archive checkpoints
 
-**Status:** INTEGRATION VERIFIED — RELEASE BLOCKED. Prior integration evidence is retained; September 14 changes require their own final verification/integration evidence in the current release report. Remaining gates are user device/accessibility results, fresh production backup/restore, exact two-migration rollout, real distribution identity and monitoring. CLI/database authentication is verified. Historical Android 16 generated-save and flag-off recovery evidence is partial release evidence only. **Owner:** typescript-agent plus security-agent for installation authority. **Outcome:** failed creation/replacement leaves the prior usable plan intact, and historical prescriptions never change under recorded workouts.
+**Status:** HOSTED DEPLOYED; physical iPhone acceptance remains open. September 15 recovery, three-migration atomic deployment and normal Expo writer enablement are verified; current authority above supersedes older pre-migration gates. **Owner:** typescript-agent plus security-agent for installation authority. **Outcome:** failed creation/replacement leaves the prior usable plan intact, and historical prescriptions never change under recorded workouts.
 
 - **Scope:** one generated/manual installation command, immutable prescription/program revisions, catalog identity validation, one-active-instance concurrency, explicit archive/restore/restart checkpoint. Excludes published templates and selective update merging.
 - **Current files:** `features/programs/*`, `features/kernel/*`, `utils/saveProgramToDb.ts`, `app/create-program.tsx`, `components/GenerateProgramModal.tsx`, `hooks/useCurrentProgram.ts`, `app/archived-programs.tsx`, `app/program-overview.tsx`, `tests/programs/*`, the AP-02/AP-03 two-migration packet and SQL suites, `types/program.ts`, `types/database.ts`.

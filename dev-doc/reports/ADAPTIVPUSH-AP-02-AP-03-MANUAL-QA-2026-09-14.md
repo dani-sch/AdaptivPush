@@ -10,11 +10,7 @@ technical verification, then will test with the existing account through
 Apple signing or TestFlight are prerequisites. Earlier matrices remain historical
 coverage inventories; none acquires a pass from this authorization.
 
-**Current status: deployment blocked by Docker recovery tooling; all five
-acceptance actions remain unverified.** The hosted database and writer flags
-are unchanged. See the [current rollout record](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md).
-After successful deployment and bundle verification, use the normal existing
-account and check:
+**Current status: HOSTED DEPLOYED; WRITERS ENABLED; physical acceptance open.** The expected hosted project has the original two migrations plus the legacy-revision correction. Recovery, rolled-back hosted probes and the fresh iOS bundle passed. No manual pass is inferred. See the [current rollout record](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md). Run ordinary `npm start`, scan its normal QR, use the existing account, and check:
 
 1. Start workouts from Home and Plan; record a set, finish and reopen history.
 2. Generate and save a program; reopen Plan and inspect its workouts.
@@ -23,7 +19,7 @@ account and check:
 5. Restore an archive using its offered exact/approximate/restart mode; start a
    workout and reopen to verify accepted changes and recorded work persist.
 
-Physical iPhone startup, UI, persistence and accessibility results remain open.
+There are 32 pre-existing empty non-rest days (five in active programs). Empty days cannot start without actual prescriptions; their data was preserved. Physical iPhone startup, UI, persistence and accessibility results remain open.
 No native startup diagnosis or fix is inferred from the hosted inspection.
 
 ## Current Expo Go retest - September 14 remediation

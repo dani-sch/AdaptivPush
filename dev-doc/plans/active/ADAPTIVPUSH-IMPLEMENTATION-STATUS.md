@@ -2,22 +2,13 @@
 
 ## September 15 current hosted state
 
-Production rollout remains incomplete: fresh authenticated SQL confirms only
-AP-01 migrations and no `program_revisions`; the ordinary iOS bundle targets
-`thfxcvxcsfvrzdysdnkq` with both writers off. Exact pending-file hashes and hosted
-two-file dry-run pass. Docker startup failure blocks the fresh encrypted backup
-and isolated restore prerequisite; no migrations, application changes, writer
-enablement or physical iPhone passes occurred in this attempt.
+The hosted AP-02/AP-03 packet is deployed to `thfxcvxcsfvrzdysdnkq`. The normal `.env` enables both writers, and the freshly served iOS bundle verifies the expected hosted backend, public client key and true/true flags with no privileged key. The user authorized this rollout after agent-run recovery and technical checks, replacing earlier pre-migration local/manual/QA-account, signing, standalone-build and distribution requirements. Physical acceptance follows deployment with the existing account through ordinary `npm start` and its Expo Go QR.
 
-The user's September 15 authorization replaces earlier pre-migration manual/
-local QA-account, physical-device, signing, standalone-build and distribution
-gates in this document. Agent recovery and technical verification precede the
-authorized deployment; normal existing-account Expo Go acceptance follows it.
-See the [current release section](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md)
-for exact evidence and recovery blocker. Earlier source/test observations below
-remain dated evidence; they do not imply hosted functionality is fixed.
+All three reviewed migrations committed atomically. Recovery, schema/security, original-data preservation, hosted rolled-back write probes and effective bundle verification passed. The additive correction permits immutable future revisions for migrated schema-1 programs without changing their historical provenance, and protects their persisted prescriptions from direct client mutation. Duplicate save recovery reassurance is removed. Source `7cc4051`, integrator `8917bfd`; [current report](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md) owns exact evidence.
 
-Snapshot: 2026-09-14 for the bounded AP-02/AP-03 release update; unrelated source observations retain their earlier scope. This document owns implementation facts and unresolved code defects. The [master plan](/dev-doc/plans/active/ADAPTIVPUSH-MASTER-PLAN.md) owns target product behavior; the [execution register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) owns delivery status and gates; the [database plan](/dev-doc/plans/active/ADAPTIVPUSH-DATABASE-PLAN.md) owns schema evolution. Approved decisions override historical product proposals, but do not make target behavior implemented.
+Physical iPhone cold launch, five-action UI/reopen acceptance and accessibility remain unverified. Thirty-two pre-existing non-rest days have no exercises (five in active programs); they were preserved, not populated with invented prescriptions. Complete persisted workouts can use their database identities; empty legacy days remain unstartable. AP-04/AP-05 remain out of scope. Earlier dated paragraphs below retain prior observations and are superseded on hosted status and rollout sequencing by this section.
+
+Snapshot: 2026-09-15 for the bounded AP-02/AP-03 release update; unrelated source observations retain their earlier scope. This document owns implementation facts and unresolved code defects. The [master plan](/dev-doc/plans/active/ADAPTIVPUSH-MASTER-PLAN.md) owns target product behavior; the [execution register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) owns delivery status and gates; the [database plan](/dev-doc/plans/active/ADAPTIVPUSH-DATABASE-PLAN.md) owns schema evolution. Approved decisions override historical product proposals, but do not make target behavior implemented.
 
 ## Evidence boundaries
 

@@ -1,12 +1,5 @@
 # AdaptivPush roadmap
 
-Current AP-02/AP-03 gate (September 15): the user authorized hosted migration
-and normal Expo writer enablement after agent-run recovery/technical checks,
-superseding former pre-migration local/manual/signing/distribution gates below.
-Docker startup failure currently blocks fresh backup/isolated restore; hosted
-schema and writers remain unchanged. Existing-account Expo Go acceptance follows
-deployment. See the [current release report](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md).
-
 Release order follows approved D-13. The [execution register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) owns precise prerequisites and independently reviewable packets; slice numbering is stable, not a mandatory serial dependency chain.
 
 | Wave | Slices | User-visible result |
@@ -22,4 +15,4 @@ Release order follows approved D-13. The [execution register](/dev-doc/plans/act
 
 AP-16 account/privacy/purchase/accessibility/support/release obligations close with each relevant wave. They are not postponed until final polish. Safe parallel work includes draft/program contracts, history/schedule selectors, generation/equipment UI and independent health/theme adapters after their own gates; the register names shared-file coordination risks.
 
-Historical authenticated compatibility evidence is retained, including context-failure recovery. AP-01.1 and AP-01.2a are locally verified; AP-01.3 released the production baseline/ledger, encrypted recovery proof, isolated role suite, and catalog authority on 2026-09-10. AP-02/AP-03 retain prior integration evidence behind default-off writers; the [September 14 release packet](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md) owns verification of current corrections. Secure CLI/database authentication is verified. Complete current automated/build/integration work, obtain the user's required device/accessibility results, then capture and restore a fresh encrypted production backup before applying exactly the two reviewed additive migrations. Production writer enablement additionally requires real distribution identity, rollback rehearsal and monitoring ownership. AP-04/AP-05 follow only after that release boundary. Health/social never block the fully usable manual core.
+AP-01 baseline/catalog authority and the AP-02/AP-03 hosted packet are deployed. The hosted AP-02/AP-03 packet is deployed to `thfxcvxcsfvrzdysdnkq`. The normal `.env` enables both writers, and the freshly served iOS bundle verifies the expected hosted backend, public client key and true/true flags with no privileged key. The user authorized this rollout after agent-run recovery and technical checks, replacing earlier pre-migration local/manual/QA-account, signing, standalone-build and distribution requirements. Physical acceptance follows deployment with the existing account through ordinary `npm start` and its Expo Go QR. Physical iPhone cold launch, five-action UI/reopen acceptance and accessibility remain unverified. Thirty-two pre-existing non-rest days have no exercises (five in active programs); they were preserved, not populated with invented prescriptions. Complete persisted workouts can use their database identities; empty legacy days remain unstartable. AP-04/AP-05 remain out of scope. [Current evidence](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md) owns the verified technical outcome and remaining acceptance. No later AP slice was started.
