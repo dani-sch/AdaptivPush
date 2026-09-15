@@ -1,11 +1,11 @@
-import React, { useCallback, useMemo, useState, useEffect } from 'react';
+import React, { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
+    FlatList,
     Image,
     KeyboardAvoidingView,
     Platform,
     Pressable,
-    ScrollView,
     StyleSheet,
     Text,
     TextInput,
@@ -20,12 +20,95 @@ import { supabase } from '@/utils/supabase';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
 import { isCatalogExerciseId, type CatalogExerciseId } from '@/features/catalog/contracts';
+import { OptionalValueCache, SingleFlightGate } from '@/features/workouts/swapInteraction';
 
 interface SwapOption extends WorkoutExercise {
     catalogExerciseId?: CatalogExerciseId;
     imageUrl?: string;
     description?: string;
 }
+
+type LoadSuggestion = NonNullable<WorkoutExercise['loadSuggestion']>;
+
+interface ExerciseOptionRowProps {
+    exercise: SwapOption;
+    isExpanded: boolean;
+    isSelected: boolean;
+    onSelect: (id: string) => void;
+    onToggleInfo: (id: string) => void;
+    styles: ReturnType<typeof createStyles>;
+    theme: Theme;
+}
+
+const ExerciseOptionRow = memo(function ExerciseOptionRow({
+    exercise,
+    isExpanded,
+    isSelected,
+    onSelect,
+    onToggleInfo,
+    styles,
+    theme,
+}: ExerciseOptionRowProps) {
+    return (
+        <View style={[styles.exerciseCard, isSelected && styles.exerciseCardSelected]}>
+            <View style={styles.exerciseRow}>
+                <Pressable
+                    onPress={() => onSelect(exercise.id)}
+                    style={({ pressed }) => [styles.exerciseSelection, pressed && styles.rowPressed]}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: isSelected }}
+                    accessibilityLabel={`Select ${exercise.name}`}
+                    hitSlop={4}
+                >
+                    <Text style={styles.exerciseName}>{exercise.name}</Text>
+                    <Text style={styles.exerciseMeta}>{exercise.equipment}</Text>
+                    <View style={styles.exerciseStatsRow}>
+                        <Text style={styles.statText}>{exercise.sets} sets</Text>
+                        <Text style={styles.statText}>{exercise.reps} reps</Text>
+                    </View>
+                    {exercise.description && !isExpanded ? (
+                        <Text style={styles.exerciseDescription} numberOfLines={2}>
+                            {exercise.description}
+                        </Text>
+                    ) : null}
+                </Pressable>
+                <View style={styles.rowActions}>
+                    {isSelected ? (
+                        <View style={styles.checkCircle}>
+                            <Check color={theme.white} size={14} />
+                        </View>
+                    ) : null}
+                    <Pressable
+                        onPress={() => onToggleInfo(exercise.id)}
+                        hitSlop={8}
+                        style={({ pressed }) => [styles.chevronBtn, pressed && styles.rowPressed]}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${isExpanded ? 'Hide' : 'Show'} information for ${exercise.name}`}
+                        accessibilityState={{ expanded: isExpanded }}
+                    >
+                        {isExpanded
+                            ? <ChevronUp color={theme.placeholder} size={18} />
+                            : <ChevronDown color={theme.placeholder} size={18} />}
+                    </Pressable>
+                </View>
+            </View>
+            {isExpanded ? (
+                <View style={styles.detailPanel}>
+                    {exercise.imageUrl ? (
+                        <Image
+                            source={{ uri: exercise.imageUrl }}
+                            style={styles.exerciseGif}
+                            resizeMode="contain"
+                        />
+                    ) : null}
+                    {exercise.description ? (
+                        <Text style={styles.descriptionText}>{exercise.description}</Text>
+                    ) : null}
+                </View>
+            ) : null}
+        </View>
+    );
+});
 
 type Props = {
     program: CurrentProgram;
@@ -48,10 +131,12 @@ export function SwapExerciseModal({ program, exerciseId, onClose, onSwap, embedd
 
     const [searchQuery, setSearchQuery] = useState('');
     const [scope, setScope] = useState<'workout_only' | 'rest_of_program'>('workout_only');
-    const [selectedExercise, setSelectedExercise] = useState<SwapOption | null>(null);
+    const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null);
     const [applying, setApplying] = useState(false);
     const [applyError, setApplyError] = useState<string | null>(null);
     const [expandedId, setExpandedId] = useState<string | null>(null);
+    const historyCacheRef = useRef(new OptionalValueCache<string, LoadSuggestion>());
+    const applyGateRef = useRef(new SingleFlightGate());
 
     const currentExercise = useMemo(() => {
         for (const workout of program.workouts) {
@@ -82,7 +167,7 @@ export function SwapExerciseModal({ program, exerciseId, onClose, onSwap, embedd
         originalName?: string,
     ) => {
         setLoadingExercises(true);
-        setSelectedExercise(null);
+        setSelectedExerciseId(null);
         setAlternatives([]);
         setCatalogUnavailable(false);
         try {
@@ -164,34 +249,66 @@ export function SwapExerciseModal({ program, exerciseId, onClose, onSwap, embedd
         );
     }, [currentExercise, loadAlternatives, resolvedMuscleGroup]);
 
+    const deferredSearchQuery = useDeferredValue(searchQuery);
     const filteredAlternatives = useMemo(() => {
-        const q = searchQuery.trim().toLowerCase();
+        const q = deferredSearchQuery.trim().toLowerCase();
         return alternatives.filter(ex => {
             if (currentExercise?.exerciseId && ex.id === currentExercise.exerciseId) return false;
             if (currentExercise && ex.name === currentExercise.name) return false;
             if (!q) return true;
             return ex.name.toLowerCase().includes(q);
         });
-    }, [alternatives, searchQuery, currentExercise]);
+    }, [alternatives, deferredSearchQuery, currentExercise]);
+
+    const selectedExercise = useMemo(
+        () => alternatives.find((exercise) => exercise.id === selectedExerciseId) ?? null,
+        [alternatives, selectedExerciseId],
+    );
+
+    const loadHistorySuggestion = useCallback(async (catalogExerciseId: string): Promise<LoadSuggestion | undefined> => {
+        const { data: historyRows } = await supabase.from('workout_exercise_sets')
+            .select('load_value, load_unit, load_kind, load_side')
+            .eq('exercise_id', catalogExerciseId)
+            .in('load_kind', ['external', 'assistance'])
+            .not('load_value', 'is', null)
+            .order('logged_at', { ascending: false })
+            .limit(1);
+        const history = historyRows?.[0];
+        if (!history
+            || !Number.isFinite(Number(history.load_value))
+            || (history.load_unit !== 'lb' && history.load_unit !== 'kg')
+            || (history.load_kind !== 'external' && history.load_kind !== 'assistance')) {
+            return undefined;
+        }
+        return {
+            value: Number(history.load_value),
+            unit: history.load_unit,
+            kind: history.load_kind,
+            side: history.load_side ?? 'unknown',
+        };
+    }, []);
+
+    useEffect(() => {
+        const catalogExerciseId = selectedExercise?.catalogExerciseId;
+        if (!isCatalogExerciseId(catalogExerciseId)) return;
+        historyCacheRef.current.prefetch(catalogExerciseId, () => loadHistorySuggestion(catalogExerciseId));
+    }, [loadHistorySuggestion, selectedExercise]);
+
+    const handleSelect = useCallback((id: string) => {
+        setApplyError(null);
+        setSelectedExerciseId((selected) => selected === id ? null : id);
+    }, []);
+
+    const handleToggleInfo = useCallback((id: string) => {
+        setExpandedId((expanded) => expanded === id ? null : id);
+    }, []);
 
     const handleSwap = async () => {
         const catalogExerciseId = selectedExercise?.catalogExerciseId;
-        if (!selectedExercise || !isCatalogExerciseId(catalogExerciseId)) return;
+        if (!selectedExercise || !isCatalogExerciseId(catalogExerciseId) || !applyGateRef.current.tryEnter()) return;
         setApplying(true);
         setApplyError(null);
         try {
-            const { data: historyRows } = await supabase.from('workout_exercise_sets')
-                .select('load_value, load_unit, load_kind, load_side')
-                .eq('exercise_id', catalogExerciseId)
-                .in('load_kind', ['external', 'assistance'])
-                .not('load_value', 'is', null)
-                .order('logged_at', { ascending: false })
-                .limit(1);
-            const history = historyRows?.[0];
-            const hasSuggestion = history
-                && Number.isFinite(Number(history.load_value))
-                && (history.load_unit === 'lb' || history.load_unit === 'kg')
-                && (history.load_kind === 'external' || history.load_kind === 'assistance');
             const applied = await onSwap({
                 exerciseId,
                 replacement: {
@@ -204,22 +321,31 @@ export function SwapExerciseModal({ program, exerciseId, onClose, onSwap, embedd
                     reps:        selectedExercise.reps,
                     imageUrl:    selectedExercise.imageUrl,
                     description: selectedExercise.description,
-                    loadSuggestion: hasSuggestion ? {
-                        value: Number(history.load_value),
-                        unit: history.load_unit,
-                        kind: history.load_kind,
-                        side: history.load_side ?? 'unknown',
-                    } : undefined,
+                    loadSuggestion: historyCacheRef.current.peek(catalogExerciseId),
                 },
                 scope,
             });
             if (applied !== false) onClose();
         } catch (error) {
-            setApplyError(error instanceof Error ? error.message : 'The exercise swap could not be saved.');
+            if (__DEV__) console.warn('[swap] Apply failed', error);
+            setApplyError('Exercise swap failed. Try again.');
         } finally {
+            applyGateRef.current.leave();
             setApplying(false);
         }
     };
+
+    const renderExercise = useCallback(({ item }: { item: SwapOption }) => (
+        <ExerciseOptionRow
+            exercise={item}
+            isExpanded={expandedId === item.id}
+            isSelected={selectedExerciseId === item.id}
+            onSelect={handleSelect}
+            onToggleInfo={handleToggleInfo}
+            styles={styles}
+            theme={theme}
+        />
+    ), [expandedId, handleSelect, handleToggleInfo, selectedExerciseId, styles, theme]);
 
     const canApplySelectedExercise = isCatalogExerciseId(selectedExercise?.catalogExerciseId);
 
@@ -256,94 +382,48 @@ export function SwapExerciseModal({ program, exerciseId, onClose, onSwap, embedd
             </View>
 
             {/* List */}
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
-                <Text style={styles.sectionLabel}>{(resolvedMuscleGroup ?? 'General').toUpperCase()} EXERCISES</Text>
-                {catalogUnavailable ? (
-                    <Text style={styles.catalogUnavailableText}>
-                        Showing local previews. Reconnect to resolve a catalog ID before applying a swap.
-                    </Text>
-                ) : null}
-                {loadingExercises ? (
-                    <ActivityIndicator color={theme.primary} style={{ marginTop: 20 }} />
-                ) : filteredAlternatives.length === 0 ? (
-                    <View style={styles.emptyWrap}>
-                        <Text style={styles.emptyText}>No exercises found</Text>
-                    </View>
-                ) : (
-                    filteredAlternatives.map(ex => {
-                        const isSelected = selectedExercise?.id === ex.id;
-                        const isExpanded = expandedId === ex.id;
-                        return (
-                            <View
-                                key={ex.id}
-                                style={[styles.exerciseCard, isSelected && styles.exerciseCardSelected]}
-                            >
-                                {/* Tappable main row — selects the exercise */}
-                                <Pressable
-                                    onPress={() => setSelectedExercise(prev => prev?.id === ex.id ? null : ex)}
-                                    style={({ pressed }) => [styles.exerciseRow, pressed && { opacity: 0.92 }]}
-                                >
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={styles.exerciseName}>{ex.name}</Text>
-                                        <Text style={styles.exerciseMeta}>{ex.equipment}</Text>
-                                        <View style={styles.exerciseStatsRow}>
-                                            <Text style={styles.statText}>{ex.sets} sets</Text>
-                                            <Text style={styles.statText}>{ex.reps} reps</Text>
-                                        </View>
-                                        {ex.description && !isExpanded && (
-                                            <Text style={styles.exerciseDescription} numberOfLines={2}>
-                                                {ex.description}
-                                            </Text>
-                                        )}
-                                    </View>
-                                    <View style={styles.rowActions}>
-                                        {isSelected && (
-                                            <View style={styles.checkCircle}>
-                                                <Check color={theme.white} size={14} />
-                                            </View>
-                                        )}
-                                        {/* Info toggle — separate from selection */}
-                                        <Pressable
-                                            onPress={() => setExpandedId(prev => prev === ex.id ? null : ex.id)}
-                                            hitSlop={8}
-                                            style={styles.chevronBtn}
-                                        >
-                                            {isExpanded
-                                                ? <ChevronUp color={theme.placeholder} size={16} />
-                                                : <ChevronDown color={theme.placeholder} size={16} />
-                                            }
-                                        </Pressable>
-                                    </View>
-                                </Pressable>
-
-                                {/* Expanded detail — GIF + full instructions */}
-                                {isExpanded && (
-                                    <View style={styles.detailPanel}>
-                                        {ex.imageUrl ? (
-                                            <Image
-                                                source={{ uri: ex.imageUrl }}
-                                                style={styles.exerciseGif}
-                                                resizeMode="contain"
-                                            />
-                                        ) : null}
-                                        {ex.description && (
-                                            <Text style={styles.descriptionText}>{ex.description}</Text>
-                                        )}
-                                    </View>
-                                )}
-                            </View>
-                        );
-                    })
+            <FlatList
+                style={styles.list}
+                contentContainerStyle={styles.listContent}
+                data={loadingExercises ? [] : filteredAlternatives}
+                renderItem={renderExercise}
+                keyExtractor={(exercise) => exercise.catalogExerciseId ?? exercise.id}
+                initialNumToRender={8}
+                maxToRenderPerBatch={8}
+                windowSize={5}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                ListHeaderComponent={(
+                    <>
+                        <Text style={styles.sectionLabel}>{(resolvedMuscleGroup ?? 'General').toUpperCase()} EXERCISES</Text>
+                        {catalogUnavailable ? (
+                            <Text style={styles.catalogUnavailableText}>
+                                Reconnect to use these preview exercises in your workout.
+                            </Text>
+                        ) : null}
+                    </>
                 )}
-            </ScrollView>
+                ListEmptyComponent={loadingExercises
+                    ? <ActivityIndicator color={theme.primary} style={styles.loadingIndicator} />
+                    : (
+                        <View style={styles.emptyWrap}>
+                            <Text style={styles.emptyText}>No exercises found</Text>
+                        </View>
+                    )}
+            />
 
             {/* Footer */}
             <View style={styles.footer}>
                 <Text style={styles.scopeLabel}>SCOPE</Text>
                 <View style={styles.scopeOptions}>
                     <Pressable
-                        style={[styles.scopeButton, scope === 'workout_only' && styles.scopeButtonSelected]}
+                        style={({ pressed }) => [
+                            styles.scopeButton,
+                            scope === 'workout_only' && styles.scopeButtonSelected,
+                            pressed && styles.rowPressed,
+                        ]}
                         onPress={() => setScope('workout_only')}
+                        hitSlop={4}
                         accessibilityRole="radio"
                         accessibilityState={{ checked: scope === 'workout_only' }}
                     >
@@ -351,8 +431,13 @@ export function SwapExerciseModal({ program, exerciseId, onClose, onSwap, embedd
                         <Text style={styles.switchDescription}>Changes this scheduled workout. Logged sets remain unchanged.</Text>
                     </Pressable>
                     <Pressable
-                        style={[styles.scopeButton, scope === 'rest_of_program' && styles.scopeButtonSelected]}
+                        style={({ pressed }) => [
+                            styles.scopeButton,
+                            scope === 'rest_of_program' && styles.scopeButtonSelected,
+                            pressed && styles.rowPressed,
+                        ]}
                         onPress={() => setScope('rest_of_program')}
+                        hitSlop={4}
                         accessibilityRole="radio"
                         accessibilityState={{ checked: scope === 'rest_of_program' }}
                     >
@@ -484,6 +569,12 @@ function createStyles(theme: Theme) {
             paddingVertical: 14,
             paddingBottom: 24,
         },
+        list: {
+            flex: 1,
+        },
+        loadingIndicator: {
+            marginTop: 20,
+        },
         sectionLabel: {
             color: theme.placeholder,
             fontSize: 11,
@@ -511,10 +602,17 @@ function createStyles(theme: Theme) {
             borderWidth: 2,
         },
         exerciseRow: {
-            padding: 14,
             flexDirection: 'row',
             alignItems: 'flex-start',
             gap: 12,
+        },
+        exerciseSelection: {
+            flex: 1,
+            minHeight: 72,
+            padding: 14,
+        },
+        rowPressed: {
+            opacity: 0.72,
         },
         exerciseName: {
             color: theme.textPrimary,
@@ -545,6 +643,8 @@ function createStyles(theme: Theme) {
         rowActions: {
             alignItems: 'center',
             gap: 8,
+            paddingTop: 10,
+            paddingRight: 6,
         },
         checkCircle: {
             width: 24,
@@ -555,7 +655,10 @@ function createStyles(theme: Theme) {
             justifyContent: 'center',
         },
         chevronBtn: {
-            padding: 2,
+            width: 44,
+            height: 44,
+            alignItems: 'center',
+            justifyContent: 'center',
         },
 
         detailPanel: {
