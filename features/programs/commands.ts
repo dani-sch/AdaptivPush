@@ -110,6 +110,9 @@ export async function executeProgramExerciseRevision(
     if (message.toLowerCase().includes('stale_revision')) {
       return { status: 'conflict', message: 'Your active program changed on another device. Refresh and try again.' };
     }
+    if (message.toLowerCase().includes('no eligible future uncompleted prescriptions')) {
+      return { status: 'validation', errors: ['No later uncompleted occurrences remain. Choose “This workout only” to keep this replacement in the selected workout.'] };
+    }
     reportSupabaseFailure('program.revise_exercise', error);
     return { status: 'unavailable', failure: classifySupabaseError(error), message: supabaseUserMessage(error, 'The future program update could not be confirmed. Keep your draft and retry to reconcile the same request.') };
   }

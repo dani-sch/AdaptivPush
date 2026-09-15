@@ -37,8 +37,8 @@ import {
 type SwapArgs = {
     exerciseId: string;
     replacement: WorkoutExercise;
-    applyToProgram: boolean;
-    scope?: 'selected_and_future' | 'future_after_current';
+    scope: 'workout_only' | 'rest_of_program';
+    startedWorkout?: boolean;
 };
 
 type DbProgram = {
@@ -728,11 +728,10 @@ function useCurrentProgramState() {
     applyProgressionRef.current = applyProgressionToNextWeek;
 
     const swapExercise = useCallback(
-        async ({ exerciseId, replacement, applyToProgram, scope = 'selected_and_future' }: SwapArgs) => {
+        async ({ exerciseId, replacement, scope, startedWorkout = false }: SwapArgs) => {
             // in the mapping above, exerciseId is the program_day_exercises row id (pde.id)
             // replacement.id should be the exercises.id from the exercises table
             if (!program) return;
-            const pdeId = exerciseId;
             const newExerciseId = replacement.exerciseId ?? replacement.id;
             if (!isCatalogExerciseId(newExerciseId)) {
                 throw new Error(
@@ -740,7 +739,7 @@ function useCurrentProgramState() {
                 );
             }
 
-            if (program.currentRevisionId && applyToProgram) {
+            if (program.currentRevisionId) {
                 const workout = program.workouts.find((candidate) => candidate.exercises.some(
                     (exercise) => exercise.id === exerciseId || exercise.stableSlotId === exerciseId,
                 ));
@@ -759,7 +758,9 @@ function useCurrentProgramState() {
                     currentStableSlotId: original.stableSlotId,
                     originalExerciseId: original.exerciseId,
                     replacementExerciseId: newExerciseId,
-                    includeCurrentDay: scope === 'selected_and_future',
+                    scope: scope === 'workout_only'
+                        ? 'selected_only'
+                        : startedWorkout ? 'future_after_current' : 'selected_and_future',
                 });
                 if (outcome.status === 'validation') throw new OperationFailureError({ category: 'validation', retryable: false }, outcome.errors.join(' '));
                 if (outcome.status === 'conflict') throw new OperationFailureError({ category: 'conflict', retryable: false }, outcome.message);
@@ -768,51 +769,7 @@ function useCurrentProgramState() {
                 return outcome;
             }
 
-            // find the PDE row to know the “original exercise” and parent program_day_id
-            const { data: pdeRow, error: pdeErr } = await supabase
-                .from('program_day_exercises')
-                .select('id, program_day_id, exercise_id')
-                .eq('id', pdeId)
-                .single<{ id: string; program_day_id: string; exercise_id: string }>();
-
-            if (pdeErr) throw pdeErr;
-
-            if (!applyToProgram) {
-                // update only this one row
-                const { error: updErr } = await supabase
-                    .from('program_day_exercises')
-                    .update({ exercise_id: newExerciseId, updated_at: new Date().toISOString() })
-                    .eq('id', pdeId);
-
-                if (updErr) throw updErr;
-                await refresh();
-                return;
-            }
-
-            // applyToProgram = true means: replace this exercise everywhere in the program
-            // Ww need to update all PDE rows in this program that currently reference old exercise_id
-            const oldExerciseId = pdeRow.exercise_id;
-
-            // get all program_day ids for this program (across all weeks)
-            const { data: allDays, error: allDaysErr } = await supabase
-                .from('program_days')
-                .select('id')
-                .eq('program_id', program.id);
-
-            if (allDaysErr) throw allDaysErr;
-
-            const dayIds = (allDays ?? []).map((d) => d.id);
-            if (dayIds.length === 0) return;
-
-            const { error: bulkErr } = await supabase
-                .from('program_day_exercises')
-                .update({ exercise_id: newExerciseId, updated_at: new Date().toISOString() })
-                .in('program_day_id', dayIds)
-                .eq('exercise_id', oldExerciseId);
-
-            if (bulkErr) throw bulkErr;
-
-            await refresh();
+            throw new Error('Revision-safe exercise swaps are unavailable for this program. Refresh it before trying again.');
         },
         [program, refresh],
     );

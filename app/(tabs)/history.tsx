@@ -20,7 +20,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 
 import { supabase } from '@/utils/supabase';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -61,8 +61,11 @@ interface WorkoutEntry {
 }
 
 interface SessionExerciseSet {
+  setId: string;
   setNumber: number;
-  weightLb: number | null;
+  loadValue: number | null;
+  loadUnit: 'lb' | 'kg' | 'none';
+  loadKind: 'external' | 'bodyweight' | 'assistance' | 'unknown';
   reps: number | null;
   rpe: number | null;
 }
@@ -234,7 +237,10 @@ const fetchSessionExercises = async (sessionId: string): Promise<SessionExercise
     .from('workout_exercise_sets')
     .select(`
       set_number,
-      weight_lb,
+      actual_set_id,
+      load_value,
+      load_unit,
+      load_kind,
       reps,
       rpe,
       exercise_id,
@@ -254,8 +260,11 @@ const fetchSessionExercises = async (sessionId: string): Promise<SessionExercise
       map.set(exId, { exerciseId: exId, name: exName, sets: [] });
     }
     map.get(exId)!.sets.push({
+      setId: row.actual_set_id,
       setNumber: row.set_number,
-      weightLb: row.weight_lb != null ? Number(row.weight_lb) : null,
+      loadValue: row.load_value != null ? Number(row.load_value) : null,
+      loadUnit: row.load_unit,
+      loadKind: row.load_kind,
       reps: row.reps != null ? Number(row.reps) : null,
       rpe: row.rpe != null ? Number(row.rpe) : null,
     });
@@ -419,11 +428,11 @@ export default function HistoryScreen() {
       }
 
       // Fetch PR count directly from personal_records table
-      const { count: prTotal } = await supabase
+      const { data: prRows } = await supabase
         .from('personal_records')
-        .select('*', { count: 'exact', head: true })
+        .select('exercise_id')
         .eq('user_id', user.id);
-      setPrCount(prTotal ?? 0);
+      setPrCount(new Set((prRows ?? []).map(row => row.exercise_id)).size);
 
       const sessionsResult = await fetchRowsFromTable('workout_sessions', user.id);
       const sessionsMissing = isMissingTableError(sessionsResult.error, 'workout_sessions');
@@ -634,6 +643,14 @@ export default function HistoryScreen() {
                 </Text>
               </View>
               <Pressable
+                style={styles.editWorkoutBtn}
+                onPress={() => detailWorkout && router.push({ pathname: '/edit-workout', params: { sessionId: detailWorkout.id } })}
+                accessibilityRole="button"
+                accessibilityLabel="Edit completed workout"
+              >
+                <Text style={styles.editWorkoutText}>Edit workout</Text>
+              </Pressable>
+              <Pressable
                 style={styles.sheetCloseBtn}
                 onPress={handleCloseDetail}
                 accessibilityRole="button"
@@ -677,10 +694,12 @@ export default function HistoryScreen() {
                     </View>
 
                     {ex.sets.map((s) => (
-                      <Text key={s.setNumber} style={styles.setRow}>
+                      <Text key={s.setId} style={styles.setRow}>
                         {`Set ${s.setNumber}`}
                         {'   '}
-                        {s.weightLb !== null ? `${s.weightLb} lb × ` : ''}
+                        {s.loadKind === 'bodyweight' ? 'Bodyweight × ' : ''}
+                        {s.loadKind === 'assistance' && s.loadValue !== null ? `${s.loadValue} ${s.loadUnit} assistance × ` : ''}
+                        {s.loadKind === 'external' && s.loadValue !== null ? `${s.loadValue} ${s.loadUnit} × ` : ''}
                         {s.reps !== null ? `${s.reps} reps` : '—'}
                         {s.rpe !== null ? `   @ RPE ${s.rpe}` : ''}
                       </Text>
@@ -937,6 +956,16 @@ function createStyles(theme: Theme) {
       borderColor: theme.border,
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    editWorkoutBtn: {
+      minHeight: 40,
+      justifyContent: 'center',
+      paddingHorizontal: 10,
+    },
+    editWorkoutText: {
+      color: theme.primary,
+      fontSize: 13,
+      fontWeight: '800',
     },
     sheetContent: {
       paddingHorizontal: 18,

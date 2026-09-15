@@ -2,13 +2,14 @@ import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import {
     ActivityIndicator,
     Image,
+    KeyboardAvoidingView,
+    Platform,
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
     TextInput,
     View,
-    Switch,
 } from 'react-native';
 // Images are served from Supabase Storage (public) — no auth headers needed.
 import { X, Search, Check, ChevronDown, ChevronUp } from 'lucide-react-native';
@@ -37,16 +38,16 @@ type Props = {
     onSwap: (args: {
         exerciseId: string;
         replacement: WorkoutExercise;
-        applyToProgram: boolean;
+        scope: 'workout_only' | 'rest_of_program';
     }) => unknown | Promise<unknown>;
 };
 
-export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwap, embedded }: Props) {
+export function SwapExerciseModal({ program, exerciseId, onClose, onSwap, embedded }: Props) {
     const { theme } = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
 
     const [searchQuery, setSearchQuery] = useState('');
-    const [applyToProgram, setApplyToProgram] = useState(false);
+    const [scope, setScope] = useState<'workout_only' | 'rest_of_program'>('workout_only');
     const [selectedExercise, setSelectedExercise] = useState<SwapOption | null>(null);
     const [applying, setApplying] = useState(false);
     const [applyError, setApplyError] = useState<string | null>(null);
@@ -77,6 +78,8 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
     const loadAlternatives = useCallback(async (
         muscleGroup: MuscleGroup | undefined,
         excludedExerciseId?: string,
+        preferredEquipment?: Equipment,
+        originalName?: string,
     ) => {
         setLoadingExercises(true);
         setSelectedExercise(null);
@@ -95,6 +98,11 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
             const { data, error } = await query;
 
             if (!error && data && data.length > 0) {
+                const { data: { session } } = await supabase.auth.getSession();
+                const { data: profile } = session ? await supabase.from('user_profile')
+                    .select('equipment_profile').eq('user_id', session.user.id).maybeSingle() : { data: null };
+                const availableEquipment = JSON.stringify(profile?.equipment_profile ?? '').toLowerCase();
+                const nameTokens = (originalName ?? '').toLowerCase().split(/\W+/).filter(token => token.length > 3);
                 const resolvedAlternatives = data.flatMap(ex => {
                     if (!isCatalogExerciseId(ex.id)) return [];
                     return [{
@@ -103,11 +111,17 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
                         name:        ex.name,
                         muscleGroup: ex.primary_muscle as MuscleGroup,
                         equipment:   ex.equipment as Equipment,
-                        sets:        3,
-                        reps:        '8–12',
+                        sets:        currentExercise?.sets,
+                        reps:        currentExercise?.reps,
                         imageUrl:    ex.image_url ?? undefined,
                         description: (ex.instructions as string[] | null)?.[0] ?? undefined,
                     }];
+                }).sort((left, right) => {
+                    const score = (option: SwapOption) =>
+                        (option.equipment === preferredEquipment ? 100 : 0)
+                        + (availableEquipment.includes(String(option.equipment).toLowerCase()) ? 50 : 0)
+                        + nameTokens.filter(token => option.name.toLowerCase().includes(token)).length * 10;
+                    return score(right) - score(left) || left.name.localeCompare(right.name);
                 });
                 if (resolvedAlternatives.length > 0) {
                     setAlternatives(resolvedAlternatives);
@@ -122,8 +136,8 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
                         name:        ex.name,
                         muscleGroup: ex.muscleGroup,
                         equipment:   ex.equipment,
-                        sets:        ex.defaultSets,
-                        reps:        `${ex.defaultRepMin}–${ex.defaultRepMax}`,
+                        sets:        currentExercise?.sets,
+                        reps:        currentExercise?.reps,
                     })));
                 }
             } else if (muscleGroup) {
@@ -134,19 +148,19 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
                     name:        ex.name,
                     muscleGroup: ex.muscleGroup,
                     equipment:   ex.equipment,
-                    sets:        ex.defaultSets,
-                    reps:        `${ex.defaultRepMin}–${ex.defaultRepMax}`,
+                    sets:        currentExercise?.sets,
+                    reps:        currentExercise?.reps,
                 })));
             }
         } finally {
             setLoadingExercises(false);
         }
-    }, []);
+    }, [currentExercise?.reps, currentExercise?.sets]);
 
     useEffect(() => {
         if (!currentExercise) return;
         void Promise.resolve().then(() =>
-            loadAlternatives(resolvedMuscleGroup, currentExercise.exerciseId),
+            loadAlternatives(resolvedMuscleGroup, currentExercise.exerciseId, currentExercise.equipment, currentExercise.name),
         );
     }, [currentExercise, loadAlternatives, resolvedMuscleGroup]);
 
@@ -166,6 +180,18 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
         setApplying(true);
         setApplyError(null);
         try {
+            const { data: historyRows } = await supabase.from('workout_exercise_sets')
+                .select('load_value, load_unit, load_kind, load_side')
+                .eq('exercise_id', catalogExerciseId)
+                .in('load_kind', ['external', 'assistance'])
+                .not('load_value', 'is', null)
+                .order('logged_at', { ascending: false })
+                .limit(1);
+            const history = historyRows?.[0];
+            const hasSuggestion = history
+                && Number.isFinite(Number(history.load_value))
+                && (history.load_unit === 'lb' || history.load_unit === 'kg')
+                && (history.load_kind === 'external' || history.load_kind === 'assistance');
             const applied = await onSwap({
                 exerciseId,
                 replacement: {
@@ -178,8 +204,14 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
                     reps:        selectedExercise.reps,
                     imageUrl:    selectedExercise.imageUrl,
                     description: selectedExercise.description,
+                    loadSuggestion: hasSuggestion ? {
+                        value: Number(history.load_value),
+                        unit: history.load_unit,
+                        kind: history.load_kind,
+                        side: history.load_side ?? 'unknown',
+                    } : undefined,
                 },
-                applyToProgram: context === 'workout' ? applyToProgram : true,
+                scope,
             });
             if (applied !== false) onClose();
         } catch (error) {
@@ -307,24 +339,29 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
 
             {/* Footer */}
             <View style={styles.footer}>
-                {context === 'workout' && (
-                    <View style={styles.switchRow}>
-                        <View style={styles.switchCopy}>
-                            <Text style={styles.switchText}>Also update future uncompleted workouts</Text>
-                            <Text style={styles.switchDescription}>
-                                Creates a new program revision. This workout stays frozen, and future replacement loads still need recalibration.
-                            </Text>
-                        </View>
-                        <Switch
-                            value={applyToProgram}
-                            onValueChange={setApplyToProgram}
-                            trackColor={{ false: theme.mutedBg, true: theme.primary }}
-                            thumbColor={theme.white}
-                            accessibilityLabel="Also update future uncompleted workouts"
-                            accessibilityHint="Creates an immutable successor program revision without changing this workout or completed history"
-                        />
-                    </View>
-                )}
+                <Text style={styles.scopeLabel}>SCOPE</Text>
+                <View style={styles.scopeOptions}>
+                    <Pressable
+                        style={[styles.scopeButton, scope === 'workout_only' && styles.scopeButtonSelected]}
+                        onPress={() => setScope('workout_only')}
+                        accessibilityRole="radio"
+                        accessibilityState={{ checked: scope === 'workout_only' }}
+                    >
+                        <Text style={styles.switchText}>This workout only</Text>
+                        <Text style={styles.switchDescription}>Changes this scheduled workout. Logged sets remain unchanged.</Text>
+                    </Pressable>
+                    <Pressable
+                        style={[styles.scopeButton, scope === 'rest_of_program' && styles.scopeButtonSelected]}
+                        onPress={() => setScope('rest_of_program')}
+                        accessibilityRole="radio"
+                        accessibilityState={{ checked: scope === 'rest_of_program' }}
+                    >
+                        <Text style={styles.switchText}>Rest of program</Text>
+                        <Text style={styles.switchDescription}>
+                            Changes this workout’s remaining work and later uncompleted occurrences. Completed history stays unchanged.
+                        </Text>
+                    </Pressable>
+                </View>
                 {applyError ? <Text style={styles.applyError} accessibilityLiveRegion="assertive">{applyError}</Text> : null}
 
                 <Pressable
@@ -343,7 +380,7 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
                             ? 'Saving…'
                             : selectedExercise && !canApplySelectedExercise
                             ? 'Reconnect to Apply'
-                            : 'Swap Exercise'}
+                            : 'Apply swap'}
                     </Text>
                 </Pressable>
             </View>
@@ -351,15 +388,18 @@ export function SwapExerciseModal({ program, exerciseId, context, onClose, onSwa
     );
 
     if (embedded) {
-        return <View style={styles.embeddedContainer}>{content}</View>;
+        return <KeyboardAvoidingView
+            style={styles.embeddedContainer}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >{content}</KeyboardAvoidingView>;
     }
 
     return (
         <View style={styles.backdrop}>
             <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-            <View style={styles.sheet}>
+            <KeyboardAvoidingView style={styles.sheet} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                 {content}
-            </View>
+            </KeyboardAvoidingView>
         </View>
     );
 }
@@ -553,14 +593,27 @@ function createStyles(theme: Theme) {
             backgroundColor: theme.surfaceBg,
             gap: 12,
         },
-        switchRow: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
+        scopeLabel: {
+            color: theme.placeholder,
+            fontSize: 11,
+            fontWeight: '800',
+            letterSpacing: 0.8,
         },
-        switchCopy: {
+        scopeOptions: {
+            flexDirection: 'row',
+            gap: 8,
+        },
+        scopeButton: {
             flex: 1,
-            paddingRight: 12,
+            minHeight: 72,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: theme.border,
+            padding: 10,
+        },
+        scopeButtonSelected: {
+            borderColor: theme.primary,
+            backgroundColor: theme.mutedBg,
         },
         switchText: {
             color: theme.textPrimary,

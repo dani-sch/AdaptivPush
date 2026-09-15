@@ -85,20 +85,24 @@ export function createProgramRepository(supabase: SupabaseClient, enabled = roll
   },
   async reviseExercise(input) {
     requireRollout(enabled, 'Future program exercise updates');
+    const payload = {
+      operationId: input.operationId,
+      programId: input.programId,
+      expectedRevision: input.expectedRevision,
+      expectedRevisionId: input.expectedRevisionId,
+      currentStableDayId: input.currentStableDayId,
+      currentStableSlotId: input.currentStableSlotId,
+      originalExerciseId: input.originalExerciseId,
+      replacementExerciseId: input.replacementExerciseId,
+      ...(input.scope === 'selected_only' ? {} : { includeCurrentDay: input.scope === 'selected_and_future' }),
+    };
     const { data, error } = await runSupabaseOperation(
-      (signal) => supabase.rpc('revise_program_exercise_v2', {
-        p_payload: {
-          operationId: input.operationId,
-          programId: input.programId,
-          expectedRevision: input.expectedRevision,
-          expectedRevisionId: input.expectedRevisionId,
-          currentStableDayId: input.currentStableDayId,
-          currentStableSlotId: input.currentStableSlotId,
-          originalExerciseId: input.originalExerciseId,
-          replacementExerciseId: input.replacementExerciseId,
-          includeCurrentDay: input.includeCurrentDay,
-        },
-      }).abortSignal(signal),
+      (signal) => supabase.rpc(
+        input.scope === 'selected_only'
+          ? 'revise_program_exercise_occurrence_v1'
+          : 'revise_program_exercise_v2',
+        { p_payload: payload },
+      ).abortSignal(signal),
       { kind: 'write', operation: 'program.revise_exercise' },
     );
     if (error) throw error;

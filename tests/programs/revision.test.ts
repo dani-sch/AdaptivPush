@@ -18,7 +18,7 @@ const request: ProgramExerciseRevisionRequest = {
   currentStableSlotId: '50000000-0000-4000-8000-000000000001',
   originalExerciseId: '60000000-0000-4000-8000-000000000001',
   replacementExerciseId: '60000000-0000-4000-8000-000000000002',
-  includeCurrentDay: false,
+  scope: 'future_after_current',
 };
 const receipt: ProgramExerciseRevisionReceipt = {
   operationId,
@@ -76,6 +76,16 @@ test('future revision failure leaves a distinct unavailable outcome', async () =
     failure: { category: 'offline', retryable: true, status: undefined, code: undefined },
     message: 'You appear to be offline. Check your connection and try again.',
   });
+});
+
+test('final occurrence explains that one-workout scope is still available', async () => {
+  const outcome = await executeProgramExerciseRevision(
+    repository(async () => { throw new Error('invalid_input: no eligible future uncompleted prescriptions'); }),
+    operationId,
+    request,
+  );
+  assert.equal(outcome.status, 'validation');
+  if (outcome.status === 'validation') assert.match(outcome.errors.join(' '), /This workout only/i);
 });
 
 test('incomplete revision identity is rejected before the repository call', async () => {

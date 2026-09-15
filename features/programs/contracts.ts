@@ -77,7 +77,7 @@ export interface ProgramExerciseRevisionRequest {
   currentStableSlotId: string;
   originalExerciseId: string;
   replacementExerciseId: string;
-  includeCurrentDay: boolean;
+  scope: 'selected_only' | 'selected_and_future' | 'future_after_current';
 }
 
 export interface ProgramExerciseRevisionReceipt {
