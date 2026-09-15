@@ -1,5 +1,29 @@
 # AdaptivPush current state
 
+## September 15 controlling rollout state
+
+The user explicitly authorized the hosted AP-02/AP-03 migrations and writer
+enablement after agent-run backup/restore and technical verification. This
+replaces all earlier pre-migration local/manual/QA-account, physical-device,
+signing, standalone-build and distribution gates below. Acceptance follows
+deployment using the existing account, ordinary `npm start` and Expo Go QR.
+
+Fresh inspection: expected project `thfxcvxcsfvrzdysdnkq`, PostgreSQL 17.6,
+only AP-01 ledger entries, missing revision table, normal served iOS bundle
+targeting that project with both writers off. Exact two-migration dry-run passes.
+**Blocked before fresh backup/restore:** Docker Desktop Linux engine fails at
+its `dockerInference` runtime socket. Supported restart did not recover it;
+automatic review rejected process/socket cleanup. No production writes,
+configuration changes or fresh private dumps occurred. Existing encrypted
+AP-01 artifacts hash-match but are stale and exclude Storage bodies.
+
+Resume agent-run recovery and deployment after Docker is operational while
+preserving volumes. No new rollout consent or local user QA is needed. Physical
+iPhone acceptance and recurring native startup behavior remain unverified.
+The [September 15 report section](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md)
+supersedes earlier rollout sequencing below; retained earlier measurements do
+not establish current production functionality. AP-04/AP-05 remain out of scope.
+
 ## Planning and code posture
 
 - September 14 iPhone remediation: typed program failures and shared strict workout-entry availability are implemented and tested; legacy views no longer promise a start without durable identity. A LAN synthetic QA route and verified enabled/disabled iOS Expo Go bundles are prepared. The original/current production-targeted bundle has writers off and production still lacks the durable schema. App Store Expo Go SDK 57 / iOS 26.6.1 is user-reported; physical cold launch and five-flow retest remain unverified. The [release addendum](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md) owns current evidence and the [manual matrix](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-MANUAL-QA-2026-09-14.md) owns precise retest steps. Signed native/signing identity, accessibility and production backup/migration gates remain open; Expo Go preparation does not close them.

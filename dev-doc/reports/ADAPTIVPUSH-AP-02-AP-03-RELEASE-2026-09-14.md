@@ -1,5 +1,80 @@
 # AP-02/AP-03 durable-record release packet - 2026-09-14
 
+## Hosted rollout attempt - September 15, current authority
+
+**BLOCKED BEFORE BACKUP/RESTORE; HOSTED DATABASE UNCHANGED.** The user's
+September 15 instruction explicitly authorizes the in-scope production migrations
+and writer enablement after agent-run recovery and technical verification. It
+supersedes every earlier pre-migration local/manual/QA-account, physical-device,
+Apple-signing, TestFlight, standalone-build and distribution prerequisite in this
+packet. Acceptance follows deployment through the existing account and ordinary
+`npm start` Expo Go QR. No physical acceptance pass is claimed. AP-04/AP-05 remain
+out of scope. Earlier dated evidence below is preserved, not current gate authority.
+
+### Fresh verified state
+
+- Intake source `5e6b0f5` was clean; work is contained on
+  `codex/ap02-ap03-hosted-rollout`. Integrator intake was clean `fae2a4a`.
+- Stored DPAPI authentication and CLI `2.117.0` verified the linked, healthy
+  project `thfxcvxcsfvrzdysdnkq`. Direct read-only SQL verified PostgreSQL `17.6`
+  using certificate and hostname verification with the Supabase CA. The initial
+  Node default trust-store rejection was resolved by supplying that CA, without
+  disabling TLS verification.
+- Hosted ledger remains exactly `20260910175317`, `20260910190000`;
+  `public.program_revisions` is absent. Safe counts: 91 programs, 1,135 days,
+  4,924 slots, 51 workout sessions, 78 sets, zero duplicate-active owners and
+  20 Storage metadata objects. No private rows or credentials were printed.
+- Exact CLI `db push --linked --dry-run` at `2026-09-15T14:48:14Z` passed and
+  listed only `20260910210000_ap02_ap03_durable_workouts_and_program_revisions.sql`
+  followed by `20260911120000_ap03_revision_safe_exercise_swap.sql`. Their byte
+  hashes still match `FB50D57063E5AE1B3BAFD863060818C6795E2A7E01026960F1A66558B70BFA64`
+  and `60399252D076A2B72823CF19C3A62308A750C78DDEFAB7AC64F1DDCF6B77D9A0`.
+  Neither migration was applied or edited. Full restored-data migration review,
+  schema-drift comparison, concurrent-write deployment sequencing and production
+  RPC/security/write probes remain incomplete.
+- Normal command is `npm start` (`expo start`). Existing Metro PID 29456 on
+  port 8081 serves the expected hosted URL/public key. The freshly requested iOS
+  bundle SHA-256 is `4ac3f975b2e8e89b55d6af745bd23d07571fe73c241d4e6cc3c75f269c39c0d2`.
+  Both flag expressions compare absent Expo environment definitions with `true`,
+  so both are false. `.env` and Process/User/Machine scopes contain no writer
+  overrides. The privileged service-key value is absent from that bundle.
+  Configuration and Metro were not changed; no enabled bundle is claimed.
+
+### Concrete recovery blocker and safe continuation
+
+Docker Desktop was stopped. Starting it failed while initializing its inference
+manager: the `dockerInference` runtime socket could not be removed/accessed
+(`The file cannot be accessed by the system`; invalid listener path). Automatic
+approval review rejected the attempted process cleanup/socket removal with
+`blocked by policy` and no further reason. Supported `docker desktop restart`
+also failed to return an operational engine; its waiting CLI was interrupted.
+No Docker reset or volume deletion was performed.
+
+The smallest missing prerequisite is an operational Docker Desktop Linux engine
+that preserves the existing volumes. **No new production backup was captured or
+restored.** Existing AP-01 backup/key hashes were freshly matched to their manifest:
+`C78618BD07FEB5BCAADB3E69997CE7C9C6C3AB47BC0252B9F89170CFDE387AFC` and
+`B13A2C12D807BB00949E41EDC4DB1EED9581315DB056195BE96B68FFCEB9B174`.
+That September 10 logical backup is stale for this rollout and excludes Storage
+object bodies; it cannot justify deployment or an automatic production restore.
+No plaintext private dumps were created. Existing recovery material is preserved.
+
+After engine recovery, continue with a fresh AES-256-GCM/DPAPI backup, isolated
+PostgreSQL 17 decrypt/restore and aggregate/history/provenance comparisons, exact
+drift/migration review and bounded concurrent-write sequence, then apply and
+verify the authorized packet. Only after hosted readiness passes, enable both
+flags in normal `.env`, clear/restart ordinary Metro and inspect its served iOS
+bundle. Failed deployment verification must disable affected producers and
+preserve newer writes for a forward correction; never reset/restore over them.
+The user does not need to reconfirm rollout authorization or operate local QA.
+
+Safe evidence and inspection helpers are outside Git at
+`C:\Users\dani2\AppData\Local\AdaptivPush\release-evidence\2026-09-15`:
+`hosted-before.json`, `bundle-before.json`, `dry-run.json`. No application or SQL
+source changed. Deployment, fresh recovery, functional write verification and
+physical iPhone acceptance remain unperformed. Documentation verification and
+integration binding are recorded in that directory's closeout manifest.
+
 ## iPhone failure remediation - September 14, current addendum
 
 **IMPLEMENTED AND LOCALLY VERIFIED; iOS acceptance and production release remain blocked.**

@@ -1,5 +1,34 @@
 # AdaptivPush active task board
 
+## [BLOCKED: RECOVERY TOOLING] September 15 hosted AP-02/AP-03 rollout
+
+This section supersedes earlier AP-02/AP-03 pre-migration manual/local QA,
+native-signing, standalone-build and distribution prerequisites below. The user
+explicitly authorized production rollout after agent-run backup/restore and
+technical verification; existing-account Expo Go acceptance follows deployment.
+
+- [COMPLETE] Preserve clean `5e6b0f5` on feature branch
+  `codex/ap02-ap03-hosted-rollout`; verify DPAPI authentication, expected project,
+  PostgreSQL 17.6, AP-01-only ledger and missing durable schema.
+- [COMPLETE] Recheck exact migration hashes and hosted two-file dry-run; inspect
+  ordinary port 8081 iOS bundle: expected hosted backend, both writers off,
+  privileged key absent. Recheck historical encrypted backup/key hashes.
+- [BLOCKED] Recover Docker Desktop's Linux engine without resetting/deleting
+  volumes. Startup fails on `dockerInference`; supported restart did not recover
+  it and automatic review rejected process/socket cleanup.
+- [OPEN] Capture fresh encrypted backup and prove isolated PostgreSQL 17 restore;
+  complete drift/backfill/history review and bounded concurrent-write sequence.
+- [OPEN] Apply only reviewed in-scope migrations; verify hosted RPCs, isolation,
+  atomicity/replay, legitimate legacy identities and preserved history.
+- [OPEN] Enable both flags in normal `.env`, clear/restart ordinary Metro, inspect
+  served iOS bundle and finish functional/integration verification.
+- [OPEN: POST-DEPLOYMENT] User runs `npm start`, scans its ordinary QR and tests
+  five actions with the existing account. No local QA account or signing setup.
+
+No production changes or fresh recovery proof exist from this attempt. The
+[release report](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md)
+owns exact safe evidence. AP-04/AP-05 are not started.
+
 ## [COMPLETE] Documentation consolidation
 
 - [COMPLETE] Inventory 61 source documents and preserve 12 superseded authorities plus 12 prior operational snapshots.

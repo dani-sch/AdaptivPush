@@ -1,5 +1,23 @@
 # AdaptivPush modular execution register
 
+## September 15 controlling AP-02/AP-03 execution gate
+
+**HOSTED ROLLOUT BLOCKED BEFORE FRESH RECOVERY.** Explicit user authorization
+replaces every earlier pre-migration local/manual/QA-account, physical-device,
+Apple-signing, standalone-build and distribution requirement below. After
+agent-run backup/isolated restore and technical verification, apply the in-scope
+hosted packet and enable both normal Expo writers without reconfirmation.
+Existing-account phone acceptance follows deployment through `npm start` and
+its ordinary Expo Go QR. No alternate local user testing environment is required.
+
+Fresh expected-project authentication, AP-01-only ledger, missing durable schema,
+migration hashes and exact hosted dry-run are verified. Docker's Linux engine
+fails on its inference socket, so fresh backup/restore and deployment remain
+unperformed. Recover the engine preserving volumes, then resume the authorized
+sequence in the [release report](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md).
+No physical pass is inferred. Earlier dated acceptance inventories remain
+coverage references, not a contrary rollout gate. AP-04/AP-05 remain out of scope.
+
 ## Authority and status
 
 **Current AP-02/AP-03 platform scope: iOS-first, as directed by the user.**

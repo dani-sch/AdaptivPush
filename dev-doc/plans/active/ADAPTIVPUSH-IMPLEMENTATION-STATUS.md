@@ -1,5 +1,22 @@
 # AdaptivPush code-backed implementation status
 
+## September 15 current hosted state
+
+Production rollout remains incomplete: fresh authenticated SQL confirms only
+AP-01 migrations and no `program_revisions`; the ordinary iOS bundle targets
+`thfxcvxcsfvrzdysdnkq` with both writers off. Exact pending-file hashes and hosted
+two-file dry-run pass. Docker startup failure blocks the fresh encrypted backup
+and isolated restore prerequisite; no migrations, application changes, writer
+enablement or physical iPhone passes occurred in this attempt.
+
+The user's September 15 authorization replaces earlier pre-migration manual/
+local QA-account, physical-device, signing, standalone-build and distribution
+gates in this document. Agent recovery and technical verification precede the
+authorized deployment; normal existing-account Expo Go acceptance follows it.
+See the [current release section](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md)
+for exact evidence and recovery blocker. Earlier source/test observations below
+remain dated evidence; they do not imply hosted functionality is fixed.
+
 Snapshot: 2026-09-14 for the bounded AP-02/AP-03 release update; unrelated source observations retain their earlier scope. This document owns implementation facts and unresolved code defects. The [master plan](/dev-doc/plans/active/ADAPTIVPUSH-MASTER-PLAN.md) owns target product behavior; the [execution register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) owns delivery status and gates; the [database plan](/dev-doc/plans/active/ADAPTIVPUSH-DATABASE-PLAN.md) owns schema evolution. Approved decisions override historical product proposals, but do not make target behavior implemented.
 
 ## Evidence boundaries
