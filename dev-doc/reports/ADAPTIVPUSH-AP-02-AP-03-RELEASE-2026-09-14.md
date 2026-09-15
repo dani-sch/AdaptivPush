@@ -1,6 +1,157 @@
 # AP-02/AP-03 durable-record release packet - 2026-09-14
 
-## Hosted rollout attempt - September 15, current authority
+## September 15 final result - hosted deployed, phone acceptance open
+
+**The actual hosted database is updated and both ordinary Expo writers are
+enabled.** This section supersedes the earlier blocked September 15 checkpoint
+and all September 14 pre-migration local/manual/signing/distribution gates below.
+The user explicitly authorized production changes after agent-run recovery and
+technical verification, with subsequent existing-account acceptance through
+ordinary `npm start` and its Expo Go QR. No new consent or separate QA setup is
+needed. No physical iPhone pass is claimed. AP-04/AP-05 were not started.
+
+### What actually shipped
+
+Project `thfxcvxcsfvrzdysdnkq`, PostgreSQL 17.6, committed at
+`2026-09-15T15:09:06.791Z`. The original two reviewed artifacts were unchanged.
+An additive correction addresses the reproduced legacy-revision rejection and
+protects revisioned legacy prescriptions from direct client mutation.
+
+| Applied version | Purpose | SHA-256 of applied bytes |
+|---|---|---|
+| `20260910210000` | Durable finalization, installations, revision backfill and archive/restore | `fb50d57063e5ae1b3bafd863060818c6795e2a7e01026960f1a66558b70bfa64` |
+| `20260911120000` | Immutable future exercise revision command | `60399252d076a2b72823cf19c3a62308a750c78ddefab7ac64f1ddcf6b77d9a0` |
+| `20260915151000` | Permit validated migrated-legacy successors, preserve provenance and deny direct revision mutations | `a40d326c25e0d7bd715783c7bd3974b0288538ded71afe682959dc57aba99130` |
+
+The final exact CLI dry-run listed those three files only. The deployment runner
+verified recovery hashes, project/version, AP-01-only ledger and exact schema
+against the untouched restored copy, then locked all 16 original public tables
+with a five-second lock timeout and 90-second statement timeout. It applied the
+three files and their version/name/statements ledger rows in **one transaction**.
+Original-column row fingerprints were identical before/after under those locks;
+the resulting schema matched the full rehearsal before COMMIT. PostgREST reload
+was notified transactionally. The ledger now has the two AP-01 and three new
+versions. No baseline replay, history repair, production reset, customer-record
+deletion or unrelated migration occurred.
+
+Code commits: `f865cfd` removes duplicated save recovery text; `7cc4051` adds
+the legacy correction and its SQL variant. Integrator code merge `8917bfd`
+independently passed application/availability tests, TypeScript and lint.
+Final documentation integration and clean-state identifiers are recorded in
+the external closeout manifest; earlier blocked checkpoint `3df6213` is
+historical and does not describe the final database.
+
+### Recovery proof and custody
+
+Docker's initial inference-socket startup failure recovered after the delayed
+supported restart; no reset or manual socket deletion was needed. Automatic
+approval review had rejected the earlier process/socket cleanup attempt with
+`blocked by policy`; that rejection did not block the supported recovery path.
+
+Fresh recovery directory:
+`C:\Users\dani2\AdaptivPush-secure-backups\AP-02-AP-03\20260915T145353Z`.
+Custodian `dani-sch`; access restricted to the current Windows identity;
+retention is 30 days after verified rollout. Prior AP-01 material is preserved.
+The PostgreSQL 17 custom dump includes schema/data plus auth, Storage metadata
+and migration ledger. It shares an exported repeatable-read snapshot with its
+comparison inventory. CLI 2.117.0 role export and encrypted supplemental role
+metadata cover managed-role dependencies; database login password hashes are
+excluded. No plaintext private dump was written to disk.
+
+| Recovery artifact | Encrypted/key SHA-256 |
+|---|---|
+| `database.dump.apbak` (770,434 bytes) | `b7df6b1d7890ba975760276dbcd7143637d86aad3f33a72da72648a42f60a49c` |
+| `roles.sql.apbak` | `494fe9b94cfef3dbc6c59e0ca4bdc73a1e352e1f1fdb0e6cdfb2ff79c7640f48` |
+| `role-catalog.json.apbak` | `69a2d4f4faa1d54151459d633f2c29aab72a03abd68e2ee763d8b0b73bb41c1f` |
+| `backup.key.dpapi` | `eafda0b396c5343f7a043b694c288629f535be6691eeb142b78b48211e90d67f` |
+
+Plain dump SHA-256 (checked only in memory):
+`2a3e7f91aa30b1a27eae29dc14984351da4d403ff3da1b7bbec31d03ec9ea5aa`.
+The manifest contains all source hashes, AES-256-GCM envelope layout, timestamps
+and exclusions. Decryption authenticates the GCM tag and checks both encrypted
+and plaintext hashes. The random key is protected by Windows DPAPI CurrentUser.
+
+Restore completed at `14:58:10Z` into a dedicated PostgreSQL 17.6 container,
+network `none`, zero published ports. All 48 relations matched count and full-row
+hash. Public columns, constraints, indexes, functions, ordinary-role grants, RLS
+and public/Storage policies matched under a common search path. Role metadata
+supplied the missing `supabase_realtime_admin` dependency. `--no-owner` maps
+object ownership to the isolated administrator; ACLs/ordinary role settings were
+restored and verified. Hosted owner/password/platform recovery remains a separate
+operator concern. Auth signup trigger is included in the full dump.
+
+Baseline comparison differences were explained: enum-related column order,
+CRLF/LF function source and the already-documented duplicate readiness unique
+constraint collapsed by baseline replay. No distinct invariant differed and
+the hosted duplicate was preserved. The complete three-file packet also passed
+an atomic rehearsal on an untouched copy of the restored real data.
+
+Recovery procedure: disable the affected public writer flags and clear/restart
+Metro; preserve drafts, receipts, checkpoints and newer database writes. Recheck
+the manifest hashes, unprotect the key as the same Windows identity, authenticate
+and decrypt the envelope, and restore only into a new isolated PostgreSQL 17
+target. Compare data/security before designing a forward correction or separately
+reviewed recovery. Never automatically restore this pre-deployment snapshot over
+newer production writes. Helpers `Restore-Backup.ps1`, `restore.cjs` and their
+safe dependencies remain with external evidence. Storage object bodies (20
+metadata entries at capture), Edge deployments, external provider configuration,
+platform secrets and infrastructure settings are not backed up. This is a logical
+recovery point, not PITR or a hosted recovery-time guarantee.
+
+### Automated verification and effective launch
+
+| Check | Result |
+|---|---|
+| Unit cases | 66 unique passes: dependencies 1, workouts 24, programs 19, availability 13, catalog 9 |
+| TypeScript / lint | Pass; zero lint errors, three unchanged unrelated unused-variable warnings |
+| Full restored-data SQL | AP-01 isolation, AP-02/AP-03 atomicity, installed-revision and migrated-legacy revision variants pass |
+| Concurrent connections | Six assertions pass: install/finalize/revision/archive/restore replay, competing installs and cleanup |
+| Hosted probes | The four SQL variants pass with fresh synthetic UUIDs inside transactions ending in ROLLBACK; no local test accounts were uploaded |
+| Hosted ledger / schema | Exactly five ledger entries; matches complete tested schema; all five RPCs exposed in PostgREST OpenAPI |
+| Authentication / ownership | Auth health 200; anon RPCs rejected with 401/42501; authenticated-role cross-owner/catalog/direct-mutation assertions pass |
+| Backfill / history | 91 migration snapshots; zero missing program/day/slot lineage; 15 approximate archives retained; no duplicate active owner |
+| Final preservation | All 47 original non-ledger relations still match capture-time original-column row counts/hashes after all hosted probes |
+| Integrator | Merge `8917bfd`: AP suites, availability, strict TypeScript and lint pass independently |
+| Fresh iOS bundle | Expected hosted URL/public key; both actual Expo env getters return `true`; privileged service key absent |
+
+Normal `.env` now contains `EXPO_PUBLIC_AP02_DURABLE_WRITER=true` and
+`EXPO_PUBLIC_AP03_ATOMIC_WRITER=true`, with its existing hosted URL/public key
+preserved. `.env` remains ignored; no privileged key entered source or the bundle.
+No Process/User/Machine overrides were present. The original Metro was replaced
+with a cleared-cache normal port-8081 session. Its fresh 3,928-module iOS bundle
+SHA-256 is `30b4f689ae093d527fca58189dac2582250978416cc522aa343b4e5e66d5983c`,
+verified at `15:12:16Z`. Both actual getter values were checked, not inferred
+from the environment edit. The task's verification Metro helper was stopped
+afterward so the default port is free for the user's ordinary `npm start` and
+normal terminal QR. The task-created private restore container was removed after
+proof; encrypted recovery artifacts and reproducible helpers remain preserved.
+
+### Remaining limits and user acceptance
+
+No physical iPhone cold-launch, interaction, reopen/persistence or accessibility
+pass was performed. No recurring native crash was observed in a connected Expo
+Go device, so native resolution is unverified; notification warnings are not
+treated as the cause of program failures. SQL/HTTP/bundle proof is separate from
+physical acceptance and signed distribution, which was not part of this rollout.
+
+There are **32 pre-existing empty non-rest days, five in active programs**, across
+the hosted data. Their content is absent before deployment; identities cannot
+reconstruct missing prescriptions. They remain preserved and unstartable rather
+than receiving invented exercises. Complete existing workouts now have persisted
+identities, and new installations use the complete atomic path. This limitation
+means the task does not claim every historical empty workout is repaired.
+
+Use the [ordinary five-action checklist](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-MANUAL-QA-2026-09-14.md):
+Home/Plan start and finish; generated save; custom save; end/archive; restore and
+start. Reopen after accepted changes to verify device persistence. All use the
+existing account and ordinary Expo Go QR; no alternate ports or QA account.
+
+Safe results, helper source, logs and manifests remain at
+`C:\Users\dani2\AppData\Local\AdaptivPush\release-evidence\2026-09-15`.
+The final manifest binds recovery, deployment, bundle, source and integrator
+hashes. Reports below retain their exact earlier observations as provenance.
+
+## Hosted rollout attempt - September 15, superseded intermediate checkpoint
 
 **BLOCKED BEFORE BACKUP/RESTORE; HOSTED DATABASE UNCHANGED.** The user's
 September 15 instruction explicitly authorizes the in-scope production migrations

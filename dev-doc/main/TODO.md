@@ -1,34 +1,5 @@
 # AdaptivPush active task board
 
-## [BLOCKED: RECOVERY TOOLING] September 15 hosted AP-02/AP-03 rollout
-
-This section supersedes earlier AP-02/AP-03 pre-migration manual/local QA,
-native-signing, standalone-build and distribution prerequisites below. The user
-explicitly authorized production rollout after agent-run backup/restore and
-technical verification; existing-account Expo Go acceptance follows deployment.
-
-- [COMPLETE] Preserve clean `5e6b0f5` on feature branch
-  `codex/ap02-ap03-hosted-rollout`; verify DPAPI authentication, expected project,
-  PostgreSQL 17.6, AP-01-only ledger and missing durable schema.
-- [COMPLETE] Recheck exact migration hashes and hosted two-file dry-run; inspect
-  ordinary port 8081 iOS bundle: expected hosted backend, both writers off,
-  privileged key absent. Recheck historical encrypted backup/key hashes.
-- [BLOCKED] Recover Docker Desktop's Linux engine without resetting/deleting
-  volumes. Startup fails on `dockerInference`; supported restart did not recover
-  it and automatic review rejected process/socket cleanup.
-- [OPEN] Capture fresh encrypted backup and prove isolated PostgreSQL 17 restore;
-  complete drift/backfill/history review and bounded concurrent-write sequence.
-- [OPEN] Apply only reviewed in-scope migrations; verify hosted RPCs, isolation,
-  atomicity/replay, legitimate legacy identities and preserved history.
-- [OPEN] Enable both flags in normal `.env`, clear/restart ordinary Metro, inspect
-  served iOS bundle and finish functional/integration verification.
-- [OPEN: POST-DEPLOYMENT] User runs `npm start`, scans its ordinary QR and tests
-  five actions with the existing account. No local QA account or signing setup.
-
-No production changes or fresh recovery proof exist from this attempt. The
-[release report](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md)
-owns exact safe evidence. AP-04/AP-05 are not started.
-
 ## [COMPLETE] Documentation consolidation
 
 - [COMPLETE] Inventory 61 source documents and preserve 12 superseded authorities plus 12 prior operational snapshots.
@@ -65,31 +36,19 @@ owns exact safe evidence. AP-04/AP-05 are not started.
 - [COMPLETE] Configure the `integrator` worktree and pass the later AP-02/AP-03 clean integration gates.
 - [OPEN] Provide an Expo-capable device for the remaining AP-01 application compatibility matrix.
 
-## [INTEGRATION VERIFIED — RELEASE BLOCKED] AP-02/AP-03 — Durable records
+## [HOSTED DEPLOYED; PHONE ACCEPTANCE OPEN] AP-02/AP-03
 
-- [COMPLETE] Resolve typed disabled/schema/auth/conflict/validation outcomes and align legacy Plan/Home availability with strict workout entry; verify 65 unique unit cases, SQL/concurrency, real AP-01 migration backfill and shipped commands over synthetic LAN HTTP. Prepare correctly verified Enabled/Disabled iOS exports and Metro sessions; preserve production writers off.
-- [OPEN] Obtain physical iPhone Safari reachability, clean Expo Go launch and five-flow results using the current [retest instructions](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-MANUAL-QA-2026-09-14.md). User reports App Store Expo Go SDK 57 / iOS 26.6.1; original native startup cause and corrected phone behavior remain unverified. Separate signed-native build/signing and remaining accessibility/manual gates are still open.
+- [COMPLETE] Preserve existing work on `codex/ap02-ap03-hosted-rollout`; use focused commits and integrator `8917bfd` for code verification.
+- [COMPLETE] Verify expected project/PG17 identity, ledger, exact reviewed hashes and dry-run. Explain baseline replay normalization; preserve all hosted objects.
+- [COMPLETE] Recover the Docker Linux engine, capture fresh encrypted consistent snapshot and DPAPI key, restore in network isolation, and match all 48 relation fingerprints plus schema/security.
+- [COMPLETE] Deploy `20260910210000`, `20260911120000` and `20260915151000` atomically with their ledger entries, bounded locks and before/after original-data checks.
+- [COMPLETE] Verify hosted install/finalize/archive/restore/revision functions, owner isolation, anonymous denial, immutable legacy successors, provenance, atomic failure and replay using rolled-back probes. All 47 original non-ledger relations still match.
+- [COMPLETE] Enable both writer flags in normal `.env`, clear/restart Metro and inspect the actual iOS bundle: correct hosted URL, true/true flags and no privileged key. Remove duplicated save recovery text.
+- [COMPLETE] Pass 66 unique unit cases, TypeScript/lint, four SQL variants, six concurrent assertions and independent integrator checks.
+- [OPEN: POST-DEPLOYMENT] User runs `npm start`, scans its ordinary QR and checks Home/Plan start, generated save, custom save, archive/end and restore/start, then reopens to check persistence. Existing account; no separate QA setup or signing prerequisite.
+- [OPEN] Physical iPhone startup/accessibility acceptance. Preserve and disclose the 32 pre-existing empty non-rest days; missing prescriptions cannot be reconstructed safely from these rows.
 
-- [COMPLETE] Add versioned workout/program contracts, stable identities, frozen prescriptions and actual-versus-planned/load semantics.
-- [COMPLETE] Add owner-scoped durable pending stores and replay-safe common repositories/commands.
-- [COMPLETE] Add the two-migration packet: `20260910210000` supplies immutable program revisions, one-active-per-owner, exact V2 checkpoints, transactional install/finalize RPCs, direct-write denial and receipts; `20260911120000` supplies revision-safe future exercise swaps. Both remain local-only pending the production release gates.
-- [COMPLETE] Route generated/manual program saves and Next Workout through the common commands; remove false completion and visible development-program behavior.
-- [COMPLETE] Pass focused contract tests, AP-01 regression SQL, AP-02/AP-03 atomicity/isolation SQL, fresh reset, database lint, strict types, lint and clean integrator verification.
-- [COMPLETE; September 11 historical emulator evidence] Establish a local Android 16 native development build and prove generated save fails before server mutation with the writer off, then installs one complete schema-v2 hierarchy with it on.
-- [COMPLETE; September 11 historical emulator evidence] Locally verify the bounded swap/route matrix on Android 16: Home and Plan entry, current-only zero/partial swaps, completed-set attribution, explicit recalibration, future immutable successor revision, reload, background/foreground, kill/reopen, cold offline recovery, stale route and actual account switching.
-- [COMPLETE] Declare Expo-compatible `@react-navigation/native`, align SDK patch dependencies, pass Metro export and native debug build, and confirm no duplicate navigation core.
-- [COMPLETE] Merge the bounded hardening packet as integrator commit `54e5a39` and rerun focused/static, Expo Doctor, fresh-reset/SQL, 3,819-module Metro and 435-task native debug assembly gates there.
-- [OPEN] Complete physical-iPhone Expo/development-build comparison, manual program, archive/restore, old-client, Dynamic Type, VoiceOver and theme coverage on the identified iOS candidate.
-- [COMPLETE] Verify secure Supabase CLI/database authentication for `thfxcvxcsfvrzdysdnkq` using the local DPAPI-protected credential helper on September 14. No production migration or new backup was performed by this authentication step.
-- [COMPLETE] Implement bounded September 14 corrections for exact replay requests, finalized/pending draft protection, load semantics, ancestor-completed revision protection, exact archive elapsed checkpoint, owner-pinned installation, archive compatibility/isolation and accessible read-only entry controls. The [release report](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md) owns final gate results; earlier integration evidence does not verify this new diff.
-- [COMPLETE] Shared-source automated verification and supplementary Android builds: 59 unit cases, strict types, lint, Expo Doctor, both Metro platforms, standard/embedded native debug builds, fresh PostgreSQL 17 reset/lint/three SQL suites/six concurrency assertions. Clean source `42f317d` and integrator `7cdf598` are bound in the release report.
-- [OPEN] Prepare the iOS native candidate: verified bundle identity/signing, install route, enabled/disabled variants and iPhone-reachable nonproduction backend. Android artifacts and iOS Metro export do not complete this preparation.
-- [BLOCKED] After iOS candidate preparation, obtain user results from the [iOS manual QA matrix](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-MANUAL-QA-2026-09-14.md). No current physical-device/accessibility passes are inferred from historical emulator evidence.
-- [BLOCKED] After the user's required pre-migration passes, capture a fresh encrypted production logical backup, prove isolated PostgreSQL 17 decrypt/restore equivalence, and dry-run/apply/verify exactly the two reviewed migrations. The earlier AP-01 recovery set is not a fresh recovery point for this packet.
-- [OPEN] Enable `EXPO_PUBLIC_AP02_DURABLE_WRITER` and `EXPO_PUBLIC_AP03_ATOMIC_WRITER` only after all release gates pass; monitor conflicts/replays/outcome coverage without sensitive payloads.
-- [BLOCKED] Supply real distribution identity, package/bundle IDs, signing/deployment ownership and EAS configuration if used, plus payload-free monitoring of conflicts, replay, pending age, failures and outcome coverage. Temporary app identity and a local debug build do not satisfy production distribution.
-
-Evidence: [AP-02](/dev-doc/reports/ADAPTIVPUSH-AP-02-2026-09-10.md) and [AP-03](/dev-doc/reports/ADAPTIVPUSH-AP-03-2026-09-10.md).
+The user's September 15 authorization replaces earlier pre-migration local/manual/native-signing gates. Physical iPhone cold launch, five-action UI/reopen acceptance and accessibility remain unverified. Thirty-two pre-existing non-rest days have no exercises (five in active programs); they were preserved, not populated with invented prescriptions. Complete persisted workouts can use their database identities; empty legacy days remain unstartable. AP-04/AP-05 remain out of scope. Evidence and recovery procedure: [release report](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md) and [manual checklist](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-MANUAL-QA-2026-09-14.md).
 
 ## [NEXT AFTER RELEASE] Bounded implementation
 
