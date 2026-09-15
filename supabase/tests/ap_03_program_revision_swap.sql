@@ -92,6 +92,22 @@ SELECT set_config('adaptivpush.install_receipt', public.install_program_v2(pg_te
 SELECT set_config('adaptivpush.program', current_setting('adaptivpush.install_receipt')::jsonb->>'programId', true);
 SELECT set_config('adaptivpush.revision_1', current_setting('adaptivpush.install_receipt')::jsonb->>'revisionId', true);
 
+-- Reuse the complete lineage/atomicity/owner suite for a migration-snapshot base.
+-- Set adaptivpush.test_legacy_revision=on before this script for that variant.
+RESET ROLE;
+DO $legacy_variant$
+BEGIN
+  IF current_setting('adaptivpush.test_legacy_revision', true) = 'on' THEN
+    UPDATE public.programs SET schema_version=1, source_origin='legacy'
+      WHERE id=current_setting('adaptivpush.program')::uuid;
+    UPDATE public.program_revisions SET schema_version=1, provenance='migration_snapshot',
+      source_origin='migration_snapshot', catalog_version='catalog-unknown', policy_version='legacy-unknown'
+      WHERE id=current_setting('adaptivpush.revision_1')::uuid;
+  END IF;
+END;
+$legacy_variant$;
+SET LOCAL ROLE authenticated;
+
 -- A prior workout on week two makes that base day immutable for the future swap.
 SELECT public.finalize_workout_v2(jsonb_build_object(
   'operationId', '61000000-0000-4000-8000-000000000001',
@@ -303,4 +319,15 @@ END
 $assert_owner_isolation$;
 
 RESET ROLE;
+DO $legacy_provenance$
+BEGIN
+  IF current_setting('adaptivpush.test_legacy_revision', true) = 'on' THEN
+    IF (SELECT schema_version FROM public.programs WHERE id=current_setting('adaptivpush.program')::uuid) <> 1
+      OR (SELECT provenance FROM public.program_revisions WHERE id=current_setting('adaptivpush.revision_1')::uuid) <> 'migration_snapshot'
+      OR EXISTS (SELECT 1 FROM public.program_revisions WHERE program_id=current_setting('adaptivpush.program')::uuid AND schema_version<>1) THEN
+      RAISE EXCEPTION 'Legacy successor relabeled historical provenance';
+    END IF;
+  END IF;
+END;
+$legacy_provenance$;
 ROLLBACK;

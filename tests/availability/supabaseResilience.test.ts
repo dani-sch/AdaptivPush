@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   classifySupabaseError,
   loginErrorMessage,
+  OperationFailureError,
   runSupabaseOperation,
   sanitizedSupabaseDiagnostic,
   supabaseSaveFailureMessage,
@@ -99,6 +100,19 @@ test('writes are never automatically duplicated', async () => {
 test('save failures distinguish no-write from possible partial completion', () => {
   assert.match(supabaseSaveFailureMessage({ status: 503 }, 0), /unsaved changes are still here/i);
   assert.match(supabaseSaveFailureMessage({ status: 503 }, 1), /may already have saved/i);
+});
+
+test('save recovery reassurance appears once across typed and classified failures', () => {
+  for (const error of [
+    { category: 'feature_disabled', retryable: false },
+    { category: 'validation', retryable: false },
+    { code: 'PGRST205' },
+    new OperationFailureError({ category: 'conflict', retryable: false },
+      'Refresh your program. Your unsaved changes are still here.'),
+  ]) {
+    const message = supabaseSaveFailureMessage(error);
+    assert.equal(message.match(/changes are still here\./gi)?.length, 1);
+  }
 });
 
 test('a bounded request times out and cancellation prevents stale work', async () => {

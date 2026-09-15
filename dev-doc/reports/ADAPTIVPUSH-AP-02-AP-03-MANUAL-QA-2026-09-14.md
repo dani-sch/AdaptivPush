@@ -1,5 +1,31 @@
 # AP-02/AP-03 remaining manual release verification - 2026-09-14
 
+## September 15 authorization and normal Expo Go acceptance
+
+This section supersedes the earlier required local QA-account workflow and all
+pre-migration manual/native-signing/build requirements below. The user authorized
+hosted migrations and writer enablement after agent-run backup/restore and
+technical verification, then will test with the existing account through
+`npm start` and its ordinary QR. No alternate ports, local backend, account setup,
+Apple signing or TestFlight are prerequisites. Earlier matrices remain historical
+coverage inventories; none acquires a pass from this authorization.
+
+**Current status: deployment blocked by Docker recovery tooling; all five
+acceptance actions remain unverified.** The hosted database and writer flags
+are unchanged. See the [current rollout record](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md).
+After successful deployment and bundle verification, use the normal existing
+account and check:
+
+1. Start workouts from Home and Plan; record a set, finish and reopen history.
+2. Generate and save a program; reopen Plan and inspect its workouts.
+3. Create and save a custom program; reopen Plan and start its workout.
+4. End/archive the current program; verify it appears in Archived Programs.
+5. Restore an archive using its offered exact/approximate/restart mode; start a
+   workout and reopen to verify accepted changes and recorded work persist.
+
+Physical iPhone startup, UI, persistence and accessibility results remain open.
+No native startup diagnosis or fix is inferred from the hosted inspection.
+
 ## Current Expo Go retest - September 14 remediation
 
 The five reported failures have code fixes and nonvisual regression evidence in

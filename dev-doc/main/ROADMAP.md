@@ -1,5 +1,12 @@
 # AdaptivPush roadmap
 
+Current AP-02/AP-03 gate (September 15): the user authorized hosted migration
+and normal Expo writer enablement after agent-run recovery/technical checks,
+superseding former pre-migration local/manual/signing/distribution gates below.
+Docker startup failure currently blocks fresh backup/isolated restore; hosted
+schema and writers remain unchanged. Existing-account Expo Go acceptance follows
+deployment. See the [current release report](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md).
+
 Release order follows approved D-13. The [execution register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) owns precise prerequisites and independently reviewable packets; slice numbering is stable, not a mandatory serial dependency chain.
 
 | Wave | Slices | User-visible result |
