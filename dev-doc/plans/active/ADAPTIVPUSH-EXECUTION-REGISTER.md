@@ -1,5 +1,10 @@
 # AdaptivPush modular execution register
 
+## Unified workout occurrence boundary
+
+The current local implementation adds shared stable-slot occurrence projection, explicit skip/not-attempted outcomes, finalized partial Home actions, shared completed exercise cards and capability-aware corrections. Repeated future swaps use immutable slot lineage. Missing required work holds progression; corrections refresh completion/volume/records and invalidate existing derived-effect receipts without advancing the program. Migrations `20260915190000` (modified) and `20260915210000` (new) are local-only. The [current state](/dev-doc/main/CURRENT-STATE.md) owns the release boundary and the [verification report](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-LIFECYCLE-2026-09-15.md) owns checks, files and remaining device/hosted acceptance. Earlier dated evidence below retains its original scope.
+
+
 ## Current AP-02/AP-03 authority and status
 
 The hosted AP-02/AP-03 packet is deployed to `thfxcvxcsfvrzdysdnkq`. The normal `.env` enables both writers, and the freshly served iOS bundle verifies the expected hosted backend, public client key and true/true flags with no privileged key. The user authorized this rollout after agent-run recovery and technical checks, replacing earlier pre-migration local/manual/QA-account, signing, standalone-build and distribution requirements. Physical acceptance follows deployment with the existing account through ordinary `npm start` and its Expo Go QR.

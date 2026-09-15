@@ -10,7 +10,7 @@
 | Category | Files |
 |----------|-------|
 | Project Root | 4 |
-| Tests | 14 |
+| Tests | 19 |
 | Top-level Scripts | 33 |
 | Automation Scripts | 24 |
 | Tool Scripts | 27 |
@@ -21,7 +21,7 @@
 | Skills | 62 |
 | Agents | 17 |
 | Commands | 8 |
-| **Total** | **247** |
+| **Total** | **252** |
 
 ---
 
@@ -60,9 +60,14 @@ _Test suite_
     │   └── rollout.test.ts — import assert from 'node:assert/strict';
     └── workouts/
         ├── correction.test.ts — import assert from 'node:assert/strict';
+        ├── effectiveCurrentWorkout.test.ts — import assert from 'node:assert/strict';
         ├── finalization.test.ts — import assert from 'node:assert/strict';
+        ├── nextWorkoutCard.test.ts — import assert from 'node:assert/strict';
+        ├── occurrence.test.ts — import assert from 'node:assert/strict';
         ├── persistedSession.test.ts — import assert from 'node:assert/strict';
-        └── routeResolution.test.ts — import assert from 'node:assert/strict';
+        ├── routeResolution.test.ts — import assert from 'node:assert/strict';
+        ├── swapInteraction.test.ts — import assert from 'node:assert/strict';
+        └── swapRecovery.test.ts — import assert from 'node:assert/strict';
 ```
 
 ---

@@ -1,5 +1,10 @@
 # AdaptivPush code-backed implementation status
 
+## Unified workout occurrence boundary
+
+The current local implementation adds shared stable-slot occurrence projection, explicit skip/not-attempted outcomes, finalized partial Home actions, shared completed exercise cards and capability-aware corrections. Repeated future swaps use immutable slot lineage. Missing required work holds progression; corrections refresh completion/volume/records and invalidate existing derived-effect receipts without advancing the program. Migrations `20260915190000` (modified) and `20260915210000` (new) are local-only. The [current state](/dev-doc/main/CURRENT-STATE.md) owns the release boundary and the [verification report](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-LIFECYCLE-2026-09-15.md) owns checks, files and remaining device/hosted acceptance. Earlier dated evidence below retains its original scope.
+
+
 ## September 15 scoped swap and completed-workout correction extension
 
 Commit `e8163b9` supplies the locally verified scoped-swap/correction base. Follow-up commits `8fff2b2`, `ae56b7f` and `eaca4f6` make an owner/program/stable-day-matched active draft the shared effective-current-workout authority on Home, route Continue Workout to the exact draft, add an accessible expandable Home list, virtualize and memoize swap options, prefetch optional history outside Apply, gate duplicate taps, and move wider synchronization outside the immediate visual-response path. Logged sets keep their actual exercise/load identity; only unlogged sets move and optional replacement-compatible history may supply a load suggestion if it is already available.
