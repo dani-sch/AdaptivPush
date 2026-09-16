@@ -339,6 +339,7 @@ BEGIN
   v_operation_id := (p_payload->>'operationId')::uuid;
   v_hash := encode(digest(convert_to(p_payload::text, 'UTF8'), 'sha256'), 'hex');
 
+  PERFORM pg_advisory_xact_lock(hashtextextended(v_user_id::text, 0));
   SELECT * INTO v_existing
   FROM public.program_installation_receipts
   WHERE user_id = v_user_id AND operation_id = v_operation_id;
@@ -347,7 +348,6 @@ BEGIN
     RETURN jsonb_set(v_existing.receipt, '{replayed}', 'true'::jsonb, true);
   END IF;
 
-  PERFORM pg_advisory_xact_lock(hashtextextended(v_user_id::text, 0));
   SELECT * INTO v_active FROM public.programs
   WHERE user_id = v_user_id AND is_active FOR UPDATE;
 
@@ -474,8 +474,8 @@ BEGIN
   IF v_active.id IS NOT NULL THEN
     UPDATE public.programs
     SET is_active = false, lifecycle = 'archived', updated_at = now(),
-        archive_checkpoint = jsonb_build_object('kind', 'revision', 'revision', current_revision),
-        archive_checkpoint_provenance = 'exact_revision'
+        archive_checkpoint = jsonb_build_object('kind', 'revision', 'revision', current_revision, 'archivedAt', now(), 'elapsedDays', CASE WHEN archive_checkpoint->>'resumedOn' IS NOT NULL THEN GREATEST(0, COALESCE((archive_checkpoint->>'elapsedDays')::integer,0) + current_date - (archive_checkpoint->>'resumedOn')::date) ELSE GREATEST(0, COALESCE(current_date - start_date,0)) END),
+        archive_checkpoint_provenance = CASE WHEN schema_version >= 2 AND current_revision_id IS NOT NULL THEN 'exact_revision' ELSE 'legacy_approximate' END
     WHERE id = v_active.id;
   END IF;
   UPDATE public.programs SET is_active = true, updated_at = now() WHERE id = v_program_id;
@@ -518,8 +518,10 @@ BEGIN
   IF v_user_id IS NULL THEN RAISE EXCEPTION 'unauthenticated'; END IF;
   v_operation_id := (p_payload->>'operationId')::uuid;
   v_draft_id := (p_payload->>'draftId')::uuid;
+  IF v_operation_id IS NULL OR v_draft_id IS NULL THEN RAISE EXCEPTION 'invalid_input: operation and draft identity required'; END IF;
   v_hash := encode(digest(convert_to(p_payload::text, 'UTF8'), 'sha256'), 'hex');
 
+  PERFORM pg_advisory_xact_lock(hashtextextended(v_user_id::text || ':' || v_operation_id::text, 0));
   SELECT * INTO v_existing FROM public.workout_sessions
   WHERE user_id = v_user_id AND operation_id = v_operation_id;
   IF FOUND THEN
@@ -527,7 +529,6 @@ BEGIN
     RETURN jsonb_set(v_existing.receipt, '{replayed}', 'true'::jsonb, true);
   END IF;
 
-  PERFORM pg_advisory_xact_lock(hashtextextended(v_user_id::text || ':' || v_operation_id::text, 0));
   SELECT * INTO v_program_day FROM public.program_days
   WHERE id = (p_payload->>'programDayId')::uuid;
   IF NOT FOUND THEN RAISE EXCEPTION 'target_unavailable'; END IF;
@@ -545,6 +546,13 @@ BEGIN
     RAISE EXCEPTION 'invalid_input: slots required';
   END IF;
 
+  IF (SELECT count(DISTINCT value->>'slotId') FROM jsonb_array_elements(p_payload->'slots'))
+       <> (SELECT count(*) FROM public.program_day_exercises WHERE program_day_id = v_program_day.id)
+     OR (SELECT count(DISTINCT value->>'slotId') FROM jsonb_array_elements(p_payload->'slots'))
+       <> jsonb_array_length(p_payload->'slots') THEN
+    RAISE EXCEPTION 'invalid_input: complete unique prescription slots required';
+  END IF;
+
   FOR v_slot IN SELECT value FROM jsonb_array_elements(p_payload->'slots') LOOP
     IF NOT EXISTS (
       SELECT 1 FROM public.program_day_exercises pde
@@ -552,18 +560,22 @@ BEGIN
         AND pde.program_revision_id = v_revision.id
         AND pde.stable_slot_id = (v_slot->>'slotId')::uuid
         AND pde.exercise_id = (v_slot->>'prescribedExerciseId')::uuid
+        AND pde.set_count = (v_slot->>'prescribedSetCount')::integer
     ) THEN RAISE EXCEPTION 'invalid_input: prescription lineage'; END IF;
     IF NOT EXISTS (SELECT 1 FROM public.exercises e WHERE e.id = (v_slot->>'actualExerciseId')::uuid) THEN
       RAISE EXCEPTION 'invalid_input: actual exercise';
     END IF;
     v_planned_count := v_planned_count + COALESCE((v_slot->>'prescribedSetCount')::integer, 0);
     v_recalibration := v_recalibration OR COALESCE((v_slot->>'requiresRecalibration')::boolean, false);
-    IF jsonb_typeof(v_slot->'sets') <> 'array' THEN RAISE EXCEPTION 'invalid_input: set array'; END IF;
+    IF jsonb_typeof(v_slot->'sets') IS DISTINCT FROM 'array' THEN RAISE EXCEPTION 'invalid_input: set array'; END IF;
+    IF jsonb_array_length(v_slot->'sets') > (v_slot->>'prescribedSetCount')::integer THEN
+      RAISE EXCEPTION 'invalid_input: set coverage';
+    END IF;
     FOR v_set IN SELECT value FROM jsonb_array_elements(v_slot->'sets') LOOP
       IF COALESCE((v_set->>'logged')::boolean, false) THEN
         IF NULLIF(v_set->>'setId', '') IS NULL
            OR COALESCE((v_set->>'actualReps')::integer, 0) <= 0
-           OR COALESCE((v_set->>'order')::integer, 0) <= 0
+           OR COALESCE((v_set->>'order')::integer, 0) NOT BETWEEN 1 AND (v_slot->>'prescribedSetCount')::integer
            OR NULLIF(v_set->>'actualExerciseId', '') IS NULL THEN
           RAISE EXCEPTION 'invalid_input: logged set';
         END IF;
@@ -578,7 +590,10 @@ BEGIN
           (v_slot->>'prescribedExerciseId')::uuid, (v_slot->>'actualExerciseId')::uuid
         ) THEN RAISE EXCEPTION 'invalid_input: set exercise identity'; END IF;
         v_logged_count := v_logged_count + 1;
-        v_total_volume := v_total_volume + COALESCE((v_set->>'actualLoad')::numeric, 0) * (v_set->>'actualReps')::integer;
+        v_total_volume := v_total_volume + CASE WHEN v_set->>'loadKind' = 'external'
+          THEN COALESCE((v_set->>'actualLoad')::numeric, 0)
+            * CASE WHEN v_set->>'loadUnit' = 'kg' THEN 2.2046226218 ELSE 1 END
+            * (v_set->>'actualReps')::integer ELSE 0 END;
       END IF;
     END LOOP;
   END LOOP;
@@ -614,7 +629,9 @@ BEGIN
           load_unit, load_kind, load_side, logged_at
         ) VALUES (
           v_session_id, (v_set->>'actualExerciseId')::uuid, (v_set->>'order')::integer,
-          (v_set->>'actualReps')::integer, COALESCE((v_set->>'actualLoad')::numeric, 0),
+          (v_set->>'actualReps')::integer, CASE WHEN v_set->>'loadKind' = 'external'
+            THEN COALESCE((v_set->>'actualLoad')::numeric, 0)
+              * CASE WHEN v_set->>'loadUnit' = 'kg' THEN 2.2046226218 ELSE 1 END ELSE 0 END,
           NULLIF(v_set->>'actualRpe', '')::numeric, (v_set->>'setId')::uuid,
           (v_slot->>'slotId')::uuid, (v_slot->>'prescribedExerciseId')::uuid,
           (v_set->>'order')::integer, NULLIF(v_set->>'actualLoad', '')::numeric,
@@ -661,25 +678,26 @@ DECLARE
 BEGIN
   IF v_user_id IS NULL THEN RAISE EXCEPTION 'unauthenticated'; END IF;
   v_hash := encode(digest(convert_to(concat_ws(':', p_program_id, p_expected_revision, p_checkpoint::text), 'UTF8'), 'sha256'), 'hex');
+  PERFORM pg_advisory_xact_lock(hashtextextended(v_user_id::text, 0));
   SELECT * INTO v_existing FROM public.program_lifecycle_receipts
   WHERE user_id = v_user_id AND operation_id = p_operation_id;
   IF FOUND THEN
     IF v_existing.payload_hash <> v_hash THEN RAISE EXCEPTION 'operation_payload_mismatch'; END IF;
     RETURN jsonb_set(v_existing.receipt, '{replayed}', 'true'::jsonb, true);
   END IF;
-  PERFORM pg_advisory_xact_lock(hashtextextended(v_user_id::text, 0));
   SELECT * INTO v_program FROM public.programs
   WHERE id = p_program_id AND user_id = v_user_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'target_unavailable'; END IF;
   IF v_program.current_revision <> p_expected_revision THEN RAISE EXCEPTION 'stale_revision'; END IF;
   UPDATE public.programs SET
-    is_active = false, lifecycle = 'archived', last_active_week = NULL,
+    is_active = false, lifecycle = 'archived',
+    last_active_week = CASE WHEN schema_version < 2 THEN GREATEST(1, COALESCE(NULLIF(p_checkpoint->>'week', '')::integer, 1)) ELSE NULL END,
     archive_checkpoint = jsonb_build_object(
       'kind', 'revision_checkpoint', 'revision', current_revision,
       'week', NULLIF(p_checkpoint->>'week', '')::integer,
-      'archivedAt', now()
+      'archivedAt', now(), 'elapsedDays', CASE WHEN archive_checkpoint->>'resumedOn' IS NOT NULL THEN GREATEST(0, COALESCE((archive_checkpoint->>'elapsedDays')::integer,0) + current_date - (archive_checkpoint->>'resumedOn')::date) ELSE GREATEST(0, COALESCE(current_date - start_date,0)) END
     ),
-    archive_checkpoint_provenance = 'exact_revision', updated_at = now()
+    archive_checkpoint_provenance = CASE WHEN schema_version >= 2 AND current_revision_id IS NOT NULL THEN 'exact_revision' ELSE 'legacy_approximate' END, updated_at = now()
   WHERE id = p_program_id;
   v_receipt := jsonb_build_object('operationId', p_operation_id, 'programId', p_program_id,
     'action', 'archive', 'revision', p_expected_revision, 'replayed', false, 'completedAt', now());
@@ -710,15 +728,15 @@ DECLARE
   v_receipt jsonb;
 BEGIN
   IF v_user_id IS NULL THEN RAISE EXCEPTION 'unauthenticated'; END IF;
-  IF p_mode NOT IN ('exact', 'restart', 'legacy_approximate') THEN RAISE EXCEPTION 'invalid_input: restore mode'; END IF;
+  IF p_mode IS NULL OR p_mode NOT IN ('exact', 'restart', 'legacy_approximate') THEN RAISE EXCEPTION 'invalid_input: restore mode'; END IF;
   v_hash := encode(digest(convert_to(concat_ws(':', p_program_id, p_mode, p_expected_active_program_id), 'UTF8'), 'sha256'), 'hex');
+  PERFORM pg_advisory_xact_lock(hashtextextended(v_user_id::text, 0));
   SELECT * INTO v_existing FROM public.program_lifecycle_receipts
   WHERE user_id = v_user_id AND operation_id = p_operation_id;
   IF FOUND THEN
     IF v_existing.payload_hash <> v_hash THEN RAISE EXCEPTION 'operation_payload_mismatch'; END IF;
     RETURN jsonb_set(v_existing.receipt, '{replayed}', 'true'::jsonb, true);
   END IF;
-  PERFORM pg_advisory_xact_lock(hashtextextended(v_user_id::text, 0));
   SELECT * INTO v_program FROM public.programs WHERE id = p_program_id AND user_id = v_user_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'target_unavailable'; END IF;
   SELECT * INTO v_active FROM public.programs WHERE user_id = v_user_id AND is_active FOR UPDATE;
@@ -731,14 +749,21 @@ BEGIN
   END IF;
   IF v_active.id IS NOT NULL AND v_active.id <> p_program_id THEN
     UPDATE public.programs SET is_active = false, lifecycle = 'archived', updated_at = now(),
-      archive_checkpoint = jsonb_build_object('kind', 'revision', 'revision', current_revision, 'archivedAt', now()),
-      archive_checkpoint_provenance = 'exact_revision'
+      archive_checkpoint = jsonb_build_object('kind', 'revision', 'revision', current_revision, 'archivedAt', now(), 'elapsedDays', CASE WHEN archive_checkpoint->>'resumedOn' IS NOT NULL THEN GREATEST(0, COALESCE((archive_checkpoint->>'elapsedDays')::integer,0) + current_date - (archive_checkpoint->>'resumedOn')::date) ELSE GREATEST(0, COALESCE(current_date - start_date,0)) END),
+      archive_checkpoint_provenance = CASE WHEN schema_version >= 2 AND current_revision_id IS NOT NULL THEN 'exact_revision' ELSE 'legacy_approximate' END
     WHERE id = v_active.id;
   END IF;
   UPDATE public.programs SET
     is_active = true, lifecycle = 'active',
     start_date = CASE WHEN p_mode = 'restart' THEN current_date ELSE start_date END,
-    archive_checkpoint = CASE WHEN p_mode = 'restart' THEN NULL ELSE archive_checkpoint END,
+    archive_checkpoint = CASE WHEN p_mode = 'restart' THEN NULL ELSE
+      COALESCE(archive_checkpoint, '{}'::jsonb) || jsonb_build_object(
+        'resumedOn', current_date,
+        'elapsedDays', CASE WHEN p_mode = 'legacy_approximate'
+          THEN COALESCE((archive_checkpoint->>'elapsedDays')::integer, (GREATEST(1, COALESCE(last_active_week,1))-1)*7)
+          ELSE COALESCE((archive_checkpoint->>'elapsedDays')::integer,
+            GREATEST(0, COALESCE((archive_checkpoint->>'archivedAt')::timestamptz::date - start_date,0))) END
+      ) END,
     archive_checkpoint_provenance = CASE WHEN p_mode = 'restart' THEN NULL ELSE archive_checkpoint_provenance END,
     last_active_week = NULL, updated_at = now()
   WHERE id = p_program_id;

@@ -1,7 +1,134 @@
 # AdaptivPush — Development Log
 
+## 2026-09-15 - Reconciled progress, integration and draft PR closeout
+
+### Preserved implementation and direction
+
+Reconciled September 11-15 source/history and the owning evidence. The deployed AP-01/AP-02/AP-03 baseline, rollout recovery and writer enablement remain distinct from the two local-only September 15 lifecycle migrations. Effective occurrence projections, stable-lineage repeat swaps, explicit set outcomes, partial finalization, shared completed cards, capability-aware corrections and conservative incomplete-work handling remain implemented. AP-04/AP-05 broader authority, authenticated lifecycle acceptance and physical iPhone regression remain open. No hosted operation was performed by this closeout.
+
+Updated the master plan, execution register, code status, database/traceability/research owners, living summaries and startup/navigation documentation. Removed obsolete instructions to restart AP-01 or treat atomic saves, durable drafts and tests as absent. Historical reports, approved decisions and source archives remain preserved; older status paragraphs now route to their dated evidence instead of competing with current execution. No temporary document was consumed or moved, so the inventory/archive map and generated TOC did not require regeneration.
+
+### Verification and integration
+
+Starting source was `36aa329` on `codex/exercise-swap-workout-corrections`; `origin/main` was `9d968d5`. Documentation commits `da8504a` and `e3634bd` were integrated with the existing checkpoint history at `d8f4502`. That merge changed files relative to its first parent and matched the reviewed feature tree exactly.
+
+Both the feature checkout and `C:/workout-app/AdaptivPush-integrator` passed `npm run test:ap02-ap03` (75), `npm run test:availability` (13), `npm run test:catalog` (9), `npx tsc --noEmit` and `npm run lint` (zero errors; three pre-existing unused-variable warnings). Total: 97 tests per checkout. Internal documentation targets and `git diff --check` passed. This task changed documentation only; no Python-side change required Ruff. Prior local SQL/concurrency/export/browser evidence remains in the lifecycle report and was not rerun here. No final-chain fresh reset, authenticated/device pass or new hosted proof is claimed.
+
+### Git preservation and cleanup
+
+Fast-forwarded the existing `codex/ap02-ap03-release` PR branch to the integrated result and pushed it without force. Updated [draft PR #56](https://github.com/dani-sch/AdaptivPush/pull/56) with the complete behavior, migration boundary, verification, limitations and evidence summary. Reused the existing draft to keep the review history together.
+
+Each removed branch tip was verified as an ancestor of the published PR branch before deletion:
+
+| Retired local branch | Preserved tip |
+|---|---|
+| `codex/ap02-ap03-build-checkpoint-20260914` | `302ce6e` |
+| `codex/ap02-ap03-docs-checkpoint-20260914` | `7cdf598` |
+| `codex/ap02-ap03-ios-scope-checkpoint-20260914` | `709c40c` |
+| `codex/ap02-ap03-release-checkpoint-20260914` | `1b6364b` |
+| `codex/ap02-ap03-hosted-rollout` | `75146c9` |
+| `codex/exercise-swap-workout-corrections` | `e3634bd` |
+| `codex/supabase-resilience` | `53ce4b2` |
+
+Removed the redundant remote `codex/ap02-ap03-hosted-rollout` only after ancestry and open-PR checks. Pruned obsolete remote-tracking/worktree metadata; no stale worktree registration remained. Retained `main`, the active draft-PR branch and the configured `integrator` worktree. Local environment, dependencies, ignored tooling and recovery material were preserved. No reset, force-push, dropped commit or empty checkpoint commit was used. This final evidence entry is committed after the integrated application checks; final publication is a documentation-only fast-forward.
+
+
+## 2026-09-15 - Scoped swaps and completed-workout corrections
+
+Commit `e8163b9` locally adds one consistent program/workout swap flow with selected-workout and rest-of-program scopes, logged-set preservation, natural replacement-load validation and durable partial-update recovery. It also adds explicit editing of finalized durable workouts with owner/revision/idempotency-safe atomic correction, same-session effective totals/completion/record refresh and internal before/after audit.
+
+Strict TypeScript passed; lint passed with three pre-existing warnings; 50 combined AP-02/AP-03 unit tests passed; local database reset applied every migration; all four committed SQL suites passed through direct `psql`, including the AP-03 legacy variant; and database lint reported no warnings. The unauthenticated Expo web welcome screen also rendered with no error overlay or browser console error after the SSR auth-storage path was made safe. Additive migration `20260915190000` is local-only/not hosted. Earlier rollout authorization does not apply. Authenticated physical iPhone/E2E visual acceptance and fresh regression of restore archive, end/archive, start workout and generate program remain open. [Owning evidence](/dev-doc/reports/ADAPTIVPUSH-SWAP-CORRECTION-2026-09-15.md).
+
+## 2026-09-14 - iPhone program failure remediation
+
+Preserved the clean existing feature branch and integrated focused code/tooling
+commits through the configured integrator. Confirmed the inspected Metro iOS
+bundle targets production with absent/off writers, and fresh production reads
+show only AP-01 migrations and no durable schema. Fixed typed error propagation,
+legacy workout availability, rejected-draft recovery and stale export-cache
+binding. Prepared local LAN-only QA and verified shipped commands through HTTP,
+real AP-01 backfill, unit/static/SQL/concurrency checks, and distinct enabled/
+disabled iOS bundles. User reports App Store Expo Go SDK 57 on iOS 26.6.1.
+Physical native startup and UI acceptance remain unverified; no production
+rollout or AP-04/AP-05 work occurred. The [owning release report](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md)
+and [manual matrix](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-MANUAL-QA-2026-09-14.md)
+contain exact commands, evidence and unchanged remaining gates.
+
+## 2026-09-14 — iOS platform and handoff readiness correction
+
+User review identified that the AP-02/AP-03 handoff incorrectly centered Android
+despite the requested iOS focus. Corrected the manual matrix, current state,
+task board and execution register to require iPhone, VoiceOver, Dynamic Type
+and iOS lifecycle coverage. The release report now explicitly supersedes the
+premature pre-QA-complete claim while preserving earlier build evidence.
+Signed iOS candidate preparation, flag variants, installation and backend
+reachability remain open. Android testing is supplementary and does not gate
+this iOS release. Documentation only; no new build/device pass, production
+migration or writer enablement is claimed.
+
+
+## 2026-09-14 — Final AP-02/AP-03 pre-QA candidate
+
+Bound clean source `42f317d66baa171d5fc5f80d6810ed9c31c46277`, integrated at
+`7cdf598d4fb7a93a882c09448b67807409e669e3`. Final packet: 59 unique unit tests,
+strict TypeScript, lint (0 errors/3 existing warnings), Expo Doctor 21/21,
+Android/iOS Metro, native debug plus distinct enabled/disabled embedded APKs,
+fresh PostgreSQL 17 reset/lint/three SQL suites/six concurrency assertions.
+A separate clean integrator dependency/test/static run passed. APK cache reuse
+between flag variants was detected and corrected before handoff; rejected
+artifacts are quarantined. Local catalog/accounts/programs/proxy controls are
+prepared. No manual, visual, device or accessibility pass is claimed.
+
+Production remains healthy PostgreSQL 17.6 with only the two AP-01 ledger
+entries. Authentication is ready; fresh backup/restore, production migration and
+writer enablement await the required manual and operational gates. Task-scoped
+archival, direct links, inventory and generated TOC are closed out. See the
+[final evidence](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md)
+and [bound manual matrix](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-MANUAL-QA-2026-09-14.md).
+
 > Chronological record of implemented changes, planning changes, and documentation decisions.  
 > Most recent entries at the top.
+
+---
+
+### 2026-09-14 AP-02/AP-03 pre-QA release packet
+
+**Scope**: Bounded durable-record release work on `codex/ap02-ap03-release`,
+starting from `origin/main` baseline `9d968d56`; no AP-04/AP-05 implementation.
+
+**Authentication and production boundary**: Secure Supabase CLI/database access
+to `thfxcvxcsfvrzdysdnkq` was independently verified using the local DPAPI-protected
+helper. Credentials remain outside the repository. No fresh production backup,
+restore or migration was performed in authentication/pre-QA work. Production
+remains at the AP-01 baseline/enforcement ledger and both writers remain off.
+The pending packet contains exactly the two locally corrected migrations
+`20260910210000` and `20260911120000`, in that order.
+
+**Implemented corrections**: Owner-lock replay ordering, exact immutable workout
+submission/end time and pending-edit protection; stable install/lifecycle retry
+requests and owner-pinned installation; ancestor-completed revision protection;
+external-load unit/volume semantics without assistance inflation; exact elapsed
+archive checkpoint without original-start-date rewriting; archive reader
+legacy fallback/account isolation; contextual accessible labels and read-only
+submitted set controls.
+
+**Documentation lifecycle**: Commit `ff29ccf` installs task-scoped lifecycle
+rules in canonical documentation instructions, document/sprint skills and
+AGENTS. The consumed intake prompt was moved byte-for-byte into the September 14
+superseded archive, retaining the distinct earlier FABLE-5 provenance. Direct
+current links and owning inventory were repaired. The task's final file
+inventory changes require TOC regeneration; no broad documentation audit or
+copy of the current chat prompt was created.
+
+**Evidence and next boundary**: The [September 14 release report](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md)
+owns final migration hashes, commits, command/build and current integration
+results. This pre-QA entry claims no final automated pass or new manual result.
+The [manual QA matrix](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-MANUAL-QA-2026-09-14.md)
+must be bound to a clean committed development build and isolated backend.
+User-required pre-migration passes precede fresh encrypted backup/isolated
+PostgreSQL 17 restore and exact two-migration production rollout. Real
+distribution identity, signing/deployment ownership, rollback rehearsal and
+named payload-free monitoring remain writer-enable gates.
 
 ---
 

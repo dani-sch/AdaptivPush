@@ -1,6 +1,8 @@
+import { resolveProgramOccurrences } from '@/features/workouts/resolveProgramOccurrences';
+import type { CurrentProgram } from '@/types/program';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -47,16 +49,18 @@ interface ProgramRationale {
 
 // ─── Fetch ────────────────────────────────────────────────────────────────────
 
-async function fetchProgramOverview(programId: string, revisionId?: string): Promise<OverviewWeek[]> {
+async function fetchProgramOverview(program: CurrentProgram, ownerId: string): Promise<OverviewWeek[]> {
   let query = supabase
     .from('program_days')
     .select(`
       id,
+      stable_day_id,
       week_number,
       day_index,
       workout_name,
       program_day_exercises!program_day_exercises_program_day_id_fkey (
         id,
+        stable_slot_id,
         position,
         set_count,
         rep_range_min,
@@ -66,14 +70,20 @@ async function fetchProgramOverview(programId: string, revisionId?: string): Pro
         exercises!program_day_exercises_exercise_id_fkey ( id, name )
       )
     `)
-    .eq('program_id', programId);
-  if (revisionId) query = query.eq('program_revision_id', revisionId);
+    .eq('program_id', program.id);
+  if (program.currentRevisionId) query = query.eq('program_revision_id', program.currentRevisionId);
   const { data, error } = await query
     .order('week_number', { ascending: true })
     .order('day_index', { ascending: true });
 
   if (error || !data) return [];
 
+  const resolved = await resolveProgramOccurrences({ ...program, workouts: (data ?? []).map(day => ({
+    id: day.id, stableDayId: day.stable_day_id, name: day.workout_name, day: '', estimatedTime: 0,
+    exercises: day.program_day_exercises.map(pde => ({ id: pde.id, stableSlotId: pde.stable_slot_id,
+      exerciseId: (Array.isArray(pde.exercises) ? pde.exercises[0] : pde.exercises)?.id, name: (Array.isArray(pde.exercises) ? pde.exercises[0] : pde.exercises)?.name ?? 'Exercise', sets: pde.set_count,
+      reps: `${pde.rep_range_min}-${pde.rep_range_max}`, weight: pde.suggested_weight_lb })),
+  })) }, ownerId);
   const weekMap = new Map<number, OverviewDay[]>();
 
   for (const day of data as any[]) {
@@ -97,7 +107,11 @@ async function fetchProgramOverview(programId: string, revisionId?: string): Pro
       id: day.id,
       name: day.workout_name ?? `Day ${day.day_index}`,
       dayIndex: day.day_index ?? 1,
-      exercises,
+      exercises: resolved.workouts.find(w => w.id === day.id)?.exercises.map(ex => ({
+        pdeId: ex.stableSlotId ?? ex.id, name: ex.name, sets: ex.sets ?? 0,
+        repMin: Number(ex.reps?.split('-')[0] ?? 0), repMax: Number(ex.reps?.split('-').at(-1) ?? 0),
+        targetRpe: null, weightLb: ex.weight ?? null,
+      })) ?? exercises,
     });
   }
 
@@ -181,7 +195,8 @@ function DayCard({
 
 export default function ProgramOverviewScreen() {
   const insets = useSafeAreaInsets();
-  const { program } = useCurrentProgram();
+  const { program, ownerId, refresh } = useCurrentProgram();
+  useFocusEffect(useCallback(() => { void refresh(); }, [refresh]));
   const { theme, isDark } = useTheme();
   const styles = useMemo(() => createStyles(theme, isDark), [isDark, theme]);
 
@@ -195,7 +210,7 @@ export default function ProgramOverviewScreen() {
   });
 
   useEffect(() => {
-    if (!program) return;
+    if (!program || !ownerId) return;
     let contextQuery = supabase
       .from('program_generation_context')
       .select('goal,policy_version,experience_level,session_length_target_min')
@@ -204,7 +219,7 @@ export default function ProgramOverviewScreen() {
       ? contextQuery.eq('program_revision_id', program.currentRevisionId)
       : contextQuery.is('program_revision_id', null);
     Promise.all([
-      fetchProgramOverview(program.id, program.currentRevisionId),
+      fetchProgramOverview(program, ownerId),
       contextQuery.maybeSingle(),
     ]).then(([data, contextResult]) => {
       setWeeks(data);
@@ -228,7 +243,7 @@ export default function ProgramOverviewScreen() {
       setExpandedWeeks(new Set([program.currentWeek]));
       setLoading(false);
     });
-  }, [program]);
+  }, [program, ownerId]);
 
   const toggleWeek = (weekNum: number) => {
     setExpandedWeeks((prev) => {

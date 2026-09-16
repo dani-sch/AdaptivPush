@@ -102,7 +102,7 @@ export const workoutDraftStore: WorkoutDraftStore = {
       }));
       if (serialized) {
         const draft = JSON.parse(serialized) as WorkoutDraft;
-        if (activeWorkoutDraftMatches(draft, ownerId, lookup)) {
+        if (workoutDraftMatches(draft, ownerId, { programId: lookup.programId, stableDayId: lookup.stableDayId })) {
           return draft;
         }
       }
@@ -125,6 +125,19 @@ export const workoutDraftStore: WorkoutDraftStore = {
     ]);
   },
   async remove(ownerId, programDayId) {
-    await AsyncStorage.removeItem(draftKey(ownerId, programDayId));
+    const key = draftKey(ownerId, programDayId);
+    const serialized = await AsyncStorage.getItem(key);
+    if (!serialized) return;
+    const draft = JSON.parse(serialized) as WorkoutDraft;
+    if (draft.ownerId !== ownerId || draft.programDayId !== programDayId) {
+      throw new Error('Stored workout draft ownership does not match the authenticated account.');
+    }
+    const keys = [key, stableDraftKey(ownerId, draft), activeStableDraftKey(ownerId, draft)];
+    for (const candidate of keys) {
+      const value = await AsyncStorage.getItem(candidate);
+      if (value && (JSON.parse(value) as WorkoutDraft).draftId === draft.draftId) {
+        await AsyncStorage.removeItem(candidate);
+      }
+    }
   },
 };

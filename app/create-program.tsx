@@ -20,6 +20,7 @@ import { SymbolView } from 'expo-symbols';
 import { supabase } from '@/utils/supabase';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
+import { requireRollout, rollout } from '@/features/kernel/rollout';
 import { createOperationId } from '@/features/kernel/operationId';
 import { installProgram } from '@/features/programs/commands';
 import {
@@ -29,7 +30,7 @@ import {
     type ProgramArtifact,
 } from '@/features/programs/contracts';
 import { programRepository } from '@/features/programs/repository';
-import { reportSupabaseFailure, supabaseSaveFailureMessage } from '@/utils/supabaseResilience';
+import { OperationFailureError, reportSupabaseFailure, supabaseSaveFailureMessage } from '@/utils/supabaseResilience';
 
 interface ProgramDay {
     id: string;
@@ -241,6 +242,7 @@ export default function CreateProgramScreen() {
 
         try {
             setSaving(true);
+            requireRollout(rollout.atomicProgramWriter, 'Atomic program installation');
 
             const userId = await requireUserId();
 
@@ -282,8 +284,7 @@ export default function CreateProgramScreen() {
                             targetRpe: exercise.target_rpe ?? null,
                             suggestedLoad: exercise.suggested_weight_lb ?? null,
                             loadUnit: 'lb' as const,
-                            loadKind: exercise.suggested_weight_lb === 0 ? 'bodyweight' as const :
-                                exercise.suggested_weight_lb == null ? 'unknown' as const : 'external' as const,
+                            loadKind: exercise.suggested_weight_lb == null ? 'unknown' as const : 'external' as const,
                             loadSide: 'external_total' as const,
                             notes: exercise.notes ?? null,
                         })),
@@ -297,9 +298,9 @@ export default function CreateProgramScreen() {
                 activeProgram?.id ?? null,
                 activeProgram?.current_revision ?? null,
             );
-            if (outcome.status === 'validation') throw new Error(outcome.errors.join(' '));
-            if (outcome.status === 'conflict') throw new Error('Your active program changed on another device. Refresh and try again.');
-            if (outcome.status === 'unavailable') throw new Error(outcome.message);
+            if (outcome.status === 'validation') throw new OperationFailureError({ category: 'validation', retryable: false }, outcome.errors.join(' '));
+            if (outcome.status === 'conflict') throw new OperationFailureError({ category: 'conflict', retryable: false }, outcome.message);
+            if (outcome.status === 'unavailable') throw new OperationFailureError(outcome.failure, outcome.message);
 
             Alert.alert('Program created', 'Your custom program has been saved.');
             router.replace('/plan');

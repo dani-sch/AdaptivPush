@@ -208,36 +208,6 @@ SELECT set_config(
   true
 );
 
-SELECT set_config(
-  'adaptivpush.workout_receipt_1',
-  public.finalize_workout_v2(current_setting('adaptivpush.workout_payload')::jsonb)::text,
-  true
-);
-
-DO $assert_workout$
-DECLARE replay jsonb;
-BEGIN
-  replay := public.finalize_workout_v2(current_setting('adaptivpush.workout_payload')::jsonb);
-  IF replay->>'sessionId' <> (current_setting('adaptivpush.workout_receipt_1')::jsonb->>'sessionId')
-     OR (replay->>'replayed')::boolean IS NOT TRUE THEN
-    RAISE EXCEPTION 'response-loss replay did not return original workout receipt';
-  END IF;
-  IF (SELECT count(*) FROM public.workout_sessions WHERE operation_id=current_setting('adaptivpush.workout_op_1')::uuid) <> 1
-     OR (SELECT count(*) FROM public.workout_exercise_sets WHERE session_id=(replay->>'sessionId')::uuid) <> 1 THEN
-    RAISE EXCEPTION 'workout replay duplicated session or sets';
-  END IF;
-  IF (SELECT count(*) FROM public.workout_receipt_effects WHERE workout_session_id=(replay->>'sessionId')::uuid) <> 3 THEN
-    RAISE EXCEPTION 'durable receipt effects were missing or duplicated';
-  END IF;
-  IF (SELECT completion_class FROM public.workout_sessions WHERE id=(replay->>'sessionId')::uuid) <> 'partial' THEN
-    RAISE EXCEPTION 'one of four sets was not classified partial';
-  END IF;
-  IF (SELECT load_value FROM public.workout_exercise_sets WHERE session_id=(replay->>'sessionId')::uuid) IS DISTINCT FROM 0::numeric THEN
-    RAISE EXCEPTION 'zero load did not round trip as zero';
-  END IF;
-END
-$assert_workout$;
-
 DO $assert_mid_transaction_failure$
 DECLARE payload jsonb;
 DECLARE failed boolean := false;
@@ -268,6 +238,43 @@ BEGIN
   END IF;
 END
 $assert_mid_transaction_failure$;
+
+SAVEPOINT workout_cases;
+SELECT set_config(
+  'adaptivpush.workout_receipt_1',
+  public.finalize_workout_v2(current_setting('adaptivpush.workout_payload')::jsonb)::text,
+  true
+);
+
+DO $assert_workout$
+DECLARE replay jsonb; duplicate_denied boolean := false;
+BEGIN
+  replay := public.finalize_workout_v2(current_setting('adaptivpush.workout_payload')::jsonb);
+  IF replay->>'sessionId' <> (current_setting('adaptivpush.workout_receipt_1')::jsonb->>'sessionId')
+     OR (replay->>'replayed')::boolean IS NOT TRUE THEN
+    RAISE EXCEPTION 'response-loss replay did not return original workout receipt';
+  END IF;
+  BEGIN
+    PERFORM public.finalize_workout_v2(jsonb_set(current_setting('adaptivpush.workout_payload')::jsonb, '{operationId}', to_jsonb(gen_random_uuid())));
+  EXCEPTION WHEN OTHERS THEN duplicate_denied := SQLERRM LIKE '%already finalized%'; END;
+  IF NOT duplicate_denied THEN RAISE EXCEPTION 'different operation duplicated finalized occurrence'; END IF;
+  IF (SELECT count(*) FROM public.workout_sessions WHERE operation_id=current_setting('adaptivpush.workout_op_1')::uuid) <> 1
+     OR (SELECT count(*) FROM public.workout_exercise_sets WHERE session_id=(replay->>'sessionId')::uuid) <> 1 THEN
+    RAISE EXCEPTION 'workout replay duplicated session or sets';
+  END IF;
+  IF (SELECT count(*) FROM public.workout_receipt_effects WHERE workout_session_id=(replay->>'sessionId')::uuid) <> 3 THEN
+    RAISE EXCEPTION 'durable receipt effects were missing or duplicated';
+  END IF;
+  IF (SELECT completion_class FROM public.workout_sessions WHERE id=(replay->>'sessionId')::uuid) <> 'partial' THEN
+    RAISE EXCEPTION 'one of four sets was not classified partial';
+  END IF;
+  IF (SELECT load_value FROM public.workout_exercise_sets WHERE session_id=(replay->>'sessionId')::uuid) IS DISTINCT FROM 0::numeric THEN
+    RAISE EXCEPTION 'zero load did not round trip as zero';
+  END IF;
+END
+$assert_workout$;
+
+
 
 DO $assert_archive_restore$
 DECLARE original_start date;
@@ -335,5 +342,77 @@ BEGIN
 END
 $assert_owner_isolation$;
 
+ROLLBACK TO SAVEPOINT workout_cases;
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', current_setting('adaptivpush.user_1'), true);
+SET LOCAL ROLE authenticated;
+DO $assert_release_payloads$
+DECLARE payload jsonb; v_test_receipt jsonb; denied boolean := false;
+BEGIN
+  payload := jsonb_set(current_setting('adaptivpush.workout_payload')::jsonb, '{operationId}', to_jsonb(gen_random_uuid()));
+  payload := jsonb_set(payload, '{slots,0,prescribedSetCount}', '1');
+  BEGIN PERFORM public.finalize_workout_v2(payload);
+  EXCEPTION WHEN OTHERS THEN denied := SQLERRM LIKE '%prescription lineage%'; END;
+  IF NOT denied THEN RAISE EXCEPTION 'client reduced planned count to forge completion'; END IF;
+
+  payload := jsonb_set(current_setting('adaptivpush.workout_payload')::jsonb, '{operationId}', to_jsonb(gen_random_uuid()));
+  payload := jsonb_set(payload, '{slots,0,sets,0,loadKind}', '"assistance"');
+  payload := jsonb_set(payload, '{slots,0,sets,0,actualLoad}', '25');
+  BEGIN
+  v_test_receipt := public.finalize_workout_v2(payload);
+  IF (SELECT total_volume_lb FROM public.workout_sessions WHERE id=(v_test_receipt->>'sessionId')::uuid) <> 0
+    OR (SELECT load_value FROM public.workout_exercise_sets WHERE session_id=(v_test_receipt->>'sessionId')::uuid) <> 25
+    OR (SELECT load_kind FROM public.workout_exercise_sets WHERE session_id=(v_test_receipt->>'sessionId')::uuid) <> 'assistance' THEN
+    RAISE EXCEPTION 'assistance was misclassified as external volume';
+  END IF;
+  RAISE SQLSTATE 'ZX001';
+  EXCEPTION WHEN SQLSTATE 'ZX001' THEN NULL; END;
+  payload := jsonb_set(payload, '{operationId}', to_jsonb(gen_random_uuid()));
+  payload := jsonb_set(payload, '{slots,0,sets,0,loadKind}', '"external"');
+  payload := jsonb_set(payload, '{slots,0,sets,0,loadUnit}', '"kg"');
+  BEGIN
+  v_test_receipt := public.finalize_workout_v2(payload);
+  IF abs((SELECT weight_lb FROM public.workout_exercise_sets WHERE session_id=(v_test_receipt->>'sessionId')::uuid) - 55.115565545) > 0.01
+    OR (SELECT load_value FROM public.workout_exercise_sets WHERE session_id=(v_test_receipt->>'sessionId')::uuid) <> 25 THEN
+    RAISE EXCEPTION 'kilograms were relabeled as pounds or raw load was changed';
+  END IF;
+  RAISE SQLSTATE 'ZX001';
+  EXCEPTION WHEN SQLSTATE 'ZX001' THEN NULL; END;
+  PERFORM public.archive_program_v2('90000000-0000-4000-8000-000000000050', current_setting('adaptivpush.program_1')::uuid, 1, '{"week":1}');
+END
+$assert_release_payloads$;
+RESET ROLE;
+-- Simulate time spent archived without waiting or changing the server clock.
+UPDATE public.programs SET start_date=current_date-20,
+  archive_checkpoint=jsonb_set(jsonb_set(archive_checkpoint, '{archivedAt}', to_jsonb((now()-interval '14 days')::text)), '{elapsedDays}', '6')
+WHERE id=current_setting('adaptivpush.program_1')::uuid;
+SET LOCAL ROLE authenticated;
+DO $assert_exact_placement$
+BEGIN
+  PERFORM public.restore_program_v2('90000000-0000-4000-8000-000000000051', current_setting('adaptivpush.program_1')::uuid, 'exact', NULL);
+  IF (SELECT start_date FROM public.programs WHERE id=current_setting('adaptivpush.program_1')::uuid) <> current_date-20
+    OR (SELECT (archive_checkpoint->>'elapsedDays')::integer FROM public.programs WHERE id=current_setting('adaptivpush.program_1')::uuid) <> 6 THEN
+    RAISE EXCEPTION 'time archived advanced the exact checkpoint';
+  END IF;
+END
+$assert_exact_placement$;
+RESET ROLE;
+-- A V1 program archived by the V2 command must never gain exact revision provenance.
+INSERT INTO public.programs(id,user_id,name,duration_weeks,days_per_week,is_active,start_date)
+VALUES ('a9000000-0000-4000-8000-000000000001',current_setting('adaptivpush.user_1')::uuid,'Legacy checkpoint fixture',4,1,false,current_date-8);
+SET LOCAL ROLE authenticated;
+DO $assert_legacy_checkpoint$
+DECLARE denied boolean := false;
+BEGIN
+  PERFORM public.archive_program_v2(gen_random_uuid(),'a9000000-0000-4000-8000-000000000001',1,'{"week":2}');
+  IF (SELECT archive_checkpoint_provenance FROM public.programs WHERE id='a9000000-0000-4000-8000-000000000001') <> 'legacy_approximate' THEN
+    RAISE EXCEPTION 'legacy archive gained false exact provenance';
+  END IF;
+  BEGIN
+    PERFORM public.restore_program_v2(gen_random_uuid(),'a9000000-0000-4000-8000-000000000001','exact',current_setting('adaptivpush.program_1')::uuid);
+  EXCEPTION WHEN OTHERS THEN denied := SQLERRM LIKE '%exact_checkpoint_unavailable%'; END;
+  IF NOT denied THEN RAISE EXCEPTION 'legacy program falsely restored exactly'; END IF;
+END
+$assert_legacy_checkpoint$;
 RESET ROLE;
 ROLLBACK;

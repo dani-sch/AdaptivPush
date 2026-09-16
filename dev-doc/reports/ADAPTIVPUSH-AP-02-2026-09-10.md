@@ -151,3 +151,42 @@ Release remains blocked on all of the following:
 - `39039e3` `fix(database): disambiguate revisioned program reads`
 - `e6754c2` `fix(workouts): recover owner drafts across lifecycle changes`
 
+
+## 2026-09-14 pre-QA release-hardening addendum
+
+The bounded release task runs on `codex/ap02-ap03-release` from `origin/main`
+baseline `9d968d56`. It corrects owner-lock/receipt ordering for concurrent RPC
+replay, freezes the submitted finalization payload and end time across retries,
+rejects edits while submission is pending/finalized, and preserves load-kind/unit
+semantics including kilogram external volume and assistance exclusion. Future
+revision work also preserves ancestor-completed set lineage. Contextual entry
+labels and accessible read-only controls were added; these are source changes,
+not new screen-reader or physical-device test passes.
+
+Secure CLI/database authentication for `thfxcvxcsfvrzdysdnkq` has been independently
+verified through the local DPAPI-protected helper. No secret or private payload
+is recorded. Production still awaits both `20260910210000` and `20260911120000`;
+they were corrected locally before production application. Earlier migration
+hashes and verification results in this dated report remain historical.
+
+The [September 14 release report](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md)
+owns the final reviewed hashes, commits, automated/build results and current
+integrator evidence; this addendum does not claim those gates passed. The
+[manual matrix](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-MANUAL-QA-2026-09-14.md)
+requires a bound build and user results. No fresh production backup, restore or
+migration occurred during authentication/pre-QA work. Required pre-migration
+manual passes precede the fresh encrypted recovery set and isolated PostgreSQL
+17 restore. Both production writers remain off; real distribution identity,
+signing/deployment ownership, rollback rehearsal and payload-free monitoring
+remain additional release gates. AP-04/AP-05 were not started.
+
+
+### September 14 final pre-QA binding
+
+The complete automated packet passed (59 unit cases and static/build/database
+gates). Clean Android source `42f317d66baa171d5fc5f80d6810ed9c31c46277` is
+integrated at `7cdf598d4fb7a93a882c09448b67807409e669e3`. Separate embedded
+enabled/disabled local APKs are verified. See the [final release report](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md)
+and [bound manual matrix](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-MANUAL-QA-2026-09-14.md).
+No manual pass, fresh production backup/restore, migration or writer enablement
+is claimed. The original dated results above remain historical.

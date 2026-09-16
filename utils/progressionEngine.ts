@@ -57,14 +57,15 @@ export function computeProgression(ctx: ProgressionContext): ProgressionResult {
           currentWeightLb, currentRepMin, currentRepMax, currentTargetRPE } = ctx;
 
   // Edge case: no data
-  if (lastSessionSets.length === 0) {
+  if (lastSessionSets.length === 0 || (ctx.requiredSetCount !== undefined && lastSessionSets.length < ctx.requiredSetCount)
+    || (ctx.completionClass !== undefined && ctx.completionClass !== 'complete' && ctx.completionClass !== 'reduced')) {
     return {
       suggestedWeightLb: currentWeightLb,
       repRangeMin: currentRepMin,
       repRangeMax: currentRepMax,
       suggestedRPE: currentTargetRPE,
       action: 'hold',
-      reason: 'No logged sets found for this exercise. Holding current weight.',
+      reason: 'Required work is incomplete or unavailable. Holding current weight.',
     };
   }
 

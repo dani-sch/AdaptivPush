@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { createOperationId, type OperationId } from '../kernel/operationId';
 import { programArtifactCanonicalPayload, type ProgramArtifact } from './contracts';
+import { stableJson } from '../kernel/stableJson';
 
 const PREFIX = '@adaptivpush/program-installs/v2';
 
@@ -9,8 +10,18 @@ export interface PendingProgramInstall {
   ownerId: string;
   operationId: OperationId;
   artifactCanonical: string;
+  artifact?: ProgramArtifact;
   expectedActiveProgramId: string | null;
   expectedActiveRevision: number | null;
+}
+
+// Authoring screens allocate new draft IDs when Save is pressed again. Match
+// the intent without those IDs, but always replay the first complete artifact.
+export function programInstallIntentCanonical(artifact: ProgramArtifact): string {
+  const normalized = JSON.parse(programArtifactCanonicalPayload(artifact)) as ProgramArtifact;
+  return stableJson({ ...normalized, days: normalized.days.map(({ dayId: _dayId, ...day }) => ({
+    ...day, exercises: day.exercises.map(({ slotId: _slotId, ...exercise }) => exercise),
+  })) });
 }
 
 function artifactFingerprint(value: string): string {
@@ -33,17 +44,19 @@ export async function getOrCreatePendingProgramInstall(
   expectedActiveProgramId: string | null,
   expectedActiveRevision: number | null,
 ): Promise<PendingProgramInstall> {
-  const artifactCanonical = programArtifactCanonicalPayload(artifact);
+  const artifactCanonical = programInstallIntentCanonical(artifact);
   const key = installKey(ownerId, artifactCanonical);
   const serialized = await AsyncStorage.getItem(key);
   if (serialized) {
     const pending = JSON.parse(serialized) as PendingProgramInstall;
     if (pending.ownerId === ownerId && pending.artifactCanonical === artifactCanonical) return pending;
+    throw new Error('A different pending installation occupies this storage key. Resolve it before retrying.');
   }
   const pending: PendingProgramInstall = {
     ownerId,
     operationId: createOperationId(),
     artifactCanonical,
+    artifact: structuredClone(artifact),
     expectedActiveProgramId,
     expectedActiveRevision,
   };
