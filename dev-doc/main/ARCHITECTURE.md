@@ -1,5 +1,11 @@
 # AdaptivPush architecture summary
 
+## Shared controls and removal overlay
+
+ExerciseCard owns both active and completed-edit rows, secondary settings and swipe actions; RemovalScopeSheet owns the scope choice. GestureHandlerRootView covers the app. AppDialogHost replaces app-owned native alerts with transparent, blocking modal presentation.
+
+Version-1 occurrence tombstones in frozen snapshots remain separate from immutable prescription evidence. Program revision removal_mask metadata carries original set positions across successor swaps. Private revise_program_removals_v1 is called only by atomic correction/finalization; owned preview/state RPCs expose truthful scope and visible prescriptions. Separate removal capability 1 gates new controls while correction capability 2 remains compatible. performanceEvidence.ts evaluates original per-exercise coverage, including newer omitted occurrences. Hosted rollout is pending explicit authorization; [evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-REMOVALS-2026-09-17.md) owns verification/recovery.
+
 ## Current source-observed runtime
 
 | Layer | Existing source | Current limitation / owning future slice |

@@ -833,3 +833,7 @@ rolled-back test, hardened avatar storage, and repaired ExerciseDB identifiers.
 the Supabase CLI normalization prerequisite, and the Free-plan backup gate.
 
 ---
+
+## 2026-09-17 — Shared controls and scoped removal integration
+
+Base 4c3c447; feature codex/workout-removal-and-shared-controls; implementation 71bac25, e40eea8, 5881ad2, cddf305, d6c164f; integrator 8ab5d6c. Shared explicit-check rows, scoped durable tombstones/atomic program revisions and transparent dialogs are locally verified. Existing user import changes remain unstaged. 106 cases, strict TypeScript, lint (three pre-existing warnings), fresh/restored SQL, database lint, original eight and new nine-label concurrency suites pass. Fresh encrypted restore matches 59 relations; exact new packet is prepared but no hosted write is authorized. [Detailed evidence and screenshots](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-REMOVALS-2026-09-17.md). Physical iPhone acceptance remains open; no AP-04/AP-05 expansion.

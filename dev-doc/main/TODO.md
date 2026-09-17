@@ -1,5 +1,11 @@
 # AdaptivPush active task board
 
+## [CURRENT] Scoped removals rollout boundary
+
+- [INTEGRATION VERIFIED] Shared active/edit controls, durable workout/program removals, neutral original evidence and transparent app dialogs. Integrator 8ab5d6c; 106 application tests plus SQL/security/concurrency gates.
+- [AWAITING EXPLICIT AUTHORIZATION] Deploy only migration 20260917180000 after reviewing the exact hash, fresh encrypted backup, isolated restore and forward-recovery packet in [removal evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-REMOVALS-2026-09-17.md). Hosted removal is not released; existing correction capability remains 2.
+- [OPEN] Physical iPhone gestures, keyboard, VoiceOver, dynamic text, modal animations/dismissal and restart. Browser checks are recorded separately.
+
 ## [CURRENT] Resume from the September 17 editing release
 
 - [COMPLETE] Reconcile the master plan, register, code status, database, traceability, research scope and living summaries with the hosted rollout and latest local workout lifecycle. Approved decisions and later-slice order remain unchanged.

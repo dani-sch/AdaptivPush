@@ -10,18 +10,18 @@
 | Category | Files |
 |----------|-------|
 | Project Root | 4 |
-| Tests | 19 |
-| Top-level Scripts | 33 |
+| Tests | 20 |
+| Top-level Scripts | 34 |
 | Automation Scripts | 24 |
 | Tool Scripts | 27 |
 | Power Automate Scripts | 1 |
 | VBA Scripts | 5 |
 | Documentation | 44 |
-| Configuration | 8 |
+| Configuration | 9 |
 | Skills | 62 |
 | Agents | 17 |
 | Commands | 8 |
-| **Total** | **252** |
+| **Total** | **255** |
 
 ---
 
@@ -65,6 +65,7 @@ _Test suite_
         ├── nextWorkoutCard.test.ts — import assert from 'node:assert/strict';
         ├── occurrence.test.ts — import assert from 'node:assert/strict';
         ├── persistedSession.test.ts — import assert from 'node:assert/strict';
+        ├── removals.test.ts — import assert from 'node:assert/strict';
         ├── routeResolution.test.ts — import assert from 'node:assert/strict';
         ├── swapInteraction.test.ts — import assert from 'node:assert/strict';
         └── swapRecovery.test.ts — import { confirmedSwapMessage } from '../../features/workouts/swapRecovery';
@@ -110,7 +111,8 @@ _Standalone utility scripts_
     ├── tsconfig.json — {
     ├── verifyDurableConcurrency.mjs — // Nonvisual integration proof. Only the named local Supabase container is used.
     ├── verifyIosProgramFlows.ts — // Exercises the shipped repository + commands against LAN-reachable synthetic Supabase.
-    └── verifyLegacyMigration.ts — // Real AP-01 -> AP-02/AP-03 upgrade on a separate synthetic local database.
+    ├── verifyLegacyMigration.ts — // Real AP-01 -> AP-02/AP-03 upgrade on a separate synthetic local database.
+    └── verifyRemovalConcurrency.mjs — // Nonvisual integration proof. Only the named local Supabase container is used.
 ```
 
 ---
@@ -306,6 +308,7 @@ _Living documents and active plans_
 _Build, lint, test, and infrastructure config_
 
 ```
+├── .gitattributes — supabase/migrations/20260917180000_scoped_workout_removals.sql text eol=lf
 ├── .gitignore — # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 ├── app.json — {
 ├── eslint.config.js — // https://docs.expo.dev/guides/using-eslint/
