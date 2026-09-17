@@ -1,6 +1,7 @@
 import { classifySupabaseError, reportSupabaseFailure, supabaseUserMessage } from '@/utils/supabaseResilience';
 import type { WorkoutCorrectionRepository } from './correctionRepository';
 import type { WorkoutCorrectionStore } from './correctionStore';
+import { CORRECTIONS_UNAVAILABLE } from './occurrenceRepository';
 import {
   type CompletedWorkoutCorrectionOutcome,
   type CompletedWorkoutCorrectionRequest,
@@ -35,13 +36,17 @@ export async function correctCompletedWorkout(
     const failure = classifySupabaseError(error);
     reportSupabaseFailure('workout.correct_completed', error);
     if (failure.category === 'schema_unavailable') {
-      return { status: 'unavailable', message: 'This workout can be viewed, but updates are temporarily unavailable.' };
+      return { status: 'unavailable', message: CORRECTIONS_UNAVAILABLE };
     }
     const message = supabaseUserMessage(
       error,
       'The update could not be confirmed. Your exact changes are saved on this device; retry to reconcile the same request.',
     );
-    if (failure.category === 'forbidden' || failure.category === 'authentication_required' || failure.category === 'validation') {
+    if (failure.category === 'validation') {
+      await store.remove(pending.ownerId, pending.sessionId, pending.operationId);
+      return { status: 'validation', errors: [message] };
+    }
+    if (failure.category === 'forbidden' || failure.category === 'authentication_required') {
       return { status: 'unavailable', message };
     }
     return { status: 'pending', message };

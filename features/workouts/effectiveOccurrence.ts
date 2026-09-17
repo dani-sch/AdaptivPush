@@ -62,15 +62,15 @@ export function projectCompletedOccurrence(
         const actual = actuals.find(a => a.actualSetId === set.setId
           || (a.prescriptionSlotId === slot.slotId && a.order === set.order));
         if (actual) consumed.add(actual.actualSetId);
-        const saved = effective?.sets.find(s => s.setId === set.setId);
+        const saved = effective?.sets?.find(s => s.setId === set.setId);
         const corrected = snapshot?.setOutcomes?.find(s => s.setId === set.setId);
         const outcome = actual ? 'performed' : corrected?.outcome ?? (saved?.outcome === 'skipped' ? 'skipped' : 'not_attempted');
         return {
-          actualSetId: set.setId, prescriptionSlotId: slot.slotId,
+          prescriptionSlotId: slot.slotId,
           prescribedExerciseId: slot.prescribedExerciseId, exerciseId,
-          order: set.order, reps: 0, loadValue: null, loadUnit: set.loadUnit,
-          loadKind: set.loadKind, loadSide: set.loadSide, rpe: null, loggedAt: '',
-          ...actual, outcome, prescribed: true,
+          order: set.order, reps: 0, loadValue: null, loadUnit: set.loadUnit ?? 'none',
+          loadKind: set.loadKind ?? 'unknown', loadSide: set.loadSide ?? 'unknown', rpe: null, loggedAt: '',
+          ...actual, actualSetId: set.setId, outcome, prescribed: true,
         };
       }),
     };

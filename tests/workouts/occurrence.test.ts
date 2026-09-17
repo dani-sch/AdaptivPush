@@ -118,17 +118,38 @@ test('one successful set out of four cannot increase load, even with high readin
   assert.equal(result.action, 'hold');
   assert.equal(result.suggestedWeightLb, 50);
 });
-function readClient(options: { missingSession?: boolean; missingColumn?: boolean; missingRpc?: boolean; error?: object } = {}) {
+function readClient(options: { missingSession?: boolean; missingColumn?: boolean; missingRpc?: boolean; error?: object; lifecycle?: string; capabilityError?: Error } = {}) {
   const query = (table: string) => {
     const response = { data: table === 'workout_sessions' ? options.missingSession ? null : {
-      id: 'session', user_id: 'owner', lifecycle: 'finalized', correction_revision: options.missingColumn ? undefined : 0,
+      id: 'session', user_id: 'owner', lifecycle: options.lifecycle ?? 'finalized', correction_revision: options.missingColumn ? undefined : 0,
       prescription_snapshot: draft().frozenPrescription, ended_at: '2026-09-15T12:30:00Z',
     } : [], error: options.error ?? null };
     const chain = { select: () => chain, eq: () => chain, order: () => Promise.resolve(response), maybeSingle: () => Promise.resolve(response) };
     return chain;
   };
-  return { from: query, rpc: async () => options.missingRpc ? { error: { code: 'PGRST202', message: 'function missing from schema cache' } } : { data: 2, error: null } } as unknown as SupabaseClient;
+  return { from: query, rpc: async () => {
+    if (options.capabilityError) throw options.capabilityError;
+    return options.missingRpc ? { error: { code: 'PGRST202', message: 'function missing from schema cache' } } : { data: 2, error: null };
+  } } as unknown as SupabaseClient;
 }
+
+test('capability 2 enables eligible workouts and gives specific reasons for other states', async () => {
+  const ready = await loadCompletedWorkout(readClient(), 'owner', 'session');
+  assert.equal(ready.canCorrect, true); assert.equal(ready.correctionIssue, null);
+  assert.match((await loadCompletedWorkout(readClient({ lifecycle: 'active' }), 'owner', 'session')).correctionIssue!, /finalized/);
+  assert.match((await loadCompletedWorkout(readClient({ missingColumn: true }), 'owner', 'session')).correctionIssue!, /revision/);
+  const offline = await loadCompletedWorkout(readClient({ capabilityError: new Error('Failed to fetch') }), 'owner', 'session');
+  assert.equal(offline.canCorrect, false); assert.equal(offline.session.id, 'session');
+  assert.doesNotMatch(offline.correctionIssue!, /does not yet support/);
+});
+
+test('legacy actual row matching by order preserves the frozen prescription set identity', () => {
+  const d = updateWorkoutSet(draft(), { setId: 'set-0-0', reps: 8, load: 40, logged: true });
+  const result = projectCompletedOccurrence(d.frozenPrescription, [{ ...actuals(d)[0], actualSetId: 'legacy-row-id' }]);
+  assert.equal(result.exercises[0].sets[0].actualSetId, 'set-0-0');
+  assert.equal(result.exercises[0].sets[0].outcome, 'performed');
+  assert.equal(result.exercises[0].sets.length, 4);
+});
 test('missing hosted correction RPC or column still returns a full read-only workout', async () => {
   for (const option of [{ missingRpc: true }, { missingColumn: true }]) {
     const loaded = await loadCompletedWorkout(readClient(option), 'owner', 'session');
