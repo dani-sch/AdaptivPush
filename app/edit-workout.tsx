@@ -1,6 +1,9 @@
+import { entryLoadDefaults } from '@/features/workouts/loadPresentation';
+import { useRemovalCapability } from '@/hooks/useRemovalCapability';
+import { useAuth } from '@/contexts/AuthContext';
 import { RemovalScopeSheet, type RemovalSelection } from '@/components/RemovalScopeSheet';
 import { ExerciseHistoryModal } from '@/components/ExerciseHistoryModal';
-import { removalsAvailable, previewRemoval, type RemovalPreview } from '@/features/workouts/removalRepository';
+import { previewRemoval, type RemovalPreview } from '@/features/workouts/removalRepository';
 import { appendRemoval, isRemoved, type WorkoutRemovals, type ProgramRemovalRequest, addProgramRemoval } from '@/features/workouts/removals';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -15,7 +18,7 @@ import { correctCompletedWorkout } from '@/features/workouts/correctionCommands'
 import { createCompletedWorkoutCorrection } from '@/features/workouts/correctionContracts';
 import { correctionLoadSelection, type EditableCorrectionSet } from '@/features/workouts/correctionEditor';
 import { workoutCorrectionRepository } from '@/features/workouts/correctionRepository';
-import { workoutCorrectionStore } from '@/features/workouts/correctionStore';
+import { workoutCorrectionStore, workoutEditDraftStore } from '@/features/workouts/correctionStore';
 import { CORRECTIONS_UNAVAILABLE, loadCompletedWorkout, loadCorrectionCatalog } from '@/features/workouts/occurrenceRepository';
 import { projectCompletedOccurrence, type OccurrenceExercise, type WorkoutMode } from '@/features/workouts/effectiveOccurrence';
 import { supabase } from '@/utils/supabase';
@@ -28,6 +31,7 @@ const editable = (exercises: OccurrenceExercise[]): EditableExercise[] => exerci
   sets: e.sets.map(s => ({ ...s, loadText: text(s.loadValue), repsText: s.outcome === 'performed' ? text(s.reps) : '', rpeText: text(s.rpe) })) }));
 
 export default function EditWorkoutScreen() {
+  const auth = useAuth();
   const navigation = useNavigation();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -39,7 +43,8 @@ export default function EditWorkoutScreen() {
   const originalRemovals = useRef<WorkoutRemovals | undefined>(undefined);
   const [programRemoval, setProgramRemoval] = useState<ProgramRemovalRequest>();
   const [removalPreview, setRemovalPreview] = useState<RemovalPreview>();
-  const [canRemove, setCanRemove] = useState(false);
+  const removalCapability = useRemovalCapability();
+  const canRemove = removalCapability.available;
   const [parent, setParent] = useState<{ programId: string; dayId: string }>();
   const [historyId, setHistoryId] = useState<string | null>(null);
   const [ownerId, setOwnerId] = useState<string | null>(null);
@@ -70,17 +75,19 @@ export default function EditWorkoutScreen() {
     setPickerSetId(null);
     try {
       if (!sessionId) throw new Error('Workout identity is missing.');
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
       if (!session) throw new Error('Sign in to view this workout.');
       if (request !== generation.current) return false;
       account.current = session.user.id;
-      const [loaded, catalogResult, recovered] = await Promise.all([
+      const [loaded, catalogResult, recovered, localEdits] = await Promise.all([
         loadCompletedWorkout(supabase, session.user.id, sessionId),
         loadCorrectionCatalog(supabase),
         workoutCorrectionStore.load(session.user.id, sessionId).then(request => ({ request, issue: null as string | null })).catch(error => {
           reportSupabaseFailure('workout.correction_recovery', error);
           return { request: null, issue: 'The pending update could not be read. Reload to retry before making more changes.' };
         }),
+        workoutEditDraftStore.load(session.user.id, sessionId),
       ]);
       if (catalogResult.error) reportSupabaseFailure('workout.catalog', catalogResult.error);
       if (request !== generation.current) return false;
@@ -89,12 +96,13 @@ export default function EditWorkoutScreen() {
       const base = editable(projection.exercises);
       setRemovals(loaded.snapshot?.removals); originalRemovals.current = loaded.snapshot?.removals;
       setProgramRemoval(undefined); setRemoval(null);
-      const available = await removalsAvailable();
       const parentResult = loaded.session.program_day_id ? await supabase.from('program_days').select('program_id,stable_day_id').eq('id', loaded.session.program_day_id).maybeSingle() : null;
       if (request !== generation.current) return false;
-      setCanRemove(available); setParent(parentResult?.data ? { programId: parentResult.data.program_id, dayId: parentResult.data.stable_day_id } : undefined);
+      setParent(parentResult?.data ? { programId: parentResult.data.program_id, dayId: parentResult.data.stable_day_id } : undefined);
       original.current = structuredClone(base);
-      setExercises(base);
+      const restoreEdits = localEdits && localEdits.revision === (loaded.session.correction_revision ?? 0) && !recovered.request;
+      setExercises(restoreEdits ? localEdits.exercises : base);
+      if (restoreEdits) { setRemovals(localEdits.removals); setProgramRemoval(localEdits.programRemoval); }
       setOwnerId(session.user.id);
       setTitle(loaded.session.workout_name);
       setRevision(loaded.session.correction_revision ?? 0);
@@ -102,8 +110,8 @@ export default function EditWorkoutScreen() {
       setCatalog(catalogResult.data ?? []);
       setCanCorrect(loaded.canCorrect && !recovered.issue);
       setPending(Boolean(recovered.request));
-      setMode('completed_view');
-      setStatus(recovered.issue ?? loaded.correctionIssue ?? (recovered.request
+      setMode(restoreEdits ? 'completed_edit' : 'completed_view');
+      setStatus(restoreEdits ? 'Your unsaved edits were restored from this device.' : localEdits && !recovered.request ? 'The saved workout changed. Your earlier edits remain on this device; review the current workout before editing again.' : recovered.issue ?? loaded.correctionIssue ?? (recovered.request
         ? 'An update is awaiting confirmation. Retry Sync to reconcile it before editing.'
         : projection.missingPrescription ? 'Original prescription context is unavailable. Showing recorded sets.' : null));
       return true;
@@ -125,17 +133,26 @@ export default function EditWorkoutScreen() {
     return () => { active = false; requests.current++; };
   }, [load]);
   useEffect(() => {
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!session && event !== 'SIGNED_OUT') return;
       if (account.current && session?.user.id !== account.current) {
         generation.current++; account.current = null; original.current = [];
         setExercises([]); setOwnerId(null); setCanCorrect(false); setPickerSetId(null);
-        setDiscard(null); setRemoval(null); setRemovals(undefined); setProgramRemoval(undefined); setHistoryId(null); setCanRemove(false); setParent(undefined);
+        setDiscard(null); setRemoval(null); setRemovals(undefined); setProgramRemoval(undefined); setHistoryId(null); setParent(undefined);
         setTitle('Workout'); setSummary(''); setMode('completed_view'); setPending(false);
         setLoading(false); setStatus('The account changed. Reload to view this workout with the current account.');
       }
     });
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (mode !== 'completed_edit' || !ownerId || !sessionId || pending || saving || loading) return;
+    void workoutEditDraftStore.save({ ownerId, sessionId, revision, exercises, removals, programRemoval }).catch(error => {
+      reportSupabaseFailure('workout.edit_draft', error);
+      setStatus('Edits could not be saved on this device. Keep this screen open and retry before leaving.');
+    });
+  }, [mode, ownerId, sessionId, revision, exercises, removals, programRemoval, pending, saving, loading]);
 
   const patchSet = (id: string, patch: Partial<EditableSet>) => setExercises(current => current.map(e => ({ ...e,
     sets: e.sets.map(s => s.actualSetId === id ? { ...s, ...patch } : s) })));
@@ -151,12 +168,17 @@ export default function EditWorkoutScreen() {
       const set = exercises.flatMap(e => e.sets).find(s => s.actualSetId === id);
       if (set) patchSet(id, correctionLoadSelection(set, value === 'bodyweight' ? 'none' : value as 'lb' | 'kg' | 'assistance' | 'external'));
     }
-    else patchSet(id, { [field === 'weight' ? 'loadText' : field === 'reps' ? 'repsText' : 'rpeText']: String(value) });
+    else {
+      const set = exercises.flatMap(e => e.sets).find(s => s.actualSetId === id);
+      const defaults = field === 'weight' && set && set.outcome !== 'performed' && set.loadKind !== 'bodyweight'
+        ? entryLoadDefaults(set.loadKind, set.loadUnit) : {};
+      patchSet(id, { ...defaults, [field === 'weight' ? 'loadText' : field === 'reps' ? 'repsText' : 'rpeText']: String(value) });
+    }
   };
-  const cancel = () => { if (savingRef.current) return; removalRequest.current++; setExercises(structuredClone(original.current)); setMode('completed_view'); setPickerSetId(null); setRemovals(originalRemovals.current); setProgramRemoval(undefined); setRemoval(null); };
+  const cancel = () => { if (savingRef.current) return; if (ownerId && sessionId) void workoutEditDraftStore.remove(ownerId, sessionId); removalRequest.current++; setExercises(structuredClone(original.current)); setMode('completed_view'); setPickerSetId(null); setRemovals(originalRemovals.current); setProgramRemoval(undefined); setRemoval(null); };
   usePreventRemove(Boolean(ownerId) && (mode === 'completed_edit' || saving), ({ data }) => {
     if (savingRef.current) return;
-    confirmDiscard('Discard workout edits?', () => navigation.dispatch(data.action));
+    confirmDiscard('Discard workout edits?', () => { cancel(); navigation.dispatch(data.action); });
   });
   const leave = () => {
     if (saving) return;
@@ -165,7 +187,7 @@ export default function EditWorkoutScreen() {
   };
   useEffect(() => { const sub = BackHandler.addEventListener('hardwareBackPress', () => { leave(); return true; }); return () => sub.remove(); });
   const save = async () => {
-    if (savingRef.current || !canCorrect || !ownerId || !sessionId) return;
+    if (!auth.canRequest || savingRef.current || !canCorrect || !ownerId || !sessionId) return;
     removalRequest.current++; savingRef.current = true; setSaving(true);
     const requestGeneration = generation.current;
     try {
@@ -186,7 +208,7 @@ export default function EditWorkoutScreen() {
       });
       const outcome = await correctCompletedWorkout(workoutCorrectionRepository, workoutCorrectionStore, request);
       if (requestGeneration !== generation.current || account.current !== ownerId) return;
-      if ('receipt' in outcome) { if (await load()) setStatus('Workout updated.'); }
+      if ('receipt' in outcome) { await workoutEditDraftStore.remove(ownerId, sessionId); if (await load()) setStatus('Workout updated.'); }
       else if (outcome.status === 'validation') { setPending(false); setStatus(outcome.errors.join(' ')); }
       else if (outcome.status === 'conflict') { if (await load()) setStatus('This workout changed elsewhere. The latest saved workout has been loaded.'); }
       else {
@@ -203,7 +225,7 @@ export default function EditWorkoutScreen() {
     finally { savingRef.current = false; setSaving(false); }
   };
   const requestRemoval = async (exercise: EditableExercise, setId?: string) => {
-    if (!canRemove || savingRef.current || pending) return;
+    if (!auth.canRequest || !canRemove || savingRef.current || pending) return;
     const removalId = ++removalRequest.current;
     const set = exercise.sets.find(s => s.actualSetId === setId);
     const requestGeneration = generation.current;
@@ -230,18 +252,21 @@ export default function EditWorkoutScreen() {
     setRemoval(null);
   };
   const visibleExercises = exercises.filter(e => !isRemoved(removals, e.slotId)).map(e => ({ ...e, sets: e.sets.filter(s => !isRemoved(removals,e.slotId,s.actualSetId)) })).filter(e => e.sets.length > 0);
-  const editing = mode === 'completed_edit' && !saving && !pending;
+  const editing = auth.canRequest && mode === 'completed_edit' && !saving && !pending;
   return <SafeAreaView style={styles.safeArea}>
     <Stack.Screen options={{ headerShown: false, gestureEnabled: mode !== 'completed_edit' && !saving }} />
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.header}>
         <Pressable accessibilityRole="button" style={styles.headerButton} disabled={saving} onPress={mode === 'completed_edit' ? cancel : leave}><Text style={styles.cancel}>{mode === 'completed_edit' ? 'Cancel' : 'Back'}</Text></Pressable>
         <View style={styles.headerCopy}><Text style={styles.title}>{title}</Text><Text style={styles.subtitle}>{summary}</Text></View>
-        {canCorrect ? <Pressable accessibilityRole="button" accessibilityState={{ disabled: saving || loading, busy: saving }} style={styles.headerButton} disabled={saving || loading} onPress={() => mode === 'completed_edit' || pending ? void save() : setMode('completed_edit')}>
+        {canCorrect ? <Pressable accessibilityRole="button" accessibilityState={{ disabled: saving || loading || !auth.canRequest, busy: saving }} style={styles.headerButton} disabled={saving || loading || !auth.canRequest} onPress={() => mode === 'completed_edit' || pending ? void save() : setMode('completed_edit')}>
           <Text style={styles.save}>{saving ? 'Saving…' : pending ? 'Retry Sync' : mode === 'completed_edit' ? 'Save changes' : 'Update Workout'}</Text>
         </Pressable> : null}
       </View>
       {loading ? <ActivityIndicator style={styles.loading} color={theme.primary} /> : <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        {removalCapability.message && <View><Text style={styles.status}>{removalCapability.message}</Text>
+          {removalCapability.status !== 'checking' && <Pressable accessibilityRole="button" onPress={removalCapability.retry}><Text style={styles.addText}>Retry removal check</Text></Pressable>}
+        </View>}
         {status ? <Text style={styles.status} accessibilityLiveRegion="polite">{status}</Text> : null}
         {visibleExercises.map(exercise => <ExerciseCard key={exercise.slotId} exercise={{
           id: exercise.slotId, exerciseId: exercise.exerciseId, name: exercise.name, prescription: exercise.prescription.replace(/^\d+ ×/, exercise.sets.filter(s => s.prescribed).length + ' ×'),
@@ -269,7 +294,7 @@ export default function EditWorkoutScreen() {
         {!visibleExercises.length ? <Text style={styles.status}>No visible sets remain. Saving keeps this workout incomplete.</Text> : null}
         <Pressable accessibilityRole="button" style={styles.addButton} disabled={saving} onPress={() => {
           if (mode !== 'completed_edit') void load();
-          else confirmDiscard('Reload saved workout?', () => void load());
+          else confirmDiscard('Reload saved workout?', () => { cancel(); void load(); });
         }}><Text style={styles.addText}>Reload workout</Text></Pressable>
       </ScrollView>}
     </KeyboardAvoidingView>
