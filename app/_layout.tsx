@@ -8,9 +8,10 @@ import {
 import { Stack, router, useRootNavigationState, useSegments } from "expo-router";
 import * as Notifications from "expo-notifications";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Constants from 'expo-constants';
-import { Platform } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, Text, View } from 'react-native';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { rollout } from '@/features/kernel/rollout';
 import "react-native-reanimated";
 
@@ -53,25 +54,12 @@ function RootLayoutInner() {
   const colorScheme = useColorScheme();
   const navigationState = useRootNavigationState();
   const segments = useSegments();
-  const { isDark } = useTheme();
-  const [authVersion, setAuthVersion] = useState(0);
-  const [routeOwnerId, setRouteOwnerId] = useState<string | null>(null);
-  const routeOwnerIdRef = useRef<string | null>(null);
+  const { theme, isDark } = useTheme();
+  const auth = useAuth();
+  const [routeIssue, setRouteIssue] = useState<string | null>(null);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT") return;
-      const nextOwnerId = session?.user.id ?? null;
-      if (nextOwnerId === routeOwnerIdRef.current) return;
-      routeOwnerIdRef.current = nextOwnerId;
-      setRouteOwnerId(nextOwnerId);
-      setAuthVersion((value) => value + 1);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (!navigationState?.key) return;
+    if (!navigationState?.key || auth.phase === 'hydrating' || auth.phase === 'recovering') return;
 
     const controller = new AbortController();
 
@@ -81,22 +69,8 @@ function RootLayoutInner() {
       const isSetupRoute = rootSegment === "(qsetup)";
       const isRootRoute = rootSegment == null;
 
-      const {
-        data: { session },
-      } = await runSupabaseOperation(() => supabase.auth.getSession(), {
-        kind: "auth",
-        operation: "navigation.local_session",
-        signal: controller.signal,
-      });
-
-      if (controller.signal.aborted) return;
-
-      if (!session?.user) {
-        routeOwnerIdRef.current = null;
-        setRouteOwnerId(null);
-        if (!isAuthRoute && !isRootRoute) {
-          router.replace("/");
-        }
+      if (auth.phase === 'signed_out' || !auth.ownerId) {
+        if (!isAuthRoute && !isRootRoute) router.replace('/');
         return;
       }
 
@@ -105,7 +79,7 @@ function RootLayoutInner() {
           supabase
             .from("user_profile")
             .select("onboarded")
-            .eq("user_id", session.user.id)
+            .eq("user_id", auth.ownerId)
             .abortSignal(signal)
             .maybeSingle<{ onboarded: boolean | null }>(),
         {
@@ -118,10 +92,10 @@ function RootLayoutInner() {
       if (controller.signal.aborted) return;
       if (profileError) {
         reportSupabaseFailure("navigation.profile_route", profileError);
+        setRouteIssue("Your session is intact, but account setup could not be checked. Retry when connected.");
         return;
       }
-      routeOwnerIdRef.current = session.user.id;
-      setRouteOwnerId(session.user.id);
+      setRouteIssue(null);
 
       if (profile?.onboarded !== true) {
         if (!isSetupRoute) {
@@ -145,11 +119,17 @@ function RootLayoutInner() {
     return () => {
       controller.abort();
     };
-  }, [authVersion, navigationState?.key, segments]);
+  }, [auth.phase, auth.ownerId, auth.expiresAt, navigationState?.key, segments]);
+
+  if (auth.phase === 'hydrating') return <View style={{ flex: 1, justifyContent: 'center' }}><ActivityIndicator accessibilityLabel="Restoring session" /></View>;
 
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-      <Stack key={routeOwnerId ?? "signed-out"}>
+      {(auth.phase === 'recovering' || routeIssue) && <View style={{ padding: 16, paddingTop: 48, backgroundColor: theme.surfaceBg }}>
+        <Text style={{ color: theme.textPrimary }}>{auth.issue ?? routeIssue ?? 'Restoring your connection…'} Protected actions are paused.</Text>
+        <Pressable accessibilityRole="button" onPress={auth.retry} style={{ paddingVertical: 12 }}><Text style={{ color: theme.textPrimary }}>Retry connection</Text></Pressable>
+      </View>}
+      <Stack key={auth.ownerId ?? "signed-out"}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(qsetup)" options={{ headerShown: false }} />
@@ -176,9 +156,9 @@ function RootLayoutInner() {
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}><AppThemeProvider>
-      <CurrentProgramProvider>
+      <AuthProvider><CurrentProgramProvider>
         <RootLayoutInner />
-      </CurrentProgramProvider>
+      </CurrentProgramProvider></AuthProvider>
     <AppDialogHost /></AppThemeProvider></GestureHandlerRootView>
   );
 }

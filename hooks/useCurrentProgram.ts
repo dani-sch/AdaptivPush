@@ -527,7 +527,8 @@ function useCurrentProgramState() {
 
     useEffect(() => {
         void refresh();
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (!session && event !== 'SIGNED_OUT') return;
             const nextOwnerId = session?.user.id ?? null;
             if (nextOwnerId === ownerIdRef.current) return;
             refreshControllerRef.current?.abort();
@@ -538,7 +539,7 @@ function useCurrentProgramState() {
             setUnavailable(false);
             setFailureCategory(null);
             prevWeekRef.current = 0;
-            void refresh();
+            setTimeout(() => void refresh(), 0);
         });
         return () => {
             subscription.unsubscribe();

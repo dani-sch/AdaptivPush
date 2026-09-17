@@ -7,6 +7,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "web:local": "node scripts/startLocalWebQa.mjs",
     "lint": "expo lint",
     "test:catalog": "tsx --test tests/catalog/*.test.ts",
     "test:dependencies": "tsx --test tests/dependencies/*.test.ts",

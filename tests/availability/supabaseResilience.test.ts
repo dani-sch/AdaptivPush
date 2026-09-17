@@ -9,7 +9,30 @@ import {
   sanitizedSupabaseDiagnostic,
   supabaseSaveFailureMessage,
   SupabaseRequestTimeoutError,
+  resilientSupabaseFetch,
 } from '../../utils/supabaseResilience';
+
+test('native fetch cancellation settles even if the transport ignores AbortSignal', async (t) => {
+  t.mock.method(globalThis, 'fetch', () => new Promise<Response>(() => {}));
+  const controller = new AbortController();
+  const pending = resilientSupabaseFetch('https://example.supabase.co/auth/v1/token', { signal: controller.signal });
+  controller.abort();
+  await assert.rejects(pending, error => classifySupabaseError(error).category === 'cancelled');
+});
+
+test('Expo native fetch, DNS/TLS and status-zero auth failures are retryable connection failures', () => {
+  for (const error of [
+    { name: 'AuthRetryableFetchError', status: 0, message: 'fetch failed: UnexpectedException: Could not connect to the server. (at ExpoModulesCore/Promise.swift:56)' },
+    { name: 'AuthRetryableFetchError', status: 0 },
+    new Error('The network connection was lost'), new Error('ECONNREFUSED'), new Error('TLS handshake failed'),
+  ]) {
+    const failure = classifySupabaseError(error);
+    assert.equal(failure.category, 'offline');
+    assert.equal(failure.retryable, true);
+    assert.match(loginErrorMessage(error), /try again/);
+    assert.doesNotMatch(loginErrorMessage(error), /password is incorrect/);
+  }
+});
 
 test('classifies availability, auth, policy, and schema failures distinctly', () => {
   assert.equal(classifySupabaseError({ status: 502 }).category, 'retryable_service_unavailable');
