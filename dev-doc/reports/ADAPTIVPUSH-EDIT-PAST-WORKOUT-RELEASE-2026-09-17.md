@@ -120,7 +120,7 @@ Feature branch: `codex/edit-past-workout-release`, based on `b48a984` (merged PR
 - `38848f6` — SQL correction semantics, lineage, outcomes and concurrent correction tests.
 - `812498d` — navigation, catalog and authenticated acceptance fixes.
 
-The canonical `integrator` worktree merged the first two at `6c6c94b`, then the final application commit at `974007a`. The final integrated application independently passed all 96 focused cases, TypeScript and lint. Release documentation and publication are recorded in the subsequent Git history and review. No force push or direct main push is part of this release.
+The canonical `integrator` worktree merged the first two at `6c6c94b`, then the final application commit at `974007a`. The final integrated application independently passed all 96 focused cases, TypeScript and lint. Release documentation commit `c65aef6` was integrated at `9463862` with an identical tree. Publication uses [PR #57](https://github.com/dani-sch/AdaptivPush/pull/57); subsequent documentation reconciliation and the final merge are recorded in that review and Git history. No force push or direct main push is part of this release.
 
 Restricted raw evidence and reproducible verification helpers are outside Git at `C:\Users\dani2\AppData\Local\AdaptivPush\release-evidence\2026-09-17-edit-workout`: project/schema inventories, reviewed hashes, backup/restore comparison, dry-run, deployment, security, original-data preservation, authenticated acceptance, pending recovery, cleanup, and source/integrator test logs. Sensitive backup contents and credentials are not published with this report. September 14/15 reports retain their original historical scope.
 
