@@ -1,5 +1,11 @@
 # AdaptivPush current state
 
+## Scoped removals and shared controls: integrated, hosted approval pending
+
+Active capture and completed edit now share compact rows with explicit checks, on-demand load/exercise settings, swipe set removal and header exercise removal. Occurrence tombstones preserve original prescriptions; selected future changes commit atomically with Save or Finish. Missing attempts hold the affected progression decision without becoming failures. App-owned dialog backdrops are transparent.
+
+The new additive migration 20260917180000 and separate removal capability 1 are locally/integration verified, **not deployed**. Earlier hosted correction capability 2 remains unchanged. The exact packet, encrypted backup/59-relation restore proof, 106 passing tests, SQL/concurrency checks, screenshots, forward recovery and physical-iPhone limitations are recorded in [September 17 removal evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-REMOVALS-2026-09-17.md). Obtain the user's explicit section-11 authorization before a new hosted write. AP-04/AP-05 remain queued.
+
 ## Unified workout occurrence boundary
 
 Home, Plan/full-program and workout capture now reconcile stable program/day/slot identities through `effectiveOccurrence.ts`, `effectiveCurrentWorkout.ts` and `resolveProgramOccurrences.ts`. Finalized sessions win over local drafts. Completed view/edit uses the existing `ExerciseCard`; the durable frozen prescription reconstructs all prescribed exercises/sets alongside actual rows, skipped outcomes and extra sets. The completed route reads stable session columns before checking correction capability and remains viewable if correction support is absent.
