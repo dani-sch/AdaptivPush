@@ -1,11 +1,11 @@
 # AdaptivPush active task board
 
-## [CURRENT] Resume from the preserved September 15 implementation
+## [CURRENT] Resume from the September 17 editing release
 
 - [COMPLETE] Reconcile the master plan, register, code status, database, traceability, research scope and living summaries with the hosted rollout and latest local workout lifecycle. Approved decisions and later-slice order remain unchanged.
 - [COMPLETE] Consolidate all prior branch tips in draft PR #56, verify the integration tree, and retire seven redundant local branches plus the hosted-rollout remote branch. [Git and verification evidence](/dev-doc/reports/DEV-LOG.md#2026-09-15---reconciled-progress-integration-and-draft-pr-closeout).
-- [CURRENT] Continue the unified workout lifecycle acceptance below. Preserve stable day/slot identity, exact retry operations, performed-set history, explicit partial outcomes, shared completed cards and capability-aware corrections. Do not restart AP-01 inspection or rebuild the existing atomic persistence modules.
-- [OPEN] Finish authenticated and physical iPhone acceptance; separately authorize and verify the two local-only migrations before hosted rollout. Git publication in draft PR #56 does not deploy them.
+- [CURRENT] Continue the remaining physical-device acceptance below. Preserve stable day/slot identity, exact retry operations, performed-set history, explicit partial outcomes, shared completed cards and capability-aware corrections. Do not restart AP-01 inspection or rebuild the existing atomic persistence modules.
+- [COMPLETE] Deploy and verify both correction migrations after fresh backup/restore; complete authenticated hosted edit/save/reopen and security acceptance. [September 17 release evidence](/dev-doc/reports/ADAPTIVPUSH-EDIT-PAST-WORKOUT-RELEASE-2026-09-17.md).
 
 ## [COMPLETE] Documentation consolidation
 
@@ -57,19 +57,20 @@
 
 The user's September 15 authorization replaces earlier pre-migration local/manual/native-signing gates. Physical iPhone cold launch, five-action UI/reopen acceptance and accessibility remain unverified. Thirty-two pre-existing non-rest days have no exercises (five in active programs); they were preserved, not populated with invented prescriptions. Complete persisted workouts can use their database identities; empty legacy days remain unstartable. AP-04/AP-05 remain out of scope. Evidence and recovery procedure: [release report](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md) and [manual checklist](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-MANUAL-QA-2026-09-14.md).
 
-## [LOCAL VERIFIED; HOSTED ROLLOUT NOT AUTHORIZED] Unified workout lifecycle
+## [RELEASED; PHYSICAL IPHONE CHECKS OPEN] Unified workout lifecycle
 
 - [COMPLETE] Share effective occurrence projection across Home, Plan/full-program, active cards and durable completed view/edit; preserve stable slots, performed identities and full frozen prescriptions.
 - [COMPLETE] Make repeat swaps follow stable original slot lineage, keep exact retry recovery and scope-specific outcomes, and protect finalized occurrences.
 - [COMPLETE] Add skip/undo and skip-exercise controls, partial finalization confirmation, explicit Home lifecycle actions and direct durable Last Workout access.
 - [COMPLETE] Reuse exercise cards for completed view/edit, support per-exercise extra sets and whole-edit Cancel, distinguish missing correction support from ownership, and sequence History dismissal before navigation.
 - [COMPLETE] Hold progression on incomplete required work; corrections recompute completion/volume/records and invalidate existing derived-effect receipts without advancing the program.
-- [LOCAL VERIFIED] 75 AP-02/AP-03 tests plus 13 availability tests, strict TypeScript, lint (three existing warnings), four SQL suites plus legacy variant, concurrent-request checks, database lint, Expo web export and unauthenticated browser smoke.
-- [OPEN] Authenticated acceptance: both swap entry points/scopes, second swap, partial finalize/reopen, correction Save/Cancel/retry/conflict, record totals and History dismissal. Physical iPhone keyboard, VoiceOver, dynamic text and reopening remain unverified.
+- [COMPLETE] 96 application cases, strict TypeScript, lint (three existing warnings), eight concurrency checks, five SQL variants on fresh/restored/hosted databases, database lint and final web export. Ruff reports absent `src/`; applicable paths exit 0 with no Python discovered.
+- [COMPLETE] Authenticated correction entry from History/Home/Plan/full-program; Save/Cancel/reload/reopen, load/outcome/set changes, exact response-loss recovery, conflict reload, totals, ownership and account-change clearing.
+- [OPEN] Physical iPhone keyboard, VoiceOver, dynamic text, native restart and broader swap/finalization device regressions.
 - [OPEN] Recheck restore archived programs, end/archive, start and generate on the physical candidate; prior confirmations remain baseline evidence.
-- [BLOCKED: HOSTED AUTHORIZATION REQUIRED] Neither modified migration `20260915190000` nor new migration `20260915210000` is authorized for hosted deployment. A future authorized rollout must verify project identity, recoverability, exact migration hashes, owner/security behavior and hosted capabilities before release.
+- [COMPLETE] Deploy exactly `20260915190000` and `20260915210000` under explicit September 17 authorization; verified capability 2, supported ledger, isolated recovery and unchanged original data.
 
-Evidence: [workout lifecycle verification](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-LIFECYCLE-2026-09-15.md). Earlier [swap/correction evidence](/dev-doc/reports/ADAPTIVPUSH-SWAP-CORRECTION-2026-09-15.md) remains historical provenance.
+Current evidence: [September 17 release evidence](/dev-doc/reports/ADAPTIVPUSH-EDIT-PAST-WORKOUT-RELEASE-2026-09-17.md). Historical evidence: [workout lifecycle verification](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-LIFECYCLE-2026-09-15.md). Earlier [swap/correction evidence](/dev-doc/reports/ADAPTIVPUSH-SWAP-CORRECTION-2026-09-15.md) remains historical provenance.
 
 ## [NEXT AFTER RELEASE] Bounded implementation
 
