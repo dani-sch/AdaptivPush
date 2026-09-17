@@ -2,7 +2,7 @@
 
 ## [CURRENT] Scoped removals rollout boundary
 
-- [INTEGRATION VERIFIED] Shared active/edit controls, durable workout/program removals, neutral original evidence and transparent app dialogs. Integrator 8ab5d6c; 107 application tests plus SQL/security/concurrency gates.
+- [INTEGRATION VERIFIED] Shared active/edit controls, durable workout/program removals, neutral original evidence and transparent app dialogs. Integrator c2fc22e; 107 application tests plus SQL/security/concurrency gates.
 - [AWAITING EXPLICIT AUTHORIZATION] Deploy only migration 20260917180000 after reviewing the exact hash, fresh encrypted backup, isolated restore and forward-recovery packet in [removal evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-REMOVALS-2026-09-17.md). Hosted removal is not released; existing correction capability remains 2.
 - [OPEN] Physical iPhone gestures, keyboard, VoiceOver, dynamic text, modal animations/dismissal and restart. Browser checks are recorded separately.
 
