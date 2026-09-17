@@ -30,6 +30,10 @@ export function removeDraftWork(draft: WorkoutDraft, slotId: string, setId?: str
   const slot = draft.slots.find(s => s.slotId === slotId);
   const set = slot?.sets.find(s => s.setId === setId);
   if (!slot || (setId && !set)) throw new Error('Workout item is no longer available.');
+  if (set && !draft.frozenPrescription.slots.find(s => s.slotId === slotId)?.sets.some(s => s.setId === setId)) {
+    if (programRemoval) throw new Error('Extra sets have no future prescription.');
+    return { ...draft, revision: nextRevision(draft.revision), slots: draft.slots.map(s => s.slotId !== slotId ? s : { ...s, sets: s.sets.filter(row => row.setId !== setId) }) };
+  }
   const removals = appendRemoval(draft.removals, slotId, set);
   return { ...draft, revision: nextRevision(draft.revision), removals, programRemoval: programRemoval ?? draft.programRemoval,
     slots: draft.slots.map(s => ({ ...s, sets: s.sets.map(row => isRemoved(removals, s.slotId, row.setId)

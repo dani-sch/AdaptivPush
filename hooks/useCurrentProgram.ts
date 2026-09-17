@@ -581,6 +581,7 @@ function useCurrentProgramState() {
                 rep_range_max,
                 target_rpe,
                 suggested_weight_lb,
+                per_set_weights_lb,
                 exercises!program_day_exercises_exercise_id_fkey ( name )
               )
             `)
@@ -601,18 +602,17 @@ function useCurrentProgramState() {
             for (const pde of pdes) {
                 const exerciseName: string = (pde.exercises as any)?.name ?? '';
 
-                // Fetch most recent logged sets for this exercise (scoped to this user).
-                // First find the most recent session_id, then get all sets from that session.
+                // Include a newer occurrence with no actual rows: omission must hold, not reuse older success.
                 const { data: latestSession, error: latestSessionError } = await supabase
-                    .from('workout_exercise_sets')
-                    .select('session_id, workout_sessions!inner(user_id,completion_class,prescription_snapshot)')
-                    .eq('exercise_id', pde.exercise_id)
-                    .eq('workout_sessions.user_id', userId)
-                    .order('created_at', { ascending: false })
+                    .from('workout_sessions')
+                    .select('id,prescription_snapshot')
+                    .eq('user_id', userId)
+                    .or('prescription_snapshot->slots.cs.' + JSON.stringify([{ prescribedExerciseId: pde.exercise_id }])
+                        + ',prescription_snapshot->effectiveSlots.cs.' + JSON.stringify([{ actualExerciseId: pde.exercise_id }]))
+                    .order('ended_at', { ascending: false })
                     .limit(1);
                 if (latestSessionError) throw latestSessionError;
-
-                const latestSessionId = (latestSession?.[0] as any)?.session_id;
+                const latestSessionId = latestSession?.[0]?.id;
 
                 let recentSets = null;
                 if (latestSessionId) {
@@ -641,7 +641,7 @@ function useCurrentProgramState() {
                     : null;
                 const baselineWeight = liftedWeightAvg ?? (pde.suggested_weight_lb ?? 0);
 
-                const fullCoverage = hasOriginalExerciseEvidence((latestSession?.[0] as any)?.workout_sessions?.prescription_snapshot, pde.exercise_id, recentSets ?? []);
+                const fullCoverage = hasOriginalExerciseEvidence((latestSession?.[0] as any)?.prescription_snapshot, pde.exercise_id, recentSets ?? []);
                 const ctx: ProgressionContext = {
                     pdeId:           pde.id,
                     exerciseName,

@@ -303,7 +303,8 @@ export function classifyWorkoutCompletion(draft: WorkoutDraft): WorkoutCompletio
   const sets = draft.slots.flatMap((slot) => slot.sets);
   const logged = sets.filter((set) => set.logged).length;
   if (logged === 0) return 'abandoned';
-  if (logged === sets.length) {
+  if (draft.frozenPrescription.slots.every(slot => slot.sets.every(required =>
+    draft.slots.find(s => s.slotId === slot.slotId)?.sets.some(set => set.setId === required.setId && set.logged)))) {
     return 'complete';
   }
   return 'partial';

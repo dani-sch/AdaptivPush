@@ -4,6 +4,7 @@ import { createWorkoutDraft, updateWorkoutSet, classifyWorkoutCompletion, valida
 import { removeDraftWork, addProgramRemoval } from '../../features/workouts/removals';
 import { draftToExercises } from '../../features/workouts/workoutPresentation';
 import { projectCompletedOccurrence } from '../../features/workouts/effectiveOccurrence';
+import { hasOriginalExerciseEvidence } from '../../features/workouts/performanceEvidence';
 import { externalActualSets } from '../../features/workouts/actualLoads';
 
 function fixture() {
@@ -72,4 +73,39 @@ test('shared presentation retains separate load kind, mixed units and bodyweight
   const sets = draftToExercises(draft)[0].sets;
   assert.deepEqual(sets.map(s => [s.loadKind, s.loadUnit]), [['assistance', 'kg'], ['bodyweight', 'none'], ['external', 'lb']]);
   assert.equal(draft.slots[0].sets[1].actualLoad, null);
+});
+
+test('extra sets cannot replace missing original evidence and remove without prescription tombstones', () => {
+  let draft = fixture();
+  draft.slots[0].sets.push({ ...draft.slots[0].sets[0], setId: 'extra', order: 4 });
+  for (const setId of ['set-1', 'set-2', 'extra']) draft = updateWorkoutSet(draft, { setId, reps: 8, load: 50, logged: true });
+  assert.equal(validateWorkoutDraft(draft).ok, true);
+  assert.equal(classifyWorkoutCompletion(draft), 'partial');
+  const projection = projectCompletedOccurrence(workoutFinalizationPayload(draft, '2026-09-17T12:30:00Z').frozenPrescription as typeof draft.frozenPrescription, [{
+    actualSetId: 'extra', prescriptionSlotId: 'slot', prescribedExerciseId: 'exercise', exerciseId: 'exercise', order: 4,
+    reps: 8, loadValue: 50, loadKind: 'external', loadUnit: 'lb', loadSide: 'external_total', rpe: null, loggedAt: '2026-09-17T12:20:00Z',
+  }]);
+  assert.equal(projection.exercises[0].sets.at(-1)?.prescribed, false);
+  draft = removeDraftWork(draft, 'slot', 'extra');
+  assert.equal(draft.slots[0].sets.length, 3);
+  assert.equal(draft.removals, undefined);
+});
+test('original per-exercise evidence holds omitted work without penalizing another exercise', () => {
+  const base = fixture().frozenPrescription;
+  const snapshot = { ...base, slots: [...base.slots, { ...base.slots[0], slotId: 'other-slot', prescribedExerciseId: 'other' }] };
+  const rows = [1, 2, 3].map(order => ({ prescription_slot_id: 'slot', order_index: order }));
+  assert.equal(hasOriginalExerciseEvidence(snapshot, 'exercise', rows), true);
+  assert.equal(hasOriginalExerciseEvidence(snapshot, 'other', rows), false);
+  assert.equal(hasOriginalExerciseEvidence(snapshot, 'exercise', []), false);
+  assert.equal(hasOriginalExerciseEvidence(snapshot, 'exercise', [rows[0], rows[1], { prescription_slot_id: 'slot', order_index: 4 }]), false);
+  assert.equal(hasOriginalExerciseEvidence(null, 'exercise', rows), false);
+});
+test('saved uniform corrections identify the new exercise, while mixed actual identities remain intact', () => {
+  const snapshot = fixture().frozenPrescription;
+  const actuals = [1, 2, 3].map(order => ({ actualSetId: 'set-' + order, prescriptionSlotId: 'slot', prescribedExerciseId: 'exercise',
+    exerciseId: 'replacement', order, reps: 8, loadValue: 15, loadKind: 'assistance' as const, loadUnit: 'kg' as const, loadSide: 'external_total' as const, rpe: 8, loggedAt: '2026-09-17T12:20:00Z' }));
+  const names = new Map([['replacement', 'Replacement']]);
+  assert.equal(projectCompletedOccurrence(snapshot, actuals, names).exercises[0].name, 'Replacement');
+  actuals[1].exerciseId = 'other';
+  assert.deepEqual(projectCompletedOccurrence(snapshot, actuals, names).exercises[0].sets.map(s => s.exerciseId), ['replacement', 'other', 'replacement']);
 });

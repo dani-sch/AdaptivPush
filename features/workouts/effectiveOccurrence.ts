@@ -59,7 +59,7 @@ export function projectCompletedOccurrence(
     return {
       slotId: slot.slotId, exerciseId,
       name: names.get(exerciseId) ?? effective?.replacementExerciseName ?? slot.exerciseName ?? 'Prescribed exercise',
-      prescription: `${slot.prescribedSetCount} × ${first ? `${first.plannedRepsMin}–${first.plannedRepsMax}` : 'prescribed reps'}`,
+      prescription: `${(slot.sets ?? []).filter(set => !isRemoved(snapshot?.removals, slot.slotId, set.setId)).length} × ${first ? `${first.plannedRepsMin}–${first.plannedRepsMax}` : 'prescribed reps'}`,
       sets: (slot.sets ?? []).filter(set => !isRemoved(snapshot?.removals, slot.slotId, set.setId)).map(set => {
         const actual = actuals.find(a => a.actualSetId === set.setId
           || (a.prescriptionSlotId === slot.slotId && a.order === set.order));
@@ -85,6 +85,13 @@ export function projectCompletedOccurrence(
       exercises.push(exercise);
     }
     exercise.sets.push({ ...actual, outcome: 'performed', prescribed: false });
+  }
+  for (const exercise of exercises) {
+    const identities = new Set(exercise.sets.map(set => set.exerciseId));
+    if (identities.size === 1 && exercise.sets.some(set => set.outcome === 'performed')) {
+      exercise.exerciseId = exercise.sets[0].exerciseId;
+      exercise.name = names.get(exercise.exerciseId) ?? exercise.name;
+    }
   }
   return { exercises: exercises.filter(e => e.sets.length > 0), missingPrescription: !snapshot?.slots?.length || snapshot.slots.some(s => !s.sets?.length) };
 }
