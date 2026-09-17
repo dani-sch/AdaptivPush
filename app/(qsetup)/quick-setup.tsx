@@ -292,7 +292,7 @@ export default function QSetupPage() {
 
                         {/* Sex assigned at birth */}
                         <Text style={styles.label}>Sex assigned at birth <Text style={styles.optional}>(optional)</Text></Text>
-                        <Dropdown
+                        <Dropdown backgroundColor="transparent"
                             data={sexOptions}
                             labelField="label"
                             valueField="value"
@@ -312,7 +312,7 @@ export default function QSetupPage() {
 
                         {/* Gender identity */}
                         <Text style={styles.label}>Gender identity <Text style={styles.optional}>(optional)</Text></Text>
-                        <Dropdown
+                        <Dropdown backgroundColor="transparent"
                             data={genderOptions}
                             labelField="label"
                             valueField="value"
@@ -373,7 +373,7 @@ export default function QSetupPage() {
 
                         {/* Training experience */}
                         <Text style={styles.label}>Training experience</Text>
-                        <Dropdown
+                        <Dropdown backgroundColor="transparent"
                             data={experienceOptions}
                             labelField="label"
                             valueField="value"

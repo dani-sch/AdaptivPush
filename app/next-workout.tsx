@@ -1,3 +1,9 @@
+import { nextRevision } from '@/features/kernel/revisions';
+import { RemovalScopeSheet, type RemovalSelection } from '@/components/RemovalScopeSheet';
+import { removalsAvailable, previewRemoval, type RemovalPreview } from '@/features/workouts/removalRepository';
+import { removeDraftWork, addProgramRemoval, emptyRemovals, isRemoved } from '@/features/workouts/removals';
+import { loadCorrectionCatalog } from '@/features/workouts/occurrenceRepository';
+import { AppAlert as Alert } from '@/components/ui/AppDialog';
 import { draftToExercises } from '@/features/workouts/workoutPresentation';
 import { haptic, Haptics } from "@/utils/haptic";
 import { ExerciseHistoryModal } from "@/components/ExerciseHistoryModal";
@@ -47,9 +53,9 @@ import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
     ActivityIndicator,
-    Alert,
     KeyboardAvoidingView,
     Modal,
+    TextInput,
     Platform,
     Pressable,
     ScrollView,
@@ -165,6 +171,13 @@ export default function NextWorkoutScreen() {
   );
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [workoutName, setWorkoutName] = useState("Workout");
+  const [canRemove, setCanRemove] = useState(false);
+  const [removal, setRemoval] = useState<RemovalSelection | null>(null);
+  const [removalPreview, setRemovalPreview] = useState<RemovalPreview>();
+  const [setPicker, setSetPicker] = useState<string | null>(null);
+  const [setCatalog, setSetCatalog] = useState<{ id: string; name: string }[]>([]);
+  const [setSearch, setSetSearch] = useState('');
+  const ownerIdRef = useRef<string | null>(null);
   const [draft, setDraft] = useState<WorkoutDraft | null>(null);
   const [draftLoading, setDraftLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(true);
@@ -176,6 +189,8 @@ export default function NextWorkoutScreen() {
   const [elapsed, setElapsed] = useState(0);
   const [showFinishModal, setShowFinishModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [removalBusy, setRemovalBusy] = useState(false);
+  const removalBusyRef = useRef(false);
   const [programUpdating, setProgramUpdating] = useState(false);
   const [swapTargetId, setSwapTargetId] = useState<string | null>(null);
   const [pendingSwap, setPendingSwap] = useState<PendingWorkoutSwap | null>(null);
@@ -220,17 +235,17 @@ export default function NextWorkoutScreen() {
     let mounted = true;
     void getPersistedSessionOwnerId().then((persistedOwnerId) => {
       if (!mounted || !persistedOwnerId) return;
-      setOwnerId(persistedOwnerId);
+      ownerIdRef.current = persistedOwnerId; setOwnerId(persistedOwnerId);
       setAuthLoading(false);
     }).catch(() => undefined);
     void supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
-      setOwnerId(data.session?.user.id ?? null);
+      ownerIdRef.current = data.session?.user.id ?? null; setOwnerId(data.session?.user.id ?? null);
       setAuthLoading(false);
     });
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!mounted) return;
-      setOwnerId(session?.user.id ?? null);
+      ownerIdRef.current = session?.user.id ?? null; setOwnerId(session?.user.id ?? null);
       setAuthLoading(false);
     });
     return () => {
@@ -302,7 +317,7 @@ export default function NextWorkoutScreen() {
         if (programWorkout.exercises.length === 0) {
           throw new Error('This requested workout has no exercise prescription. Refresh the plan and try again.');
         }
-        const nextDraft = createWorkoutDraft({
+        let nextDraft = createWorkoutDraft({
           ownerId,
           programId: program.id,
           programDayId: programWorkout.id,
@@ -339,6 +354,14 @@ export default function NextWorkoutScreen() {
             };
           }),
         });
+        const removals = emptyRemovals();
+        for (const exercise of programWorkout.exercises) {
+          const mask = exercise.removalMask; const slot = nextDraft.slots.find(s => s.slotId === (exercise.stableSlotId ?? exercise.id));
+          if (!mask || !slot) continue;
+          if (mask.removed) removals.slots.push(slot.slotId);
+          for (const set of slot.sets) if (mask.orders.includes(set.order)) removals.sets.push({ slotId: slot.slotId, setId: set.setId, order: set.order });
+        }
+        if (removals.slots.length || removals.sets.length) nextDraft = { ...nextDraft, removals };
         await workoutDraftStore.save(nextDraft);
         if (cancelled) return;
         setDraft(nextDraft);
@@ -410,6 +433,11 @@ export default function NextWorkoutScreen() {
     };
   }, [draft]);
 
+  useEffect(() => { let active = true;
+    void Promise.resolve().then(() => { if (active) { setCanRemove(false); setRemoval(null); setSetPicker(null); } });
+    void removalsAvailable().then(value => { if (active) setCanRemove(value); });
+    return () => { active = false; };
+  }, [ownerId]);
   const completedCount = exercises.filter((e) => e.completed).length;
 
   const updateSet = (
@@ -418,7 +446,7 @@ export default function NextWorkoutScreen() {
     field: keyof WorkoutSet,
     value: string | boolean,
   ) => {
-    if (!draft || draft.finalizationEndedAt || draft.lifecycle === 'finalized' || saving) return;
+    if (!draft || draft.finalizationEndedAt || draft.lifecycle === 'finalized' || saving || removalBusyRef.current || pendingSwap) return;
     try {
       const asNumber = (input: string): number | null => input.trim() === '' ? null : Number(input);
       const update = field === 'weight'
@@ -427,9 +455,13 @@ export default function NextWorkoutScreen() {
           ? { enteredRepsText: String(value), reps: asNumber(String(value)) }
           : field === 'rpe'
             ? { enteredRpeText: String(value), rpe: asNumber(String(value)) }
+            : field === 'loadKind' ? { loadKind: value as import('@/features/workouts/contracts').LoadKind, loadUnit: value === 'bodyweight' ? 'none' as const : draft.slots.flatMap(s => s.sets).find(s => s.setId === setId)?.loadUnit === 'kg' ? 'kg' as const : 'lb' as const }
+            : field === 'loadUnit' ? { loadUnit: value as 'lb' | 'kg' }
             : field === 'outcome' ? { outcome: value as import('@/features/workouts/contracts').SetOutcome }
             : { logged: Boolean(value), loggedAt: value ? new Date().toISOString() : null };
-      const nextDraft = updateWorkoutSet(draft, { setId, ...update });
+      const current = draft.slots.flatMap(s => s.sets).find(s => s.setId === setId);
+      const checked = field === 'logged' && value && current ? { load: current.loadKind === 'bodyweight' ? null : asNumber(current.enteredLoadText), reps: asNumber(current.enteredRepsText), rpe: asNumber(current.enteredRpeText) } : {};
+      const nextDraft = updateWorkoutSet(draft, { setId, ...checked, ...update });
       setDraft(nextDraft);
       setExercises(draftToExercises(nextDraft, programWorkout ?? undefined));
       persistDraft(nextDraft);
@@ -438,23 +470,42 @@ export default function NextWorkoutScreen() {
     }
   };
 
-  const skipExercise = (exerciseId: string) => {
-    if (!draft || draft.finalizationEndedAt || draft.lifecycle === 'finalized' || saving) return;
-    let next = draft;
-    for (const set of draft.slots.find(s => s.slotId === exerciseId)?.sets ?? []) {
-      if (!set.logged) next = updateWorkoutSet(next, { setId: set.setId, outcome: 'skipped' });
-    }
-    setDraft(next); setExercises(draftToExercises(next, programWorkout ?? undefined)); void persistDraft(next);
+  const requestRemoval = async (slotId: string, setId?: string) => {
+    if (!draft || !canRemove || saving || removalBusyRef.current || pendingSwap || draft.finalizationEndedAt || draft.lifecycle === 'finalized') return;
+    removalBusyRef.current = true; setRemovalBusy(true);
+    const slot = draft.slots.find(s => s.slotId === slotId); const set = slot?.sets.find(s => s.setId === setId);
+    if (!slot) { removalBusyRef.current = false; setRemovalBusy(false); return; }
+    try {
+      const extra = Boolean(set && set.order > slot.prescribedSetCount);
+      const preview = extra ? undefined : await previewRemoval(draft.programId, draft.stableDayId, slotId, set?.order ?? null);
+      if (ownerIdRef.current !== draft.ownerId) return;
+      setRemovalPreview(preview); setRemoval({ slotId, setId, order: set?.order, label: set ? 'set ' + (exercises.find(e => e.id === slotId)?.sets.findIndex(s => s.id === setId)! + 1) : slot.exerciseName ?? 'exercise',
+        recorded: set ? set.logged : slot.sets.some(s => s.logged), futureCount: preview?.futureCount ?? 0, unavailableReason: extra ? 'Extra sets have no future prescription. Only this workout will change.' : undefined });
+    } catch { setSyncMessage('Removal scope could not be checked. Try again.'); }
+    finally { removalBusyRef.current = false; setRemovalBusy(false); }
+  };
+  const confirmRemoval = async (wholeProgram: boolean) => {
+    if (!draft || !removal || saving || removalBusyRef.current || pendingSwap || draft.finalizationEndedAt || draft.lifecycle === 'finalized') return;
+    removalBusyRef.current = true; setRemovalBusy(true);
+    try {
+      const intent = wholeProgram && removalPreview ? addProgramRemoval(draft.programRemoval, removalPreview, { slotId: removal.slotId, order: removal.order ?? null }) : draft.programRemoval;
+      const next = removeDraftWork(draft, removal.slotId, removal.setId, wholeProgram ? intent : undefined);
+      await persistDraft(next);
+      if (ownerIdRef.current !== draft.ownerId) return;
+      setDraft(next); setExercises(draftToExercises(next, programWorkout ?? undefined)); setRemoval(null);
+      setSyncMessage(wholeProgram ? 'Removal saved on this device. Matching future workouts update together when you Finish.' : 'Removed from this workout.');
+    } catch (error) { setSyncMessage(error instanceof Error ? error.message : 'Removal could not be saved. Try again.'); }
+    finally { removalBusyRef.current = false; setRemovalBusy(false); }
   };
   const toggleExerciseComplete = (exerciseId: string) => {
-    if (!draft || draft.finalizationEndedAt || draft.lifecycle === 'finalized' || saving) return;
+    if (!draft || draft.finalizationEndedAt || draft.lifecycle === 'finalized' || saving || removalBusyRef.current || pendingSwap) return;
     const slot = draft.slots.find((candidate) => candidate.slotId === exerciseId);
     if (!slot) return;
     const shouldLog = !slot.sets.every((set) => set.logged);
     try {
       let nextDraft = draft;
       for (const set of slot.sets) {
-        if (!set.actualReps || set.actualReps <= 0) continue;
+        if (isRemoved(draft.removals, slot.slotId, set.setId) || !set.actualReps || set.actualReps <= 0) continue;
         nextDraft = updateWorkoutSet(nextDraft, {
           setId: set.setId,
           logged: shouldLog,
@@ -707,6 +758,7 @@ export default function NextWorkoutScreen() {
   };
 
   const handleFinish = async () => {
+    if (saving || removalBusyRef.current || pendingSwapRef.current) return;
     if (intervalRef.current) clearInterval(intervalRef.current);
     setShowFinishModal(false);
     setSaving(true);
@@ -951,11 +1003,19 @@ export default function NextWorkoutScreen() {
               </View>
             </View>
           ) : null}
+          {!exercises.length ? <Text style={styles.syncBannerText}>No visible sets remain. Finish explicitly to save this as an uncompleted workout.</Text> : null}
           {exercises.map((exercise) => (
             <ExerciseCard
-              onSkipExercise={() => skipExercise(exercise.id)}
+              onRemoveSet={canRemove && !saving && !removalBusy && !pendingSwap && !draft?.finalizationEndedAt && draft?.lifecycle !== 'finalized' ? id => void requestRemoval(exercise.id, id) : undefined}
+              onRemoveExercise={canRemove && !saving && !removalBusy && !pendingSwap && !draft?.finalizationEndedAt && draft?.lifecycle !== 'finalized' ? () => void requestRemoval(exercise.id) : undefined}
+              onAddSet={canRemove && !saving && !removalBusy && !pendingSwap && !draft?.finalizationEndedAt && draft?.lifecycle !== 'finalized' ? () => {
+                if (!draft) return; const slot = draft.slots.find(s => s.slotId === exercise.id); const prior = slot?.sets.at(-1); if (!slot || !prior) return;
+                const next = { ...draft, revision: nextRevision(draft.revision), slots: draft.slots.map(s => s.slotId !== slot.slotId ? s : { ...s, sets: [...s.sets, { ...prior, setId: createOperationId(), order: Math.max(...s.sets.map(row => row.order)) + 1, logged: false, outcome: 'not_attempted' as const, actualLoad: null, actualReps: null, actualRpe: null, enteredLoadText: '', enteredRepsText: '', enteredRpeText: '', loggedAt: null }] }) };
+                setDraft(next); setExercises(draftToExercises(next, programWorkout ?? undefined)); void persistDraft(next);
+              } : undefined}
+              onSetExercise={id => { setSetPicker(id); setSetSearch(''); void loadCorrectionCatalog(supabase).then(result => setSetCatalog(result.data ?? [])); }}
               key={exercise.id}
-              exercise={exercise}
+              exercise={{ ...exercise, readOnly: exercise.readOnly || saving || removalBusy || Boolean(pendingSwap) || Boolean(draft?.finalizationEndedAt) || draft?.lifecycle === 'finalized' }}
               onUpdateSet={(setId, field, value) =>
                 updateSet(exercise.id, setId, field, value)
               }
@@ -964,7 +1024,7 @@ export default function NextWorkoutScreen() {
                 setHistoryExerciseId(exercise.exerciseId ?? null);
                 setHistoryExerciseName(exercise.name);
               }}
-              onPressSwap={() => setSwapTargetId(exercise.id)}
+              onPressSwap={() => { if (draft?.programRemoval) setSyncMessage('Finish the pending program removals before applying another program swap.'); else setSwapTargetId(exercise.id); }}
             />
           ))}
 
@@ -977,7 +1037,7 @@ export default function NextWorkoutScreen() {
             onPress={() => {
               if (draft?.lifecycle === 'finalized' && draft.finalizedReceipt?.sessionId) {
                 router.push({ pathname: '/edit-workout', params: { sessionId: draft.finalizedReceipt.sessionId } });
-              } else if (canFinishWorkout) setShowFinishModal(true);
+              } else if (canFinishWorkout && !removalBusyRef.current) setShowFinishModal(true);
             }}
             disabled={!canFinishWorkout && draft?.lifecycle !== 'finalized'}
             accessibilityRole="button"
@@ -996,6 +1056,17 @@ export default function NextWorkoutScreen() {
         </View>
       </KeyboardAvoidingView>
 
+      <RemovalScopeSheet selection={removal} busy={saving || removalBusy} onCancel={() => { if (!removalBusyRef.current) setRemoval(null); }} onConfirm={whole => void confirmRemoval(whole)} />
+      <Modal visible={setPicker !== null} transparent animationType="none" onRequestClose={() => setSetPicker(null)}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'transparent' }}><View style={{ maxHeight: '80%', padding: 24, backgroundColor: theme.surfaceBg, borderWidth: 1, borderColor: theme.border }} accessibilityViewIsModal>
+          <TextInput accessibilityLabel="Search exercises" style={{ color: theme.textPrimary, minHeight: 48 }} value={setSearch} onChangeText={setSetSearch} placeholder="Search exercises" />
+          <ScrollView keyboardShouldPersistTaps="handled">{setCatalog.filter(e => e.name.toLowerCase().includes(setSearch.toLowerCase())).map(e => <Pressable key={e.id} accessibilityRole="button" style={{ minHeight: 48, justifyContent: 'center' }} onPress={() => {
+            if (draft && setPicker && !saving && !removalBusyRef.current && !pendingSwap && !draft.finalizationEndedAt && draft.lifecycle !== 'finalized') { const next = updateWorkoutSet(draft, { setId: setPicker, actualExerciseId: e.id, actualExerciseName: e.name }); setDraft(next); setExercises(draftToExercises(next, programWorkout ?? undefined)); void persistDraft(next); }
+            setSetPicker(null);
+          }}><Text style={{ color: theme.text }}>{e.name}</Text></Pressable>)}</ScrollView>
+          <Pressable accessibilityRole="button" style={{ minHeight: 48 }} onPress={() => setSetPicker(null)}><Text style={{ color: theme.primary }}>Close</Text></Pressable>
+        </View></View>
+      </Modal>
       <FinishModal
         visible={showFinishModal}
         elapsed={elapsed}
@@ -1245,7 +1316,7 @@ function createStyles(theme: Theme) {
     },
     modalOverlay: {
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.85)",
+      backgroundColor: 'transparent',
       justifyContent: "center",
       alignItems: "center",
       padding: 24,
@@ -1304,7 +1375,7 @@ function createStyles(theme: Theme) {
     },
     savingOverlay: {
       ...StyleSheet.absoluteFill,
-      backgroundColor: "rgba(0,0,0,0.75)",
+      backgroundColor: 'transparent',
       justifyContent: "center",
       alignItems: "center",
       gap: 16,

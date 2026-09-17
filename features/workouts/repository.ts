@@ -15,7 +15,7 @@ export const workoutRepository: WorkoutRepository = {
   async finalize(draft, endedAt) {
     requireRollout(rollout.durableWorkoutWriter, 'Durable workout synchronization');
     const { data, error } = await runSupabaseOperation(
-      (signal) => supabase.rpc('finalize_workout_v2', {
+      (signal) => supabase.rpc(draft.removals || draft.programRemoval || draft.slots.some(s => s.sets.length > s.prescribedSetCount) ? 'finalize_workout_removals_v1' : 'finalize_workout_v2', {
         p_payload: workoutFinalizationPayload(draft, endedAt),
       }).abortSignal(signal),
       { kind: 'write', operation: 'workout.finalize' },

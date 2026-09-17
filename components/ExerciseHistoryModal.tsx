@@ -144,7 +144,7 @@ function createStyles(theme: Theme) {
   return StyleSheet.create({
     backdrop: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.82)',
+      backgroundColor: 'rgba(0, 0, 0, 0)',
       justifyContent: 'flex-end',
     },
     sheet: {

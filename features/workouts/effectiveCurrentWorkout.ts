@@ -55,6 +55,7 @@ function effectiveExercise(
       ? slot.replacementExerciseName ?? metadata?.name ?? 'Replacement exercise'
       : slot.exerciseName ?? prescribedSlot?.name ?? metadata?.name ?? 'Prescribed exercise',
     sets: slot.prescribedSetCount,
+    removalMask: { version: 1, removed: Boolean(draft.removals?.slots.includes(slot.slotId)), orders: draft.removals?.sets.filter(s => s.slotId === slot.slotId).map(s => s.order) ?? [] },
     reps: repRange(slot) ?? prescribedSlot?.reps,
     loadSuggestion: slot.loadSuggestion,
   };

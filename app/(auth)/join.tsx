@@ -1,5 +1,6 @@
+import { AppAlert as Alert } from '@/components/ui/AppDialog';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Keyboard, KeyboardAvoidingView, ScrollView, View, Text, TextInput, Pressable, StyleSheet } from "react-native";
+import { Keyboard, KeyboardAvoidingView, ScrollView, View, Text, TextInput, Pressable, StyleSheet } from "react-native";
 import { Link, router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useSafeAreaInsets } from "react-native-safe-area-context";

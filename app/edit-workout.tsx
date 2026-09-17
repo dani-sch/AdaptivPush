@@ -1,3 +1,7 @@
+import { RemovalScopeSheet, type RemovalSelection } from '@/components/RemovalScopeSheet';
+import { ExerciseHistoryModal } from '@/components/ExerciseHistoryModal';
+import { removalsAvailable, previewRemoval, type RemovalPreview } from '@/features/workouts/removalRepository';
+import { appendRemoval, isRemoved, type WorkoutRemovals, type ProgramRemovalRequest, addProgramRemoval } from '@/features/workouts/removals';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, BackHandler, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -29,6 +33,15 @@ export default function EditWorkoutScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const params = useLocalSearchParams<{ sessionId?: string }>();
   const sessionId = params.sessionId;
+  const removalRequest = useRef(0);
+  const [removal, setRemoval] = useState<RemovalSelection | null>(null);
+  const [removals, setRemovals] = useState<WorkoutRemovals>();
+  const originalRemovals = useRef<WorkoutRemovals | undefined>(undefined);
+  const [programRemoval, setProgramRemoval] = useState<ProgramRemovalRequest>();
+  const [removalPreview, setRemovalPreview] = useState<RemovalPreview>();
+  const [canRemove, setCanRemove] = useState(false);
+  const [parent, setParent] = useState<{ programId: string; dayId: string }>();
+  const [historyId, setHistoryId] = useState<string | null>(null);
   const [ownerId, setOwnerId] = useState<string | null>(null);
   const [title, setTitle] = useState('Workout');
   const [summary, setSummary] = useState('');
@@ -51,7 +64,7 @@ export default function EditWorkoutScreen() {
   const generation = useRef(0);
   const account = useRef<string | null>(null);
   const load = useCallback(async () => {
-    const request = ++generation.current;
+    const request = ++generation.current; removalRequest.current++;
     setLoading(true);
     setCanCorrect(false);
     setPickerSetId(null);
@@ -74,6 +87,12 @@ export default function EditWorkoutScreen() {
       const names = new Map((catalogResult.data ?? []).map(e => [e.id, e.name]));
       const projection = projectCompletedOccurrence(loaded.snapshot, loaded.sets, names);
       const base = editable(projection.exercises);
+      setRemovals(loaded.snapshot?.removals); originalRemovals.current = loaded.snapshot?.removals;
+      setProgramRemoval(undefined); setRemoval(null);
+      const available = await removalsAvailable();
+      const parentResult = loaded.session.program_day_id ? await supabase.from('program_days').select('program_id,stable_day_id').eq('id', loaded.session.program_day_id).maybeSingle() : null;
+      if (request !== generation.current) return false;
+      setCanRemove(available); setParent(parentResult?.data ? { programId: parentResult.data.program_id, dayId: parentResult.data.stable_day_id } : undefined);
       original.current = structuredClone(base);
       setExercises(base);
       setOwnerId(session.user.id);
@@ -110,7 +129,7 @@ export default function EditWorkoutScreen() {
       if (account.current && session?.user.id !== account.current) {
         generation.current++; account.current = null; original.current = [];
         setExercises([]); setOwnerId(null); setCanCorrect(false); setPickerSetId(null);
-        setDiscard(null);
+        setDiscard(null); setRemoval(null); setRemovals(undefined); setProgramRemoval(undefined); setHistoryId(null); setCanRemove(false); setParent(undefined);
         setTitle('Workout'); setSummary(''); setMode('completed_view'); setPending(false);
         setLoading(false); setStatus('The account changed. Reload to view this workout with the current account.');
       }
@@ -121,11 +140,20 @@ export default function EditWorkoutScreen() {
   const patchSet = (id: string, patch: Partial<EditableSet>) => setExercises(current => current.map(e => ({ ...e,
     sets: e.sets.map(s => s.actualSetId === id ? { ...s, ...patch } : s) })));
   const updateSet = (id: string, field: keyof WorkoutSet, value: string | boolean) => {
+    if (savingRef.current || pending || mode !== 'completed_edit') return;
     if (field === 'outcome') patchSet(id, { outcome: value as EditableSet['outcome'], loadText: '', repsText: '', rpeText: '' });
-    else if (field === 'logged') patchSet(id, { outcome: value ? 'performed' : 'not_attempted' });
-    else patchSet(id, { [field === 'weight' ? 'loadText' : field === 'reps' ? 'repsText' : 'rpeText']: String(value), outcome: 'performed' });
+    else if (field === 'logged') {
+      const set = exercises.flatMap(e => e.sets).find(s => s.actualSetId === id);
+      if (value && (!set || !Number.isInteger(Number(set.repsText)) || Number(set.repsText) <= 0 || ((set.loadKind === 'external' || set.loadKind === 'assistance') && !set.loadText.trim()))) { setStatus('Enter positive whole-number reps and the required load before checking this set.'); return; }
+      patchSet(id, { outcome: value ? 'performed' : 'not_attempted' });
+    }
+    else if (field === 'loadKind' || field === 'loadUnit') {
+      const set = exercises.flatMap(e => e.sets).find(s => s.actualSetId === id);
+      if (set) patchSet(id, correctionLoadSelection(set, value === 'bodyweight' ? 'none' : value as 'lb' | 'kg' | 'assistance' | 'external'));
+    }
+    else patchSet(id, { [field === 'weight' ? 'loadText' : field === 'reps' ? 'repsText' : 'rpeText']: String(value) });
   };
-  const cancel = () => { if (savingRef.current) return; setExercises(structuredClone(original.current)); setMode('completed_view'); setPickerSetId(null); };
+  const cancel = () => { if (savingRef.current) return; removalRequest.current++; setExercises(structuredClone(original.current)); setMode('completed_view'); setPickerSetId(null); setRemovals(originalRemovals.current); setProgramRemoval(undefined); setRemoval(null); };
   usePreventRemove(Boolean(ownerId) && (mode === 'completed_edit' || saving), ({ data }) => {
     if (savingRef.current) return;
     confirmDiscard('Discard workout edits?', () => navigation.dispatch(data.action));
@@ -138,21 +166,22 @@ export default function EditWorkoutScreen() {
   useEffect(() => { const sub = BackHandler.addEventListener('hardwareBackPress', () => { leave(); return true; }); return () => sub.remove(); });
   const save = async () => {
     if (savingRef.current || !canCorrect || !ownerId || !sessionId) return;
-    savingRef.current = true; setSaving(true);
+    removalRequest.current++; savingRef.current = true; setSaving(true);
     const requestGeneration = generation.current;
     try {
       const recovered = await workoutCorrectionStore.load(ownerId, sessionId);
       if (requestGeneration !== generation.current || account.current !== ownerId) return;
       const all = exercises.flatMap(e => e.sets);
       const request = recovered ?? createCompletedWorkoutCorrection({ ownerId, sessionId, expectedRevision: revision,
-        sets: all.filter(s => s.outcome === 'performed').map(s => ({
+        removals, programRemoval,
+        sets: all.filter(s => s.outcome === 'performed' && !isRemoved(removals, s.prescriptionSlotId ?? s.exerciseId, s.actualSetId)).map(s => ({
           actualSetId: s.actualSetId, prescriptionSlotId: s.prescriptionSlotId, prescribedExerciseId: s.prescribedExerciseId,
           exerciseId: s.exerciseId, order: s.order, reps: Number(s.repsText),
           loadValue: s.loadText.trim() ? Number(s.loadText) : null, loadKind: s.loadKind, loadUnit: s.loadUnit,
           loadSide: s.loadSide, rpe: s.rpeText.trim() ? Number(s.rpeText) : null, loggedAt: s.loggedAt || new Date().toISOString(),
         })),
         setOutcomes: all.filter(s => s.prescribed && s.prescriptionSlotId).map(s => ({
-          setId: s.actualSetId, slotId: s.prescriptionSlotId!, order: s.order, outcome: s.outcome,
+          setId: s.actualSetId, slotId: s.prescriptionSlotId!, order: s.order, outcome: isRemoved(removals, s.prescriptionSlotId!, s.actualSetId) ? 'not_attempted' : s.outcome,
         })),
       });
       const outcome = await correctCompletedWorkout(workoutCorrectionRepository, workoutCorrectionStore, request);
@@ -173,6 +202,34 @@ export default function EditWorkoutScreen() {
     }
     finally { savingRef.current = false; setSaving(false); }
   };
+  const requestRemoval = async (exercise: EditableExercise, setId?: string) => {
+    if (!canRemove || savingRef.current || pending) return;
+    const removalId = ++removalRequest.current;
+    const set = exercise.sets.find(s => s.actualSetId === setId);
+    const requestGeneration = generation.current;
+    try {
+      const preview = parent && (!set || set.prescribed) ? await previewRemoval(parent.programId, parent.dayId, exercise.slotId, set?.order ?? null) : undefined;
+      if (requestGeneration !== generation.current || removalId !== removalRequest.current || savingRef.current || mode !== 'completed_edit') return;
+      setRemovalPreview(preview);
+      setRemoval({ slotId: exercise.slotId, setId, order: set?.order, label: set ? 'set ' + (exercise.sets.indexOf(set) + 1) : exercise.name,
+        recorded: set ? set.outcome === 'performed' : exercise.sets.some(s => s.outcome === 'performed'), futureCount: preview?.futureCount ?? 0,
+        unavailableReason: set && !set.prescribed ? 'Extra sets have no future prescription. Only this workout will change.' : undefined });
+    } catch { setStatus('Removal scope could not be checked. Reload and try again.'); }
+  };
+  const confirmRemoval = (wholeProgram: boolean) => {
+    if (!removal || savingRef.current || pending) return;
+    const exercise = exercises.find(e => e.slotId === removal.slotId);
+    const set = exercise?.sets.find(s => s.actualSetId === removal.setId);
+    if (wholeProgram && removalPreview) {
+      try { setProgramRemoval(addProgramRemoval(programRemoval, removalPreview, { slotId: removal.slotId, order: removal.order ?? null })); }
+      catch { setStatus('The program changed. Cancel these edits and reload before choosing program scope again.'); setRemoval(null); return; }
+    }
+    if (set && !set.prescribed) setExercises(current => current.map(e => ({ ...e, sets: e.sets.filter(s => s.actualSetId !== set.actualSetId) })));
+    else if (exercise?.sets.some(s => s.prescribed)) setRemovals(appendRemoval(removals, removal.slotId, set ? { setId: set.actualSetId, order: set.order } : undefined));
+    else setExercises(current => current.filter(e => e.slotId !== removal.slotId));
+    setRemoval(null);
+  };
+  const visibleExercises = exercises.filter(e => !isRemoved(removals, e.slotId)).map(e => ({ ...e, sets: e.sets.filter(s => !isRemoved(removals,e.slotId,s.actualSetId)) })).filter(e => e.sets.length > 0);
   const editing = mode === 'completed_edit' && !saving && !pending;
   return <SafeAreaView style={styles.safeArea}>
     <Stack.Screen options={{ headerShown: false, gestureEnabled: mode !== 'completed_edit' && !saving }} />
@@ -186,14 +243,18 @@ export default function EditWorkoutScreen() {
       </View>
       {loading ? <ActivityIndicator style={styles.loading} color={theme.primary} /> : <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {status ? <Text style={styles.status} accessibilityLiveRegion="polite">{status}</Text> : null}
-        {exercises.map(exercise => <ExerciseCard key={exercise.slotId} exercise={{
-          id: exercise.slotId, exerciseId: exercise.exerciseId, name: exercise.name, prescription: exercise.prescription,
+        {visibleExercises.map(exercise => <ExerciseCard key={exercise.slotId} exercise={{
+          id: exercise.slotId, exerciseId: exercise.exerciseId, name: exercise.name, prescription: exercise.prescription.replace(/^\d+ ×/, exercise.sets.filter(s => s.prescribed).length + ' ×'),
           completed: exercise.sets.length > 0 && exercise.sets.every(s => s.outcome === 'performed'), readOnly: !editing,
           editingCompleted: editing, loadLabel: 'LOAD', sets: exercise.sets.map(s => ({ id: s.actualSetId,
             weight: s.loadText, reps: s.repsText, rpe: s.rpeText, logged: s.outcome === 'performed', outcome: s.outcome,
             loadUnit: s.loadUnit, loadKind: s.loadKind, exerciseName: catalog.find(e => e.id === s.exerciseId)?.name })),
         }} onUpdateSet={(id, field, value) => updateSet(id, field, value)} onToggleComplete={() => {}}
-          onPressSwap={() => {}}
+          onPressSwap={() => { setExerciseSearch(''); setPickerSetId('slot:' + exercise.slotId); }}
+          onPressHistory={() => setHistoryId(exercise.exerciseId)}
+          onSetExercise={id => { setExerciseSearch(''); setPickerSetId(id); }}
+          onRemoveSet={editing && canRemove ? id => void requestRemoval(exercise, id) : undefined}
+          onRemoveExercise={editing && canRemove ? () => void requestRemoval(exercise) : undefined}
           onAddSet={editing ? () => {
             const prior = exercise.sets.at(-1);
             setExercises(current => current.map(e => e.slotId !== exercise.slotId ? e : { ...e, sets: [...e.sets, {
@@ -203,25 +264,17 @@ export default function EditWorkoutScreen() {
               prescribed: false, outcome: 'not_attempted', loadText: '', repsText: '', rpeText: '', loggedAt: '',
             }] }));
           } : undefined}
-          renderSetControls={editing ? row => {
-            const set = exercise.sets.find(s => s.actualSetId === row.id)!;
-            return <View style={styles.kindRow}>
-              <Pressable accessibilityRole="button" accessibilityLabel={`Change exercise for set ${set.order}`} style={styles.kindButton} onPress={() => { setExerciseSearch(''); setPickerSetId(row.id); }}><Text style={styles.kindText}>Change exercise</Text></Pressable>
-              {(['lb', 'kg', 'none', 'assistance', 'external'] as const).map(selection => {
-                const selected = selection === 'assistance' || selection === 'external' ? set.loadKind === selection : set.loadUnit === selection;
-                return <Pressable key={selection} accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={`${selection === 'none' ? 'Bodyweight' : selection}, set ${set.order}`} style={[styles.kindButton, selected && styles.kindSelected]} onPress={() => patchSet(row.id, correctionLoadSelection(set, selection))}><Text style={styles.kindText}>{selection === 'none' ? 'Bodyweight' : selection === 'external' ? 'External load' : selection}</Text></Pressable>;
-              })}
-              <Pressable accessibilityRole="button" style={styles.kindButton} onPress={() => set.prescribed ? patchSet(row.id, { outcome: 'not_attempted', loadText: '', repsText: '', rpeText: '' }) : setExercises(current => current.map(e => ({ ...e, sets: e.sets.filter(s => s.actualSetId !== row.id) })))}><Text style={styles.kindText}>{set.prescribed ? 'Clear result' : 'Remove extra set'}</Text></Pressable>
-            </View>;
-          } : undefined}
+
         />)}
-        {!exercises.length && !status ? <Text style={styles.status}>No sets were recorded for this workout.</Text> : null}
+        {!visibleExercises.length ? <Text style={styles.status}>No visible sets remain. Saving keeps this workout incomplete.</Text> : null}
         <Pressable accessibilityRole="button" style={styles.addButton} disabled={saving} onPress={() => {
           if (mode !== 'completed_edit') void load();
           else confirmDiscard('Reload saved workout?', () => void load());
         }}><Text style={styles.addText}>Reload workout</Text></Pressable>
       </ScrollView>}
     </KeyboardAvoidingView>
+    <RemovalScopeSheet selection={removal} busy={saving || pending} onCancel={() => setRemoval(null)} onConfirm={confirmRemoval} />
+    <Modal visible={historyId !== null} transparent animationType="none" onRequestClose={() => setHistoryId(null)}>{historyId ? <ExerciseHistoryModal exerciseId={historyId} exerciseName={catalog.find(e => e.id === historyId)?.name ?? 'Exercise'} onClose={() => setHistoryId(null)} /> : null}</Modal>
     <Modal visible={discard !== null} transparent animationType="fade" onRequestClose={() => setDiscard(null)}>
       <View style={styles.modalBackdrop}><View style={styles.discardDialog} accessibilityViewIsModal>
         <Text style={styles.title}>{discard?.title}</Text>
@@ -233,7 +286,7 @@ export default function EditWorkoutScreen() {
     <Modal visible={pickerSetId !== null} transparent animationType="slide" onRequestClose={() => setPickerSetId(null)}>
       <View style={styles.modalBackdrop}><View style={styles.picker}><Text style={styles.title}>Performed exercise</Text>
         <TextInput accessibilityLabel="Search exercises" placeholder="Search exercises" placeholderTextColor={theme.placeholder} value={exerciseSearch} onChangeText={setExerciseSearch} style={styles.search} />
-        <ScrollView keyboardShouldPersistTaps="handled">{!catalog.length ? <Text style={styles.status}>Exercise list unavailable. Close and reload the workout to retry.</Text> : catalog.filter(e => e.name.toLowerCase().includes(exerciseSearch.trim().toLowerCase())).map(e => <Pressable accessibilityRole="button" key={e.id} style={styles.pickerRow} onPress={() => { if (pickerSetId && editing) patchSet(pickerSetId, { exerciseId: e.id }); setPickerSetId(null); }}><Text style={styles.exerciseName}>{e.name}</Text></Pressable>)}</ScrollView>
+        <ScrollView keyboardShouldPersistTaps="handled">{!catalog.length ? <Text style={styles.status}>Exercise list unavailable. Close and reload the workout to retry.</Text> : catalog.filter(e => e.name.toLowerCase().includes(exerciseSearch.trim().toLowerCase())).map(e => <Pressable accessibilityRole="button" key={e.id} style={styles.pickerRow} onPress={() => { if (pickerSetId && editing) { if (pickerSetId.startsWith('slot:')) setExercises(current => current.map(ex => ex.slotId === pickerSetId.slice(5) ? { ...ex, exerciseId: e.id, name: e.name, sets: ex.sets.map(s => ({ ...s, exerciseId: e.id })) } : ex)); else patchSet(pickerSetId, { exerciseId: e.id }); } setPickerSetId(null); }}><Text style={styles.exerciseName}>{e.name}</Text></Pressable>)}</ScrollView>
         <Pressable accessibilityRole="button" style={styles.addButton} onPress={() => setPickerSetId(null)}><Text style={styles.addText}>Close</Text></Pressable>
       </View></View>
     </Modal>
@@ -249,7 +302,7 @@ function createStyles(theme: Theme) {
     discardDialog: { backgroundColor: theme.surfaceBg, padding: 24, gap: 12, borderTopLeftRadius: 22, borderTopRightRadius: 22 },
     headerCopy: { flex: 1, alignItems: 'center' }, title: { color: theme.textPrimary, fontSize: 18, fontWeight: '800' },
     subtitle: { color: theme.text, fontSize: 12 }, cancel: { color: theme.text, fontWeight: '700' }, save: { color: theme.primary, fontWeight: '800' }, disabled: { opacity: 0.45 },
-    loading: { marginTop: 60 }, content: { padding: 16, paddingBottom: 80, gap: 12 },
+    loading: { marginTop: 60 }, content: { padding: 16, paddingBottom: 80 },
     status: { color: theme.textPrimary, backgroundColor: theme.mutedBg, padding: 12, borderRadius: 10, lineHeight: 19 },
     card: { borderWidth: 1, borderColor: theme.border, backgroundColor: theme.surfaceBg, borderRadius: 14, padding: 12, gap: 10 },
     cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, setTitle: { color: theme.textPrimary, fontWeight: '800' },
@@ -257,6 +310,6 @@ function createStyles(theme: Theme) {
     kindRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 }, kindButton: { minHeight: 44, justifyContent: 'center', borderWidth: 1, borderColor: theme.border, borderRadius: 16, paddingHorizontal: 9, paddingVertical: 7 }, kindSelected: { borderColor: theme.primary, backgroundColor: theme.mutedBg }, kindText: { color: theme.text, fontSize: 11, textTransform: 'capitalize' },
     inputs: { flexDirection: 'row', gap: 8 }, input: { flex: 1, minHeight: 46, borderWidth: 1, borderColor: theme.border, borderRadius: 10, color: theme.textPrimary, paddingHorizontal: 10 },
     addButton: { minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: theme.primary, alignItems: 'center', justifyContent: 'center' }, addText: { color: theme.primary, fontWeight: '800' },
-    modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'flex-end' }, picker: { height: '75%', backgroundColor: theme.surfaceBg, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 18, gap: 12 }, pickerRow: { minHeight: 48, justifyContent: 'center', borderBottomWidth: 1, borderBottomColor: theme.border },
+    modalBackdrop: { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-end' }, picker: { height: '75%', backgroundColor: theme.surfaceBg, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 18, gap: 12 }, pickerRow: { minHeight: 48, justifyContent: 'center', borderBottomWidth: 1, borderBottomColor: theme.border },
   });
 }

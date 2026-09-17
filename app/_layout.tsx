@@ -1,3 +1,5 @@
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { AppDialogHost } from '@/components/ui/AppDialog';
 import {
   DarkTheme,
   DefaultTheme,
@@ -173,10 +175,10 @@ function RootLayoutInner() {
 
 export default function RootLayout() {
   return (
-    <AppThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}><AppThemeProvider>
       <CurrentProgramProvider>
         <RootLayoutInner />
       </CurrentProgramProvider>
-    </AppThemeProvider>
+    <AppDialogHost /></AppThemeProvider></GestureHandlerRootView>
   );
 }

@@ -1,6 +1,8 @@
+import { visibleProgramExercises } from '@/features/workouts/visibleProgramExercises';
+import { AppAlert as Alert } from '@/components/ui/AppDialog';
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { Link, router, useFocusEffect } from 'expo-router';
-import { Alert, ScrollView, StyleSheet, Text, View, Pressable, Modal, Platform } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, Pressable, Modal, Platform } from 'react-native';
 import { Plus, ChevronRight, MoreVertical, LayoutList, Archive } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -400,7 +402,7 @@ export default function PlanScreen() {
                                     </Pressable>
                                 </View>
 
-                                <Text style={styles.exerciseCount}>{workout.exercises.length} exercises</Text>
+                                <Text style={styles.exerciseCount}>{visibleProgramExercises(workout.exercises).length} exercises</Text>
                             </View>
                         ))}
                     </View>
