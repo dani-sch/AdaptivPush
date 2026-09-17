@@ -4,7 +4,7 @@
 
 Implementation is integrated and locally verified. Hosted scoped removal is **not released**. Project `thfxcvxcsfvrzdysdnkq` still has its seven existing ledger entries and correction capability 2. The new removal controls are unavailable unless the separate authenticated `workout_removal_capability_v1()` returns integer 1. The two deployed correction migrations were not edited or replayed. User request section 11 requires explicit authorization for this new packet before any hosted write.
 
-Base: `origin/main 4c3c447`. Feature: `codex/workout-removal-and-shared-controls`. Implementation commits: `71bac25` (domain), `e40eea8` (atomic database contract), `5881ad2` (original evidence/extras), `cddf305` (compatibility/security/concurrency), `d6c164f` (shared controls/dialogs). Canonical integrator merged without conflicts at `8ab5d6c` and independently passed strict TypeScript, 106 application tests, lint and the nine-label removal concurrency suite. No direct main or force push occurred. The pre-existing ExerciseHistoryModal import changes remain unstaged; its existing transparent backdrop is included without overwriting that work.
+Base: `origin/main 4c3c447`. Feature: `codex/workout-removal-and-shared-controls`. Implementation commits: `71bac25` (domain), `e40eea8` (atomic database contract), `5881ad2` (original evidence/extras), `cddf305` (compatibility/security/concurrency), `d6c164f` (shared controls/dialogs). Canonical integrator merged without conflicts at `8ab5d6c` and independently passed strict TypeScript, 107 application tests, lint and the nine-label removal concurrency suite. No direct main or force push occurred. The pre-existing ExerciseHistoryModal import changes remain unstaged; its existing transparent backdrop is included without overwriting that work.
 
 Publication: [draft PR #58](https://github.com/dani-sch/AdaptivPush/pull/58). Feature documentation commit c032a98 is integrated at ebfa63e with a matching tree. The PR remains draft while new hosted authorization and physical-device acceptance are open.
 
@@ -42,7 +42,7 @@ Authenticated browser checks exercised typing/checking, scope Cancel, workout-on
 | Gate | Result |
 |---|---|
 | Strict TypeScript | `npx tsc --noEmit --strict` passes in feature and integrator |
-| Application suites | 106/106 workout/program/availability/dependency tests pass, including ten removal cases |
+| Application suites | 107/107 workout/program/availability/dependency tests pass, including eleven removal cases |
 | Lint | Zero errors; three existing unused-variable warnings: forgot-password submitted, Home isDecrease, Profile parsePrCount |
 | Web export | Integrator production web export passes (35 routes); expected Expo web push-token warning |
 | Database lint | `npx supabase db lint --local` reports no schema errors |

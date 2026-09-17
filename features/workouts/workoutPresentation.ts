@@ -47,6 +47,6 @@ export function draftToExercises(draft: WorkoutDraft, workout?: ProgramWorkout):
         ? `Previous ${slot.loadSuggestion.kind === 'assistance' ? 'assistance' : 'load'} for this exercise: ${slot.loadSuggestion.value} ${slot.loadSuggestion.unit}`
         : undefined,
     };
-  });
+  }).filter(exercise => exercise.sets.length > 0);
 }
 

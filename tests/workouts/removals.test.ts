@@ -109,3 +109,12 @@ test('saved uniform corrections identify the new exercise, while mixed actual id
   actuals[1].exerciseId = 'other';
   assert.deepEqual(projectCompletedOccurrence(snapshot, actuals, names).exercises[0].sets.map(s => s.exerciseId), ['replacement', 'other', 'replacement']);
 });
+
+test('removing the final visible set produces the same empty state as removing its exercise', () => {
+  let draft = fixture();
+  for (const setId of ['set-1', 'set-2', 'set-3']) draft = removeDraftWork(draft, 'slot', setId);
+  assert.deepEqual(draftToExercises(draft), []);
+  assert.equal(classifyWorkoutCompletion(draft), 'abandoned');
+  assert.equal(validateWorkoutDraft(draft).ok, true);
+  assert.equal(draft.frozenPrescription.slots[0].prescribedSetCount, 3);
+});
