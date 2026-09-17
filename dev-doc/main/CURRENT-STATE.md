@@ -40,4 +40,6 @@ AP-01.3 production baseline and lookup-only catalog authority remain released. S
 
 ## Current review and continuation
 
+Scoped removal and shared controls are published in [draft PR #58](https://github.com/dani-sch/AdaptivPush/pull/58), integrated at ebfa63e after implementation verification at 8ab5d6c. The new hosted packet awaits the explicit authorization documented above.
+
 PR #56 is merged. The completed editing release is published in [PR #57](https://github.com/dani-sch/AdaptivPush/pull/57) from `codex/edit-past-workout-release`; implementation commits `d0962fa`, `38848f6` and `812498d` are integrated through `974007a` and independently verified. [September 17 release evidence](/dev-doc/reports/ADAPTIVPUSH-EDIT-PAST-WORKOUT-RELEASE-2026-09-17.md) and Git review history own publication evidence. Resume from TODO; physical device acceptance is the remaining correction-specific acceptance limitation.

@@ -6,6 +6,8 @@ Implementation is integrated and locally verified. Hosted scoped removal is **no
 
 Base: `origin/main 4c3c447`. Feature: `codex/workout-removal-and-shared-controls`. Implementation commits: `71bac25` (domain), `e40eea8` (atomic database contract), `5881ad2` (original evidence/extras), `cddf305` (compatibility/security/concurrency), `d6c164f` (shared controls/dialogs). Canonical integrator merged without conflicts at `8ab5d6c` and independently passed strict TypeScript, 106 application tests, lint and the nine-label removal concurrency suite. No direct main or force push occurred. The pre-existing ExerciseHistoryModal import changes remain unstaged; its existing transparent backdrop is included without overwriting that work.
 
+Publication: [draft PR #58](https://github.com/dani-sch/AdaptivPush/pull/58). Feature documentation commit c032a98 is integrated at ebfa63e with a matching tree. The PR remains draft while new hosted authorization and physical-device acceptance are open.
+
 ## User interaction
 
 Active logging and completed editing share ExerciseCard and its set rows: number, load, reps, RPE and explicit check. Typing never logs an unperformed set. Logged rows remain logged while editing, with validation before Save/Finish. Load type and lb/kg live in set options, reached through the set number or LOAD header. Units remain visible beside load values; assistance is marked with a minus and bodyweight needs no external value. Mixed performed exercises retain individual identities and a concise name cue. Header overflow offers History and Swap; the separate compact trash removes the exercise. Add set and extra-set correction/removal remain available.
