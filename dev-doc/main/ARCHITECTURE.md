@@ -1,5 +1,11 @@
 # AdaptivPush architecture summary
 
+## Auth recovery and shared workout input boundary
+
+`contexts/AuthContext.tsx` composes the pure `features/auth/sessionRecovery.ts` controller with Supabase and native AppState. Hydration, ready, recovering and signed-out states distinguish stored owner identity from request authorization; null initial events and transient failures cannot impersonate sign-out. Root routing waits for hydration and retains the route on profile availability errors. Authenticated owner checks remain at server writers. `features/auth/backendConfiguration.ts` rejects native loopback backends; `scripts/startLocalWebQa.mjs` isolates synthetic browser environments.
+
+`useRemovalCapability` retains unsupported versus failed requests and retries under the current owner. `loadPresentation.ts` separates blank entry metadata/labels from actual measurements. `editDraftStore.ts` retains unsubmitted completed edits by owner/session/revision, separately from immutable pending correction requests. Existing active draft/swap/finalization stores and server tombstones/audit remain authoritative. [Verification and limitations](/dev-doc/reports/ADAPTIVPUSH-IPHONE-RECOVERY-2026-09-17.md).
+
 ## Shared controls and removal overlay
 
 ExerciseCard owns both active and completed-edit rows, secondary settings and swipe actions; RemovalScopeSheet owns the scope choice. GestureHandlerRootView covers the app. AppDialogHost replaces app-owned native alerts with transparent, blocking modal presentation.

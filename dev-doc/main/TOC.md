@@ -10,8 +10,8 @@
 | Category | Files |
 |----------|-------|
 | Project Root | 4 |
-| Tests | 20 |
-| Top-level Scripts | 34 |
+| Tests | 24 |
+| Top-level Scripts | 35 |
 | Automation Scripts | 24 |
 | Tool Scripts | 27 |
 | Power Automate Scripts | 1 |
@@ -21,7 +21,7 @@
 | Skills | 62 |
 | Agents | 17 |
 | Commands | 8 |
-| **Total** | **255** |
+| **Total** | **260** |
 
 ---
 
@@ -47,6 +47,7 @@ _Test suite_
     ├── availability/
     │   ├── profileResilience.test.ts — import assert from 'node:assert/strict';
     │   ├── programAvailability.test.ts — import assert from 'node:assert/strict';
+    │   ├── sessionRecovery.test.ts — import assert from 'node:assert/strict';
     │   └── supabaseResilience.test.ts — import assert from 'node:assert/strict';
     ├── catalog/
     │   └── resolveCatalogExercises.test.ts — import assert from 'node:assert/strict';
@@ -60,11 +61,14 @@ _Test suite_
     │   └── rollout.test.ts — import assert from 'node:assert/strict';
     └── workouts/
         ├── correction.test.ts — import assert from 'node:assert/strict';
+        ├── editDraftStore.test.ts — import assert from 'node:assert/strict';
         ├── effectiveCurrentWorkout.test.ts — import assert from 'node:assert/strict';
         ├── finalization.test.ts — import assert from 'node:assert/strict';
+        ├── loadPresentation.test.ts — import assert from 'node:assert/strict';
         ├── nextWorkoutCard.test.ts — import assert from 'node:assert/strict';
         ├── occurrence.test.ts — import assert from 'node:assert/strict';
         ├── persistedSession.test.ts — import assert from 'node:assert/strict';
+        ├── removalCapability.test.ts — import assert from 'node:assert/strict';
         ├── removals.test.ts — import assert from 'node:assert/strict';
         ├── routeResolution.test.ts — import assert from 'node:assert/strict';
         ├── swapInteraction.test.ts — import assert from 'node:assert/strict';
@@ -107,6 +111,7 @@ _Standalone utility scripts_
     ├── seedManualQa.ts — // Synthetic public catalog only. This script has no remote-target option.
     ├── Start-ApIosQa.ps1 — param(
     ├── Start-ApManualQa.ps1 — param(
+    ├── startLocalWebQa.mjs — // Local database fixtures are browser-only. Never advertise this server on LAN.
     ├── sync-all-clones.sh — sync-all-clones.sh - Fast-forward all CHAOS clones to a selected origin branch.
     ├── tsconfig.json — {
     ├── verifyDurableConcurrency.mjs — // Nonvisual integration proof. Only the named local Supabase container is used.

@@ -1,5 +1,11 @@
 # AdaptivPush active task board
 
+## [CURRENT] iPhone recovery acceptance and hosted removal
+
+- [INTEGRATION VERIFIED] Auth/session recovery, isolated browser QA, focused-input swiping, typed capability failures, blank LB labels and owner-scoped unsubmitted edit recovery; integrator 801d7dc, 119 application cases and iOS export. [Evidence and packet](/dev-doc/reports/ADAPTIVPUSH-IPHONE-RECOVERY-2026-09-17.md).
+- [AWAITING EXPLICIT AUTHORIZATION] The exact unchanged 20260917180000 packet is reverified with a fresh encrypted backup, 59-relation isolated restore, zero seven-section drift, SQL/security/concurrency proof and forward recovery. Hosted removal remains absent.
+- [OPEN] Use the hosted Expo server on 8081 for physical iPhone authentication, swiping/scrolling, keyboard, background/foreground, temporary disconnect/reconnect and draft restoration. The failed screenshot came from the previous local-test 8082 server; its replacement is loopback-only. Do not clear device storage.
+
 ## [CURRENT] Scoped removals rollout boundary
 
 - [INTEGRATION VERIFIED] Shared active/edit controls, durable workout/program removals, neutral original evidence and transparent app dialogs. Integrator c2fc22e; 107 application tests plus SQL/security/concurrency gates.

@@ -1,5 +1,11 @@
 # AdaptivPush current state
 
+## iPhone recovery and workout fixes: integration verified, hosted removal pending
+
+The failed phone login is tied by its exact timestamp to the local-test Expo server on 8082, whose iOS bundle embedded phone-localhost Supabase. Hosted Expo remains on 8081; local browser QA is now loopback-only and native clients reject loopback backend configurations. Session hydration now distinguishes outages from sign-out, coordinates foreground refresh and preserves owner-scoped drafts/pending operations. Input focus no longer disables row swiping; removal checks distinguish failed requests from missing server support, and blank applicable loads display LB without inventing measurements.
+
+Feature commits f85d679, 42a9ed9, e04d89a and 2476343 are integrated through 801d7dc. Strict TypeScript, lint (three existing warnings), 119 application tests, iOS export, 12 fresh/restored SQL executions and nine-label concurrency pass. Fresh encrypted restore matches 59 relations; all 23 hosted public relations remain unchanged. [iPhone recovery evidence](/dev-doc/reports/ADAPTIVPUSH-IPHONE-RECOVERY-2026-09-17.md) owns causes, browser outage/reconnect/persistence checks, screenshots and the exact reverified migration packet. Hosted removal is still absent and requires new explicit authorization. Physical iPhone acceptance remains open. No scheduling/progression redesign.
+
 ## Scoped removals and shared controls: integrated, hosted approval pending
 
 Active capture and completed edit now share compact rows with explicit checks, on-demand load/exercise settings, swipe set removal and header exercise removal. Occurrence tombstones preserve original prescriptions; selected future changes commit atomically with Save or Finish. Missing attempts hold the affected progression decision without becoming failures. App-owned dialog backdrops are transparent.
@@ -26,7 +32,7 @@ The authoritative hosted ledger contains seven entries: `20260910175317`, `20260
 
 The September 17 encrypted AES-256-GCM/DPAPI backup passed isolated PostgreSQL 17 restore: all 57 captured relation counts and row hashes plus seven schema/security inventory sections matched. All 56 original non-ledger relations matched immediately after deployment; all 21 original public relations matched after synthetic acceptance cleanup. Storage object bodies, platform settings, infrastructure and login credentials are outside logical recovery. Recovery preserves newer writes and uses a rehearsed forward fix, never an automatic production reset.
 
-Current authentication, recovery and supported deployment are complete. [September 17 release evidence](/dev-doc/reports/ADAPTIVPUSH-EDIT-PAST-WORKOUT-RELEASE-2026-09-17.md) owns backup custody, exact migration hashes, verification and recovery procedure.
+The latest iPhone investigation and recovery limitations are recorded above; physical authentication acceptance remains open. [September 17 release evidence](/dev-doc/reports/ADAPTIVPUSH-EDIT-PAST-WORKOUT-RELEASE-2026-09-17.md) owns backup custody, exact migration hashes, verification and recovery procedure.
 
 ## Hosted packet verification and acceptance
 
