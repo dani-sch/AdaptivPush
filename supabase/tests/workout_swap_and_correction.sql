@@ -148,11 +148,60 @@ SELECT public.correct_completed_workout_v1(current_setting('adaptivpush.partial_
 DO $partial_outcomes$
 BEGIN
   IF (SELECT completion_class FROM public.workout_sessions WHERE id=current_setting('adaptivpush.session')::uuid) <> 'partial' THEN RAISE EXCEPTION 'extra set hid incomplete prescribed work'; END IF;
-  IF (SELECT prescription_snapshot->'setOutcomes'->0->>'outcome' FROM public.workout_sessions WHERE id=current_setting('adaptivpush.session')::uuid) <> 'skipped' THEN RAISE EXCEPTION 'skip not persisted'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.workout_sessions ws,
+    jsonb_array_elements(ws.prescription_snapshot->'setOutcomes') outcome
+    WHERE ws.id=current_setting('adaptivpush.session')::uuid
+      AND outcome->>'setId'='97000000-0000-4000-8000-000000000002' AND outcome->>'outcome'='skipped') THEN RAISE EXCEPTION 'skip not persisted'; END IF;
   IF (SELECT count(*) FROM public.workout_sessions WHERE user_id=current_setting('adaptivpush.user_1')::uuid) <> 1 THEN RAISE EXCEPTION 'correction duplicated session'; END IF;
   IF (SELECT current_revision FROM public.programs WHERE id=current_setting('adaptivpush.program')::uuid) <> 4 THEN RAISE EXCEPTION 'correction replayed advancement'; END IF;
   IF public.workout_correction_capability_v1() <> 2 THEN RAISE EXCEPTION 'capability version mismatch'; END IF;
 END $partial_outcomes$;
+
+SET LOCAL ROLE authenticated;
+DO $correction_validation$
+DECLARE base jsonb; bad jsonb; rejected boolean; modification jsonb;
+BEGIN
+  base := current_setting('adaptivpush.correction_payload')::jsonb || jsonb_build_object('operationId', gen_random_uuid(), 'expectedRevision', 2);
+  FOREACH modification IN ARRAY ARRAY[
+    '{"loadKind":"external","loadUnit":"none"}'::jsonb,
+    '{"loadKind":"bodyweight","loadUnit":"lb"}'::jsonb,
+    '{"loadKind":"assistance","loadValue":null}'::jsonb,
+    '{"loadValue":"NaN"}'::jsonb,
+    jsonb_build_object('prescriptionSlotId', current_setting('adaptivpush.slot_2'))
+  ] LOOP
+    bad := jsonb_set(base, '{sets,0}', (base->'sets'->0) || modification);
+    rejected := false;
+    BEGIN PERFORM public.correct_completed_workout_v1(bad);
+    EXCEPTION WHEN OTHERS THEN rejected := SQLERRM LIKE '%invalid_input%'; END;
+    IF NOT rejected THEN RAISE EXCEPTION 'malformed load or cross-day lineage accepted'; END IF;
+  END LOOP;
+  bad := base || jsonb_build_object('setOutcomes', jsonb_build_array(jsonb_build_object(
+    'setId', '97000000-0000-4000-8000-000000000001', 'slotId', current_setting('adaptivpush.slot_1'), 'order', 1, 'outcome', 'skipped')));
+  rejected := false;
+  BEGIN PERFORM public.correct_completed_workout_v1(bad);
+  EXCEPTION WHEN OTHERS THEN rejected := SQLERRM LIKE '%invalid_input%'; END;
+  IF NOT rejected THEN RAISE EXCEPTION 'contradictory outcome accepted'; END IF;
+  IF (SELECT correction_revision FROM public.workout_sessions WHERE id=current_setting('adaptivpush.session')::uuid) <> 2 THEN
+    RAISE EXCEPTION 'rejected correction changed revision'; END IF;
+  BEGIN PERFORM 1 FROM public.workout_correction_audit; RAISE EXCEPTION 'client can read audit';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  PERFORM public.correct_completed_workout_v1(base || jsonb_build_object('sets', '[]'::jsonb));
+  IF (SELECT completion_class FROM public.workout_sessions WHERE id=current_setting('adaptivpush.session')::uuid) <> 'abandoned'
+     OR EXISTS (SELECT 1 FROM public.workout_sessions ws, jsonb_array_elements(ws.prescription_snapshot->'setOutcomes') outcome
+       WHERE ws.id=current_setting('adaptivpush.session')::uuid AND outcome->>'outcome' <> 'not_attempted') THEN
+    RAISE EXCEPTION 'clear did not retain explicit unattempted prescription'; END IF;
+END $correction_validation$;
+
+RESET ROLE;
+SET LOCAL ROLE anon;
+DO $anonymous_denial$
+BEGIN
+  BEGIN PERFORM public.workout_correction_capability_v1(); RAISE EXCEPTION 'anonymous capability access';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN PERFORM public.correct_completed_workout_v1('{}'::jsonb); RAISE EXCEPTION 'anonymous correction access';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+END $anonymous_denial$;
+RESET ROLE;
 
 SELECT set_config('request.jwt.claim.sub', current_setting('adaptivpush.user_2'), true);
 SET LOCAL ROLE authenticated;
