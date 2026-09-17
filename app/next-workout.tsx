@@ -376,7 +376,7 @@ export default function NextWorkoutScreen() {
   const canFinishWorkout = auth.canRequest && availability === 'ready'
     && draft?.ownerId === ownerId
     && draft.lifecycle !== 'finalized'
-    && !saving;
+    && !saving && !removalBusy && !programUpdating && !pendingSwap;
 
   const programForSwap = useMemo<CurrentProgram | null>(() => {
     if (!program || !draft) return null;
