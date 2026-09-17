@@ -252,7 +252,7 @@ DECLARE
   v_receipt jsonb;
 BEGIN
   IF v_user_id IS NULL THEN RAISE EXCEPTION 'unauthenticated'; END IF;
-  IF jsonb_typeof(p_payload) <> 'object' OR jsonb_typeof(p_payload->'sets') <> 'array' THEN
+  IF jsonb_typeof(p_payload) IS DISTINCT FROM 'object' OR jsonb_typeof(p_payload->'sets') IS DISTINCT FROM 'array' THEN
     RAISE EXCEPTION 'invalid_input: payload and sets required';
   END IF;
   IF COALESCE((p_payload->>'schemaVersion')::integer, 0) <> 1
@@ -299,6 +299,7 @@ BEGIN
        AND NOT EXISTS (
          SELECT 1 FROM public.program_day_exercises pde
          WHERE pde.program_revision_id = v_session.program_revision_id
+           AND pde.program_day_id = v_session.program_day_id
            AND pde.stable_slot_id = (v_set->>'prescriptionSlotId')::uuid
            AND (NULLIF(v_set->>'prescribedExerciseId', '') IS NULL
              OR pde.exercise_id = (v_set->>'prescribedExerciseId')::uuid)
@@ -306,13 +307,22 @@ BEGIN
     IF NULLIF(v_set->>'loadValue', '') IS NOT NULL AND (v_set->>'loadValue')::numeric < 0 THEN
       RAISE EXCEPTION 'invalid_input: load';
     END IF;
+    IF (v_set->>'loadKind' IN ('external', 'assistance') AND
+        (NULLIF(v_set->>'loadValue', '') IS NULL OR v_set->>'loadUnit' NOT IN ('lb', 'kg')))
+       OR (v_set->>'loadKind' IN ('bodyweight', 'unknown') AND
+        (v_set->>'loadUnit' <> 'none' OR COALESCE((v_set->>'loadValue')::numeric, 0) <> 0))
+       OR lower(COALESCE(v_set->>'loadValue', '')) IN ('nan', 'infinity', '-infinity') THEN
+      RAISE EXCEPTION 'invalid_input: load semantics';
+    END IF;
     IF NULLIF(v_set->>'rpe', '') IS NOT NULL AND (v_set->>'rpe')::numeric NOT BETWEEN 0 AND 10 THEN
       RAISE EXCEPTION 'invalid_input: rpe';
     END IF;
   END LOOP;
 
   IF p_payload ? 'setOutcomes' THEN
-    IF jsonb_typeof(p_payload->'setOutcomes') <> 'array' THEN RAISE EXCEPTION 'invalid_input: set outcomes'; END IF;
+    IF jsonb_typeof(p_payload->'setOutcomes') IS DISTINCT FROM 'array' THEN RAISE EXCEPTION 'invalid_input: set outcomes'; END IF;
+    IF (SELECT count(DISTINCT value->>'setId') FROM jsonb_array_elements(p_payload->'setOutcomes'))
+       <> jsonb_array_length(p_payload->'setOutcomes') THEN RAISE EXCEPTION 'invalid_input: duplicate set outcomes'; END IF;
     FOR v_set IN SELECT value FROM jsonb_array_elements(p_payload->'setOutcomes') LOOP
       IF COALESCE(v_set->>'outcome', '') NOT IN ('performed', 'skipped', 'not_attempted') OR NOT EXISTS (
         SELECT 1 FROM jsonb_array_elements(v_session.prescription_snapshot->'slots') slot,
@@ -320,6 +330,11 @@ BEGIN
         WHERE slot->>'slotId' = v_set->>'slotId' AND planned->>'setId' = v_set->>'setId'
           AND planned->>'order' = v_set->>'order'
       ) THEN RAISE EXCEPTION 'invalid_input: outcome prescription lineage'; END IF;
+      IF (v_set->>'outcome' = 'performed') IS DISTINCT FROM EXISTS (
+        SELECT 1 FROM jsonb_array_elements(p_payload->'sets') actual
+        WHERE actual->>'actualSetId' = v_set->>'setId'
+          AND actual->>'prescriptionSlotId' = v_set->>'slotId' AND actual->>'order' = v_set->>'order'
+      ) THEN RAISE EXCEPTION 'invalid_input: outcome does not match performed result'; END IF;
     END LOOP;
   END IF;
   DELETE FROM public.workout_exercise_sets WHERE session_id = v_session_id;
@@ -359,9 +374,20 @@ BEGIN
   UPDATE public.workout_sessions SET total_volume_lb = v_total_volume,
     completion_class = v_completion, correction_revision = v_result_revision,
     corrected_at = now(), pr_count = 0,
-    prescription_snapshot = CASE WHEN p_payload ? 'setOutcomes' THEN
-      jsonb_set(COALESCE(prescription_snapshot, '{}'::jsonb), '{setOutcomes}', p_payload->'setOutcomes', true)
-      ELSE prescription_snapshot END
+    prescription_snapshot = jsonb_set(COALESCE(prescription_snapshot, '{}'::jsonb), '{setOutcomes}', (
+      SELECT COALESCE(jsonb_agg(jsonb_build_object(
+        'setId', planned->>'setId', 'slotId', slot->>'slotId', 'order', (planned->>'order')::integer,
+        'outcome', CASE WHEN EXISTS (
+          SELECT 1 FROM public.workout_exercise_sets actual WHERE actual.session_id = v_session_id
+            AND actual.prescription_slot_id::text = slot->>'slotId' AND actual.order_index = (planned->>'order')::integer
+        ) THEN 'performed' WHEN EXISTS (
+          SELECT 1 FROM jsonb_array_elements(COALESCE(p_payload->'setOutcomes', '[]'::jsonb)) outcome
+          WHERE outcome->>'setId' = planned->>'setId' AND outcome->>'outcome' = 'skipped'
+        ) THEN 'skipped' ELSE 'not_attempted' END
+      )), '[]'::jsonb)
+      FROM jsonb_array_elements(COALESCE(v_session.prescription_snapshot->'slots', '[]'::jsonb)) slot,
+        jsonb_array_elements(COALESCE(slot->'sets', '[]'::jsonb)) planned
+    ), true)
   WHERE id = v_session_id;
   -- Rebuild only correction-aware PR rows owned by this session. Legacy rows
   -- without a session identity stay readable and are never guessed/deleted.
@@ -391,7 +417,7 @@ BEGIN
   ) WHERE id = v_session_id;
   UPDATE public.workout_receipt_effects SET status = 'pending', attempt_count = 0,
     last_error_code = NULL, updated_at = now() WHERE workout_session_id = v_session_id;
-  SELECT jsonb_build_object('session', to_jsonb(ws), 'sets', COALESCE(jsonb_agg(to_jsonb(wes) ORDER BY wes.order_index), '[]'::jsonb))
+  SELECT jsonb_build_object('session', to_jsonb(ws), 'sets', COALESCE(jsonb_agg(to_jsonb(wes) ORDER BY wes.order_index) FILTER (WHERE wes.id IS NOT NULL), '[]'::jsonb))
   INTO v_after FROM public.workout_sessions ws LEFT JOIN public.workout_exercise_sets wes ON wes.session_id = ws.id
   WHERE ws.id = v_session_id GROUP BY ws.id;
   INSERT INTO public.workout_correction_audit (

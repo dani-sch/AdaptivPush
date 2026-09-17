@@ -12,6 +12,7 @@ import { haptic, Haptics } from "@/utils/haptic";
 export interface WorkoutSet {
     outcome?: 'performed' | 'skipped' | 'not_attempted';
     loadUnit?: string;
+    loadKind?: string;
     id: string;
     weight: string;
     reps: string;
@@ -80,12 +81,12 @@ const SetRow: React.FC<SetRowProps> = ({
 
         <TextInput
             style={[styles.setInput, set.logged && styles.setInputLogged]}
-            accessibilityLabel={`${exerciseName}, set ${index + 1}, load in ${loadLabel}`}
+            accessibilityLabel={`${exerciseName}, set ${index + 1}, ${set.loadKind ?? 'external'} load in ${set.loadUnit ?? loadLabel}`}
             value={set.weight}
             onChangeText={onChangeWeight}
             keyboardType="decimal-pad"
             selectTextOnFocus
-            editable={(!set.logged || editingCompleted) && !readOnly && set.outcome !== 'skipped'}
+            editable={(!set.logged || editingCompleted) && !readOnly && set.outcome !== 'skipped' && set.loadKind !== 'bodyweight'}
             placeholderTextColor={theme.placeholder}
             placeholder="—"
         />
@@ -137,7 +138,7 @@ const SetRow: React.FC<SetRowProps> = ({
             />
         </Pressable>
       </View>
-      <Text style={styles.actualExerciseLabel}>{set.outcome === 'skipped' ? 'Skipped' : set.logged ? `Performed · ${set.loadUnit ?? loadLabel}` : 'Not attempted'}</Text>
+      <Text style={styles.actualExerciseLabel}>{set.outcome === 'skipped' ? 'Skipped' : set.logged ? `Performed · ${set.loadKind === 'bodyweight' ? 'Bodyweight' : `${set.loadKind === 'assistance' ? 'Assistance · ' : ''}${set.loadUnit ?? loadLabel}`}` : 'Not attempted'}</Text>
       {!readOnly && !set.logged ? <Pressable onPress={onToggleSkipped} accessibilityRole="button" style={styles.setAction}>
         <Text style={styles.actionButtonText}>{set.outcome === 'skipped' ? 'Undo skip' : 'Skip set'}</Text>
       </Pressable> : null}
@@ -199,8 +200,6 @@ export default function ExerciseCard({
                                 styles.exerciseName,
                                 exercise.completed && styles.exerciseNameCompleted,
                             ]}
-                            numberOfLines={1}
-                            ellipsizeMode="tail"
                         >
                             {exercise.name}
                         </Text>

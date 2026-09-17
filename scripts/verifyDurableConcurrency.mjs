@@ -56,8 +56,22 @@ try {
     slots: [{ slotId: slots[1], prescribedExerciseId: exercises[0], actualExerciseId: exercises[0], prescribedSetCount: 1,
       sets: [{ setId: randomUUID(), order: 1, actualExerciseId: exercises[0], actualReps: 8, actualLoad: 0,
         actualRpe: null, logged: true, loadKind: 'external', loadUnit: 'lb', loadSide: 'external_total' }] }] };
-  await race(`public.finalize_workout_v2(${json(workout)})`);
+  const finalized = await race(`public.finalize_workout_v2(${json(workout)})`);
   console.log('PASS concurrent identical finalization creates one session and replay');
+  const correction = { schemaVersion: 1, operationId: randomUUID(), sessionId: finalized.sessionId, expectedRevision: 0,
+    sets: [{ actualSetId: workout.slots[0].sets[0].setId, prescriptionSlotId: slots[1], prescribedExerciseId: exercises[0],
+      exerciseId: exercises[1], order: 1, reps: 10, loadValue: 25, loadKind: 'external', loadUnit: 'kg',
+      loadSide: 'external_total', rpe: 7, loggedAt: '2026-09-17T12:00:00Z' }] };
+  await race(`public.correct_completed_workout_v1(${json(correction)})`);
+  assert.equal(await sql(`SELECT count(*) FROM public.workout_correction_audit WHERE workout_session_id='${finalized.sessionId}'`), '1');
+  console.log('PASS concurrent identical corrections produce one revision and audit');
+  const correctionRace = await Promise.allSettled([8, 9].map(reps => rpc(`public.correct_completed_workout_v1(${json({
+    ...correction, operationId: randomUUID(), expectedRevision: 1, sets: [{ ...correction.sets[0], reps }],
+  })})`)));
+  assert.equal(correctionRace.filter(r => r.status === 'fulfilled').length, 1);
+  assert.match(correctionRace.find(r => r.status === 'rejected').reason.message, /stale_revision/);
+  assert.equal(await sql(`SELECT correction_revision FROM public.workout_sessions WHERE id='${finalized.sessionId}'`), '2');
+  console.log('PASS competing correction revisions accept one and reject the stale request');
   const revisionRequest = { operationId: randomUUID(), programId: install.programId, expectedRevision: 1,
     expectedRevisionId: install.revisionId, currentStableDayId: days[0], currentStableSlotId: slots[0],
     originalExerciseId: exercises[0], replacementExerciseId: exercises[1], includeCurrentDay: false };

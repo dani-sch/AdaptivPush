@@ -8,6 +8,7 @@ import {
 } from '../../features/workouts/correctionContracts';
 import type { WorkoutCorrectionRepository } from '../../features/workouts/correctionRepository';
 import type { WorkoutCorrectionStore } from '../../features/workouts/correctionStore';
+import { correctionLoadSelection, type EditableCorrectionSet } from '../../features/workouts/correctionEditor';
 
 const request = createCompletedWorkoutCorrection({
   ownerId: '11111111-1111-4111-8111-111111111111',
@@ -97,4 +98,37 @@ test('stale correction is a conflict and permits a freshly loaded edit', async (
 test('empty set list is a valid explicit correction to an abandoned workout', () => {
   const empty = createCompletedWorkoutCorrection({ ...request, sets: [] });
   assert.equal(validateCompletedWorkoutCorrection(empty).ok, true);
+});
+
+test('assistance survives unit changes and bodyweight clears external measurements', () => {
+  const set: EditableCorrectionSet = { ...request.sets[0], prescribed: true, outcome: 'performed', loadText: '25', repsText: '8', rpeText: '8' };
+  const assisted = { ...set, ...correctionLoadSelection(set, 'assistance') };
+  assert.equal(correctionLoadSelection(assisted, 'lb').loadKind, 'assistance');
+  assert.equal(correctionLoadSelection(assisted, 'external').loadKind, 'external');
+  const bodyweight = { ...assisted, ...correctionLoadSelection(assisted, 'none') };
+  assert.equal(bodyweight.loadText, ''); assert.equal(bodyweight.loadValue, null);
+  assert.equal(bodyweight.loadUnit, 'none');
+});
+
+test('validation rejects invalid revisions, load enums and contradictory prescribed outcomes', () => {
+  for (const expectedRevision of [NaN, Infinity, 0.5, -1]) assert.equal(validateCompletedWorkoutCorrection({ ...request, expectedRevision }).ok, false);
+  const outcome = { setId: request.sets[0].actualSetId, slotId: request.sets[0].prescriptionSlotId!, order: 1, outcome: 'performed' as const };
+  assert.equal(validateCompletedWorkoutCorrection({ ...request, setOutcomes: [outcome] }).ok, true);
+  assert.equal(validateCompletedWorkoutCorrection({ ...request, setOutcomes: [outcome, outcome] }).ok, false);
+  assert.equal(validateCompletedWorkoutCorrection({ ...request, setOutcomes: [{ ...outcome, outcome: 'skipped' }] }).ok, false);
+  assert.equal(validateCompletedWorkoutCorrection({ ...request, sets: [], setOutcomes: [outcome] }).ok, false);
+  assert.equal(validateCompletedWorkoutCorrection({ ...request, sets: [{ ...request.sets[0], loadUnit: 'invalid' as 'lb' }] }).ok, false);
+});
+
+test('definitive server validation frees the edit while uncertain requests stay recoverable', async () => {
+  const store = memoryStore();
+  const outcome = await correctCompletedWorkout({ correct: async () => { throw new Error('invalid_input: unknown exercise'); } }, store, request);
+  assert.equal(outcome.status, 'validation'); assert.equal(store.value, null);
+});
+
+test('correction creation freezes prescribed outcomes for exact retries', () => {
+  const setOutcomes = [{ setId: request.sets[0].actualSetId, slotId: request.sets[0].prescriptionSlotId!, order: 1, outcome: 'performed' as const }];
+  const frozen = createCompletedWorkoutCorrection({ ...request, setOutcomes });
+  setOutcomes[0].order = 2;
+  assert.equal(frozen.setOutcomes?.[0].order, 1);
 });
