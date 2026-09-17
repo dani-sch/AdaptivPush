@@ -33,6 +33,7 @@ export default function TabLayout() {
         name="home"
         options={{
           title: 'Home',
+          tabBarAccessibilityLabel: 'Home',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons color={color} name={focused ? 'home' : 'home-outline'} size={28} />
           ),
@@ -42,6 +43,7 @@ export default function TabLayout() {
         name="plan"
         options={{
           title: 'Plan',
+          tabBarAccessibilityLabel: 'Plan',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons color={color} name={focused ? 'book' : 'book-outline'} size={28} />
           ),
@@ -51,6 +53,7 @@ export default function TabLayout() {
         name="history"
         options={{
           title: 'History',
+          tabBarAccessibilityLabel: 'History',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons color={color} name={focused ? 'time' : 'time-outline'} size={28} />
           ),
@@ -60,6 +63,7 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'Profile',
+          tabBarAccessibilityLabel: 'Profile',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons color={color} name={focused ? 'person' : 'person-outline'} size={28} />
           ),

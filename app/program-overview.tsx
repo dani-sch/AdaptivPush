@@ -32,6 +32,7 @@ interface OverviewExercise {
 
 interface OverviewDay {
   id: string;
+  sessionId?: string;
   name: string;
   dayIndex: number;
   exercises: OverviewExercise[];
@@ -105,6 +106,7 @@ async function fetchProgramOverview(program: CurrentProgram, ownerId: string): P
 
     weekMap.get(weekNum)!.push({
       id: day.id,
+      sessionId: resolved.workouts.find(w => w.id === day.id)?.sessionId,
       name: day.workout_name ?? `Day ${day.day_index}`,
       dayIndex: day.day_index ?? 1,
       exercises: resolved.workouts.find(w => w.id === day.id)?.exercises.map(ex => ({
@@ -185,6 +187,11 @@ function DayCard({
           {day.exercises.map((ex) => (
             <ExerciseRow key={ex.pdeId} ex={ex} styles={styles} />
           ))}
+          {day.sessionId ? <Pressable accessibilityRole="button" style={styles.completedAction}
+            accessibilityLabel={`View or update ${day.name}`}
+            onPress={() => router.push({ pathname: '/edit-workout', params: { sessionId: day.sessionId! } })}>
+            <Text style={styles.weightText}>View or Update Workout</Text>
+          </Pressable> : null}
         </View>
       )}
     </View>
@@ -379,6 +386,7 @@ export default function ProgramOverviewScreen() {
 
 function createStyles(theme: Theme, isDark: boolean) {
   return StyleSheet.create({
+    completedAction: { minHeight: 48, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: theme.primary, borderRadius: 10, marginTop: 8 },
     container: {
       flex: 1,
       backgroundColor: theme.background,

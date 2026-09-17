@@ -6,7 +6,7 @@ import { draftToExercises } from '../../features/workouts/workoutPresentation';
 import { externalActualSets } from '../../features/workouts/actualLoads';
 import { workoutFinalizationPayload } from '../../features/workouts/contracts';
 import { computeProgression } from '../../utils/progressionEngine';
-import { loadCompletedWorkout } from '../../features/workouts/occurrenceRepository';
+import { loadCompletedWorkout, loadCorrectionCatalog } from '../../features/workouts/occurrenceRepository';
 import { correctCompletedWorkout } from '../../features/workouts/correctionCommands';
 import { createCompletedWorkoutCorrection } from '../../features/workouts/correctionContracts';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -141,6 +141,17 @@ test('capability 2 enables eligible workouts and gives specific reasons for othe
   const offline = await loadCompletedWorkout(readClient({ capabilityError: new Error('Failed to fetch') }), 'owner', 'session');
   assert.equal(offline.canCorrect, false); assert.equal(offline.session.id, 'session');
   assert.doesNotMatch(offline.correctionIssue!, /does not yet support/);
+});
+
+test('correction catalog loads exercises beyond the API default first page', async () => {
+  const catalog = Array.from({ length: 1369 }, (_, i) => ({ id: String(i), name: `Exercise ${i}` }));
+  const ranges: number[][] = [];
+  const query = { select: () => query, order: () => query, range: async (start: number, end: number) => {
+    ranges.push([start, end]); return { data: catalog.slice(start, end + 1), error: null };
+  } };
+  const result = await loadCorrectionCatalog({ from: () => query } as unknown as SupabaseClient);
+  assert.deepEqual(result.data, catalog); assert.equal(result.error, null);
+  assert.deepEqual(ranges, [[0, 499], [500, 999], [1000, 1499]]);
 });
 
 test('legacy actual row matching by order preserves the frozen prescription set identity', () => {

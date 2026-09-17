@@ -18,3 +18,9 @@ test('React Navigation is a resolvable direct Expo dependency', () => {
 
   assert.match(installed.version, /^7\./, 'Expo SDK 57 must resolve React Navigation 7');
 });
+
+test('completed editor imports navigation guards through the SDK 57 Expo Router entry point', () => {
+  assert.ok(require.resolve('expo-router/react-navigation'));
+  const editor = readFileSync(new URL('../../app/edit-workout.tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(editor, /from\s+['"]@react-navigation\//, 'SDK 57 rejects external navigation imports when bundling');
+});

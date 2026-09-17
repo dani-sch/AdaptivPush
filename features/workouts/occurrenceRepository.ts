@@ -5,6 +5,17 @@ import { classifySupabaseError, reportSupabaseFailure, supabaseUserMessage } fro
 
 export const CORRECTIONS_UNAVAILABLE = 'This workout can be viewed. The server does not yet support workout updates.';
 
+export async function loadCorrectionCatalog(client: SupabaseClient) {
+  const data: { id: string; name: string }[] = [];
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    const page = await client.from('exercises').select('id,name').order('name').order('id').range(offset, offset + pageSize - 1);
+    if (page.error) return { data: [], error: page.error };
+    data.push(...page.data);
+    if (page.data.length < pageSize) return { data, error: null };
+  }
+}
+
 export async function workoutCorrectionsAvailable(client: SupabaseClient): Promise<boolean> {
   return await workoutCorrectionIssue(client) === null;
 }
