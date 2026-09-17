@@ -1,6 +1,9 @@
+import { useRemovalCapability } from '@/hooks/useRemovalCapability';
+import { entryLoadDefaults } from '@/features/workouts/loadPresentation';
+import { useAuth } from '@/contexts/AuthContext';
 import { nextRevision } from '@/features/kernel/revisions';
 import { RemovalScopeSheet, type RemovalSelection } from '@/components/RemovalScopeSheet';
-import { removalsAvailable, previewRemoval, type RemovalPreview } from '@/features/workouts/removalRepository';
+import { previewRemoval, type RemovalPreview } from '@/features/workouts/removalRepository';
 import { removeDraftWork, addProgramRemoval, emptyRemovals, isRemoved } from '@/features/workouts/removals';
 import { loadCorrectionCatalog } from '@/features/workouts/occurrenceRepository';
 import { AppAlert as Alert } from '@/components/ui/AppDialog';
@@ -10,7 +13,7 @@ import { ExerciseHistoryModal } from "@/components/ExerciseHistoryModal";
 import { SwapExerciseModal } from "@/components/SwapExerciseModal";
 import { useCurrentProgram } from "@/hooks/useCurrentProgram";
 import type { CurrentProgram, ProgramWorkout } from "@/types/program";
-import { getPersistedSessionOwnerId, supabase } from "@/utils/supabase";
+import { supabase } from "@/utils/supabase";
 import { notifyPRCelebration } from "@/utils/notifications";
 import { createOperationId } from "@/features/kernel/operationId";
 import {
@@ -171,7 +174,8 @@ export default function NextWorkoutScreen() {
   );
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [workoutName, setWorkoutName] = useState("Workout");
-  const [canRemove, setCanRemove] = useState(false);
+  const removalCapability = useRemovalCapability();
+  const canRemove = removalCapability.available;
   const [removal, setRemoval] = useState<RemovalSelection | null>(null);
   const [removalPreview, setRemovalPreview] = useState<RemovalPreview>();
   const [setPicker, setSetPicker] = useState<string | null>(null);
@@ -180,8 +184,10 @@ export default function NextWorkoutScreen() {
   const ownerIdRef = useRef<string | null>(null);
   const [draft, setDraft] = useState<WorkoutDraft | null>(null);
   const [draftLoading, setDraftLoading] = useState(true);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [ownerId, setOwnerId] = useState<string | null>(null);
+  const auth = useAuth();
+  const authLoading = auth.phase === 'hydrating';
+  const ownerId = auth.ownerId;
+  useEffect(() => { ownerIdRef.current = ownerId; }, [ownerId]);
   const [resolutionAttempt, setResolutionAttempt] = useState(0);
   const [resolvedTargetKey, setResolvedTargetKey] = useState<string | null>(null);
   const [resolutionError, setResolutionError] = useState<string | null>(null);
@@ -230,29 +236,6 @@ export default function NextWorkoutScreen() {
     persistQueueRef.current = save;
     return save;
   };
-
-  useEffect(() => {
-    let mounted = true;
-    void getPersistedSessionOwnerId().then((persistedOwnerId) => {
-      if (!mounted || !persistedOwnerId) return;
-      ownerIdRef.current = persistedOwnerId; setOwnerId(persistedOwnerId);
-      setAuthLoading(false);
-    }).catch(() => undefined);
-    void supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      ownerIdRef.current = data.session?.user.id ?? null; setOwnerId(data.session?.user.id ?? null);
-      setAuthLoading(false);
-    });
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!mounted) return;
-      ownerIdRef.current = session?.user.id ?? null; setOwnerId(session?.user.id ?? null);
-      setAuthLoading(false);
-    });
-    return () => {
-      mounted = false;
-      subscription.subscription.unsubscribe();
-    };
-  }, []);
 
   // Resolve the exact owner/revision/stable-day target. A local draft may win while
   // the network-backed program is still loading, but an unrelated workout never does.
@@ -346,8 +329,7 @@ export default function NextWorkoutScreen() {
                   plannedRepsMin: min,
                   plannedRepsMax: max,
                   plannedLoad,
-                  loadKind: exercise.loadKind ?? (exercise.equipment === 'Bodyweight' ? 'bodyweight' : plannedLoad === null ? 'unknown' : 'external'),
-                  loadUnit: exercise.loadUnit ?? (plannedLoad === null ? 'none' : 'lb'),
+                  ...entryLoadDefaults(exercise.loadKind ?? (exercise.equipment === 'Bodyweight' ? 'bodyweight' : 'external'), exercise.loadUnit),
                   loadSide: exercise.loadSide ?? 'unknown',
                 };
               }),
@@ -391,7 +373,7 @@ export default function NextWorkoutScreen() {
     ownerId,
     route: routeTarget,
   });
-  const canFinishWorkout = availability === 'ready'
+  const canFinishWorkout = auth.canRequest && availability === 'ready'
     && draft?.ownerId === ownerId
     && draft.lifecycle !== 'finalized'
     && !saving;
@@ -433,11 +415,6 @@ export default function NextWorkoutScreen() {
     };
   }, [draft]);
 
-  useEffect(() => { let active = true;
-    void Promise.resolve().then(() => { if (active) { setCanRemove(false); setRemoval(null); setSetPicker(null); } });
-    void removalsAvailable().then(value => { if (active) setCanRemove(value); });
-    return () => { active = false; };
-  }, [ownerId]);
   const completedCount = exercises.filter((e) => e.completed).length;
 
   const updateSet = (
@@ -471,7 +448,7 @@ export default function NextWorkoutScreen() {
   };
 
   const requestRemoval = async (slotId: string, setId?: string) => {
-    if (!draft || !canRemove || saving || removalBusyRef.current || pendingSwap || draft.finalizationEndedAt || draft.lifecycle === 'finalized') return;
+    if (!auth.canRequest || !draft || !canRemove || saving || removalBusyRef.current || pendingSwap || draft.finalizationEndedAt || draft.lifecycle === 'finalized') return;
     removalBusyRef.current = true; setRemovalBusy(true);
     const slot = draft.slots.find(s => s.slotId === slotId); const set = slot?.sets.find(s => s.setId === setId);
     if (!slot) { removalBusyRef.current = false; setRemovalBusy(false); return; }
@@ -633,6 +610,7 @@ export default function NextWorkoutScreen() {
     replacement: ProgramWorkout["exercises"][number];
     scope: 'workout_only' | 'rest_of_program';
   }): Promise<WorkoutSwapResult | null> => {
+    if (!auth.canRequest) throw new Error('Reconnect or sign in before changing exercises. Your draft is preserved.');
     if (!draft) throw new Error('Workout draft is unavailable.');
     if (draft.finalizationEndedAt || saving) throw new Error('Retry synchronization before changing this submitted workout.');
     const replacementExerciseId = replacement.exerciseId ?? replacement.id;
@@ -730,7 +708,7 @@ export default function NextWorkoutScreen() {
   };
 
   const retryPendingSwap = async () => {
-    if (!pendingSwap || !ownerId || pendingSwap.ownerId !== ownerId) return;
+    if (!auth.canRequest || !pendingSwap || !ownerId || pendingSwap.ownerId !== ownerId) return;
     setProgramUpdating(true);
     setSyncMessage('Updating program…');
     const generation = swapSyncGenerationRef.current + 1;
@@ -747,7 +725,7 @@ export default function NextWorkoutScreen() {
   };
 
   const keepThisWorkoutOnly = async () => {
-    if (!pendingSwap || !ownerId || pendingSwap.ownerId !== ownerId) return;
+    if (!auth.canRequest || !pendingSwap || !ownerId || pendingSwap.ownerId !== ownerId) return;
     setProgramUpdating(true);
     setSyncMessage('Updating program…');
     const generation = swapSyncGenerationRef.current + 1;
@@ -758,7 +736,7 @@ export default function NextWorkoutScreen() {
   };
 
   const handleFinish = async () => {
-    if (saving || removalBusyRef.current || pendingSwapRef.current) return;
+    if (!auth.canRequest || saving || removalBusyRef.current || pendingSwapRef.current) return;
     if (intervalRef.current) clearInterval(intervalRef.current);
     setShowFinishModal(false);
     setSaving(true);
@@ -769,7 +747,8 @@ export default function NextWorkoutScreen() {
         error: authErr,
       } = await supabase.auth.getSession();
       const user = session?.user;
-      if (authErr || !user) throw new Error("Not signed in");
+      if (authErr) throw authErr;
+      if (!user) throw new Error("Not signed in");
       if (!draft || draft.ownerId !== user.id) throw new Error('Workout draft is unavailable for this account.');
       await persistQueueRef.current;
       const outcome = await finalizeWorkout(
@@ -985,6 +964,10 @@ export default function NextWorkoutScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {removalCapability.message && <View style={styles.syncBanner}>
+            <Text style={styles.syncBannerText}>{removalCapability.message}</Text>
+            {removalCapability.status !== 'checking' && <Pressable accessibilityRole="button" onPress={removalCapability.retry}><Text style={styles.syncBannerText}>Retry removal check</Text></Pressable>}
+          </View>}
           {syncMessage && (
             <View style={styles.syncBanner} accessibilityLiveRegion="polite">
               <Text style={styles.syncBannerText}>{syncMessage}</Text>
@@ -994,10 +977,10 @@ export default function NextWorkoutScreen() {
             <View style={styles.pendingSwapActions} accessibilityRole="summary">
               <Text style={styles.syncBannerText}>Exercise swapped here, but future workouts could not be updated. Retry.</Text>
               <View style={styles.unavailableActions}>
-                <Pressable style={styles.secondaryButton} onPress={() => void retryPendingSwap()} disabled={programUpdating}>
+                <Pressable style={styles.secondaryButton} onPress={() => void retryPendingSwap()} disabled={programUpdating || !auth.canRequest}>
                   <Text style={styles.secondaryButtonText}>Retry</Text>
                 </Pressable>
-                <Pressable style={styles.secondaryButton} onPress={() => void keepThisWorkoutOnly()} disabled={programUpdating}>
+                <Pressable style={styles.secondaryButton} onPress={() => void keepThisWorkoutOnly()} disabled={programUpdating || !auth.canRequest}>
                   <Text style={styles.secondaryButtonText}>Keep workout only</Text>
                 </Pressable>
               </View>
@@ -1006,8 +989,8 @@ export default function NextWorkoutScreen() {
           {!exercises.length ? <Text style={styles.syncBannerText}>No visible sets remain. Finish explicitly to save this as an uncompleted workout.</Text> : null}
           {exercises.map((exercise) => (
             <ExerciseCard
-              onRemoveSet={canRemove && !saving && !removalBusy && !pendingSwap && !draft?.finalizationEndedAt && draft?.lifecycle !== 'finalized' ? id => void requestRemoval(exercise.id, id) : undefined}
-              onRemoveExercise={canRemove && !saving && !removalBusy && !pendingSwap && !draft?.finalizationEndedAt && draft?.lifecycle !== 'finalized' ? () => void requestRemoval(exercise.id) : undefined}
+              onRemoveSet={auth.canRequest && canRemove && !saving && !removalBusy && !pendingSwap && !draft?.finalizationEndedAt && draft?.lifecycle !== 'finalized' ? id => void requestRemoval(exercise.id, id) : undefined}
+              onRemoveExercise={auth.canRequest && canRemove && !saving && !removalBusy && !pendingSwap && !draft?.finalizationEndedAt && draft?.lifecycle !== 'finalized' ? () => void requestRemoval(exercise.id) : undefined}
               onAddSet={canRemove && !saving && !removalBusy && !pendingSwap && !draft?.finalizationEndedAt && draft?.lifecycle !== 'finalized' ? () => {
                 if (!draft) return; const slot = draft.slots.find(s => s.slotId === exercise.id); const prior = slot?.sets.at(-1); if (!slot || !prior) return;
                 const next = { ...draft, revision: nextRevision(draft.revision), slots: draft.slots.map(s => s.slotId !== slot.slotId ? s : { ...s, sets: [...s.sets, { ...prior, setId: createOperationId(), order: Math.max(...s.sets.map(row => row.order)) + 1, logged: false, outcome: 'not_attempted' as const, actualLoad: null, actualReps: null, actualRpe: null, enteredLoadText: '', enteredRepsText: '', enteredRpeText: '', loggedAt: null }] }) };
@@ -1024,7 +1007,7 @@ export default function NextWorkoutScreen() {
                 setHistoryExerciseId(exercise.exerciseId ?? null);
                 setHistoryExerciseName(exercise.name);
               }}
-              onPressSwap={() => { if (draft?.programRemoval) setSyncMessage('Finish the pending program removals before applying another program swap.'); else setSwapTargetId(exercise.id); }}
+              onPressSwap={() => { if (!auth.canRequest) { auth.retry(); return; } if (draft?.programRemoval) setSyncMessage('Finish the pending program removals before applying another program swap.'); else setSwapTargetId(exercise.id); }}
             />
           ))}
 

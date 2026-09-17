@@ -1,3 +1,4 @@
+import { exerciseLoadLabel, loadUnitLabel } from '@/features/workouts/loadPresentation';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -53,12 +54,14 @@ function SetRow({ set, index, exercise, onUpdateSet, onSettings, onRemove }: {
   const { theme } = useTheme();
   const swipe = useRef<SwipeableMethods>(null);
   const swiping = useRef(false);
-  const [focused, setFocused] = useState(false);
   const [revealed, setRevealed] = useState(false);
-  useEffect(() => { if (exercise.readOnly) swipe.current?.close(); }, [exercise.readOnly]);
+  // Focusing a numeric input must not disable the entire row's pan gesture.
+  // Swipeable's horizontal threshold separates a swipe from a tap to type.
+  const canSwipe = Boolean(onRemove) && !exercise.readOnly;
+  useEffect(() => { if (!canSwipe) swipe.current?.close(); }, [canSwipe]);
   useEffect(() => { const row = swipe.current; return () => { if (openRow === row) openRow = null; }; }, []);
   const open = () => { if (openRow !== swipe.current) openRow?.close(); openRow = swipe.current; };
-  return <ReanimatedSwipeable ref={swipe} enabled={Boolean(onRemove) && !exercise.readOnly && !focused}
+  return <ReanimatedSwipeable ref={swipe} enabled={canSwipe}
     hitSlop={{ left: -24 }} dragOffsetFromRightEdge={24} rightThreshold={40} overshootRight={false} overshootLeft={false}
     enableTrackpadTwoFingerGesture onSwipeableOpenStartDrag={() => { swiping.current = true; open(); }} onSwipeableWillOpen={open}
     onSwipeableOpen={() => setRevealed(true)} onSwipeableClose={() => { swiping.current = false; setRevealed(false); }}
@@ -76,11 +79,11 @@ function SetRow({ set, index, exercise, onUpdateSet, onSettings, onRemove }: {
         </Pressable>
         {(['weight', 'reps', 'rpe'] as const).map(field => <View key={field} style={[styles.input, { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.mutedBg, borderColor: theme.border }]}><TextInput
           style={{ flex: 1, minWidth: 0, textAlign: 'center', fontSize: 15, color: theme.textPrimary, minHeight: 34, padding: 0 }}
-          accessibilityLabel={exercise.name + ', set ' + (index + 1) + ', ' + (field === 'weight' ? (set.loadKind ?? 'external') + ' load in ' + (set.loadUnit ?? 'lb') : field)}
+          accessibilityLabel={exercise.name + ', set ' + (index + 1) + ', ' + (field === 'weight' ? (set.loadKind ?? 'external') + ' load in ' + loadUnitLabel(set) : field)}
           editable={!exercise.readOnly && !(field === 'weight' && set.loadKind === 'bodyweight')}
           value={set[field]} onChangeText={value => onUpdateSet(set.id, field, value)} selectTextOnFocus
-          onFocus={() => { setFocused(true); openRow?.close(); }} onBlur={() => setFocused(false)}
-          keyboardType={field === 'reps' ? 'number-pad' : 'decimal-pad'} placeholder={field === 'weight' && set.loadKind === 'bodyweight' ? 'BW' : '—'} placeholderTextColor={theme.placeholder} />{field === 'weight' && set.loadKind !== 'bodyweight' ? <Text style={{ fontSize: 10, color: theme.text }}>{set.loadKind === 'assistance' ? '−' : ''}{set.loadUnit === 'none' ? '' : set.loadUnit ?? 'lb'}</Text> : null}</View>)}
+          onFocus={() => { openRow?.close(); }}
+          keyboardType={field === 'reps' ? 'number-pad' : 'decimal-pad'} placeholder={field === 'weight' && set.loadKind === 'bodyweight' ? 'BW' : '—'} placeholderTextColor={theme.placeholder} />{field === 'weight' && set.loadKind !== 'bodyweight' ? <Text style={{ fontSize: 10, color: theme.text }}>{loadUnitLabel(set)}</Text> : null}</View>)}
         <Pressable style={[styles.check, { backgroundColor: set.logged ? theme.primary : theme.mutedBg, borderColor: theme.border }]}
           accessibilityRole="checkbox" aria-checked={set.logged} accessibilityLabel={exercise.name + ', set ' + (index + 1) + ' logged'} accessibilityState={{ checked: set.logged, disabled: exercise.readOnly }}
           disabled={exercise.readOnly} onPress={() => { if (!swiping.current) onUpdateSet(set.id, 'logged', !set.logged); }}>
@@ -105,7 +108,7 @@ export default function ExerciseCard({ exercise, onUpdateSet, onPressHistory, on
       <Pressable style={styles.icon} accessibilityRole="button" accessibilityLabel={exercise.name + ' options'} onPress={() => setMenu('header')}><Ionicons name="ellipsis-horizontal" size={22} color={theme.text} /></Pressable>
     </View>
     <View style={styles.row}><View style={styles.number}><Text style={[styles.column, { color: theme.placeholder }]}>SET</Text></View>
-      <Pressable style={{ flex: 1 }} disabled={exercise.readOnly} onPress={() => setMenu('loads')} accessibilityRole="button" accessibilityLabel="Load and unit settings"><Text style={[styles.column, { color: theme.placeholder }]}>LOAD</Text></Pressable>
+      <Pressable style={{ flex: 1 }} disabled={exercise.readOnly} onPress={() => setMenu('loads')} accessibilityRole="button" accessibilityLabel="Load and unit settings"><Text style={[styles.column, { color: theme.placeholder }]}>{exerciseLoadLabel(exercise.sets)}</Text></Pressable>
       {['REPS', 'RPE'].map(label => <Text key={label} style={[styles.column, { flex: 1, color: theme.placeholder }]}>{label}</Text>)}<View style={{ width: 44 }} /></View>
     {exercise.sets.map((set, index) => <SetRow key={set.id} {...{ set, index, exercise, onUpdateSet }} onSettings={() => setMenu(set.id)} onRemove={onRemoveSet ? () => onRemoveSet(set.id) : undefined} />)}
     {!exercise.readOnly && onAddSet ? button('Add set', onAddSet) : null}

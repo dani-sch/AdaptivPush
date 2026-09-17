@@ -1,5 +1,5 @@
 import { supabase } from '@/utils/supabase';
-import { runSupabaseOperation } from '@/utils/supabaseResilience';
+import { OperationFailureError, runSupabaseOperation } from '@/utils/supabaseResilience';
 import { requireRollout, rollout } from '../kernel/rollout';
 
 import type { WorkoutDraft, WorkoutFinalizationReceipt } from './contracts';
@@ -14,10 +14,16 @@ export { workoutFinalizationPayload } from './contracts';
 export const workoutRepository: WorkoutRepository = {
   async finalize(draft, endedAt) {
     requireRollout(rollout.durableWorkoutWriter, 'Durable workout synchronization');
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) throw sessionError;
+    if (!session || session.user.id !== draft.ownerId) throw new OperationFailureError(
+      { category: 'authentication_required', retryable: false },
+      'Sign in to the draft’s account before finishing. Your exact workout is preserved.',
+    );
     const { data, error } = await runSupabaseOperation(
       (signal) => supabase.rpc(draft.removals || draft.programRemoval || draft.slots.some(s => s.sets.length > s.prescribedSetCount) ? 'finalize_workout_removals_v1' : 'finalize_workout_v2', {
         p_payload: workoutFinalizationPayload(draft, endedAt),
-      }).abortSignal(signal),
+      }).setHeader('Authorization', `Bearer ${session.access_token}`).abortSignal(signal),
       { kind: 'write', operation: 'workout.finalize' },
     );
     if (error) throw error;

@@ -70,8 +70,8 @@ export function projectCompletedOccurrence(
         return {
           prescriptionSlotId: slot.slotId,
           prescribedExerciseId: slot.prescribedExerciseId, exerciseId,
-          order: set.order, reps: 0, loadValue: null, loadUnit: set.loadUnit ?? 'none',
-          loadKind: set.loadKind ?? 'unknown', loadSide: set.loadSide ?? 'unknown', rpe: null, loggedAt: '',
+          order: set.order, reps: 0, loadValue: null, loadUnit: saved?.loadUnit ?? set.loadUnit ?? 'none',
+          loadKind: saved?.loadKind ?? set.loadKind ?? 'unknown', loadSide: saved?.loadSide ?? set.loadSide ?? 'unknown', rpe: null, loggedAt: '',
           ...actual, actualSetId: set.setId, outcome, prescribed: true,
         };
       }),
