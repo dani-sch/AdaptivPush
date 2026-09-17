@@ -4,7 +4,7 @@
 
 Active capture and completed edit now share compact rows with explicit checks, on-demand load/exercise settings, swipe set removal and header exercise removal. Occurrence tombstones preserve original prescriptions; selected future changes commit atomically with Save or Finish. Missing attempts hold the affected progression decision without becoming failures. App-owned dialog backdrops are transparent.
 
-The new additive migration 20260917180000 and separate removal capability 1 are locally/integration verified, **not deployed**. Earlier hosted correction capability 2 remains unchanged. The exact packet, encrypted backup/59-relation restore proof, 106 passing tests, SQL/concurrency checks, screenshots, forward recovery and physical-iPhone limitations are recorded in [September 17 removal evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-REMOVALS-2026-09-17.md). Obtain the user's explicit section-11 authorization before a new hosted write. AP-04/AP-05 remain queued.
+The new additive migration 20260917180000 and separate removal capability 1 are locally/integration verified, **not deployed**. Earlier hosted correction capability 2 remains unchanged. The exact packet, encrypted backup/59-relation restore proof, 107 passing tests, SQL/concurrency checks, screenshots, forward recovery and physical-iPhone limitations are recorded in [September 17 removal evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-REMOVALS-2026-09-17.md). Obtain the user's explicit section-11 authorization before a new hosted write. AP-04/AP-05 remain queued.
 
 ## Unified workout occurrence boundary
 
