@@ -1,8 +1,8 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, BackHandler, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, BackHandler, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, usePreventRemove } from '@react-navigation/native';
+import { useNavigation, usePreventRemove } from 'expo-router/react-navigation';
 import type { Theme } from '@/constants/themes';
 import { useTheme } from '@/contexts/ThemeContext';
 import ExerciseCard, { type WorkoutSet } from '@/components/ExerciseCard';
@@ -12,7 +12,7 @@ import { createCompletedWorkoutCorrection } from '@/features/workouts/correction
 import { correctionLoadSelection, type EditableCorrectionSet } from '@/features/workouts/correctionEditor';
 import { workoutCorrectionRepository } from '@/features/workouts/correctionRepository';
 import { workoutCorrectionStore } from '@/features/workouts/correctionStore';
-import { CORRECTIONS_UNAVAILABLE, loadCompletedWorkout } from '@/features/workouts/occurrenceRepository';
+import { CORRECTIONS_UNAVAILABLE, loadCompletedWorkout, loadCorrectionCatalog } from '@/features/workouts/occurrenceRepository';
 import { projectCompletedOccurrence, type OccurrenceExercise, type WorkoutMode } from '@/features/workouts/effectiveOccurrence';
 import { supabase } from '@/utils/supabase';
 import { reportSupabaseFailure, supabaseUserMessage } from '@/utils/supabaseResilience';
@@ -43,6 +43,10 @@ export default function EditWorkoutScreen() {
   const [status, setStatus] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<{ id: string; name: string }[]>([]);
   const [pickerSetId, setPickerSetId] = useState<string | null>(null);
+  const [exerciseSearch, setExerciseSearch] = useState('');
+  const [discard, setDiscard] = useState<{ title: string; action: () => void } | null>(null);
+  const confirmDiscard = (title: string, action: () => void) => setDiscard({ title, action });
+  useEffect(() => { if (status && Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(status); }, [status]);
   const savingRef = useRef(false);
   const generation = useRef(0);
   const account = useRef<string | null>(null);
@@ -59,8 +63,11 @@ export default function EditWorkoutScreen() {
       account.current = session.user.id;
       const [loaded, catalogResult, recovered] = await Promise.all([
         loadCompletedWorkout(supabase, session.user.id, sessionId),
-        supabase.from('exercises').select('id,name').order('name'),
-        workoutCorrectionStore.load(session.user.id, sessionId),
+        loadCorrectionCatalog(supabase),
+        workoutCorrectionStore.load(session.user.id, sessionId).then(request => ({ request, issue: null as string | null })).catch(error => {
+          reportSupabaseFailure('workout.correction_recovery', error);
+          return { request: null, issue: 'The pending update could not be read. Reload to retry before making more changes.' };
+        }),
       ]);
       if (catalogResult.error) reportSupabaseFailure('workout.catalog', catalogResult.error);
       if (request !== generation.current) return false;
@@ -74,10 +81,10 @@ export default function EditWorkoutScreen() {
       setRevision(loaded.session.correction_revision ?? 0);
       setSummary(`${new Date(loaded.session.ended_at).toLocaleDateString()} · ${loaded.session.completion_class ?? 'Recorded'}`);
       setCatalog(catalogResult.data ?? []);
-      setCanCorrect(loaded.canCorrect);
-      setPending(Boolean(recovered));
+      setCanCorrect(loaded.canCorrect && !recovered.issue);
+      setPending(Boolean(recovered.request));
       setMode('completed_view');
-      setStatus(loaded.correctionIssue ?? (recovered
+      setStatus(recovered.issue ?? loaded.correctionIssue ?? (recovered.request
         ? 'An update is awaiting confirmation. Retry Sync to reconcile it before editing.'
         : projection.missingPrescription ? 'Original prescription context is unavailable. Showing recorded sets.' : null));
       return true;
@@ -103,6 +110,7 @@ export default function EditWorkoutScreen() {
       if (account.current && session?.user.id !== account.current) {
         generation.current++; account.current = null; original.current = [];
         setExercises([]); setOwnerId(null); setCanCorrect(false); setPickerSetId(null);
+        setDiscard(null);
         setTitle('Workout'); setSummary(''); setMode('completed_view'); setPending(false);
         setLoading(false); setStatus('The account changed. Reload to view this workout with the current account.');
       }
@@ -120,16 +128,11 @@ export default function EditWorkoutScreen() {
   const cancel = () => { if (savingRef.current) return; setExercises(structuredClone(original.current)); setMode('completed_view'); setPickerSetId(null); };
   usePreventRemove(Boolean(ownerId) && (mode === 'completed_edit' || saving), ({ data }) => {
     if (savingRef.current) return;
-    Alert.alert('Discard workout edits?', 'Your saved workout will stay unchanged.', [
-      { text: 'Keep editing', style: 'cancel' },
-      { text: 'Discard', style: 'destructive', onPress: () => navigation.dispatch(data.action) },
-    ]);
+    confirmDiscard('Discard workout edits?', () => navigation.dispatch(data.action));
   });
   const leave = () => {
     if (saving) return;
-    if (mode === 'completed_edit') Alert.alert('Discard workout edits?', 'Your saved workout will stay unchanged.', [
-      { text: 'Keep editing', style: 'cancel' }, { text: 'Discard', onPress: cancel },
-    ]);
+    if (mode === 'completed_edit') confirmDiscard('Discard workout edits?', cancel);
     else router.back();
   };
   useEffect(() => { const sub = BackHandler.addEventListener('hardwareBackPress', () => { leave(); return true; }); return () => sub.remove(); });
@@ -156,7 +159,7 @@ export default function EditWorkoutScreen() {
       if (requestGeneration !== generation.current || account.current !== ownerId) return;
       if ('receipt' in outcome) { if (await load()) setStatus('Workout updated.'); }
       else if (outcome.status === 'validation') { setPending(false); setStatus(outcome.errors.join(' ')); }
-      else if (outcome.status === 'conflict') { if (await load()) setStatus(outcome.message); }
+      else if (outcome.status === 'conflict') { if (await load()) setStatus('This workout changed elsewhere. The latest saved workout has been loaded.'); }
       else {
         setStatus(outcome.message);
         setPending(true);
@@ -203,7 +206,7 @@ export default function EditWorkoutScreen() {
           renderSetControls={editing ? row => {
             const set = exercise.sets.find(s => s.actualSetId === row.id)!;
             return <View style={styles.kindRow}>
-              <Pressable accessibilityRole="button" accessibilityLabel={`Change exercise for set ${set.order}`} style={styles.kindButton} onPress={() => setPickerSetId(row.id)}><Text style={styles.kindText}>Change exercise</Text></Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel={`Change exercise for set ${set.order}`} style={styles.kindButton} onPress={() => { setExerciseSearch(''); setPickerSetId(row.id); }}><Text style={styles.kindText}>Change exercise</Text></Pressable>
               {(['lb', 'kg', 'none', 'assistance', 'external'] as const).map(selection => {
                 const selected = selection === 'assistance' || selection === 'external' ? set.loadKind === selection : set.loadUnit === selection;
                 return <Pressable key={selection} accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={`${selection === 'none' ? 'Bodyweight' : selection}, set ${set.order}`} style={[styles.kindButton, selected && styles.kindSelected]} onPress={() => patchSet(row.id, correctionLoadSelection(set, selection))}><Text style={styles.kindText}>{selection === 'none' ? 'Bodyweight' : selection === 'external' ? 'External load' : selection}</Text></Pressable>;
@@ -215,16 +218,23 @@ export default function EditWorkoutScreen() {
         {!exercises.length && !status ? <Text style={styles.status}>No sets were recorded for this workout.</Text> : null}
         <Pressable accessibilityRole="button" style={styles.addButton} disabled={saving} onPress={() => {
           if (mode !== 'completed_edit') void load();
-          else Alert.alert('Reload saved workout?', 'Unsaved edits will be discarded.', [
-            { text: 'Keep editing', style: 'cancel' }, { text: 'Reload', onPress: () => void load() },
-          ]);
+          else confirmDiscard('Reload saved workout?', () => void load());
         }}><Text style={styles.addText}>Reload workout</Text></Pressable>
       </ScrollView>}
     </KeyboardAvoidingView>
+    <Modal visible={discard !== null} transparent animationType="fade" onRequestClose={() => setDiscard(null)}>
+      <View style={styles.modalBackdrop}><View style={styles.discardDialog} accessibilityViewIsModal>
+        <Text style={styles.title}>{discard?.title}</Text>
+        <Text style={styles.status}>Unsaved edits will be discarded. Your saved workout will stay unchanged.</Text>
+        <Pressable accessibilityRole="button" style={styles.addButton} onPress={() => setDiscard(null)}><Text style={styles.addText}>Keep editing</Text></Pressable>
+        <Pressable accessibilityRole="button" style={styles.addButton} onPress={() => { const action = discard?.action; setDiscard(null); action?.(); }}><Text style={styles.addText}>Discard edits</Text></Pressable>
+      </View></View>
+    </Modal>
     <Modal visible={pickerSetId !== null} transparent animationType="slide" onRequestClose={() => setPickerSetId(null)}>
       <View style={styles.modalBackdrop}><View style={styles.picker}><Text style={styles.title}>Performed exercise</Text>
-        <ScrollView>{!catalog.length ? <Text style={styles.status}>Exercise list unavailable. Close and reload the workout to retry.</Text> : catalog.map(e => <Pressable accessibilityRole="button" key={e.id} style={styles.pickerRow} onPress={() => { if (pickerSetId && editing) patchSet(pickerSetId, { exerciseId: e.id }); setPickerSetId(null); }}><Text style={styles.exerciseName}>{e.name}</Text></Pressable>)}</ScrollView>
-        <Pressable style={styles.addButton} onPress={() => setPickerSetId(null)}><Text style={styles.addText}>Close</Text></Pressable>
+        <TextInput accessibilityLabel="Search exercises" placeholder="Search exercises" placeholderTextColor={theme.placeholder} value={exerciseSearch} onChangeText={setExerciseSearch} style={styles.search} />
+        <ScrollView keyboardShouldPersistTaps="handled">{!catalog.length ? <Text style={styles.status}>Exercise list unavailable. Close and reload the workout to retry.</Text> : catalog.filter(e => e.name.toLowerCase().includes(exerciseSearch.trim().toLowerCase())).map(e => <Pressable accessibilityRole="button" key={e.id} style={styles.pickerRow} onPress={() => { if (pickerSetId && editing) patchSet(pickerSetId, { exerciseId: e.id }); setPickerSetId(null); }}><Text style={styles.exerciseName}>{e.name}</Text></Pressable>)}</ScrollView>
+        <Pressable accessibilityRole="button" style={styles.addButton} onPress={() => setPickerSetId(null)}><Text style={styles.addText}>Close</Text></Pressable>
       </View></View>
     </Modal>
   </SafeAreaView>;
@@ -235,6 +245,8 @@ function createStyles(theme: Theme) {
     safeArea: { flex: 1, backgroundColor: theme.background }, flex: { flex: 1 },
     header: { minHeight: 64, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: theme.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
     headerButton: { minHeight: 48, minWidth: 48, maxWidth: '35%', justifyContent: 'center' },
+    search: { minHeight: 48, borderWidth: 1, borderColor: theme.border, borderRadius: 10, color: theme.textPrimary, paddingHorizontal: 10 },
+    discardDialog: { backgroundColor: theme.surfaceBg, padding: 24, gap: 12, borderTopLeftRadius: 22, borderTopRightRadius: 22 },
     headerCopy: { flex: 1, alignItems: 'center' }, title: { color: theme.textPrimary, fontSize: 18, fontWeight: '800' },
     subtitle: { color: theme.text, fontSize: 12 }, cancel: { color: theme.text, fontWeight: '700' }, save: { color: theme.primary, fontWeight: '800' }, disabled: { opacity: 0.45 },
     loading: { marginTop: 60 }, content: { padding: 16, paddingBottom: 80, gap: 12 },

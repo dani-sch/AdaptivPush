@@ -25,7 +25,7 @@ type Props = {
 function ExerciseRow({ exercise, idx, onSwap, styles, theme }: {
     exercise: WorkoutExercise;
     idx: number;
-    onSwap: () => void;
+    onSwap?: () => void;
     styles: ReturnType<typeof createStyles>;
     theme: Theme;
 }) {
@@ -59,14 +59,14 @@ function ExerciseRow({ exercise, idx, onSwap, styles, theme }: {
                             <Info color={theme.white} size={15} />
                         </Pressable>
                     )}
-                    <Pressable
+                    {onSwap ? <Pressable
                         onPress={onSwap}
                         style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.75 }]}
                         accessibilityRole="button"
                         accessibilityLabel={`Swap ${exercise.name}`}
                     >
                         <ArrowLeftRight color={theme.white} size={15} />
-                    </Pressable>
+                    </Pressable> : null}
                 </View>
             </View>
 
@@ -107,6 +107,7 @@ export function WorkoutTemplateModal({ workout, program, onSwapExercise, onClose
                         onPress={onClose}
                         style={({ pressed }) => [styles.closeButton, pressed && { opacity: 0.85 }]}
                         accessibilityRole="button"
+                        accessibilityLabel="Close workout preview"
                     >
                         <X color={theme.white} size={18} />
                     </Pressable>
@@ -118,7 +119,7 @@ export function WorkoutTemplateModal({ workout, program, onSwapExercise, onClose
                             key={exercise.id}
                             exercise={exercise}
                             idx={idx}
-                            onSwap={() => { if (!workout.sessionId) setSwapExerciseId(exercise.id); }}
+                            onSwap={workout.sessionId ? undefined : () => setSwapExerciseId(exercise.id)}
                             styles={styles}
                             theme={theme}
                         />
@@ -131,7 +132,7 @@ export function WorkoutTemplateModal({ workout, program, onSwapExercise, onClose
                         accessibilityState={{ disabled: !!entryIssue }}
                         style={({ pressed }) => [styles.startButton, pressed && { opacity: 0.85 }]}
                         accessibilityRole="button"
-                        accessibilityLabel={`Start ${workout.name}`}
+                        accessibilityLabel={`${workout.sessionId ? 'View or update' : 'Start'} ${workout.name}`}
                     >
                         <Text style={styles.startButtonText}>{workout.sessionId ? 'View or Update Workout' : entryIssue ? 'Workout unavailable' : 'Start This Workout'}</Text>
                     </Pressable>

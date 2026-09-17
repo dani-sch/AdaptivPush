@@ -1,6 +1,6 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { Link, router, useFocusEffect } from 'expo-router';
-import { Alert, ScrollView, StyleSheet, Text, View, Pressable, Modal } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View, Pressable, Modal, Platform } from 'react-native';
 import { Plus, ChevronRight, MoreVertical, LayoutList, Archive } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,6 +10,7 @@ import { GenerateProgramModal } from '@/components/GenerateProgramModal';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
 import { workoutRouteParams } from '@/features/workouts/routeResolution';
+import { createCompletedNavigation } from '@/features/workouts/effectiveOccurrence';
 import { reportSupabaseFailure, supabaseSaveFailureMessage } from '@/utils/supabaseResilience';
 
 function LoadingState({ styles }: { styles: ReturnType<typeof createStyles> }) {
@@ -146,6 +147,16 @@ export default function PlanScreen() {
     const styles = useMemo(() => createStyles(theme), [theme]);
 
     const [selectedWorkout, setSelectedWorkout] = useState<string | null>(null);
+    const [pendingEdit] = useState(createCompletedNavigation);
+    const navigateAfterDismiss = useCallback(() => {
+        const sessionId = pendingEdit.dismiss();
+        if (sessionId) router.push({ pathname: '/edit-workout', params: { sessionId } });
+    }, [pendingEdit]);
+    useEffect(() => {
+        if (Platform.OS === 'ios' || selectedWorkout || !pendingEdit.pending()) return;
+        const frame = requestAnimationFrame(navigateAfterDismiss);
+        return () => cancelAnimationFrame(frame);
+    }, [selectedWorkout, navigateAfterDismiss, pendingEdit]);
     const [showMenu, setShowMenu] = useState(false);
     const [showGenModal, setShowGenModal] = useState(false);
 
@@ -380,7 +391,7 @@ export default function PlanScreen() {
                                     </View>
 
                                     <Pressable
-                                        onPress={() => setSelectedWorkout(workout.id)}
+                                        onPress={() => { pendingEdit.reset(); setSelectedWorkout(workout.id); }}
                                         style={({ pressed }) => [styles.chevronButton, pressed && { opacity: 0.85 }]}
                                         accessibilityRole="button"
                                         accessibilityLabel={`Open workout ${workout.name}`}
@@ -423,21 +434,22 @@ export default function PlanScreen() {
             </ScrollView>
 
             {/* Workout Template Modal */}
-            {!!selectedWorkoutObj && (
-                <Modal transparent animationType="slide" onRequestClose={() => setSelectedWorkout(null)}>
-                    <WorkoutTemplateModal
+                <Modal visible={!!selectedWorkoutObj} transparent animationType={Platform.OS === 'ios' ? 'slide' : 'none'} onDismiss={navigateAfterDismiss} onRequestClose={() => setSelectedWorkout(null)}>
+                    {selectedWorkoutObj ? <WorkoutTemplateModal
                         workout={selectedWorkoutObj}
                         program={program}
                         onSwapExercise={swapExercise}
                         onClose={() => setSelectedWorkout(null)}
                         onStart={() => {
+                            if (selectedWorkoutObj.sessionId) {
+                                if (pendingEdit.request(selectedWorkoutObj.sessionId)) setSelectedWorkout(null);
+                                return;
+                            }
                             setSelectedWorkout(null);
-                            if (selectedWorkoutObj.sessionId) router.push({ pathname: '/edit-workout', params: { sessionId: selectedWorkoutObj.sessionId } });
-                            else router.push({ pathname: '/next-workout', params: workoutRouteParams(program, selectedWorkoutObj) });
+                            router.push({ pathname: '/next-workout', params: workoutRouteParams(program, selectedWorkoutObj) });
                         }}
-                    />
+                    /> : null}
                 </Modal>
-            )}
 
             {/* Generate Program Modal */}
             <Modal visible={showGenModal} transparent animationType="slide">
