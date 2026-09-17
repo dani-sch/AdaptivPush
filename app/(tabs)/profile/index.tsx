@@ -1,3 +1,4 @@
+import { AppAlert as Alert } from '@/components/ui/AppDialog';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import { type Href, router } from 'expo-router';
@@ -16,11 +17,8 @@ import {
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActionSheetIOS,
   ActivityIndicator,
-  Alert,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -666,21 +664,7 @@ export default function ProfileScreen() {
   const handleEditExperienceLevel = () => {
     const options: TrainingExperience[] = ['beginner', 'intermediate', 'advanced'];
 
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: ['Cancel', 'Beginner', 'Intermediate', 'Advanced'],
-          cancelButtonIndex: 0,
-          title: 'Experience Level',
-        },
-        async (buttonIndex) => {
-          if (buttonIndex === 0) return;
-          const selected = options[buttonIndex - 1];
-          await saveExperienceLevel(selected);
-        },
-      );
-    } else {
-      Alert.alert(
+    Alert.alert(
         'Experience Level',
         'Select your training experience',
         [
@@ -691,7 +675,6 @@ export default function ProfileScreen() {
           { text: 'Cancel', style: 'cancel' as const },
         ],
       );
-    }
   };
 
   const saveExperienceLevel = async (level: TrainingExperience) => {
@@ -1624,7 +1607,7 @@ function createStyles(theme: Theme) {
     readinessOverlay: {
       flex: 1,
       justifyContent: 'center',
-      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+      backgroundColor: 'transparent',
       paddingHorizontal: 18,
     },
     readinessModal: {

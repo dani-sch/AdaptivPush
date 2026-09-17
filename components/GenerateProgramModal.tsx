@@ -1,5 +1,6 @@
+import { AppAlert as Alert } from '@/components/ui/AppDialog';
 import React, { useMemo, useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, Alert, TextInput } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
 import { X } from 'lucide-react-native';
 import { supabase } from '@/utils/supabase';
 import { generateProgram } from '@/utils/programGenerator';
@@ -448,7 +449,7 @@ function createStyles(theme: Theme) {
     // Backdrop
     backdrop: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.82)',
+      backgroundColor: 'transparent',
       justifyContent: 'flex-end',
     },
 

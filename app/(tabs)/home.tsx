@@ -1,3 +1,4 @@
+import { visibleProgramExercises } from '@/features/workouts/visibleProgramExercises';
 import { workoutCorrectionsAvailable } from '@/features/workouts/occurrenceRepository';
 import { occurrenceAction, occurrenceState } from '@/features/workouts/effectiveOccurrence';
 import { Ionicons } from "@expo/vector-icons";
@@ -781,7 +782,7 @@ export default function HomeScreen() {
         id: effectiveWorkout.stableDayId ?? effectiveWorkout.id,
         name: effectiveWorkout.name,
         durationMinutes: effectiveWorkout.estimatedTime || 60,
-        exercises: effectiveWorkout.exercises.map((ex) => ({
+        exercises: visibleProgramExercises(effectiveWorkout.exercises).map((ex) => ({
           id: ex.stableSlotId ?? ex.id,
           name: ex.name,
           prescription: `${ex.sets ?? 3}×${(ex.reps ?? "8-12").replace("-", "–")}`,
@@ -1135,7 +1136,7 @@ function createStyles(theme: Theme) {
 
     modalOverlay: {
       flex: 1,
-      backgroundColor: "rgba(0, 0, 0, 0.85)",
+      backgroundColor: 'transparent',
       justifyContent: "center",
       alignItems: "center",
       padding: 16,
@@ -1319,7 +1320,7 @@ function createStyles(theme: Theme) {
     // readiness adjustment popup
     adjOverlay: {
       flex: 1,
-      backgroundColor: "rgba(0, 0, 0, 0.88)",
+      backgroundColor: 'transparent',
       justifyContent: "center",
       alignItems: "center",
       padding: 24,

@@ -1,3 +1,4 @@
+import { AppAlert as Alert } from '@/components/ui/AppDialog';
 import BackButton from "@/components/ui/BackButton";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { Theme } from "@/constants/themes";
@@ -13,7 +14,6 @@ import { Link, router } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Pressable,

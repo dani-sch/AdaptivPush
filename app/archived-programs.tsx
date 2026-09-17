@@ -1,5 +1,6 @@
+import { AppAlert as Alert } from '@/components/ui/AppDialog';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { ChevronLeft, Archive } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';

@@ -939,7 +939,7 @@ function createStyles(theme: Theme) {
     // Session detail bottom sheet
     sheetBackdrop: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.82)',
+      backgroundColor: 'transparent',
       justifyContent: 'flex-end',
     },
     sheet: {

@@ -1,13 +1,10 @@
-import { Ionicons } from "@expo/vector-icons";
-import React, { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { ExerciseInfoPanel } from "./ExerciseInfoPanel";
-import { useTheme } from "@/contexts/ThemeContext";
-import type { Theme } from "@/constants/themes";
-import type { MuscleGroup } from "@/types/program";
-import { haptic, Haptics } from "@/utils/haptic";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
+import { Ionicons } from '@expo/vector-icons';
+import React, { useEffect, useRef, useState } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import ReanimatedSwipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
+import { useTheme } from '@/contexts/ThemeContext';
+import type { MuscleGroup } from '@/types/program';
+import { ExerciseInfoPanel } from './ExerciseInfoPanel';
 
 export interface WorkoutSet {
     outcome?: 'performed' | 'skipped' | 'not_attempted';
@@ -37,422 +34,110 @@ export interface Exercise {
     loadSuggestion?: string;
 }
 
-// ─── SetRow ───────────────────────────────────────────────────────────────────
-
-interface SetRowProps {
-    set: WorkoutSet;
-    index: number;
-    exerciseName: string;
-    readOnly?: boolean;
-    loadLabel: string;
-    onChangeWeight: (val: string) => void;
-    onChangeReps: (val: string) => void;
-    onChangeRpe: (val: string) => void;
-    onToggleLogged: () => void;
-    onToggleSkipped: () => void;
-    editingCompleted?: boolean;
-    controls?: React.ReactNode;
-    styles: ReturnType<typeof createStyles>;
-    theme: Theme;
-}
-
-const SetRow: React.FC<SetRowProps> = ({
-    set,
-    index,
-    exerciseName,
-    readOnly,
-    loadLabel,
-    onChangeWeight,
-    onChangeReps,
-    onChangeRpe,
-    onToggleLogged,
-    onToggleSkipped,
-    editingCompleted,
-    controls,
-    styles,
-    theme,
-}) => (
-    <View>
-      {set.exerciseName && set.exerciseName !== exerciseName ? (
-        <Text style={styles.actualExerciseLabel}>Set {index + 1}: {set.exerciseName}</Text>
-      ) : null}
-      <View style={[styles.setRow, set.logged && styles.setRowLogged]}>
-        <Text style={styles.setNumber}>{index + 1}</Text>
-
-        <TextInput
-            style={[styles.setInput, set.logged && styles.setInputLogged]}
-            accessibilityLabel={`${exerciseName}, set ${index + 1}, ${set.loadKind ?? 'external'} load in ${set.loadUnit ?? loadLabel}`}
-            value={set.weight}
-            onChangeText={onChangeWeight}
-            keyboardType="decimal-pad"
-            selectTextOnFocus
-            editable={(!set.logged || editingCompleted) && !readOnly && set.outcome !== 'skipped' && set.loadKind !== 'bodyweight'}
-            placeholderTextColor={theme.placeholder}
-            placeholder="—"
-        />
-
-        <TextInput
-            style={[styles.setInput, set.logged && styles.setInputLogged]}
-            accessibilityLabel={`${exerciseName}, set ${index + 1}, repetitions`}
-            value={set.reps}
-            onChangeText={onChangeReps}
-            keyboardType="number-pad"
-            selectTextOnFocus
-            editable={(!set.logged || editingCompleted) && !readOnly && set.outcome !== 'skipped'}
-            placeholderTextColor={theme.placeholder}
-            placeholder="—"
-        />
-
-        <TextInput
-            style={[styles.setInput, set.logged && styles.setInputLogged]}
-            accessibilityLabel={`${exerciseName}, set ${index + 1}, rating of perceived exertion`}
-            value={set.rpe}
-            onChangeText={onChangeRpe}
-            keyboardType="decimal-pad"
-            selectTextOnFocus
-            editable={(!set.logged || editingCompleted) && !readOnly && set.outcome !== 'skipped'}
-            placeholderTextColor={theme.placeholder}
-            placeholder="—"
-        />
-
-        <Pressable
-            style={({ pressed }) => [
-                styles.logButton,
-                set.logged && styles.logButtonDone,
-                pressed && { opacity: 0.7 },
-            ]}
-            onPress={() => {
-                if (!set.logged) void haptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
-                onToggleLogged();
-            }}
-            hitSlop={8}
-            disabled={readOnly}
-            accessibilityRole="checkbox"
-            accessibilityLabel={`${exerciseName}, set ${index + 1} logged`}
-            accessibilityState={{ checked: set.logged, disabled: readOnly }}
-        >
-            <Ionicons
-                name="checkmark"
-                size={16}
-                color={set.logged ? theme.white : theme.placeholder}
-            />
-        </Pressable>
-      </View>
-      <Text style={styles.actualExerciseLabel}>{set.outcome === 'skipped' ? 'Skipped' : set.logged ? `Performed · ${set.loadKind === 'bodyweight' ? 'Bodyweight' : `${set.loadKind === 'assistance' ? 'Assistance · ' : ''}${set.loadUnit ?? loadLabel}`}` : 'Not attempted'}</Text>
-      {!readOnly && !set.logged ? <Pressable onPress={onToggleSkipped} accessibilityRole="button" style={styles.setAction}>
-        <Text style={styles.actionButtonText}>{set.outcome === 'skipped' ? 'Undo skip' : 'Skip set'}</Text>
-      </Pressable> : null}
-      {controls}
-    </View>
-);
-
-// ─── ExerciseCard ─────────────────────────────────────────────────────────────
 
 interface ExerciseCardProps {
-    renderSetControls?: (set: WorkoutSet) => React.ReactNode;
-    onAddSet?: () => void;
-    onSkipExercise?: () => void;
-    exercise: Exercise;
-    onUpdateSet: (setId: string, field: keyof WorkoutSet, value: string | boolean) => void;
-    onToggleComplete: () => void;
-    onPressHistory?: () => void;
-    onPressSwap: () => void;
+  exercise: Exercise;
+  onUpdateSet: (setId: string, field: keyof WorkoutSet, value: string | boolean) => void;
+  onToggleComplete: () => void;
+  onPressHistory?: () => void;
+  onPressSwap: () => void;
+  onSetExercise?: (setId: string) => void;
+  onRemoveSet?: (setId: string) => void;
+  onRemoveExercise?: () => void;
+  onAddSet?: () => void;
 }
-
-export default function ExerciseCard({
-    exercise,
-    onUpdateSet,
-    onToggleComplete,
-    onPressHistory,
-    onPressSwap,
-    renderSetControls,
-    onAddSet,
-    onSkipExercise,
-}: ExerciseCardProps) {
-    const { theme } = useTheme();
-    const styles = useMemo(() => createStyles(theme), [theme]);
-    const [showInfo, setShowInfo] = useState(false);
-    return (
-        <View style={[styles.card, exercise.completed && styles.cardCompleted]}>
-            {/* Header */}
-            <View style={styles.header}>
-                <View style={styles.headerLeft}>
-                    <Pressable
-                        style={({ pressed }) => [
-                            styles.completionCircle,
-                            exercise.completed && styles.completionCircleDone,
-                            pressed && { opacity: 0.7 },
-                        ]}
-                        onPress={onToggleComplete}
-                        disabled={exercise.readOnly || exercise.editingCompleted}
-                        accessibilityRole="checkbox"
-                        accessibilityLabel={`${exercise.name}, all entered sets logged`}
-                        accessibilityState={{ checked: exercise.completed, disabled: exercise.readOnly }}
-                        hitSlop={8}
-                    >
-                        {exercise.completed && (
-                            <Ionicons name="checkmark" size={16} color={theme.white} />
-                        )}
-                    </Pressable>
-                    <View style={styles.exerciseNameWrapper}>
-                        <Text
-                            style={[
-                                styles.exerciseName,
-                                exercise.completed && styles.exerciseNameCompleted,
-                            ]}
-                        >
-                            {exercise.name}
-                        </Text>
-                        <Text style={styles.prescription}>{exercise.prescription}</Text>
-                        {exercise.loadSuggestion ? <Text style={styles.loadSuggestion}>{exercise.loadSuggestion}</Text> : null}
-                    </View>
-                </View>
-                <View style={styles.actions}>
-                    {(exercise.imageUrl || exercise.description) && (
-                        <Pressable
-                            style={({ pressed }) => [styles.actionButton, showInfo && styles.actionButtonActive, pressed && { opacity: 0.7 }]}
-                            onPress={() => setShowInfo(p => !p)}
-                            accessibilityRole="button"
-                            accessibilityLabel={`Information about ${exercise.name}`}
-                            hitSlop={6}
-                        >
-                            <Ionicons name="information-circle-outline" size={16} color={showInfo ? theme.text : theme.text} />
-                        </Pressable>
-                    )}
-                    {onPressHistory ? <Pressable
-                        style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.7 }]}
-                        onPress={onPressHistory}
-                    >
-                        <Ionicons name="time-outline" size={16} color={theme.text} />
-                        <Text style={styles.actionButtonText}>History</Text>
-                    </Pressable> : null}
-                    {!exercise.editingCompleted && !exercise.readOnly ? <Pressable
-                        style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.7 }]}
-                        onPress={onPressSwap}
-                        disabled={exercise.readOnly}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Swap ${exercise.name}`}
-                    >
-                        <Ionicons name="swap-horizontal" size={16} color={theme.text} />
-                        <Text style={styles.actionButtonText}>Swap</Text>
-                    </Pressable> : null}
-                </View>
-            </View>
-            {showInfo && (
-                <ExerciseInfoPanel imageUrl={exercise.imageUrl} description={exercise.description} />
-            )}
-
-            {/* Sets table */}
-            <View style={styles.setsTable}>
-                <View style={styles.setRow}>
-                    <Text style={styles.setHeaderSet}>SET</Text>
-                    <Text style={styles.setHeaderLabel}>{exercise.loadLabel ?? "LBS"}</Text>
-                    <Text style={styles.setHeaderLabel}>REPS</Text>
-                    <Text style={styles.setHeaderLabel}>RPE</Text>
-                    <View style={styles.logButtonPlaceholder} />
-                </View>
-
-                {exercise.sets.map((set, idx) => (
-                    <SetRow
-                        key={set.id}
-                        set={set}
-                        index={idx}
-                        exerciseName={exercise.name}
-                        readOnly={exercise.readOnly}
-                        editingCompleted={exercise.editingCompleted}
-                        controls={renderSetControls?.(set)}
-                        loadLabel={exercise.loadLabel ?? "pounds"}
-                        onChangeWeight={(val) => onUpdateSet(set.id, "weight", val)}
-                        onChangeReps={(val) => onUpdateSet(set.id, "reps", val)}
-                        onChangeRpe={(val) => onUpdateSet(set.id, "rpe", val)}
-                        onToggleLogged={() => onUpdateSet(set.id, "logged", !set.logged)}
-                        onToggleSkipped={() => onUpdateSet(set.id, 'outcome', set.outcome === 'skipped' ? 'not_attempted' : 'skipped')}
-                        styles={styles}
-                        theme={theme}
-                    />
-                ))}
-            </View>
-            {!exercise.readOnly ? <View>
-              <Pressable style={styles.setAction} onPress={onSkipExercise ?? (() => exercise.sets.filter(s => !s.logged).forEach(s => onUpdateSet(s.id, 'outcome', 'skipped')))} accessibilityRole="button">
-                <Text style={styles.actionButtonText}>Skip remaining exercise</Text>
-              </Pressable>
-              {onAddSet ? <Pressable style={styles.setAction} onPress={onAddSet} accessibilityRole="button"><Text style={styles.actionButtonText}>Add extra set</Text></Pressable> : null}
-            </View> : null}
+let openRow: SwipeableMethods | null = null;
+function SetRow({ set, index, exercise, onUpdateSet, onSettings, onRemove }: {
+  set: WorkoutSet; index: number; exercise: Exercise; onUpdateSet: ExerciseCardProps['onUpdateSet']; onSettings: () => void; onRemove?: () => void;
+}) {
+  const { theme } = useTheme();
+  const swipe = useRef<SwipeableMethods>(null);
+  const swiping = useRef(false);
+  const [focused, setFocused] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  useEffect(() => { if (exercise.readOnly) swipe.current?.close(); }, [exercise.readOnly]);
+  useEffect(() => { const row = swipe.current; return () => { if (openRow === row) openRow = null; }; }, []);
+  const open = () => { if (openRow !== swipe.current) openRow?.close(); openRow = swipe.current; };
+  return <ReanimatedSwipeable ref={swipe} enabled={Boolean(onRemove) && !exercise.readOnly && !focused}
+    hitSlop={{ left: -24 }} dragOffsetFromRightEdge={24} rightThreshold={40} overshootRight={false} overshootLeft={false}
+    enableTrackpadTwoFingerGesture onSwipeableOpenStartDrag={() => { swiping.current = true; open(); }} onSwipeableWillOpen={open}
+    onSwipeableOpen={() => setRevealed(true)} onSwipeableClose={() => { swiping.current = false; setRevealed(false); }}
+    renderRightActions={() => onRemove ? <Pressable accessibilityRole="button" accessibilityLabel={'Remove set ' + (index + 1)}
+      accessible={revealed} aria-hidden={!revealed} focusable={revealed} disabled={!revealed || exercise.readOnly} style={[styles.trash, { backgroundColor: theme.mutedBg }]}
+      onPress={() => { swipe.current?.close(); onRemove(); }}><Ionicons name="trash-outline" size={22} color={theme.textPrimary} /></Pressable> : null}>
+    <View style={{ backgroundColor: theme.cardBg }}>
+      {set.exerciseName && set.exerciseName !== exercise.name ? <Pressable disabled={exercise.readOnly} onPress={onSettings} accessibilityRole="button"><Text style={{ color: theme.text, fontSize: 12 }}>{set.exerciseName}</Text></Pressable> : null}
+      <View style={styles.row}>
+        <Pressable style={styles.number} disabled={exercise.readOnly} onPress={onSettings} accessibilityRole="button"
+          accessibilityLabel={'Set ' + (index + 1) + ' options'} accessibilityHint="Load settings, exercise correction and removal"
+          accessibilityActions={onRemove ? [{ name: 'remove', label: 'Remove set' }] : []}
+          onAccessibilityAction={event => { if (event.nativeEvent.actionName === 'remove' && !exercise.readOnly) onRemove?.(); }}>
+          <Text style={{ color: theme.text }}>{index + 1}</Text>
+        </Pressable>
+        {(['weight', 'reps', 'rpe'] as const).map(field => <View key={field} style={[styles.input, { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.mutedBg, borderColor: theme.border }]}><TextInput
+          style={{ flex: 1, minWidth: 0, textAlign: 'center', fontSize: 15, color: theme.textPrimary, minHeight: 34, padding: 0 }}
+          accessibilityLabel={exercise.name + ', set ' + (index + 1) + ', ' + (field === 'weight' ? (set.loadKind ?? 'external') + ' load in ' + (set.loadUnit ?? 'lb') : field)}
+          editable={!exercise.readOnly && !(field === 'weight' && set.loadKind === 'bodyweight')}
+          value={set[field]} onChangeText={value => onUpdateSet(set.id, field, value)} selectTextOnFocus
+          onFocus={() => { setFocused(true); openRow?.close(); }} onBlur={() => setFocused(false)}
+          keyboardType={field === 'reps' ? 'number-pad' : 'decimal-pad'} placeholder={field === 'weight' && set.loadKind === 'bodyweight' ? 'BW' : '—'} placeholderTextColor={theme.placeholder} />{field === 'weight' && set.loadKind !== 'bodyweight' ? <Text style={{ fontSize: 10, color: theme.text }}>{set.loadKind === 'assistance' ? '−' : ''}{set.loadUnit === 'none' ? '' : set.loadUnit ?? 'lb'}</Text> : null}</View>)}
+        <Pressable style={[styles.check, { backgroundColor: set.logged ? theme.primary : theme.mutedBg, borderColor: theme.border }]}
+          accessibilityRole="checkbox" aria-checked={set.logged} accessibilityLabel={exercise.name + ', set ' + (index + 1) + ' logged'} accessibilityState={{ checked: set.logged, disabled: exercise.readOnly }}
+          disabled={exercise.readOnly} onPress={() => { if (!swiping.current) onUpdateSet(set.id, 'logged', !set.logged); }}>
+          <Ionicons name="checkmark" size={18} color={set.logged ? theme.white : theme.placeholder} />
+        </Pressable>
+      </View>
+    </View>
+  </ReanimatedSwipeable>;
+}
+export default function ExerciseCard({ exercise, onUpdateSet, onPressHistory, onPressSwap, onSetExercise, onRemoveSet, onRemoveExercise, onAddSet }: ExerciseCardProps) {
+  const { theme } = useTheme();
+  const [menu, setMenu] = useState<string | null>(null);
+  const selected = exercise.sets.find(set => set.id === menu);
+  useEffect(() => { if (exercise.readOnly) void Promise.resolve().then(() => setMenu(null)); }, [exercise.readOnly]);
+  const closeThen = (action?: () => void) => { setMenu(null); action?.(); };
+  const button = (label: string, action: () => void) => <Pressable key={label} accessibilityRole="button" style={styles.menuAction} onPress={action}><Text style={{ color: theme.primary }}>{label}</Text></Pressable>;
+  return <View style={[styles.card, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
+    <View style={styles.header}>
+      <View style={{ flex: 1 }}><Text style={[styles.title, { color: theme.textPrimary }]}>{exercise.name}</Text><Text style={{ color: theme.text }}>{exercise.prescription}</Text>
+        {exercise.loadSuggestion ? <Text style={{ color: theme.text, fontSize: 12 }}>{exercise.loadSuggestion}</Text> : null}</View>
+      {!exercise.readOnly && onRemoveExercise ? <Pressable style={styles.icon} accessibilityRole="button" accessibilityLabel={'Remove ' + exercise.name} onPress={onRemoveExercise}><Ionicons name="trash-outline" size={20} color={theme.text} /></Pressable> : null}
+      <Pressable style={styles.icon} accessibilityRole="button" accessibilityLabel={exercise.name + ' options'} onPress={() => setMenu('header')}><Ionicons name="ellipsis-horizontal" size={22} color={theme.text} /></Pressable>
+    </View>
+    <View style={styles.row}><View style={styles.number}><Text style={[styles.column, { color: theme.placeholder }]}>SET</Text></View>
+      <Pressable style={{ flex: 1 }} disabled={exercise.readOnly} onPress={() => setMenu('loads')} accessibilityRole="button" accessibilityLabel="Load and unit settings"><Text style={[styles.column, { color: theme.placeholder }]}>LOAD</Text></Pressable>
+      {['REPS', 'RPE'].map(label => <Text key={label} style={[styles.column, { flex: 1, color: theme.placeholder }]}>{label}</Text>)}<View style={{ width: 44 }} /></View>
+    {exercise.sets.map((set, index) => <SetRow key={set.id} {...{ set, index, exercise, onUpdateSet }} onSettings={() => setMenu(set.id)} onRemove={onRemoveSet ? () => onRemoveSet(set.id) : undefined} />)}
+    {!exercise.readOnly && onAddSet ? button('Add set', onAddSet) : null}
+    <Modal visible={menu !== null} transparent animationType="none" presentationStyle="overFullScreen" onRequestClose={() => setMenu(null)}>
+      <View style={styles.backdrop} accessibilityViewIsModal aria-modal role="dialog"><Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={() => setMenu(null)} />
+        <View style={[styles.sheet, { backgroundColor: theme.surfaceBg, borderColor: theme.border }]}>
+          <ScrollView keyboardShouldPersistTaps="handled">
+            <Text accessibilityRole="header" style={[styles.title, { color: theme.textPrimary }]}>{selected ? 'Set ' + (exercise.sets.indexOf(selected) + 1) : exercise.name}</Text>
+            {menu === 'header' ? <>{onPressHistory ? button('History', () => closeThen(onPressHistory)) : null}
+              {!exercise.readOnly ? button('Swap exercise', () => closeThen(onPressSwap)) : null}
+              {(exercise.imageUrl || exercise.description) ? <ExerciseInfoPanel imageUrl={exercise.imageUrl} description={exercise.description} /> : null}</> : menu === 'loads' ?
+              exercise.sets.map((set, i) => button('Set ' + (i + 1) + ' · ' + (set.loadKind ?? 'external') + ' · ' + (set.loadUnit ?? 'lb'), () => setMenu(set.id))) : selected ? <>
+                <Text style={{ color: theme.text }}>Load type</Text>
+                {(['external', 'assistance', 'bodyweight'] as const).map(kind => button((kind === selected.loadKind ? '✓ ' : '') + kind, () => onUpdateSet(selected.id, 'loadKind', kind)))}
+                {selected.loadKind !== 'bodyweight' ? <><Text style={{ color: theme.text }}>Measurement unit</Text>{(['lb','kg'] as const).map(unit => button((selected.loadUnit === unit ? '✓ ' : '') + unit, () => onUpdateSet(selected.id, 'loadUnit', unit)))}</> : null}
+                {onSetExercise ? button('Change performed exercise', () => closeThen(() => onSetExercise(selected.id))) : null}
+                {onRemoveSet ? button('Remove set', () => closeThen(() => onRemoveSet(selected.id))) : null}
+              </> : null}
+            {button('Close', () => setMenu(null))}
+          </ScrollView>
         </View>
-    );
+      </View>
+    </Modal>
+  </View>;
 }
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
-function createStyles(theme: Theme) {
-    return StyleSheet.create({
-        setAction: { minHeight: 44, justifyContent: 'center' },
-        card: {
-            backgroundColor: theme.cardBg,
-            borderRadius: 20,
-            borderWidth: 1,
-            borderColor: theme.border,
-            padding: 16,
-            marginBottom: 12,
-        },
-        cardCompleted: {
-            borderColor: theme.success,
-            borderWidth: 1.5,
-            opacity: 0.75,
-        },
-
-        header: {
-            flexDirection: "row",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-            marginBottom: 16,
-        },
-        headerLeft: {
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 12,
-            flex: 1,
-        },
-        completionCircle: {
-            width: 28,
-            height: 28,
-            borderRadius: 14,
-            borderWidth: 2,
-            borderColor: theme.border,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: "transparent",
-        },
-        completionCircleDone: {
-            backgroundColor: theme.success,
-            borderColor: theme.success,
-        },
-        exerciseNameWrapper: {
-            flex: 1,
-            flexShrink: 1,
-        },
-        exerciseName: {
-            color: theme.textPrimary,
-            fontSize: 16,
-            fontWeight: "700",
-            marginBottom: 2,
-        },
-        exerciseNameCompleted: {
-            textDecorationLine: "line-through",
-            color: theme.text,
-        },
-        prescription: {
-            color: theme.text,
-            fontSize: 13,
-            fontWeight: "500",
-        },
-        loadSuggestion: {
-            color: theme.secondaryLight,
-            fontSize: 12,
-            fontWeight: "600",
-            marginTop: 3,
-        },
-        actualExerciseLabel: {
-            color: theme.text,
-            fontSize: 12,
-            fontWeight: "600",
-            marginTop: 8,
-        },
-
-        actions: {
-            flexDirection: "row",
-            gap: 8,
-            marginLeft: 8,
-        },
-        actionButton: {
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 4,
-            backgroundColor: theme.mutedBg,
-            borderRadius: 10,
-            paddingHorizontal: 10,
-            paddingVertical: 6,
-            borderWidth: 1,
-            borderColor: theme.border,
-        },
-        actionButtonActive: {
-            borderColor: theme.text,
-        },
-        actionButtonText: {
-            color: theme.text,
-            fontSize: 12,
-            fontWeight: "600",
-        },
-
-        setsTable: {
-            gap: 4,
-        },
-        setRow: {
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 8,
-            paddingVertical: 4,
-        },
-        setRowLogged: {
-            opacity: 0.6,
-        },
-        setNumber: {
-            color: theme.placeholder,
-            fontSize: 14,
-            fontWeight: "600",
-            width: 24,
-            textAlign: "center",
-        },
-        setHeaderSet: {
-            color: theme.placeholder,
-            fontSize: 11,
-            fontWeight: "700",
-            letterSpacing: 0.8,
-            width: 24,
-            textAlign: "center",
-        },
-        setHeaderLabel: {
-            color: theme.placeholder,
-            fontSize: 11,
-            fontWeight: "700",
-            letterSpacing: 0.8,
-            flex: 1,
-            textAlign: "center",
-        },
-        setInput: {
-            flex: 1,
-            backgroundColor: theme.mutedBg,
-            borderRadius: 10,
-            paddingVertical: 8,
-            paddingHorizontal: 4,
-            color: theme.textPrimary,
-            fontSize: 15,
-            fontWeight: "600",
-            textAlign: "center",
-            borderWidth: 1,
-            borderColor: theme.border,
-        },
-        setInputLogged: {
-            backgroundColor: "transparent",
-            borderColor: "transparent",
-            color: theme.text,
-        },
-        logButton: {
-            width: 32,
-            height: 32,
-            borderRadius: 10,
-            backgroundColor: theme.buttonDisabled,
-            alignItems: "center",
-            justifyContent: "center",
-            borderWidth: 1,
-            borderColor: theme.border,
-        },
-        logButtonDone: {
-            backgroundColor: theme.primary,
-            borderColor: theme.primary,
-        },
-        logButtonPlaceholder: {
-            width: 32,
-        },
-    });
-}
+const styles = StyleSheet.create({
+  card: { borderWidth: 1, borderRadius: 20, padding: 16, marginBottom: 12 }, header: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  title: { fontSize: 16, fontWeight: '700' }, icon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  row: { flexDirection: 'row', gap: 8, alignItems: 'center', paddingVertical: 4 }, number: { width: 32, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  column: { fontSize: 11, textAlign: 'center', fontWeight: '700', textAlignVertical: 'center' },
+  input: { flex: 1, minWidth: 0, minHeight: 44, borderWidth: 1, borderRadius: 10, textAlign: 'center', fontSize: 15, padding: 4 },
+  check: { width: 44, height: 44, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  trash: { width: 64, justifyContent: 'center', alignItems: 'center' }, menuAction: { minHeight: 48, justifyContent: 'center' },
+  backdrop: { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-end' }, sheet: { borderWidth: 1, borderRadius: 22, maxHeight: '85%', padding: 24, paddingBottom: 36, boxShadow: '0 -4px 20px rgba(0,0,0,0.15)' },
+});
