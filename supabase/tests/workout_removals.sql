@@ -219,7 +219,44 @@ BEGIN
   END IF;
 END $assert_owner$;
 RESET ROLE;
+DO $removal_security$
+DECLARE f regprocedure;
+BEGIN
+  FOREACH f IN ARRAY ARRAY['public.workout_removal_capability_v1()'::regprocedure,'public.program_removal_state_v1(uuid)'::regprocedure,
+    'public.preview_workout_removal_v1(uuid,uuid,uuid,integer)'::regprocedure,'public.finalize_workout_removals_v1(jsonb)'::regprocedure,'public.correct_workout_removals_v1(jsonb)'::regprocedure] LOOP
+    IF has_function_privilege('anon',f,'EXECUTE') OR NOT has_function_privilege('authenticated',f,'EXECUTE') THEN RAISE EXCEPTION 'incorrect removal entrypoint grants: %',f; END IF;
+  END LOOP;
+  FOREACH f IN ARRAY ARRAY['public.revise_program_removals_v1(jsonb)'::regprocedure,'public.workout_removal_targets(uuid,uuid,uuid,uuid,integer)'::regprocedure,'public.validate_workout_removals(jsonb,jsonb,jsonb,jsonb,uuid,uuid)'::regprocedure] LOOP
+    IF has_function_privilege('anon',f,'EXECUTE') OR has_function_privilege('authenticated',f,'EXECUTE') THEN RAISE EXCEPTION 'private removal helper accessible: %',f; END IF;
+  END LOOP;
+END $removal_security$;
+SET LOCAL ROLE authenticated;
+DO $removal_wrong_owner$
+DECLARE denied boolean;
+BEGIN
+  denied:=false;
+  BEGIN PERFORM public.preview_workout_removal_v1(current_setting('adaptivpush.program')::uuid,current_setting('adaptivpush.day_1')::uuid,current_setting('adaptivpush.slot_1')::uuid,1);
+  EXCEPTION WHEN OTHERS THEN denied:=SQLERRM LIKE '%forbidden%'; END;
+  IF NOT denied THEN RAISE EXCEPTION 'foreign preview accessible'; END IF;
+  denied:=false;
+  BEGIN PERFORM public.program_removal_state_v1(current_setting('adaptivpush.program')::uuid);
+  EXCEPTION WHEN OTHERS THEN denied:=SQLERRM LIKE '%forbidden%'; END;
+  IF NOT denied THEN RAISE EXCEPTION 'foreign removal masks accessible'; END IF;
+END $removal_wrong_owner$;
+RESET ROLE;
 SELECT set_config('request.jwt.claim.sub',current_setting('adaptivpush.user_1'),true);
+DO $shorter_and_ended$
+DECLARE n integer;
+BEGIN
+  UPDATE public.program_day_exercises SET set_count=1 WHERE stable_slot_id=current_setting('adaptivpush.slot_2')::uuid;
+  n:=(public.preview_workout_removal_v1(current_setting('adaptivpush.program')::uuid,current_setting('adaptivpush.day_1')::uuid,current_setting('adaptivpush.slot_1')::uuid,2)->>'futureCount')::integer;
+  IF n<>0 THEN RAISE EXCEPTION 'shorter target substituted a different set'; END IF;
+  UPDATE public.program_day_exercises SET set_count=2 WHERE stable_slot_id=current_setting('adaptivpush.slot_2')::uuid;
+  UPDATE public.programs SET is_active=false WHERE id=current_setting('adaptivpush.program')::uuid;
+  n:=(public.preview_workout_removal_v1(current_setting('adaptivpush.program')::uuid,current_setting('adaptivpush.day_1')::uuid,current_setting('adaptivpush.slot_1')::uuid,1)->>'futureCount')::integer;
+  IF n<>0 THEN RAISE EXCEPTION 'ended program offered targets'; END IF;
+  UPDATE public.programs SET is_active=true WHERE id=current_setting('adaptivpush.program')::uuid;
+END $shorter_and_ended$;
 SET LOCAL ROLE authenticated;
 DO $removals$
 DECLARE payload jsonb; result jsonb; replay jsonb; before_revision uuid; after_revision uuid; rejected boolean; n integer;
@@ -265,6 +302,11 @@ BEGIN
  IF (result->'programRemoval'->>'futureChangedSlotCount')::integer<>1 THEN RAISE EXCEPTION 'exercise not removed'; END IF;
  IF EXISTS(SELECT 1 FROM public.program_days WHERE program_revision_id=(result->'programRemoval'->>'revisionId')::uuid AND is_rest_day) THEN RAISE EXCEPTION 'removal became rest'; END IF;
  IF (SELECT count(*) FROM public.workout_sessions WHERE user_id=current_setting('adaptivpush.user_1')::uuid)<>1 THEN RAISE EXCEPTION 'removal advanced/completed another day'; END IF;
+-- A subsequent legacy swap clone must retain the removal mask.
+ result:=public.revise_program_exercise_v2(jsonb_build_object('operationId',gen_random_uuid(),'programId',current_setting('adaptivpush.program'),
+   'expectedRevision',6,'expectedRevisionId',result->'programRemoval'->>'revisionId','currentStableDayId',current_setting('adaptivpush.day_1'),
+   'currentStableSlotId',current_setting('adaptivpush.slot_1'),'originalExerciseId',current_setting('adaptivpush.exercise_2'),'replacementExerciseId',current_setting('adaptivpush.exercise_1'),'includeCurrentDay',false));
+ IF NOT EXISTS(SELECT 1 FROM public.program_day_exercises WHERE program_revision_id=(result->>'revisionId')::uuid AND stable_slot_id=current_setting('adaptivpush.slot_2')::uuid AND (removal_mask->>'removed')::boolean) THEN RAISE EXCEPTION 'subsequent swap resurrected removed exercise'; END IF;
 END $removals$;
 RESET ROLE;
 ROLLBACK;

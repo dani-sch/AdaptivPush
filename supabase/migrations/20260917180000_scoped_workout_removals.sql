@@ -293,6 +293,8 @@ BEGIN
     END LOOP;
   END IF;
   SELECT * INTO v_parent FROM public.program_days WHERE id=v_session.program_day_id;
+  IF p_payload->'removals' IS NOT NULL AND p_payload->'removals'<>'null'::jsonb AND v_session.prescription_snapshot->'removals' IS NOT NULL
+    AND NOT ((p_payload->'removals') @> (v_session.prescription_snapshot->'removals')) THEN RAISE EXCEPTION 'invalid_input: removed work cannot be restored by an older edit'; END IF;
   PERFORM public.validate_workout_removals(v_session.prescription_snapshot,p_payload->'removals',p_payload->'sets',p_payload->'programRemoval',v_parent.program_id,v_parent.stable_day_id);
   -- Omitted removal metadata from older clients preserves saved tombstones and cannot resurrect results.
   PERFORM public.validate_workout_removals(v_session.prescription_snapshot,v_session.prescription_snapshot->'removals',p_payload->'sets',NULL,v_parent.program_id,v_parent.stable_day_id);
@@ -428,6 +430,10 @@ DECLARE
   v_program_receipt jsonb;
   v_actuals jsonb;
   v_covered integer := 0;
+  v_removals jsonb;
+  v_snapshot jsonb;
+  v_mask jsonb;
+  v_planned jsonb;
 BEGIN
   IF v_user_id IS NULL THEN RAISE EXCEPTION 'unauthenticated'; END IF;
   v_operation_id := (p_payload->>'operationId')::uuid;
@@ -526,9 +532,36 @@ BEGIN
     ELSE 'partial'
   END;
 
+  v_removals:=COALESCE(NULLIF(p_payload->'removals','null'::jsonb),'{"version":1,"slots":[],"sets":[]}'::jsonb);
+  v_snapshot:=p_payload->'frozenPrescription';
+  IF (p_payload->'removals' IS NOT NULL AND p_payload->'removals'<>'null'::jsonb) OR EXISTS(SELECT 1 FROM public.program_day_exercises WHERE program_day_id=v_program_day.id AND removal_mask IS NOT NULL) THEN
+  -- Require original prescription coverage; IDs may be generated locally, positions may not be reassigned.
+  IF jsonb_array_length(v_snapshot->'slots') IS DISTINCT FROM jsonb_array_length(p_payload->'slots') THEN RAISE EXCEPTION 'invalid_input: frozen slot coverage'; END IF;
+  FOR v_slot IN SELECT value FROM jsonb_array_elements(p_payload->'slots') LOOP
+    SELECT value INTO v_planned FROM jsonb_array_elements(v_snapshot->'slots') WHERE value->>'slotId'=v_slot->>'slotId';
+    IF v_planned IS NULL OR v_planned->>'prescribedExerciseId' IS DISTINCT FROM v_slot->>'prescribedExerciseId'
+      OR (v_planned->>'prescribedSetCount')::integer IS DISTINCT FROM (v_slot->>'prescribedSetCount')::integer
+      OR jsonb_array_length(v_planned->'sets') IS DISTINCT FROM (v_slot->>'prescribedSetCount')::integer
+      OR (SELECT count(DISTINCT (t->>'order')::integer) FROM jsonb_array_elements(v_planned->'sets') t WHERE (t->>'order')::integer BETWEEN 1 AND (v_slot->>'prescribedSetCount')::integer) <> (v_slot->>'prescribedSetCount')::integer
+      THEN RAISE EXCEPTION 'invalid_input: frozen set coverage'; END IF;
+    IF EXISTS(SELECT 1 FROM jsonb_array_elements(v_slot->'sets') t WHERE (t->>'order')::integer <= (v_slot->>'prescribedSetCount')::integer AND NOT EXISTS(
+      SELECT 1 FROM jsonb_array_elements(v_planned->'sets') f WHERE f->>'setId'=t->>'setId' AND f->>'order'=t->>'order')) THEN RAISE EXCEPTION 'invalid_input: stable set order'; END IF;
+    SELECT removal_mask INTO v_mask FROM public.program_day_exercises WHERE program_day_id=v_program_day.id AND stable_slot_id=(v_slot->>'slotId')::uuid;
+    IF COALESCE((v_mask->>'removed')::boolean,false) AND NOT (v_removals->'slots') ? (v_slot->>'slotId') THEN
+      v_removals:=jsonb_set(v_removals,'{slots}',(v_removals->'slots')||jsonb_build_array(v_slot->>'slotId'));
+    END IF;
+    FOR v_set IN SELECT value FROM jsonb_array_elements(v_planned->'sets') LOOP
+      IF COALESCE(v_mask->'orders','[]'::jsonb) @> jsonb_build_array((v_set->>'order')::integer) AND NOT EXISTS(
+        SELECT 1 FROM jsonb_array_elements(v_removals->'sets') t WHERE t->>'setId'=v_set->>'setId') THEN
+        v_removals:=jsonb_set(v_removals,'{sets}',(v_removals->'sets')||jsonb_build_array(jsonb_build_object('slotId',v_slot->>'slotId','setId',v_set->>'setId','order',(v_set->>'order')::integer)));
+      END IF;
+    END LOOP;
+  END LOOP;
+  END IF;
+  v_snapshot:=jsonb_set(COALESCE(v_snapshot,'{}'::jsonb),'{removals}',v_removals);
   SELECT COALESCE(jsonb_agg(jsonb_build_object('actualSetId',t->>'setId','prescriptionSlotId',s->>'slotId','order',t->'order')),'[]'::jsonb) INTO v_actuals
     FROM jsonb_array_elements(p_payload->'slots') s,jsonb_array_elements(s->'sets') t WHERE COALESCE((t->>'logged')::boolean,false);
-  PERFORM public.validate_workout_removals(p_payload->'frozenPrescription',p_payload->'removals',v_actuals,p_payload->'programRemoval',v_program_day.program_id,v_program_day.stable_day_id);
+  PERFORM public.validate_workout_removals(v_snapshot,v_removals,v_actuals,p_payload->'programRemoval',v_program_day.program_id,v_program_day.stable_day_id);
   IF p_payload->'programRemoval' IS NOT NULL AND p_payload->'programRemoval'<>'null'::jsonb THEN
     v_program_receipt:=public.revise_program_removals_v1((p_payload->'programRemoval')||jsonb_build_object('operationId',v_operation_id));
   END IF;
@@ -543,7 +576,7 @@ BEGIN
     (p_payload->>'startedAt')::timestamptz, COALESCE((p_payload->>'endedAt')::timestamptz, now()),
     GREATEST(0, COALESCE((p_payload->>'durationMin')::integer, 0)), v_total_volume,
     v_operation_id, v_draft_id, 2, (p_payload->>'revision')::integer, 'finalized',
-    v_completion, v_hash, v_revision.id, (p_payload->'frozenPrescription') || jsonb_build_object('effectiveSlots', p_payload->'slots'),
+    v_completion, v_hash, v_revision.id, v_snapshot || jsonb_build_object('effectiveSlots', p_payload->'slots'),
     NULLIF(p_payload->>'timezone', ''), now()
   );
 
