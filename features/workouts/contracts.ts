@@ -1,6 +1,8 @@
 import { createOperationId, type OperationId } from '../kernel/operationId';
 import { asRevision, nextRevision, type Revision } from '../kernel/revisions';
 
+import { isRemoved, type WorkoutRemovals, type ProgramRemovalRequest } from './removals';
+
 export const WORKOUT_SCHEMA_VERSION = 2 as const;
 export const WORKOUT_POLICY_VERSION = 'workout-finalize-v2' as const;
 
@@ -42,6 +44,7 @@ export interface FrozenPrescriptionSlot {
 }
 
 export interface FrozenWorkoutPrescription {
+  removals?: WorkoutRemovals;
   revisionId: string;
   programDayId: string;
   workoutName: string;
@@ -77,6 +80,8 @@ export interface WorkoutDraftSlot {
 }
 
 export interface WorkoutDraft {
+  removals?: WorkoutRemovals;
+  programRemoval?: ProgramRemovalRequest;
   schemaVersion: typeof WORKOUT_SCHEMA_VERSION;
   policyVersion: typeof WORKOUT_POLICY_VERSION;
   ownerId: string;
@@ -190,6 +195,10 @@ export function updateWorkoutSet(
     reps?: number | null;
     load?: number | null;
     rpe?: number | null;
+    loadKind?: LoadKind;
+    loadUnit?: LoadUnit;
+    actualExerciseId?: string;
+    actualExerciseName?: string;
     logged?: boolean;
     outcome?: SetOutcome;
     loggedAt?: string | null;
@@ -204,13 +213,16 @@ export function updateWorkoutSet(
     ...slot,
     sets: slot.sets.map((set) => {
       if (set.setId !== update.setId) return set;
+      if (isRemoved(draft.removals, slot.slotId, set.setId)) throw new Error('This set was removed.');
       found = true;
       const next = {
         ...set,
         actualReps: update.reps === undefined ? set.actualReps : update.reps,
         actualLoad: update.load === undefined ? set.actualLoad : update.load,
-        loadKind: update.load != null && set.loadKind === 'unknown' ? 'external' as const : set.loadKind,
-        loadUnit: update.load != null && set.loadUnit === 'none' ? 'lb' as const : set.loadUnit,
+        actualExerciseId: update.actualExerciseId ?? set.actualExerciseId,
+        actualExerciseName: update.actualExerciseName ?? set.actualExerciseName,
+        loadKind: update.loadKind ?? (update.load != null && set.loadKind === 'unknown' ? 'external' as const : set.loadKind),
+        loadUnit: update.loadUnit ?? (update.load != null && set.loadUnit === 'none' ? 'lb' as const : set.loadUnit),
         actualRpe: update.rpe === undefined ? set.actualRpe : update.rpe,
         logged: update.logged === undefined ? set.logged : update.logged,
         loggedAt: update.loggedAt === undefined ? set.loggedAt : update.loggedAt,
@@ -229,7 +241,8 @@ export function updateWorkoutSet(
         next.enteredRpeText = '';
         next.loggedAt = null;
       }
-      if (next.logged) {
+      if (update.loadKind === 'bodyweight') { next.actualLoad = null; next.enteredLoadText = ''; next.loadUnit = 'none'; }
+      if (next.logged && update.logged === true) {
         if (!Number.isInteger(next.actualReps) || (next.actualReps ?? 0) <= 0) {
           throw new Error('Enter positive whole-number reps before logging this set.');
         }
@@ -315,7 +328,7 @@ export function validateWorkoutDraft(draft: WorkoutDraft): { ok: boolean; errors
     if (!slot.slotId || !slot.prescribedExerciseId || !slot.actualExerciseId) {
       errors.push('Every slot requires stable prescription and actual exercise identity.');
     }
-    if (slot.sets.length !== slot.prescribedSetCount) {
+    if (slot.sets.length < slot.prescribedSetCount) {
       errors.push(`Slot ${slot.slotId || '(unknown)'} does not preserve its prescribed set count.`);
     }
     for (const set of slot.sets) {
@@ -323,6 +336,9 @@ export function validateWorkoutDraft(draft: WorkoutDraft): { ok: boolean; errors
       setIds.add(set.setId);
       if (set.logged && (!Number.isInteger(set.actualReps) || (set.actualReps ?? 0) <= 0)) {
         errors.push(`Logged set ${set.setId} requires positive integer reps.`);
+      }
+      if (set.logged && (set.loadKind === 'external' || set.loadKind === 'assistance') && (set.actualLoad === null || set.loadUnit === 'none')) {
+        errors.push(`Logged set ${set.setId} requires a load and measurement unit.`);
       }
       if (set.actualLoad !== null && (!Number.isFinite(set.actualLoad) || set.actualLoad < 0)) {
         errors.push(`Set ${set.setId} has an invalid actual load.`);
@@ -351,7 +367,9 @@ export function workoutFinalizationPayload(draft: WorkoutDraft, endedAt: string)
     endedAt,
     durationMin: Math.max(0, Math.round((ended - started) / 60_000)),
     timezone: draft.timezone,
-    frozenPrescription: { ...draft.frozenPrescription, effectiveSlots: draft.slots },
+    frozenPrescription: { ...draft.frozenPrescription, effectiveSlots: draft.slots, removals: draft.removals },
+    removals: draft.removals,
+    programRemoval: draft.programRemoval,
     slots: draft.slots,
   };
 }

@@ -24,7 +24,7 @@ export function createWorkoutCorrectionRepository(client: SupabaseClient): Worko
       }
       const { ownerId: _ownerId, ...payload } = request;
       const { data, error } = await runSupabaseOperation(
-        (signal) => client.rpc('correct_completed_workout_v1', { p_payload: payload })
+        (signal) => client.rpc(request.removals || request.programRemoval ? 'correct_workout_removals_v1' : 'correct_completed_workout_v1', { p_payload: payload })
           .setHeader('Authorization', `Bearer ${session.access_token}`)
           .abortSignal(signal),
         { kind: 'write', operation: 'workout.correct_completed' },
