@@ -1,15 +1,24 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { FrozenWorkoutPrescription } from './contracts';
 import type { CompletedWorkoutSetCorrection } from './correctionContracts';
-import { classifySupabaseError } from '@/utils/supabaseResilience';
+import { classifySupabaseError, reportSupabaseFailure, supabaseUserMessage } from '@/utils/supabaseResilience';
 
-export const CORRECTIONS_UNAVAILABLE = 'This workout can be viewed, but updates are temporarily unavailable.';
+export const CORRECTIONS_UNAVAILABLE = 'This workout can be viewed. The server does not yet support workout updates.';
 
 export async function workoutCorrectionsAvailable(client: SupabaseClient): Promise<boolean> {
-  const capability = await client.rpc('workout_correction_capability_v1');
-  if (!capability.error) return capability.data === 2;
-  if (classifySupabaseError(capability.error).category !== 'schema_unavailable') console.warn('[workout.capability]', capability.error.code);
-  return false;
+  return await workoutCorrectionIssue(client) === null;
+}
+
+async function workoutCorrectionIssue(client: SupabaseClient): Promise<string | null> {
+  try {
+    const capability = await client.rpc('workout_correction_capability_v1');
+    if (!capability.error) return capability.data === 2 ? null : CORRECTIONS_UNAVAILABLE;
+    throw capability.error;
+  } catch (error) {
+    if (classifySupabaseError(error).category === 'schema_unavailable') return CORRECTIONS_UNAVAILABLE;
+    reportSupabaseFailure('workout.capability', error);
+    return supabaseUserMessage(error, 'Workout updates could not be checked. Reload to try again.');
+  }
 }
 
 export async function loadCompletedWorkout(client: SupabaseClient, ownerId: string, sessionId: string) {
@@ -22,14 +31,22 @@ export async function loadCompletedWorkout(client: SupabaseClient, ownerId: stri
     .select('*').eq('session_id', sessionId).order('set_number');
   if (setsError) throw setsError;
   // A read-only capability function confirms the RPC and snapshot-outcome contract together.
-  const canCorrect = await workoutCorrectionsAvailable(client) && session.correction_revision !== undefined && session.lifecycle === 'finalized';
+  const capabilityIssue = await workoutCorrectionIssue(client);
+  const correctionIssue = session.lifecycle !== 'finalized'
+    ? 'Only finalized workouts can be updated.'
+    : !Number.isInteger(session.correction_revision) || session.correction_revision < 0
+      ? 'This workout is missing the revision information required for safe updates.'
+      : capabilityIssue;
+  const canCorrect = correctionIssue === null;
   const sets: CompletedWorkoutSetCorrection[] = (rows ?? []).map(row => ({
     actualSetId: row.actual_set_id ?? row.id, prescriptionSlotId: row.prescription_slot_id ?? null,
     prescribedExerciseId: row.prescribed_exercise_id ?? null, exerciseId: row.exercise_id,
     order: row.order_index ?? row.set_number, reps: row.reps,
     loadValue: row.load_value == null ? row.weight_lb == null ? null : Number(row.weight_lb) : Number(row.load_value),
-    loadKind: row.load_kind ?? 'external', loadUnit: row.load_unit ?? 'lb', loadSide: row.load_side ?? 'unknown',
+    loadKind: row.load_kind ?? 'external',
+    loadUnit: row.load_kind === 'bodyweight' || row.load_kind === 'unknown' ? 'none' : row.load_unit ?? 'lb',
+    loadSide: row.load_side ?? 'unknown',
     rpe: row.rpe == null ? null : Number(row.rpe), loggedAt: row.logged_at ?? session.ended_at,
   }));
-  return { session, snapshot: session.prescription_snapshot as FrozenWorkoutPrescription | null, sets, canCorrect };
+  return { session, snapshot: session.prescription_snapshot as FrozenWorkoutPrescription | null, sets, canCorrect, correctionIssue };
 }
