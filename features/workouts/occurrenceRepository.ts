@@ -5,6 +5,23 @@ import { classifySupabaseError, reportSupabaseFailure, supabaseUserMessage } fro
 
 export const CORRECTIONS_UNAVAILABLE = 'This workout can be viewed. The server does not yet support workout updates.';
 
+/** Stable pagination includes the complete catalog, including detailed card metadata. */
+export async function loadExercisePickerCatalog(client: SupabaseClient, muscleGroup?: string, isCurrent = () => true) {
+  const rows: { id: string; name: string; primary_muscle: string; equipment: string; image_url: string | null; instructions: string[] | null }[] = [];
+  const pageSize = 500;
+  for (let offset = 0; isCurrent(); offset += pageSize) {
+    let query = client.from('exercises').select('id, name, primary_muscle, equipment, image_url, instructions')
+      .order('name').order('id').range(offset, offset + pageSize - 1);
+    if (muscleGroup) query = query.eq('primary_muscle', muscleGroup);
+    const page = await query;
+    if (!isCurrent()) return [];
+    if (page.error) throw page.error;
+    rows.push(...page.data);
+    if (page.data.length < pageSize) return rows;
+  }
+  return [];
+}
+
 export async function loadCorrectionCatalog(client: SupabaseClient) {
   const data: { id: string; name: string }[] = [];
   const pageSize = 500;

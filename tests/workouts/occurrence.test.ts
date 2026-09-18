@@ -183,6 +183,49 @@ test('missing correction RPC returns an honest unavailable result and retains ex
   assert.deepEqual(saved, request);
 });
 
+import { loadExercisePickerCatalog } from '../../features/workouts/occurrenceRepository';
+import { InteractionScope } from '../../features/workouts/swapInteraction';
+
+test('detailed Add catalog loads every page and metadata without muscle or exclusion filters', async () => {
+  const rows = Array.from({ length: 1500 }, (_, i) => ({ id: String(i), name: `Exercise ${i}`,
+    primary_muscle: i % 2 ? 'Chest' : 'Back', equipment: 'Barbell', image_url: 'https://example.test/exercise.png', instructions: ['First step', 'Second step'] }));
+  const ranges: number[][] = []; const orders: string[] = []; let columns = '';
+  const query = { select: (value: string) => { columns = value; return query; },
+    order: (value: string) => { orders.push(value); return query; },
+    range: (start: number, end: number) => { ranges.push([start, end]); return Promise.resolve({ data: rows.slice(start, end + 1), error: null }); } };
+  const loaded = await loadExercisePickerCatalog({ from: () => query } as unknown as SupabaseClient);
+  assert.deepEqual(loaded, rows);
+  assert.deepEqual(ranges, [[0, 499], [500, 999], [1000, 1499], [1500, 1999]]);
+  assert.deepEqual(orders, ['name', 'id', 'name', 'id', 'name', 'id', 'name', 'id']);
+  assert.match(columns, /image_url, instructions/);
+});
+
+test('late page failure does not offer a silently truncated Add list', async () => {
+  const failure = new Error('page unavailable');
+  const query = { select: () => query, order: () => query, range: async (start: number) => start === 0
+    ? { data: Array.from({ length: 500 }, (_, i) => ({ id: String(i), name: 'Press' })), error: null }
+    : { data: null, error: failure } };
+  await assert.rejects(loadExercisePickerCatalog({ from: () => query } as unknown as SupabaseClient), /page unavailable/);
+});
+
+test('closing a catalog request prevents stale results and stops remaining pagination', async () => {
+  const scope = new InteractionScope(); let pageCount = 0; let resolve!: (value: unknown) => void;
+  const request = new Promise(done => { resolve = done; });
+  const query = { select: () => query, order: () => query, range: () => { pageCount++; return request; } };
+  const loaded = loadExercisePickerCatalog({ from: () => query } as unknown as SupabaseClient, undefined, scope.capture());
+  scope.invalidate();
+  resolve({ data: Array.from({ length: 500 }, (_, i) => ({ id: String(i), name: 'Press' })), error: null });
+  assert.deepEqual(await loaded, []); assert.equal(pageCount, 1);
+});
+
+test('detailed Swap catalog preserves the requested muscle filter', async () => {
+  const filters: string[][] = [];
+  const query = { select: () => query, order: () => query, range: () => query,
+    eq: (column: string, value: string) => { filters.push([column, value]); return Promise.resolve({ data: [], error: null }); } };
+  assert.deepEqual(await loadExercisePickerCatalog({ from: () => query } as unknown as SupabaseClient, 'Chest'), []);
+  assert.deepEqual(filters, [['primary_muscle', 'Chest']]);
+});
+
 test('finalization is separate from prescription fulfillment', () => {
   assert.equal(isPrescriptionFulfilled('partial'), false);
   assert.equal(isPrescriptionFulfilled('abandoned'), false);

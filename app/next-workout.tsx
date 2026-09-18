@@ -1,5 +1,5 @@
-import { createWorkoutEditingState, parseEntry } from '@/features/workouts/editingState';
-import { addWorkoutExercise, addWorkoutSet, composeProgramSwap } from '@/features/workouts/structure';
+import { createWorkoutEditingState, resolveWorkoutEditingSession, parseEntry } from '@/features/workouts/editingState';
+import { addWorkoutExerciseWithScope, addWorkoutSet, composeProgramSwap } from '@/features/workouts/structure';
 import { useWorkoutStructure } from '@/hooks/useWorkoutStructure';
 import { previewAddition } from '@/features/workouts/structureRepository';
 import { preserveWorkoutRecovery } from '@/features/workouts/recoveryStorage';
@@ -14,7 +14,7 @@ import { AppAlert as Alert } from '@/components/ui/AppDialog';
 import { draftToExercises } from '@/features/workouts/workoutPresentation';
 import { haptic, Haptics } from "@/utils/haptic";
 import { ExerciseHistoryModal } from "@/components/ExerciseHistoryModal";
-import { SwapExerciseModal } from "@/components/SwapExerciseModal";
+import { SwapExerciseModal, type AddExerciseSelection } from "@/components/SwapExerciseModal";
 import { useCurrentProgram } from "@/hooks/useCurrentProgram";
 import type { CurrentProgram, ProgramWorkout } from "@/types/program";
 import { supabase } from "@/utils/supabase";
@@ -24,7 +24,6 @@ import {
   amendWorkoutExercise,
   createWorkoutDraft,
   updateWorkoutSet,
-  validateWorkoutDraft,
   type WorkoutDraft,
 } from "@/features/workouts/contracts";
 import { finalizeWorkout } from "@/features/workouts/commands";
@@ -32,6 +31,7 @@ import { externalActualSets } from "@/features/workouts/actualLoads";
 import { workoutDraftStore } from "@/features/workouts/draftStore";
 import {
   draftLookupForRoute,
+  resumableWorkoutDraftMatches,
   resolveProgramWorkout,
   workoutAvailability,
   type WorkoutRouteTarget,
@@ -48,7 +48,6 @@ import {
   workoutSwapOperationStore,
 } from '@/features/workouts/swapOperationStore';
 import {
-  isNoFutureWorkoutsDetail,
   confirmedSwapMessage,
   workoutOnlyReconciliationStep,
   workoutSwapSyncDisposition,
@@ -162,7 +161,12 @@ export default function NextWorkoutScreen() {
     stableDayId?: string;
     programDayId?: string;
   }>();
-  const { program, loading, refresh, failureCategory } = useCurrentProgram();
+  const auth = useAuth();
+  const authLoading = auth.phase === 'hydrating';
+  const ownerId = auth.ownerId;
+  const { program: loadedProgram, ownerId: programOwnerId, loading: programLoading, refresh, failureCategory } = useCurrentProgram();
+  const program = programOwnerId === ownerId ? loadedProgram : null;
+  const loading = programLoading || Boolean(ownerId && programOwnerId !== ownerId);
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const routeTarget = useMemo<WorkoutRouteTarget>(() => ({
@@ -181,13 +185,11 @@ export default function NextWorkoutScreen() {
   const removalCapability = useRemovalCapability();
   const canRemove = removalCapability.available;
   const structure = useWorkoutStructure();
-  const [addition, setAddition] = useState<{ id: string; name: string } | null>(null);
-  const [additionPreview, setAdditionPreview] = useState<RemovalPreview>();
+  const [additionTarget, setAdditionTarget] = useState<string | null>(null);
   const [removal, setRemoval] = useState<RemovalSelection | null>(null);
   const [removalPreview, setRemovalPreview] = useState<RemovalPreview>();
   const [setPicker, setSetPicker] = useState<string | null>(null);
-  const additionRequest = useRef(0);
-  const closeSetPicker = () => { additionRequest.current++; setAddition(null); setSetPicker(null); };
+  const closeSetPicker = () => setSetPicker(null);
   const [setCatalog, setSetCatalog] = useState<{ id: string; name: string }[]>([]);
   const [setSearch, setSetSearch] = useState('');
   const ownerIdRef = useRef<string | null>(null);
@@ -196,9 +198,6 @@ export default function NextWorkoutScreen() {
   const setDraft = useCallback((value: WorkoutDraft | null) => { editingState.replace(value); renderDraft(value); }, [editingState]);
   const exercises = useMemo(() => draft ? draftToExercises(draft, programWorkout ?? undefined) : [], [draft, programWorkout]);
   const [draftLoading, setDraftLoading] = useState(true);
-  const auth = useAuth();
-  const authLoading = auth.phase === 'hydrating';
-  const ownerId = auth.ownerId;
   useEffect(() => { ownerIdRef.current = ownerId; }, [ownerId]);
   const [resolutionAttempt, setResolutionAttempt] = useState(0);
   const [resolvedTargetKey, setResolvedTargetKey] = useState<string | null>(null);
@@ -262,109 +261,102 @@ export default function NextWorkoutScreen() {
       setSyncMessage(null);
       setDraftLoading(true);
       setResolvedTargetKey(null);
+      pendingSwapRef.current = null;
+      setPendingSwap(null);
+      swapSyncGenerationRef.current++;
     }
     if (authLoading) return () => { cancelled = true; };
-    if (editingState.read()) return () => { cancelled = true; };
     (async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      setDraftLoading(true);
       let settled = false;
       try {
         if (!ownerId) throw new Error('Sign in to restore this workout draft.');
-        await preserveWorkoutRecovery(ownerId);
         const lookup = draftLookupForRoute(routeTarget, programWorkout ?? undefined);
-        const stored = await workoutDraftStore.loadMatching(ownerId, lookup);
-        const completedSessionId = programWorkout?.sessionId ?? stored?.finalizedReceipt?.sessionId;
-        if (completedSessionId) {
-          settled = true;
-          if (!cancelled) router.replace({ pathname: '/edit-workout', params: { sessionId: completedSessionId } });
-          return;
-        }
-        if (stored) {
-          const validation = validateWorkoutDraft(stored, false);
-          if (!validation.ok) {
-            throw new Error(`Stored workout draft is invalid. ${validation.errors.join(' ')}`);
-          }
-          settled = true;
-          if (cancelled || !editingState.hydrate(resolutionTargetKey, stored)) return;
-          renderDraft(stored);
-          setElapsed(Math.max(0, Math.floor((Date.now() - new Date(stored.startedAt).getTime()) / 1000)));
-          
-          setWorkoutName(stored.workoutName);
-          setResolutionError(null);
-          const recoveredSwap = await workoutSwapOperationStore.load(stored.ownerId, stored.draftId);
-          if (recoveredSwap && isNoFutureWorkoutsDetail(recoveredSwap.lastError)) {
-            await workoutSwapOperationStore.removeIfCurrent(
-              recoveredSwap.ownerId,
-              recoveredSwap.draftId,
-              recoveredSwap.pendingId,
-            );
-            if (!cancelled) setPendingSwap(null);
-          } else if (!cancelled) {
-            setPendingSwap(recoveredSwap);
-          }
-          if (stored.lifecycle === 'finalized') setSyncMessage('This workout is already finalized.');
-          return;
-        }
-        if (loading) return;
-        settled = true;
-        if (failureCategory) throw new Error(supabaseUserMessage({ category: failureCategory, retryable: false }, 'The plan could not be loaded. Check your connection and refresh.'));
-        const entryIssue = workoutEntryIssue(program, programWorkout);
-        if (entryIssue) throw new Error(entryIssue);
-        if (!program || !programWorkout?.prescriptionRevisionId || !programWorkout.stableDayId) {
-          throw new Error('Return to Plan and select a current workout.');
-        }
-        if (programWorkout.exercises.length === 0) {
-          throw new Error('This requested workout has no exercise prescription. Refresh the plan and try again.');
-        }
-        let nextDraft = createWorkoutDraft({
-          ownerId,
-          programId: program.id,
-          programDayId: programWorkout.id,
-          stableDayId: programWorkout.stableDayId,
-          prescriptionRevisionId: programWorkout.prescriptionRevisionId,
-          workoutName: programWorkout.name,
-          startedAt: new Date().toISOString(),
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-          slots: programWorkout.exercises.map((exercise, slotIndex) => {
-            if (!exercise.exerciseId) throw new Error(`${exercise.name} has no catalog exercise identity.`);
-            const repMatch = (exercise.reps ?? '8-12').match(/(\d+)\D+(\d+)/);
-            const min = Number(repMatch?.[1] ?? 8);
-            const max = Number(repMatch?.[2] ?? min);
-            const setCount = exercise.sets ?? 3;
-            return {
-              slotId: exercise.stableSlotId ?? exercise.id,
-              prescribedExerciseId: exercise.exerciseId,
-              exerciseName: exercise.name,
-              order: slotIndex + 1,
-              prescribedSetCount: setCount,
-              sets: Array.from({ length: setCount }, (_, setIndex) => {
-                const plannedLoad = exercise.perSetWeights?.[setIndex] ?? exercise.weight ?? null;
+        const result = await resolveWorkoutEditingSession({
+          state: editingState,
+          key: resolutionTargetKey,
+          isCurrent: () => !cancelled,
+          matches: value => resumableWorkoutDraftMatches(value, ownerId, lookup),
+          completedSessionId: programWorkout?.sessionId,
+          installed: value => {
+            renderDraft(value);
+            setElapsed(Math.max(0, Math.floor((Date.now() - new Date(value.startedAt).getTime()) / 1000)));
+            setWorkoutName(value.workoutName);
+          },
+          recover: value => workoutSwapOperationStore.load(value.ownerId, value.draftId),
+          load: async () => {
+            await preserveWorkoutRecovery(ownerId);
+            const stored = await workoutDraftStore.loadMatching(ownerId, lookup);
+            if (stored) return stored;
+            if (loading) return null;
+            if (failureCategory) throw new Error(supabaseUserMessage({ category: failureCategory, retryable: false }, 'The plan could not be loaded. Check your connection and refresh.'));
+            const entryIssue = workoutEntryIssue(program, programWorkout);
+            if (entryIssue) throw new Error(entryIssue);
+            if (!program || !programWorkout?.prescriptionRevisionId || !programWorkout.stableDayId) {
+              throw new Error('Return to Plan and select a current workout.');
+            }
+            if (programWorkout.exercises.length === 0) {
+              throw new Error('This requested workout has no exercise prescription. Refresh the plan and try again.');
+            }
+            let nextDraft = createWorkoutDraft({
+              ownerId,
+              programId: program.id,
+              programDayId: programWorkout.id,
+              stableDayId: programWorkout.stableDayId,
+              prescriptionRevisionId: programWorkout.prescriptionRevisionId,
+              workoutName: programWorkout.name,
+              startedAt: new Date().toISOString(),
+              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+              slots: programWorkout.exercises.map((exercise, slotIndex) => {
+                if (!exercise.exerciseId) throw new Error(`${exercise.name} has no catalog exercise identity.`);
+                const repMatch = (exercise.reps ?? '8-12').match(/(\d+)\D+(\d+)/);
+                const min = Number(repMatch?.[1] ?? 8);
+                const max = Number(repMatch?.[2] ?? min);
+                const setCount = exercise.sets ?? 3;
                 return {
-                  setId: createOperationId(),
-                  order: setIndex + 1,
-                  plannedRepsMin: min,
-                  plannedRepsMax: max,
-                  plannedLoad,
-                  ...entryLoadDefaults(exercise.loadKind ?? (exercise.equipment === 'Bodyweight' ? 'bodyweight' : 'external'), exercise.loadUnit),
-                  loadSide: exercise.loadSide ?? 'unknown',
+                  slotId: exercise.stableSlotId ?? exercise.id,
+                  prescribedExerciseId: exercise.exerciseId,
+                  exerciseName: exercise.name,
+                  order: slotIndex + 1,
+                  prescribedSetCount: setCount,
+                  sets: Array.from({ length: setCount }, (_, setIndex) => {
+                    const plannedLoad = exercise.perSetWeights?.[setIndex] ?? exercise.weight ?? null;
+                    return {
+                      setId: createOperationId(),
+                      order: setIndex + 1,
+                      plannedRepsMin: min,
+                      plannedRepsMax: max,
+                      plannedLoad,
+                      ...entryLoadDefaults(exercise.loadKind ?? (exercise.equipment === 'Bodyweight' ? 'bodyweight' : 'external'), exercise.loadUnit),
+                      loadSide: exercise.loadSide ?? 'unknown',
+                    };
+                  }),
                 };
               }),
-            };
-          }),
+            });
+            const removals = emptyRemovals();
+            for (const exercise of programWorkout.exercises) {
+              const mask = exercise.removalMask; const slot = nextDraft.slots.find(s => s.slotId === (exercise.stableSlotId ?? exercise.id));
+              if (!mask || !slot) continue;
+              if (mask.removed) removals.slots.push(slot.slotId);
+              for (const set of slot.sets) if (mask.orders.includes(set.order)) removals.sets.push({ slotId: slot.slotId, setId: set.setId, order: set.order });
+            }
+            if (removals.slots.length || removals.sets.length) nextDraft = { ...nextDraft, removals };
+            if (!editingState.isTarget(resolutionTargetKey)) return null;
+            await workoutDraftStore.save(nextDraft);
+            return nextDraft;
+          },
         });
-        const removals = emptyRemovals();
-        for (const exercise of programWorkout.exercises) {
-          const mask = exercise.removalMask; const slot = nextDraft.slots.find(s => s.slotId === (exercise.stableSlotId ?? exercise.id));
-          if (!mask || !slot) continue;
-          if (mask.removed) removals.slots.push(slot.slotId);
-          for (const set of slot.sets) if (mask.orders.includes(set.order)) removals.sets.push({ slotId: slot.slotId, setId: set.setId, order: set.order });
+        if (result.status === 'cancelled' || result.status === 'waiting') return;
+        settled = true;
+        if (result.status === 'completed') {
+          router.replace({ pathname: '/edit-workout', params: { sessionId: result.sessionId } });
+          return;
         }
-        if (removals.slots.length || removals.sets.length) nextDraft = { ...nextDraft, removals };
-        await workoutDraftStore.save(nextDraft);
-        if (cancelled || !editingState.hydrate(resolutionTargetKey, nextDraft)) return;
-        renderDraft(nextDraft);
-        setElapsed(Math.max(0, Math.floor((Date.now() - new Date(nextDraft.startedAt).getTime()) / 1000)));
-        
-        setWorkoutName(nextDraft.workoutName);
+        pendingSwapRef.current = result.recovery;
+        setPendingSwap(result.recovery);
         setResolutionError(null);
       } catch (error) {
         settled = true;
@@ -381,7 +373,9 @@ export default function NextWorkoutScreen() {
 
   const availability = workoutAvailability({
     authLoading,
-    programLoading: loading || draftLoading || resolvedTargetKey !== resolutionTargetKey,
+    programLoading: loading,
+    resolutionLoading: draftLoading || resolvedTargetKey !== resolutionTargetKey,
+    resolutionError,
     program,
     programWorkout,
     draft,
@@ -491,25 +485,35 @@ export default function NextWorkoutScreen() {
     } catch (error) { setSyncMessage(error instanceof Error ? error.message : 'Removal could not be saved. Try again.'); }
     finally { removalBusyRef.current = false; setRemovalBusy(false); }
   };
-  const confirmAddition = async (wholeProgram: boolean) => {
+  const loadAdditionScope = useCallback(async () => {
     const current = editingState.read();
-    if (!current || !addition || removalBusyRef.current || !structure.available) return;
+    if (!current || current.ownerId !== ownerId || !editingState.isTarget(resolutionTargetKey)) throw new Error('Workout changed. Reopen Add exercise.');
+    return previewAddition(current.programId, current.stableDayId);
+  }, [editingState, ownerId, resolutionTargetKey]);
+
+  const confirmAddition = async ({ exercise, scope, preview, isCurrent }: AddExerciseSelection) => {
+    const current = editingState.read();
+    if (!isCurrent() || !current || current.ownerId !== ownerId || !canFinishWorkout || removalBusyRef.current || !structure.available) return false;
+    const wholeProgram = scope === 'rest_of_program';
+    const next = addWorkoutExerciseWithScope(current, exercise, wholeProgram, preview);
     removalBusyRef.current = true; setRemovalBusy(true);
+    // Commit the selected local edit synchronously. A later save completion cannot
+    // replace typing, close a reopened picker, or install it in another account.
+    setDraft(next);
     try {
-      const next = addWorkoutExercise(current, addition); const slot = next.slots.at(-1)!;
-      if (wholeProgram) {
-        next.removals ??= emptyRemovals();
-        if (!additionPreview?.futureCount) throw new Error('No eligible future workouts.');
-        if (current.programRemoval && current.programRemoval.expectedRevisionId !== additionPreview.expectedRevisionId) throw new Error('The program changed. Your existing changes are preserved.');
-        next.programRemoval = { ...additionPreview, ...current.programRemoval, targets: current.programRemoval?.targets ?? [],
-          additions: [...(current.programRemoval?.additions ?? []), { slotId: slot.slotId, exerciseId: addition.id, setCount: 1 }] };
-      }
       await persistDraft(next);
-      if (ownerIdRef.current !== current.ownerId) return;
-      setDraft(next); setAddition(null); setSetPicker(null);
-      setSyncMessage(wholeProgram ? 'Exercise added. Future occurrences update together when you Finish.' : 'Exercise added to this workout.');
-    } catch (error) { setSyncMessage(error instanceof Error ? error.message : 'Addition could not be saved.'); }
-    finally { removalBusyRef.current = false; setRemovalBusy(false); }
+      if (isCurrent() && ownerIdRef.current === current.ownerId) {
+        setSyncMessage(wholeProgram ? 'Exercise added. Future occurrences update together when you Finish.' : 'Exercise added to this workout.');
+      }
+    } catch {
+      if (ownerIdRef.current === current.ownerId && editingState.isTarget(resolutionTargetKey)) {
+        setSyncMessage('Exercise added locally, but could not be saved on this device. Keep this workout open and retry saving.');
+      }
+    } finally {
+      removalBusyRef.current = false;
+      setRemovalBusy(false);
+    }
+    return true;
   };
   const toggleExerciseComplete = (exerciseId: string) => {
     const draft = editingState.read();
@@ -791,7 +795,7 @@ export default function NextWorkoutScreen() {
 
   const handleFinish = async () => {
     const draft = editingState.read();
-    if (!auth.canRequest || saving || removalBusyRef.current || pendingSwapRef.current) return;
+    if (!canFinishWorkout || removalBusyRef.current || pendingSwapRef.current) return;
     if (intervalRef.current) clearInterval(intervalRef.current);
     setShowFinishModal(false);
     setSaving(true);
@@ -942,7 +946,8 @@ export default function NextWorkoutScreen() {
               onPress={() => {
                 setDraftLoading(true);
                 setResolutionError(null);
-                void refresh().finally(() => setResolutionAttempt((attempt) => attempt + 1));
+                setResolutionAttempt((attempt) => attempt + 1);
+                void refresh();
               }}
               accessibilityRole="button"
               accessibilityLabel="Retry requested workout"
@@ -958,7 +963,7 @@ export default function NextWorkoutScreen() {
     );
   }
 
-  if (availability === 'loading' && exercises.length === 0) {
+  if (availability === 'loading') {
     return (
       <SafeAreaView style={styles.safeArea} edges={["top"]}>
         <View style={styles.loadingContainer}>
@@ -1067,10 +1072,9 @@ export default function NextWorkoutScreen() {
           ))}
 
           <Pressable accessibilityRole="button" accessibilityLabel="Add exercise"
-            disabled={!draft || !structure.available || saving || removalBusy || Boolean(pendingSwap) || Boolean(draft?.finalizationEndedAt) || draft?.lifecycle === 'finalized'}
+            disabled={!canFinishWorkout || !draft || !structure.available || saving || removalBusy || Boolean(pendingSwap) || Boolean(draft?.finalizationEndedAt) || draft?.lifecycle === 'finalized'}
             style={styles.secondaryButton} onPress={() => {
-              additionRequest.current++; setAddition(null); setSetSearch(''); setSetPicker('add');
-              void loadCorrectionCatalog(supabase).then(result => setSetCatalog(result.data ?? []));
+              setAdditionTarget(resolutionTargetKey);
             }}><Text style={styles.secondaryButtonText}>Add exercise</Text></Pressable>
           {!structure.available ? <Pressable accessibilityRole="button" onPress={structure.retry}><Text style={styles.syncBannerText}>{structure.message} Tap to retry.</Text></Pressable> : null}
           <Pressable
@@ -1102,25 +1106,18 @@ export default function NextWorkoutScreen() {
       </KeyboardAvoidingView>
 
       <RemovalScopeSheet selection={removal} busy={saving || removalBusy} onCancel={() => { if (!removalBusyRef.current) setRemoval(null); }} onConfirm={whole => void confirmRemoval(whole)} />
+      <Modal visible={additionTarget === resolutionTargetKey} transparent animationType="none" onRequestClose={() => setAdditionTarget(null)}>
+        {additionTarget === resolutionTargetKey ? <SwapExerciseModal
+          mode="add" onClose={() => setAdditionTarget(null)} loadAdditionScope={loadAdditionScope} onAdd={confirmAddition}
+        /> : null}
+      </Modal>
       <Modal visible={setPicker !== null} transparent animationType="none" onRequestClose={closeSetPicker}>
         <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'transparent' }}><View style={{ maxHeight: '80%', padding: 24, backgroundColor: theme.surfaceBg, borderWidth: 1, borderColor: theme.border }} accessibilityViewIsModal>
-          {addition ? <View>
-            <Text style={{ color: theme.textPrimary }}>Add {addition.name}</Text>
-            <Text style={{ color: theme.text }}>One blank set. Whole program includes this workout and {additionPreview?.futureCount ?? 0} later uncompleted occurrences of this day.</Text>
-            {(['This workout only', 'Whole program — this day'] as const).map((label, index) => <Pressable key={label} accessibilityRole="button" disabled={removalBusy || (index === 1 && !additionPreview?.futureCount)} style={{ minHeight: 48 }} onPress={() => void confirmAddition(index === 1)}><Text style={{ color: theme.primary }}>{label}</Text></Pressable>)}
-          </View> : <>
           <TextInput accessibilityLabel="Search exercises" style={{ color: theme.textPrimary, minHeight: 48 }} value={setSearch} onChangeText={setSetSearch} placeholder="Search exercises" />
           <ScrollView keyboardShouldPersistTaps="handled">{setCatalog.filter(e => e.name.toLowerCase().includes(setSearch.toLowerCase())).map(e => <Pressable key={e.id} accessibilityRole="button" style={{ minHeight: 48, justifyContent: 'center' }} onPress={() => {
-            if (setPicker === 'add') {
-              const current = editingState.read(); if (!current || removalBusy) return;
-              const request = ++additionRequest.current;
-              setRemovalBusy(true);
-              void previewAddition(current.programId, current.stableDayId).then(preview => { if (request === additionRequest.current && ownerIdRef.current === current.ownerId) { setAdditionPreview(preview); setAddition(e); } }).catch(() => { if (request === additionRequest.current) setSyncMessage('Addition scope could not be checked. Reconnect and retry.'); }).finally(() => setRemovalBusy(false));
-              return;
-            }
             if (draft && setPicker && !saving && !removalBusyRef.current && !pendingSwap && !draft.finalizationEndedAt && draft.lifecycle !== 'finalized') { const next = updateWorkoutSet(draft, { setId: setPicker, actualExerciseId: e.id, actualExerciseName: e.name }); setDraft(next);  void persistDraft(next); }
             closeSetPicker();
-          }}><Text style={{ color: theme.text }}>{e.name}</Text></Pressable>)}</ScrollView></>}
+          }}><Text style={{ color: theme.text }}>{e.name}</Text></Pressable>)}</ScrollView>
           <Pressable accessibilityRole="button" style={{ minHeight: 48 }} onPress={closeSetPicker}><Text style={{ color: theme.primary }}>Cancel</Text></Pressable>
         </View></View>
       </Modal>

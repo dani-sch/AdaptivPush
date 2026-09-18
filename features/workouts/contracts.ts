@@ -323,6 +323,9 @@ function requireEditableWorkout(draft: WorkoutDraft): void {
 
 export function validateWorkoutDraft(draft: WorkoutDraft, measurements = true): { ok: boolean; errors: string[] } {
   const errors: string[] = [];
+  if (!draft || !Array.isArray(draft.slots) || draft.slots.some(slot => !slot || !Array.isArray(slot.sets) || slot.sets.some(set => !set))) {
+    return { ok: false, errors: ['Workout draft has malformed exercise or set structure.'] };
+  }
   if (!draft.ownerId || !draft.programDayId || !draft.prescriptionRevisionId) {
     errors.push('Owner, program day, and prescription revision identity are required.');
   }

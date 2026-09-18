@@ -40,6 +40,49 @@ export class SingleFlightGate {
   }
 }
 
+/** Closing/unmounting invalidates all captured work, including optional lookups. */
+export class InteractionScope {
+  private generation = 0;
+  private closed = false;
+  capture(): () => boolean {
+    const generation = this.generation;
+    return () => !this.closed && generation === this.generation;
+  }
+  activate(): void { this.generation++; this.closed = false; }
+  invalidate(): void { this.generation++; this.closed = true; }
+}
+
+export async function applyExercisePickerSelection(input: {
+  gate: SingleFlightGate;
+  interaction: InteractionScope;
+  apply: (isCurrent: () => boolean) => unknown | Promise<unknown>;
+  started: () => void;
+  succeeded: () => void;
+  failed: (error: unknown) => void;
+  settled: () => void;
+}): Promise<void> {
+  const isCurrent = input.interaction.capture();
+  if (!isCurrent() || !input.gate.tryEnter()) return;
+  input.started();
+  try {
+    const result = await input.apply(isCurrent);
+    if (isCurrent() && result !== false) input.succeeded();
+  } catch (error) {
+    if (isCurrent()) input.failed(error);
+  } finally {
+    input.gate.leave();
+    if (isCurrent()) input.settled();
+  }
+}
+
+export function filterExercisePickerOptions<T extends { id: string; name: string }>(
+  options: T[], query: string, mode: 'add' | 'swap', current?: { exerciseId?: string; name: string } | null,
+): T[] {
+  const text = query.trim().toLowerCase();
+  return options.filter(exercise => (mode === 'add' || (exercise.id !== current?.exerciseId && exercise.name !== current?.name))
+    && (!text || exercise.name.toLowerCase().includes(text)));
+}
+
 export function interactionNow(): number {
   return globalThis.performance?.now?.() ?? Date.now();
 }
