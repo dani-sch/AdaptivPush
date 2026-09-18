@@ -1,3 +1,5 @@
+import { hasOriginalExerciseEvidence } from '@/features/workouts/performanceEvidence';
+import { programRemovalState } from '@/features/workouts/removalRepository';
 import { workoutDraftStore } from '@/features/workouts/draftStore';
 import { amendWorkoutExercise } from '@/features/workouts/contracts';
 import { resolveProgramOccurrences } from '@/features/workouts/resolveProgramOccurrences';
@@ -425,6 +427,7 @@ function useCurrentProgramState() {
                     .map((day) => day.stable_day_id as string),
             );
 
+            const removalMasks = await programRemovalState(prog.id);
             // Map DB -> UI types
             const workouts: ProgramWorkout[] =
                 (days ?? []).map((d) => {
@@ -436,6 +439,7 @@ function useCurrentProgramState() {
                             return {
                                 id: pde.id, // program_day_exercises row id (swap targets this)
                                 stableSlotId: pde.stable_slot_id,
+                                removalMask: removalMasks[pde.stable_slot_id ?? ''],
                                 exerciseId: ex?.id ?? undefined,
                                 name: ex?.name ?? 'Unknown exercise',
                                 imageUrl: (ex as any)?.image_url ?? undefined,
@@ -523,7 +527,8 @@ function useCurrentProgramState() {
 
     useEffect(() => {
         void refresh();
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (!session && event !== 'SIGNED_OUT') return;
             const nextOwnerId = session?.user.id ?? null;
             if (nextOwnerId === ownerIdRef.current) return;
             refreshControllerRef.current?.abort();
@@ -534,7 +539,7 @@ function useCurrentProgramState() {
             setUnavailable(false);
             setFailureCategory(null);
             prevWeekRef.current = 0;
-            void refresh();
+            setTimeout(() => void refresh(), 0);
         });
         return () => {
             subscription.unsubscribe();
@@ -577,6 +582,7 @@ function useCurrentProgramState() {
                 rep_range_max,
                 target_rpe,
                 suggested_weight_lb,
+                per_set_weights_lb,
                 exercises!program_day_exercises_exercise_id_fkey ( name )
               )
             `)
@@ -597,24 +603,23 @@ function useCurrentProgramState() {
             for (const pde of pdes) {
                 const exerciseName: string = (pde.exercises as any)?.name ?? '';
 
-                // Fetch most recent logged sets for this exercise (scoped to this user).
-                // First find the most recent session_id, then get all sets from that session.
+                // Include a newer occurrence with no actual rows: omission must hold, not reuse older success.
                 const { data: latestSession, error: latestSessionError } = await supabase
-                    .from('workout_exercise_sets')
-                    .select('session_id, workout_sessions!inner(user_id,completion_class)')
-                    .eq('exercise_id', pde.exercise_id)
-                    .eq('workout_sessions.user_id', userId)
-                    .order('created_at', { ascending: false })
+                    .from('workout_sessions')
+                    .select('id,prescription_snapshot')
+                    .eq('user_id', userId)
+                    .or('prescription_snapshot->slots.cs.' + JSON.stringify([{ prescribedExerciseId: pde.exercise_id }])
+                        + ',prescription_snapshot->effectiveSlots.cs.' + JSON.stringify([{ actualExerciseId: pde.exercise_id }]))
+                    .order('ended_at', { ascending: false })
                     .limit(1);
                 if (latestSessionError) throw latestSessionError;
-
-                const latestSessionId = (latestSession?.[0] as any)?.session_id;
+                const latestSessionId = latestSession?.[0]?.id;
 
                 let recentSets = null;
                 if (latestSessionId) {
                     const { data: latestSets, error: recentSetsError } = await supabase
                         .from('workout_exercise_sets')
-                        .select('set_number, weight_lb, reps, rpe')
+                        .select('set_number, weight_lb, reps, rpe, prescription_slot_id, order_index')
                         .eq('exercise_id', pde.exercise_id)
                         .eq('session_id', latestSessionId)
                         .order('set_number', { ascending: true })
@@ -637,6 +642,7 @@ function useCurrentProgramState() {
                     : null;
                 const baselineWeight = liftedWeightAvg ?? (pde.suggested_weight_lb ?? 0);
 
+                const fullCoverage = hasOriginalExerciseEvidence((latestSession?.[0] as any)?.prescription_snapshot, pde.exercise_id, recentSets ?? []);
                 const ctx: ProgressionContext = {
                     pdeId:           pde.id,
                     exerciseName,
@@ -647,7 +653,7 @@ function useCurrentProgramState() {
                     experienceLevel,
                     lastSessionSets,
                     requiredSetCount: pde.set_count,
-                    completionClass: (latestSession?.[0] as any)?.workout_sessions?.completion_class ?? 'legacy_unknown',
+                    completionClass: fullCoverage ? 'complete' : 'partial',
                     readinessScore:  null, // Readiness is applied as UI overlay only, not baked into progression
                 };
 
@@ -666,8 +672,6 @@ function useCurrentProgramState() {
                     (s) => s.reps < pde.rep_range_min
                 );
 
-                const fullCoverage = (latestSession?.[0] as any)?.workout_sessions?.completion_class === 'complete'
-                    && lastSessionSets.length >= pde.set_count;
                 const allHitMax   = fullCoverage && setsHitMax.length === lastSessionSets.length && lastSessionSets.length > 0;
                 const allMissedMin = setsMissedMin.length === lastSessionSets.length && lastSessionSets.length > 0;
                 const someMissedMin = setsMissedMin.length > 0 && lastSessionSets.length > 0;
@@ -676,7 +680,7 @@ function useCurrentProgramState() {
                 const incrementLb: Record<string, number> = { beginner: 5.0, intermediate: 2.5, advanced: 1.25 };
                 const increment = incrementLb[experienceLevel] ?? 2.5;
 
-                let perSetWeightsLb: number[] | null = null;
+                let perSetWeightsLb: number[] | null = !fullCoverage ? pde.per_set_weights_lb ?? null : null;
                 let newUniformWeight: number;
 
                 if (lastSessionSets.length === 0 || !fullCoverage) {

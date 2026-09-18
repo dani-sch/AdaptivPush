@@ -23,6 +23,7 @@ export type Equipment =
     | 'Other';
 
 export type WorkoutExercise = {
+    removalMask?: import('@/features/workouts/removalRepository').ProgramRemovalMask;
     id: string;         // program_day_exercises.id (used for swap targeting)
     stableSlotId?: string; // immutable prescription slot identity
     exerciseId?: string; // exercises.id (used for DB set writes)

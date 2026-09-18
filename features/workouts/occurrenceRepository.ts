@@ -5,6 +5,23 @@ import { classifySupabaseError, reportSupabaseFailure, supabaseUserMessage } fro
 
 export const CORRECTIONS_UNAVAILABLE = 'This workout can be viewed. The server does not yet support workout updates.';
 
+/** Stable pagination includes the complete catalog, including detailed card metadata. */
+export async function loadExercisePickerCatalog(client: SupabaseClient, muscleGroup?: string, isCurrent = () => true) {
+  const rows: { id: string; name: string; primary_muscle: string; equipment: string; image_url: string | null; instructions: string[] | null }[] = [];
+  const pageSize = 500;
+  for (let offset = 0; isCurrent(); offset += pageSize) {
+    let query = client.from('exercises').select('id, name, primary_muscle, equipment, image_url, instructions')
+      .order('name').order('id').range(offset, offset + pageSize - 1);
+    if (muscleGroup) query = query.eq('primary_muscle', muscleGroup);
+    const page = await query;
+    if (!isCurrent()) return [];
+    if (page.error) throw page.error;
+    rows.push(...page.data);
+    if (page.data.length < pageSize) return rows;
+  }
+  return [];
+}
+
 export async function loadCorrectionCatalog(client: SupabaseClient) {
   const data: { id: string; name: string }[] = [];
   const pageSize = 500;
@@ -53,7 +70,9 @@ export async function loadCompletedWorkout(client: SupabaseClient, ownerId: stri
     actualSetId: row.actual_set_id ?? row.id, prescriptionSlotId: row.prescription_slot_id ?? null,
     prescribedExerciseId: row.prescribed_exercise_id ?? null, exerciseId: row.exercise_id,
     order: row.order_index ?? row.set_number, reps: row.reps,
-    loadValue: row.load_value == null ? row.weight_lb == null ? null : Number(row.weight_lb) : Number(row.load_value),
+    loadValue: row.load_value == null
+      ? row.load_kind === 'bodyweight' || row.load_kind === 'unknown' || row.weight_lb == null ? null : Number(row.weight_lb)
+      : Number(row.load_value),
     loadKind: row.load_kind ?? 'external',
     loadUnit: row.load_kind === 'bodyweight' || row.load_kind === 'unknown' ? 'none' : row.load_unit ?? 'lb',
     loadSide: row.load_side ?? 'unknown',

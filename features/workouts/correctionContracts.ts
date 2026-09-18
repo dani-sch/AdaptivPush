@@ -1,5 +1,7 @@
 import { createOperationId, type OperationId } from '../kernel/operationId';
-import type { LoadKind, LoadSide, LoadUnit } from './contracts';
+import type { LoadKind, LoadSide, LoadUnit, WorkoutDraftSlot } from './contracts';
+
+import type { WorkoutRemovals, ProgramRemovalRequest } from './removals';
 
 export const WORKOUT_CORRECTION_SCHEMA_VERSION = 1 as const;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -20,6 +22,9 @@ export interface CompletedWorkoutSetCorrection {
 }
 
 export interface CompletedWorkoutCorrectionRequest {
+  effectiveSlots?: WorkoutDraftSlot[];
+  removals?: WorkoutRemovals;
+  programRemoval?: ProgramRemovalRequest;
   schemaVersion: typeof WORKOUT_CORRECTION_SCHEMA_VERSION;
   operationId: OperationId;
   ownerId: string;
@@ -56,6 +61,7 @@ export function createCompletedWorkoutCorrection(input: Omit<
     schemaVersion: WORKOUT_CORRECTION_SCHEMA_VERSION,
     operationId: input.operationId ?? createOperationId(),
     sets: structuredClone(input.sets),
+    effectiveSlots: input.effectiveSlots ? structuredClone(input.effectiveSlots) : undefined,
     setOutcomes: input.setOutcomes ? structuredClone(input.setOutcomes) : undefined,
   };
 }

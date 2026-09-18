@@ -1,6 +1,6 @@
+import { AppAlert as Alert } from '@/components/ui/AppDialog';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-    Alert,
     Keyboard,
     KeyboardAvoidingView,
     Modal,
@@ -785,7 +785,7 @@ function createStyles(theme: Theme) {
             gap: 6,
         },
         removeText: { color: theme.primary, fontSize: 12, fontWeight: '600' },
-        modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+        modalBackdrop: { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-end' },
         modalCard: { backgroundColor: theme.cardBg, borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16, gap: 10, maxHeight: '88%' },
         filterRow: { gap: 8, paddingVertical: 4 },
         filterChip: { borderWidth: 1, borderColor: theme.border, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 12 },

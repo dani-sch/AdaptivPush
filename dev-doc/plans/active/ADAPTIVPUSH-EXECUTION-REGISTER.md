@@ -1,5 +1,23 @@
 # AdaptivPush modular execution register
 
+## Current AP-02/AP-03 extension boundary; user-led Expo acceptance
+
+The integration tree includes scoped removal/session recovery, durable workout structure, and the later resume/detailed-Add fixes. Migration `20260918160000` is deployed under explicit authorization, after the deployed correction/effective-occurrence and scoped-removal migrations. The hosted ledger has nine entries; capabilities are structure 1, removal 1, and correction 2. Fresh encrypted recovery, isolated restore, schema/security, concurrency, and existing-data preservation passed for the dated release packet.
+
+The current client restores unfinished measurements without treating them as invalid drafts, settles pending-operation recovery before readiness, and reuses the complete detailed exercise picker for explicit Add scopes. Stable occurrence identity, frozen prescriptions, exact pending requests, and atomic composed future edits are preserved. Current verification passes 157 application cases, strict TypeScript, and lint with zero errors and three known warnings. The user owns Expo/physical-device acceptance; native runtime cause and the exact past-program route remain unconfirmed. [September 18 implementation evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-EDITING-2026-09-18.md) owns the packet, verification, and limitations. AP-04/AP-05 scope is unchanged.
+
+## iPhone recovery and workout fixes: integrated, hosted removal deployed
+
+The failed phone login is tied by its exact timestamp to the local-test Expo server on 8082, whose iOS bundle embedded phone-localhost Supabase. Hosted Expo remains on 8081; local browser QA is now loopback-only and native clients reject loopback backend configurations. Session hydration now distinguishes outages from sign-out, coordinates foreground refresh and preserves owner-scoped drafts/pending operations. Input focus no longer disables row swiping; removal checks distinguish failed requests from missing server support, and blank applicable loads display LB without inventing measurements.
+
+Feature commits f85d679, 42a9ed9, e04d89a and 2476343 are integrated through 801d7dc. Strict TypeScript, lint (three existing warnings), 119 application tests, iOS export, 12 fresh/restored SQL executions and nine-label concurrency pass. Fresh encrypted restore matches 59 relations; all 23 hosted public relations remain unchanged. [iPhone recovery evidence](/dev-doc/reports/ADAPTIVPUSH-IPHONE-RECOVERY-2026-09-17.md) owns causes, browser outage/reconnect/persistence checks, screenshots and the exact reverified migration packet. The user authorized the exact migration, now deployed with removal capability 1 and correction capability 2; [hosted removal release](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-REMOVAL-RELEASE-2026-09-17.md) owns the fresh recovery, preservation and hosted checks. Physical iPhone acceptance remains open. No scheduling/progression redesign.
+
+## Scoped removals and shared controls: integrated and hosted
+
+Active capture and completed edit now share compact rows with explicit checks, on-demand load/exercise settings, swipe set removal and header exercise removal. Occurrence tombstones preserve original prescriptions; selected future changes commit atomically with Save or Finish. Missing attempts hold the affected progression decision without becoming failures. App-owned dialog backdrops are transparent.
+
+Migration 20260917180000 is deployed to thfxcvxcsfvrzdysdnkq under the user's explicit follow-up authorization. Removal capability is 1 and correction capability remains 2. Fresh encrypted backup/59-relation restore, 12 SQL suite executions, zero schema/security drift and all 58 non-ledger relations preserved are recorded in [hosted removal release](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-REMOVAL-RELEASE-2026-09-17.md). Physical iPhone acceptance remains open. AP-04/AP-05 remain queued.
+
 ## Unified workout occurrence boundary
 
 Past-workout editing is released to `thfxcvxcsfvrzdysdnkq`. Authorized migrations `20260915190000` and `20260915210000` are deployed; authenticated capability is integer `2`. The existing editor supports explicit outcomes and loading semantics, same-session corrections, exact retry and stale-revision recovery. Authenticated hosted browser edit/cancel/save/reopen and all completed-workout entry points passed. Fresh encrypted backup and isolated restore matched all 57 captured relations; original data was preserved. [September 17 release evidence](/dev-doc/reports/ADAPTIVPUSH-EDIT-PAST-WORKOUT-RELEASE-2026-09-17.md) owns hashes, security, 96 passing application cases, eight concurrency checks, SQL verification and limits. Physical iPhone acceptance remains open. AP-04/AP-05 remain queued.
@@ -17,7 +35,7 @@ Physical iPhone cold launch, five-action UI/reopen acceptance and accessibility 
 
 This document owns delivery decomposition, dependencies, status, owner routes, and execution gates. Product decisions belong to [the approved decision record](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECORD-2026-09-08.md); implementation behavior belongs to [the master plan](/dev-doc/plans/active/ADAPTIVPUSH-MASTER-PLAN.md). [Code status](/dev-doc/plans/active/ADAPTIVPUSH-IMPLEMENTATION-STATUS.md) owns observed facts, [database plan](/dev-doc/plans/active/ADAPTIVPUSH-DATABASE-PLAN.md) owns data design, and [traceability](/dev-doc/plans/active/ADAPTIVPUSH-TRACEABILITY.md) owns requirement dispositions and acceptance scenarios.
 
-Original consolidation baseline: September 8, `refactor-1` at `093c567`; review and bounded execution were authorized September 9. The status sections above supersede that initial planning-only state. Preserve the released AP-01 and AP-02/AP-03 foundations and the implemented September 15 lifecycle extension; AP-04/AP-05 remain queued. Owner names below are repository routes, not claims that a human owner has accepted an assignment.
+Original consolidation baseline: September 8, `refactor-1` at `093c567`; review and bounded execution were authorized September 9. The status sections above supersede that initial planning-only state. Preserve the released AP-01 and AP-02/AP-03 foundations plus the deployed correction, removal, and structure extensions; AP-04/AP-05 remain queued. Owner names below are repository routes, not claims that a human owner has accepted an assignment.
 
 Execution update: AP-01.1 was performed on 2026-09-09 from feature branch
 `adaptivpush-refactor` at base `20a95e5`. The current read-only database,
@@ -33,9 +51,9 @@ restore caveats, synthetic rollback probes, and post-rollout checks are in [the
 September 10 evidence artifact](/dev-doc/reports/ADAPTIVPUSH-AP-01-2026-09-10.md).
 Database prerequisites for AP-02/AP-03 were closed by AP-01, and the earlier
 durable packet is hosted. Its dated evidence remains valid for that exact packet.
-The September 15 scoped-swap/correction extension is a new local boundary: its
-new migration, device behavior and rollout must be authorized and verified on
-their own evidence. Restore archived programs, end/archive programs, start
+The September 15 scoped-swap/correction boundary and its September 17/18 removal
+and structure extensions are now deployed under separate authorizations, with
+their own recovery and verification evidence. Restore archived programs, end/archive programs, start
 workouts and generate new programs remain the four user-confirmed regression
 baselines; no fresh physical-device pass is inferred for them.
 

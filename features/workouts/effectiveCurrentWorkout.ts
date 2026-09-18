@@ -18,7 +18,7 @@ export function matchingActiveWorkoutDraft(
   draft: WorkoutDraft | null,
 ): WorkoutDraft | null {
   if (!program || !workout?.stableDayId || !ownerId || !draft) return null;
-  if (!validateWorkoutDraft(draft).ok) return null;
+  if (!validateWorkoutDraft(draft, false).ok) return null;
   return activeWorkoutDraftMatches(draft, ownerId, {
     programId: program.id,
     stableDayId: workout.stableDayId,
@@ -28,7 +28,7 @@ export function matchingActiveWorkoutDraft(
 export function matchingOccurrenceWorkoutDraft(
   program: CurrentProgram | null, workout: ProgramWorkout | null, ownerId: string | null, draft: WorkoutDraft | null,
 ): WorkoutDraft | null {
-  return program && workout?.stableDayId && ownerId && draft && validateWorkoutDraft(draft).ok
+  return program && workout?.stableDayId && ownerId && draft && validateWorkoutDraft(draft, false).ok
     && draft.ownerId === ownerId && draft.programId === program.id && draft.stableDayId === workout.stableDayId ? draft : null;
 }
 
@@ -55,6 +55,7 @@ function effectiveExercise(
       ? slot.replacementExerciseName ?? metadata?.name ?? 'Replacement exercise'
       : slot.exerciseName ?? prescribedSlot?.name ?? metadata?.name ?? 'Prescribed exercise',
     sets: slot.prescribedSetCount,
+    removalMask: { version: 1, removed: Boolean(draft.removals?.slots.includes(slot.slotId)), orders: draft.removals?.sets.filter(s => s.slotId === slot.slotId).map(s => s.order) ?? [] },
     reps: repRange(slot) ?? prescribedSlot?.reps,
     loadSuggestion: slot.loadSuggestion,
   };

@@ -6,6 +6,7 @@ import type { ProgramExerciseRevisionRequest } from '../../features/programs/con
 import {
   compensationRequest,
   isNoFutureWorkoutsDetail,
+  pendingSwapForRecovery,
   workoutOnlyReconciliationStep,
   workoutSwapSyncDisposition,
 } from '../../features/workouts/swapRecovery';
@@ -27,6 +28,9 @@ test('deterministic no-future-workouts result does not become pending Retry stat
     { status: 'no_future_workouts' },
   );
   assert.equal(isNoFutureWorkoutsDetail('No later uncompleted occurrences remain.'), true);
+  const stored = { request, lastError: 'No later uncompleted occurrences remain.' };
+  assert.equal(pendingSwapForRecovery(stored), null);
+  assert.equal(stored.request, request);
 });
 
 test('genuine response loss remains uncertain for exact-operation retry', () => {
@@ -40,6 +44,8 @@ test('genuine response loss remains uncertain for exact-operation retry', () => 
     status: 'uncertain',
     detail: 'request timed out',
   });
+  const pending = { request, operationId: 'exact-id', lastError: outcome.message };
+  assert.equal(pendingSwapForRecovery(pending), pending);
 });
 
 test('workout-only supersession reverses only the confirmed wider operation', () => {

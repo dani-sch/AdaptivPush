@@ -1,4 +1,5 @@
 export type SupabaseFailureCategory =
+  | 'configuration'
   | 'feature_disabled'
   | 'conflict'
   | 'validation'
@@ -85,6 +86,8 @@ export function classifySupabaseError(error: unknown): SupabaseFailure {
   const name = typeof source.name === 'string' ? source.name.toLowerCase() : '';
   const message = typeof source.message === 'string' ? source.message.toLowerCase() : '';
   const combined = `${name} ${code?.toLowerCase() ?? ''} ${message}`;
+
+  if (combined.includes('ap_backend_configuration')) return { category: 'configuration', retryable: false, status, code };
 
   if (code === 'ROLLOUT_DISABLED') return { category: 'feature_disabled', retryable: false, code };
   if (code === 'AP_AUTHENTICATION_REQUIRED') return { category: 'authentication_required', retryable: false, code };
@@ -176,6 +179,15 @@ export function classifySupabaseError(error: unknown): SupabaseFailure {
   }
 
   if (
+    (status === 0 && name === 'authretryablefetcherror') ||
+    combined.includes('fetch failed') ||
+    combined.includes('could not connect to the server') ||
+    combined.includes('could not connect to server') ||
+    combined.includes('network connection was lost') ||
+    combined.includes('econnrefused') ||
+    combined.includes('econnreset') ||
+    combined.includes('tls') ||
+    combined.includes('ssl') ||
     combined.includes('network request failed') ||
     combined.includes('network unavailable') ||
     combined.includes('failed to fetch') ||
@@ -208,6 +220,8 @@ export function supabaseUserMessage(
       : classifySupabaseError(errorOrFailure);
 
   switch (failure.category) {
+    case 'configuration':
+      return 'This build cannot reach its configured backend. Open the hosted Expo server on port 8081, or a verified LAN test build. Your account and workout drafts have not been deleted.';
     case 'feature_disabled':
       return 'Saving changes is not enabled in this build. Use an updated build when this feature is released. Your changes are still here.';
     case 'conflict':
@@ -220,7 +234,7 @@ export function supabaseUserMessage(
     case 'timeout':
       return "AdaptivPush's data service took too long to respond. Your data is safe. Try again.";
     case 'offline':
-      return 'You appear to be offline. Check your connection and try again.';
+      return 'Could not connect to AdaptivPush. Check Wi-Fi or cellular access and try again. If other apps work, verify the app server connection. Your workout drafts are still on this device.';
     case 'authentication_required':
       return 'Your session has expired. Please sign in again.';
     case 'forbidden':
@@ -450,27 +464,11 @@ export async function resilientSupabaseFetch(
   input: RequestInfo | URL,
   init?: RequestInit,
 ): Promise<Response> {
-  const timeoutMs = fetchTimeout(input, init);
-  const controller = new AbortController();
-  let timedOut = false;
   const inputSignal =
     typeof Request !== 'undefined' && input instanceof Request ? input.signal : undefined;
-  const externalSignal = init?.signal ?? inputSignal;
-  const forwardAbort = () => controller.abort();
-  if (externalSignal?.aborted) controller.abort();
-  externalSignal?.addEventListener('abort', forwardAbort, { once: true });
-  const timer = setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, timeoutMs);
-
-  try {
-    return await fetch(input, { ...init, signal: controller.signal });
-  } catch (error) {
-    if (timedOut) throw new SupabaseRequestTimeoutError(timeoutMs);
-    throw error;
-  } finally {
-    clearTimeout(timer);
-    externalSignal?.removeEventListener('abort', forwardAbort);
-  }
+  return oneAttempt(
+    signal => fetch(input, { ...init, signal }),
+    fetchTimeout(input, init),
+    init?.signal ?? inputSignal,
+  );
 }

@@ -1,3 +1,5 @@
+import { programRemovalState } from '@/features/workouts/removalRepository';
+import { visibleProgramExercises } from '@/features/workouts/visibleProgramExercises';
 import { resolveProgramOccurrences } from '@/features/workouts/resolveProgramOccurrences';
 import type { CurrentProgram } from '@/types/program';
 import { Ionicons } from '@expo/vector-icons';
@@ -79,9 +81,10 @@ async function fetchProgramOverview(program: CurrentProgram, ownerId: string): P
 
   if (error || !data) return [];
 
+  const masks = await programRemovalState(program.id);
   const resolved = await resolveProgramOccurrences({ ...program, workouts: (data ?? []).map(day => ({
     id: day.id, stableDayId: day.stable_day_id, name: day.workout_name, day: '', estimatedTime: 0,
-    exercises: day.program_day_exercises.map(pde => ({ id: pde.id, stableSlotId: pde.stable_slot_id,
+    exercises: day.program_day_exercises.map(pde => ({ id: pde.id, stableSlotId: pde.stable_slot_id, removalMask: masks[pde.stable_slot_id ?? ''],
       exerciseId: (Array.isArray(pde.exercises) ? pde.exercises[0] : pde.exercises)?.id, name: (Array.isArray(pde.exercises) ? pde.exercises[0] : pde.exercises)?.name ?? 'Exercise', sets: pde.set_count,
       reps: `${pde.rep_range_min}-${pde.rep_range_max}`, weight: pde.suggested_weight_lb })),
   })) }, ownerId);
@@ -109,7 +112,7 @@ async function fetchProgramOverview(program: CurrentProgram, ownerId: string): P
       sessionId: resolved.workouts.find(w => w.id === day.id)?.sessionId,
       name: day.workout_name ?? `Day ${day.day_index}`,
       dayIndex: day.day_index ?? 1,
-      exercises: resolved.workouts.find(w => w.id === day.id)?.exercises.map(ex => ({
+      exercises: visibleProgramExercises(resolved.workouts.find(w => w.id === day.id)?.exercises ?? []).map(ex => ({
         pdeId: ex.stableSlotId ?? ex.id, name: ex.name, sets: ex.sets ?? 0,
         repMin: Number(ex.reps?.split('-')[0] ?? 0), repMax: Number(ex.reps?.split('-').at(-1) ?? 0),
         targetRpe: null, weightLb: ex.weight ?? null,

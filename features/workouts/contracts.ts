@@ -1,6 +1,8 @@
 import { createOperationId, type OperationId } from '../kernel/operationId';
 import { asRevision, nextRevision, type Revision } from '../kernel/revisions';
 
+import { isRemoved, type WorkoutRemovals, type ProgramRemovalRequest } from './removals';
+
 export const WORKOUT_SCHEMA_VERSION = 2 as const;
 export const WORKOUT_POLICY_VERSION = 'workout-finalize-v2' as const;
 
@@ -42,6 +44,7 @@ export interface FrozenPrescriptionSlot {
 }
 
 export interface FrozenWorkoutPrescription {
+  removals?: WorkoutRemovals;
   revisionId: string;
   programDayId: string;
   workoutName: string;
@@ -77,6 +80,9 @@ export interface WorkoutDraftSlot {
 }
 
 export interface WorkoutDraft {
+  structureVersion?: 1;
+  removals?: WorkoutRemovals;
+  programRemoval?: ProgramRemovalRequest;
   schemaVersion: typeof WORKOUT_SCHEMA_VERSION;
   policyVersion: typeof WORKOUT_POLICY_VERSION;
   ownerId: string;
@@ -190,6 +196,10 @@ export function updateWorkoutSet(
     reps?: number | null;
     load?: number | null;
     rpe?: number | null;
+    loadKind?: LoadKind;
+    loadUnit?: LoadUnit;
+    actualExerciseId?: string;
+    actualExerciseName?: string;
     logged?: boolean;
     outcome?: SetOutcome;
     loggedAt?: string | null;
@@ -204,13 +214,16 @@ export function updateWorkoutSet(
     ...slot,
     sets: slot.sets.map((set) => {
       if (set.setId !== update.setId) return set;
+      if (isRemoved(draft.removals, slot.slotId, set.setId)) throw new Error('This set was removed.');
       found = true;
       const next = {
         ...set,
         actualReps: update.reps === undefined ? set.actualReps : update.reps,
         actualLoad: update.load === undefined ? set.actualLoad : update.load,
-        loadKind: update.load != null && set.loadKind === 'unknown' ? 'external' as const : set.loadKind,
-        loadUnit: update.load != null && set.loadUnit === 'none' ? 'lb' as const : set.loadUnit,
+        actualExerciseId: update.actualExerciseId ?? set.actualExerciseId,
+        actualExerciseName: update.actualExerciseName ?? set.actualExerciseName,
+        loadKind: update.loadKind ?? (update.load != null && set.loadKind === 'unknown' ? 'external' as const : set.loadKind),
+        loadUnit: update.loadUnit ?? (update.load != null && set.loadUnit === 'none' ? 'lb' as const : set.loadUnit),
         actualRpe: update.rpe === undefined ? set.actualRpe : update.rpe,
         logged: update.logged === undefined ? set.logged : update.logged,
         loggedAt: update.loggedAt === undefined ? set.loggedAt : update.loggedAt,
@@ -218,9 +231,13 @@ export function updateWorkoutSet(
         enteredRepsText: update.enteredRepsText === undefined ? set.enteredRepsText : update.enteredRepsText,
         enteredRpeText: update.enteredRpeText === undefined ? set.enteredRpeText : update.enteredRpeText,
       };
-      next.outcome = update.outcome ?? (update.logged === undefined ? set.outcome ?? (set.logged ? 'performed' : 'not_attempted') : update.logged ? 'performed' : 'not_attempted');
+      const editing = update.enteredLoadText !== undefined || update.enteredRepsText !== undefined
+        || update.enteredRpeText !== undefined || update.reps !== undefined || update.load !== undefined || update.rpe !== undefined;
+      next.outcome = update.outcome ?? (update.logged === undefined
+        ? editing && set.outcome === 'skipped' ? 'not_attempted' : set.outcome ?? (set.logged ? 'performed' : 'not_attempted')
+        : update.logged ? 'performed' : 'not_attempted');
       next.logged = next.outcome === 'performed';
-      if (next.outcome === 'skipped') {
+      if (update.outcome === 'skipped') {
         next.actualReps = null;
         next.actualLoad = null;
         next.actualRpe = null;
@@ -229,7 +246,8 @@ export function updateWorkoutSet(
         next.enteredRpeText = '';
         next.loggedAt = null;
       }
-      if (next.logged) {
+      if (update.loadKind === 'bodyweight') { next.actualLoad = null; next.enteredLoadText = ''; next.loadUnit = 'none'; }
+      if (next.logged && update.logged === true) {
         if (!Number.isInteger(next.actualReps) || (next.actualReps ?? 0) <= 0) {
           throw new Error('Enter positive whole-number reps before logging this set.');
         }
@@ -290,7 +308,8 @@ export function classifyWorkoutCompletion(draft: WorkoutDraft): WorkoutCompletio
   const sets = draft.slots.flatMap((slot) => slot.sets);
   const logged = sets.filter((set) => set.logged).length;
   if (logged === 0) return 'abandoned';
-  if (logged === sets.length) {
+  if (draft.frozenPrescription.slots.every(slot => slot.sets.every(required =>
+    draft.slots.find(s => s.slotId === slot.slotId)?.sets.some(set => set.setId === required.setId && set.logged)))) {
     return 'complete';
   }
   return 'partial';
@@ -302,8 +321,11 @@ function requireEditableWorkout(draft: WorkoutDraft): void {
   }
 }
 
-export function validateWorkoutDraft(draft: WorkoutDraft): { ok: boolean; errors: string[] } {
+export function validateWorkoutDraft(draft: WorkoutDraft, measurements = true): { ok: boolean; errors: string[] } {
   const errors: string[] = [];
+  if (!draft || !Array.isArray(draft.slots) || draft.slots.some(slot => !slot || !Array.isArray(slot.sets) || slot.sets.some(set => !set))) {
+    return { ok: false, errors: ['Workout draft has malformed exercise or set structure.'] };
+  }
   if (!draft.ownerId || !draft.programDayId || !draft.prescriptionRevisionId) {
     errors.push('Owner, program day, and prescription revision identity are required.');
   }
@@ -311,24 +333,37 @@ export function validateWorkoutDraft(draft: WorkoutDraft): { ok: boolean; errors
     errors.push('Workout draft must contain at least one exercise slot.');
   }
   const setIds = new Set<string>();
+  const slotIds = new Set<string>();
   for (const slot of draft.slots) {
+    if (slotIds.has(slot.slotId)) errors.push('Stable exercise identities must be unique.');
+    slotIds.add(slot.slotId);
     if (!slot.slotId || !slot.prescribedExerciseId || !slot.actualExerciseId) {
       errors.push('Every slot requires stable prescription and actual exercise identity.');
     }
-    if (slot.sets.length !== slot.prescribedSetCount) {
+    if (slot.sets.length < slot.prescribedSetCount) {
       errors.push(`Slot ${slot.slotId || '(unknown)'} does not preserve its prescribed set count.`);
     }
     for (const set of slot.sets) {
       if (!set.setId || setIds.has(set.setId)) errors.push('Stable set identities must be present and unique.');
       setIds.add(set.setId);
+      if (!measurements) continue;
+      const label = `${slot.replacementExerciseName ?? slot.exerciseName ?? 'Exercise'}, set ${set.order}`;
+      if (set.logged) {
+        for (const [field, raw] of [['load', set.enteredLoadText], ['reps', set.enteredRepsText], ['RPE', set.enteredRpeText]]) {
+          if (raw && !/^\d+(?:\.\d*)?$/.test(raw.trim())) errors.push(`${label}: enter a valid ${field}.`);
+        }
+      }
       if (set.logged && (!Number.isInteger(set.actualReps) || (set.actualReps ?? 0) <= 0)) {
-        errors.push(`Logged set ${set.setId} requires positive integer reps.`);
+        errors.push(`${label}: enter positive whole-number reps.`);
       }
-      if (set.actualLoad !== null && (!Number.isFinite(set.actualLoad) || set.actualLoad < 0)) {
-        errors.push(`Set ${set.setId} has an invalid actual load.`);
+      if (set.logged && (set.loadKind === 'external' || set.loadKind === 'assistance') && (set.actualLoad === null || set.loadUnit === 'none')) {
+        errors.push(`${label}: enter a load and measurement unit.`);
       }
-      if (set.actualRpe !== null && (!Number.isFinite(set.actualRpe) || set.actualRpe < 0 || set.actualRpe > 10)) {
-        errors.push(`Set ${set.setId} has an invalid RPE.`);
+      if (set.logged && set.actualLoad !== null && (!Number.isFinite(set.actualLoad) || set.actualLoad < 0)) {
+        errors.push(`${label}: enter a nonnegative load.`);
+      }
+      if (set.logged && set.actualRpe !== null && (!Number.isFinite(set.actualRpe) || set.actualRpe < 0 || set.actualRpe > 10)) {
+        errors.push(`${label}: RPE must be between 0 and 10, or blank.`);
       }
     }
   }
@@ -340,6 +375,7 @@ export function workoutFinalizationPayload(draft: WorkoutDraft, endedAt: string)
   const ended = new Date(endedAt).getTime();
   return {
     operationId: draft.operationId,
+    structureVersion: draft.structureVersion,
     draftId: draft.draftId,
     schemaVersion: draft.schemaVersion,
     policyVersion: draft.policyVersion,
@@ -351,7 +387,9 @@ export function workoutFinalizationPayload(draft: WorkoutDraft, endedAt: string)
     endedAt,
     durationMin: Math.max(0, Math.round((ended - started) / 60_000)),
     timezone: draft.timezone,
-    frozenPrescription: { ...draft.frozenPrescription, effectiveSlots: draft.slots },
+    frozenPrescription: { ...draft.frozenPrescription, effectiveSlots: draft.slots, removals: draft.removals },
+    removals: draft.removals,
+    programRemoval: draft.programRemoval,
     slots: draft.slots,
   };
 }

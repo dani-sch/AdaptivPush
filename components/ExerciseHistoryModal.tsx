@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { X } from 'lucide-react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import type { Theme } from '@/constants/themes';
+import { useTheme } from '@/contexts/ThemeContext';
 import type { ExerciseHistoryEntry } from '@/types/program';
 import { fetchExerciseHistory } from '@/utils/fetchExerciseHistory';
-import { useTheme } from '@/contexts/ThemeContext';
-import type { Theme } from '@/constants/themes';
 
 interface ExerciseHistoryModalProps {
   exerciseId: string;
@@ -144,7 +144,7 @@ function createStyles(theme: Theme) {
   return StyleSheet.create({
     backdrop: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.82)',
+      backgroundColor: 'rgba(0, 0, 0, 0)',
       justifyContent: 'flex-end',
     },
     sheet: {

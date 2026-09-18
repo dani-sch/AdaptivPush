@@ -2,8 +2,11 @@ import type { Exercise } from '@/components/ExerciseCard';
 import type { WorkoutDraft } from './contracts';
 import type { ProgramWorkout } from '@/types/program';
 
+import { isRemoved } from './removals';
+
 export function draftToExercises(draft: WorkoutDraft, workout?: ProgramWorkout): Exercise[] {
-  return draft.slots.map((slot) => {
+  return draft.slots.filter(slot => !isRemoved(draft.removals, slot.slotId)).map((originalSlot) => {
+    const slot = { ...originalSlot, sets: originalSlot.sets.filter(set => !isRemoved(draft.removals, originalSlot.slotId, set.setId)) };
     const current = workout?.exercises.find((exercise) => exercise.stableSlotId === slot.slotId);
     const frozen = draft.frozenPrescription.slots.find((candidate) => candidate.slotId === slot.slotId);
     const originalExerciseName = frozen?.exerciseName ?? current?.name ?? 'the original exercise';
@@ -20,7 +23,7 @@ export function draftToExercises(draft: WorkoutDraft, workout?: ProgramWorkout):
       name: slot.actualExerciseId !== slot.prescribedExerciseId
         ? slot.replacementExerciseName ?? "Replacement exercise"
         : current?.name ?? slot.exerciseName ?? "Prescribed exercise",
-      prescription: `${slot.prescribedSetCount}×${repDisplay}`,
+      prescription: `${slot.sets.length}×${repDisplay}`,
       readOnly: Boolean(draft.finalizationEndedAt) || draft.lifecycle === 'finalized',
       loadLabel: firstSet?.loadUnit === 'kg' ? 'KG' : firstSet?.loadUnit === 'lb' ? 'LBS' : 'LOAD',
       muscleGroup: current?.muscleGroup,
@@ -34,6 +37,7 @@ export function draftToExercises(draft: WorkoutDraft, workout?: ProgramWorkout):
         logged: set.logged,
         outcome: set.outcome ?? (set.logged ? 'performed' : 'not_attempted'),
         loadUnit: set.loadUnit,
+        loadKind: set.loadKind,
         exerciseName: set.actualExerciseName ?? (set.actualExerciseId === slot.actualExerciseId
           ? slot.replacementExerciseName ?? current?.name ?? slot.exerciseName
           : originalExerciseName),
@@ -43,6 +47,6 @@ export function draftToExercises(draft: WorkoutDraft, workout?: ProgramWorkout):
         ? `Previous ${slot.loadSuggestion.kind === 'assistance' ? 'assistance' : 'load'} for this exercise: ${slot.loadSuggestion.value} ${slot.loadSuggestion.unit}`
         : undefined,
     };
-  });
+  }).filter(exercise => exercise.sets.length > 0);
 }
 

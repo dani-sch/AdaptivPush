@@ -1,3 +1,4 @@
+import { visibleProgramExercises } from '@/features/workouts/visibleProgramExercises';
 import { confirmedSwapMessage } from '@/features/workouts/swapRecovery';
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -95,12 +96,12 @@ export function WorkoutTemplateModal({ workout, program, onSwapExercise, onClose
         <View style={styles.backdrop}>
             {!swapExerciseId && <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />}
 
-            <View style={[styles.sheet, swapExerciseId && { opacity: 0.25 }]}>
+            <View style={styles.sheet}>
                 <View style={styles.header}>
                     <View style={{ flex: 1 }}>
                         <Text style={styles.headerTitle}>{workout.name}</Text>
                         <Text style={styles.headerSubtitle}>
-                            {workout.estimatedTime} min • {workout.exercises.length} exercises
+                            {workout.estimatedTime} min • {visibleProgramExercises(workout.exercises).length} exercises
                         </Text>
                     </View>
                     <Pressable
@@ -114,7 +115,7 @@ export function WorkoutTemplateModal({ workout, program, onSwapExercise, onClose
                 </View>
 
                 <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                    {workout.exercises.map((exercise, idx) => (
+                    {visibleProgramExercises(workout.exercises).map((exercise, idx) => (
                         <ExerciseRow
                             key={exercise.id}
                             exercise={exercise}
@@ -169,7 +170,7 @@ function createStyles(theme: Theme) {
     return StyleSheet.create({
         backdrop: {
             flex: 1,
-            backgroundColor: 'rgba(0,0,0,0.82)',
+            backgroundColor: 'transparent',
             justifyContent: 'flex-end',
         },
         sheet: {
@@ -295,7 +296,7 @@ function createStyles(theme: Theme) {
         },
         swapOverlay: {
             ...StyleSheet.absoluteFill,
-            backgroundColor: 'rgba(0,0,0,0.82)',
+            backgroundColor: 'transparent',
             justifyContent: 'flex-end',
         },
         nestedSheet: {

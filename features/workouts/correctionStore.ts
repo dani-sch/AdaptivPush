@@ -1,6 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { CompletedWorkoutCorrectionRequest } from './correctionContracts';
+import { createWorkoutEditDraftStore } from './editDraftStore';
+
+export const workoutEditDraftStore = createWorkoutEditDraftStore(AsyncStorage);
 
 const PREFIX = '@adaptivpush/workout-corrections/v1';
 

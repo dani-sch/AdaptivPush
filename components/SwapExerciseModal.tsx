@@ -17,6 +17,9 @@ import { X, Search, Check, ChevronDown, ChevronUp } from 'lucide-react-native';
 import type { CurrentProgram, WorkoutExercise, MuscleGroup, Equipment } from '@/types/program';
 import { getAlternativesFor, exercisesByMuscleGroup } from '@/lib/exerciseDatabase';
 import { supabase } from '@/utils/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import { loadExercisePickerCatalog } from '@/features/workouts/occurrenceRepository';
+import type { RemovalPreview } from '@/features/workouts/removalRepository';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
 import { isCatalogExerciseId, type CatalogExerciseId } from '@/features/catalog/contracts';
@@ -25,6 +28,9 @@ import {
     OptionalValueCache,
     reportDevelopmentInteraction,
     SingleFlightGate,
+    InteractionScope,
+    filterExercisePickerOptions,
+    applyExercisePickerSelection,
 } from '@/features/workouts/swapInteraction';
 
 interface SwapOption extends WorkoutExercise {
@@ -115,22 +121,51 @@ const ExerciseOptionRow = memo(function ExerciseOptionRow({
     );
 });
 
+export interface AddExerciseSelection {
+    exercise: WorkoutExercise;
+    scope: 'workout_only' | 'rest_of_program';
+    preview?: RemovalPreview;
+    isCurrent: () => boolean;
+}
+
 type Props = {
-    program: CurrentProgram;
-    exerciseId: string;
-    context: 'program' | 'workout';
     onClose: () => void;
     /** When true, skip the backdrop/sheet wrapper — parent handles layout. */
     embedded?: boolean;
-
+} & ({
+    mode?: 'swap';
+    program: CurrentProgram;
+    exerciseId: string;
+    context: 'program' | 'workout';
     onSwap: (args: {
         exerciseId: string;
         replacement: WorkoutExercise;
         scope: 'workout_only' | 'rest_of_program';
     }) => unknown | Promise<unknown>;
-};
+} | {
+    mode: 'add';
+    loadAdditionScope: () => Promise<RemovalPreview>;
+    onAdd: (args: AddExerciseSelection) => unknown | Promise<unknown>;
+});
 
-export function SwapExerciseModal({ program, exerciseId, onClose, onSwap, embedded }: Props) {
+export function SwapExerciseModal(props: Props) {
+    const { ownerId } = useAuth();
+    // Account/target changes discard selections and invalidate outstanding requests.
+    return <ExercisePicker key={`${ownerId}/${props.mode ?? 'swap'}/${props.mode === 'add' ? '' : props.exerciseId}`} {...props} />;
+}
+
+function ExercisePicker(props: Props) {
+    const { embedded } = props;
+    const mode = props.mode ?? 'swap';
+    const program = props.mode === 'add' ? undefined : props.program;
+    const exerciseId = props.mode === 'add' ? undefined : props.exerciseId;
+    const interaction = useRef(new InteractionScope());
+    useEffect(() => {
+        const session = interaction.current;
+        session.activate();
+        return () => session.invalidate();
+    }, []);
+    const onClose = () => { interaction.current.invalidate(); props.onClose(); };
     const { theme } = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -147,7 +182,7 @@ export function SwapExerciseModal({ program, exerciseId, onClose, onSwap, embedd
     const applyStartedAtRef = useRef<number | null>(null);
 
     const currentExercise = useMemo(() => {
-        for (const workout of program.workouts) {
+        for (const workout of program?.workouts ?? []) {
             const found = workout.exercises.find((e) => e.id === exerciseId);
             if (found) return found as WorkoutExercise;
         }
@@ -168,105 +203,90 @@ export function SwapExerciseModal({ program, exerciseId, onClose, onSwap, embedd
     }, [currentExercise]);
     const [catalogUnavailable, setCatalogUnavailable] = useState(false);
 
-    const loadAlternatives = useCallback(async (
-        muscleGroup: MuscleGroup | undefined,
-        excludedExerciseId?: string,
-        preferredEquipment?: Equipment,
-        originalName?: string,
-    ) => {
-        setLoadingExercises(true);
-        setSelectedExerciseId(null);
-        setAlternatives([]);
-        setCatalogUnavailable(false);
-        try {
-            let query = supabase
-                .from('exercises')
-                .select('id, name, primary_muscle, equipment, image_url, instructions')
-                .order('name');
+    const [catalogAttempt, setCatalogAttempt] = useState(0);
+    const [scopeAttempt, setScopeAttempt] = useState(0);
+    const [additionPreview, setAdditionPreview] = useState<RemovalPreview>();
+    const [scopeLoading, setScopeLoading] = useState(mode === 'add');
+    const [scopeError, setScopeError] = useState<string | null>(null);
+    const loadAdditionScope = props.mode === 'add' ? props.loadAdditionScope : undefined;
 
-            if (muscleGroup) {
-                query = query.eq('primary_muscle', muscleGroup);
+    useEffect(() => {
+        if (!loadAdditionScope) return;
+        let cancelled = false;
+        const active = interaction.current.capture();
+        void Promise.resolve().then(async () => {
+            if (cancelled || !active()) return;
+            setScopeLoading(true); setScopeError(null); setAdditionPreview(undefined);
+            try {
+                const preview = await loadAdditionScope();
+                if (!cancelled && active()) setAdditionPreview(preview);
+            } catch {
+                if (!cancelled && active()) setScopeError('Future workout scope could not be checked. Retry, or add to this workout only.');
+            } finally {
+                if (!cancelled && active()) setScopeLoading(false);
             }
+        });
+        return () => { cancelled = true; };
+    }, [loadAdditionScope, scopeAttempt]);
 
-            const { data, error } = await query;
-
-            if (!error && data && data.length > 0) {
-                const { data: { session } } = await supabase.auth.getSession();
-                const { data: profile } = session ? await supabase.from('user_profile')
-                    .select('equipment_profile').eq('user_id', session.user.id).maybeSingle() : { data: null };
-                const availableEquipment = JSON.stringify(profile?.equipment_profile ?? '').toLowerCase();
-                const nameTokens = (originalName ?? '').toLowerCase().split(/\W+/).filter(token => token.length > 3);
-                const resolvedAlternatives = data.flatMap(ex => {
-                    if (!isCatalogExerciseId(ex.id)) return [];
-                    return [{
-                        id:          ex.id,
-                        catalogExerciseId: ex.id,
-                        name:        ex.name,
-                        muscleGroup: ex.primary_muscle as MuscleGroup,
-                        equipment:   ex.equipment as Equipment,
-                        sets:        currentExercise?.sets,
-                        reps:        currentExercise?.reps,
-                        imageUrl:    ex.image_url ?? undefined,
-                        description: (ex.instructions as string[] | null)?.[0] ?? undefined,
-                    }];
-                }).sort((left, right) => {
+    useEffect(() => {
+        if (mode === 'swap' && !currentExercise) return;
+        let cancelled = false;
+        const active = interaction.current.capture();
+        const isCurrent = () => !cancelled && active();
+        void Promise.resolve().then(async () => {
+            if (!isCurrent()) return;
+            setLoadingExercises(true); setSelectedExerciseId(null); setAlternatives([]); setCatalogUnavailable(false);
+            try {
+                const data = await loadExercisePickerCatalog(supabase, mode === 'add' ? undefined : resolvedMuscleGroup, isCurrent);
+                if (!isCurrent()) return;
+                let availableEquipment = '';
+                if (mode === 'swap') {
+                    const { data: { session } } = await supabase.auth.getSession();
+                    if (!isCurrent()) return;
+                    const { data: profile } = session ? await supabase.from('user_profile')
+                        .select('equipment_profile').eq('user_id', session.user.id).maybeSingle() : { data: null };
+                    availableEquipment = JSON.stringify(profile?.equipment_profile ?? '').toLowerCase();
+                }
+                if (!isCurrent()) return;
+                const nameTokens = (currentExercise?.name ?? '').toLowerCase().split(/\W+/).filter(token => token.length > 3);
+                const options: SwapOption[] = data.flatMap(ex => !isCatalogExerciseId(ex.id) ? [] : [{
+                    id: ex.id, catalogExerciseId: ex.id, name: ex.name,
+                    muscleGroup: ex.primary_muscle as MuscleGroup, equipment: ex.equipment as Equipment,
+                    sets: mode === 'add' ? 1 : currentExercise?.sets,
+                    reps: mode === 'add' ? '8-12' : currentExercise?.reps,
+                    imageUrl: ex.image_url ?? undefined,
+                    description: ex.instructions?.join('\n') || undefined,
+                }]);
+                if (mode === 'swap') options.sort((left, right) => {
                     const score = (option: SwapOption) =>
-                        (option.equipment === preferredEquipment ? 100 : 0)
+                        (option.equipment === currentExercise?.equipment ? 100 : 0)
                         + (availableEquipment.includes(String(option.equipment).toLowerCase()) ? 50 : 0)
                         + nameTokens.filter(token => option.name.toLowerCase().includes(token)).length * 10;
                     return score(right) - score(left) || left.name.localeCompare(right.name);
                 });
-                if (resolvedAlternatives.length > 0) {
-                    setAlternatives(resolvedAlternatives);
-                } else if (muscleGroup) {
+                if (options.length === 0 && mode === 'swap' && resolvedMuscleGroup) {
                     setCatalogUnavailable(true);
-                    const local = getAlternativesFor(
-                        muscleGroup,
-                        excludedExerciseId ? [excludedExerciseId] : [],
-                    );
-                    setAlternatives(local.map(ex => ({
-                        id:          ex.id,
-                        name:        ex.name,
-                        muscleGroup: ex.muscleGroup,
-                        equipment:   ex.equipment,
-                        sets:        currentExercise?.sets,
-                        reps:        currentExercise?.reps,
-                    })));
-                }
-            } else if (muscleGroup) {
+                    setAlternatives(getAlternativesFor(resolvedMuscleGroup, currentExercise?.exerciseId ? [currentExercise.exerciseId] : [])
+                        .map(ex => ({ ...ex, sets: currentExercise?.sets, reps: currentExercise?.reps })));
+                } else setAlternatives(options);
+            } catch {
+                if (!isCurrent()) return;
                 setCatalogUnavailable(true);
-                const local = getAlternativesFor(muscleGroup, excludedExerciseId ? [excludedExerciseId] : []);
-                setAlternatives(local.map(ex => ({
-                    id:          ex.id,
-                    name:        ex.name,
-                    muscleGroup: ex.muscleGroup,
-                    equipment:   ex.equipment,
-                    sets:        currentExercise?.sets,
-                    reps:        currentExercise?.reps,
-                })));
+                if (mode === 'swap' && resolvedMuscleGroup) {
+                    setAlternatives(getAlternativesFor(resolvedMuscleGroup, currentExercise?.exerciseId ? [currentExercise.exerciseId] : [])
+                        .map(ex => ({ ...ex, sets: currentExercise?.sets, reps: currentExercise?.reps })));
+                }
+            } finally {
+                if (isCurrent()) setLoadingExercises(false);
             }
-        } finally {
-            setLoadingExercises(false);
-        }
-    }, [currentExercise?.reps, currentExercise?.sets]);
-
-    useEffect(() => {
-        if (!currentExercise) return;
-        void Promise.resolve().then(() =>
-            loadAlternatives(resolvedMuscleGroup, currentExercise.exerciseId, currentExercise.equipment, currentExercise.name),
-        );
-    }, [currentExercise, loadAlternatives, resolvedMuscleGroup]);
+        });
+        return () => { cancelled = true; };
+    }, [mode, currentExercise, resolvedMuscleGroup, catalogAttempt]);
 
     const deferredSearchQuery = useDeferredValue(searchQuery);
-    const filteredAlternatives = useMemo(() => {
-        const q = deferredSearchQuery.trim().toLowerCase();
-        return alternatives.filter(ex => {
-            if (currentExercise?.exerciseId && ex.id === currentExercise.exerciseId) return false;
-            if (currentExercise && ex.name === currentExercise.name) return false;
-            if (!q) return true;
-            return ex.name.toLowerCase().includes(q);
-        });
-    }, [alternatives, deferredSearchQuery, currentExercise]);
+    const filteredAlternatives = useMemo(() => filterExercisePickerOptions(alternatives, deferredSearchQuery, mode, currentExercise),
+        [alternatives, deferredSearchQuery, mode, currentExercise]);
 
     const selectedExercise = useMemo(
         () => alternatives.find((exercise) => exercise.id === selectedExerciseId) ?? null,
@@ -298,9 +318,9 @@ export function SwapExerciseModal({ program, exerciseId, onClose, onSwap, embedd
 
     useEffect(() => {
         const catalogExerciseId = selectedExercise?.catalogExerciseId;
-        if (!isCatalogExerciseId(catalogExerciseId)) return;
+        if (mode === 'add' || !isCatalogExerciseId(catalogExerciseId)) return;
         historyCacheRef.current.prefetch(catalogExerciseId, () => loadHistorySuggestion(catalogExerciseId));
-    }, [loadHistorySuggestion, selectedExercise]);
+    }, [loadHistorySuggestion, selectedExercise, mode]);
 
     const handleSelect = useCallback((id: string) => {
         selectionStartedAtRef.current = interactionNow();
@@ -327,37 +347,28 @@ export function SwapExerciseModal({ program, exerciseId, onClose, onSwap, embedd
         scopeStartedAtRef.current = null;
     }, [scope]);
 
-    const handleSwap = async () => {
+    const handleApply = async () => {
         const catalogExerciseId = selectedExercise?.catalogExerciseId;
-        if (!selectedExercise || !isCatalogExerciseId(catalogExerciseId) || !applyGateRef.current.tryEnter()) return;
-        applyStartedAtRef.current = interactionNow();
-        setApplying(true);
-        setApplyError(null);
-        try {
-            const applied = await onSwap({
-                exerciseId,
-                replacement: {
-                    id:          catalogExerciseId,
-                    exerciseId:  catalogExerciseId,
-                    name:        selectedExercise.name,
-                    muscleGroup: selectedExercise.muscleGroup,
-                    equipment:   selectedExercise.equipment,
-                    sets:        selectedExercise.sets,
-                    reps:        selectedExercise.reps,
-                    imageUrl:    selectedExercise.imageUrl,
-                    description: selectedExercise.description,
-                    loadSuggestion: historyCacheRef.current.peek(catalogExerciseId),
-                },
-                scope,
-            });
-            if (applied !== false) onClose();
-        } catch (error) {
-            if (__DEV__) console.warn('[swap] Apply failed', error);
-            setApplyError('Exercise swap failed. Try again.');
-        } finally {
-            applyGateRef.current.leave();
-            setApplying(false);
-        }
+        if (!selectedExercise || !canApplySelectedExercise || !isCatalogExerciseId(catalogExerciseId)) return;
+        await applyExercisePickerSelection({
+            gate: applyGateRef.current,
+            interaction: interaction.current,
+            started: () => { applyStartedAtRef.current = interactionNow(); setApplying(true); setApplyError(null); },
+            apply: isCurrent => {
+                const exercise: WorkoutExercise = {
+                    id: catalogExerciseId, exerciseId: catalogExerciseId, name: selectedExercise.name,
+                    muscleGroup: selectedExercise.muscleGroup, equipment: selectedExercise.equipment,
+                    sets: selectedExercise.sets, reps: selectedExercise.reps, imageUrl: selectedExercise.imageUrl,
+                    description: selectedExercise.description, loadSuggestion: historyCacheRef.current.peek(catalogExerciseId),
+                };
+                return props.mode === 'add'
+                    ? props.onAdd({ exercise, scope, preview: additionPreview, isCurrent })
+                    : props.onSwap({ exerciseId: props.exerciseId, replacement: exercise, scope });
+            },
+            succeeded: onClose,
+            failed: error => setApplyError(error instanceof Error ? error.message : 'Exercise change failed. Try again.'),
+            settled: () => setApplying(false),
+        });
     };
 
     useEffect(() => {
@@ -378,20 +389,22 @@ export function SwapExerciseModal({ program, exerciseId, onClose, onSwap, embedd
         />
     ), [expandedId, handleSelect, handleToggleInfo, selectedExerciseId, styles, theme]);
 
-    const canApplySelectedExercise = isCatalogExerciseId(selectedExercise?.catalogExerciseId);
+    const futureUnavailable = mode === 'add' && (scopeLoading || !additionPreview?.futureCount);
+    const canApplySelectedExercise = isCatalogExerciseId(selectedExercise?.catalogExerciseId)
+        && !(scope === 'rest_of_program' && futureUnavailable);
 
-    if (!currentExercise) return null;
+    if (mode === 'swap' && !currentExercise) return null;
 
     const content = (
         <>
             {/* Header */}
             <View style={styles.header}>
                 <View style={{ flex: 1 }}>
-                    <Text style={styles.headerTitle}>Swap Exercise</Text>
-                    <Text style={styles.headerSubtitle}>Replace {currentExercise.name}</Text>
+                    <Text style={styles.headerTitle}>{mode === 'add' ? 'Add Exercise' : 'Swap Exercise'}</Text>
+                    <Text style={styles.headerSubtitle}>{mode === 'add' ? 'Add one blank, unperformed set' : `Replace ${currentExercise?.name}`}</Text>
                 </View>
 
-                <Pressable style={styles.iconBtn} onPress={onClose} accessibilityRole="button">
+                <Pressable style={styles.iconBtn} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close exercise picker">
                     <X color={theme.white} size={18} />
                 </Pressable>
             </View>
@@ -404,6 +417,7 @@ export function SwapExerciseModal({ program, exerciseId, onClose, onSwap, embedd
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                         placeholder="Search exercises..."
+                        accessibilityLabel="Search exercises"
                         placeholderTextColor={theme.placeholder}
                         style={styles.searchInput}
                         autoCorrect={false}
@@ -426,11 +440,14 @@ export function SwapExerciseModal({ program, exerciseId, onClose, onSwap, embedd
                 showsVerticalScrollIndicator={false}
                 ListHeaderComponent={(
                     <>
-                        <Text style={styles.sectionLabel}>{(resolvedMuscleGroup ?? 'General').toUpperCase()} EXERCISES</Text>
+                        <Text style={styles.sectionLabel}>{mode === 'add' ? 'ALL' : (resolvedMuscleGroup ?? 'General').toUpperCase()} EXERCISES</Text>
                         {catalogUnavailable ? (
-                            <Text style={styles.catalogUnavailableText}>
-                                Reconnect to use these preview exercises in your workout.
-                            </Text>
+                            <View>
+                                <Text style={styles.catalogUnavailableText}>{mode === 'add' ? 'The exercise catalog could not be loaded.' : 'Reconnect to use these preview exercises in your workout.'}</Text>
+                                <Pressable accessibilityRole="button" onPress={() => setCatalogAttempt(value => value + 1)} style={styles.scopeButton}>
+                                    <Text style={styles.switchText}>Retry catalog</Text>
+                                </Pressable>
+                            </View>
                         ) : null}
                     </>
                 )}
@@ -467,24 +484,32 @@ export function SwapExerciseModal({ program, exerciseId, onClose, onSwap, embedd
                             scope === 'rest_of_program' && styles.scopeButtonSelected,
                             pressed && styles.rowPressed,
                         ]}
+                        disabled={futureUnavailable}
                         onPress={() => handleScope('rest_of_program')}
                         hitSlop={4}
                         accessibilityRole="radio"
-                        accessibilityState={{ checked: scope === 'rest_of_program' }}
+                        accessibilityState={{ checked: scope === 'rest_of_program', disabled: futureUnavailable }}
                     >
-                        <Text style={styles.switchText}>Rest of program</Text>
+                        <Text style={styles.switchText}>{mode === 'add' ? 'Whole program — this day' : 'Rest of program'}</Text>
                         <Text style={styles.switchDescription}>
-                            Changes this workout’s remaining work and later uncompleted occurrences. Completed history stays unchanged.
+                            {mode === 'add'
+                                ? scopeLoading ? 'Checking eligible future workouts…' : additionPreview ? `Includes this workout and ${additionPreview.futureCount} later uncompleted occurrences of this day.` : 'Future count unavailable.'
+                                : 'Changes this workout’s remaining work and later uncompleted occurrences. Completed history stays unchanged.'}
                         </Text>
                     </Pressable>
                 </View>
+                {mode === 'add' && scopeError ? <View>
+                    <Text style={styles.applyError} accessibilityLiveRegion="polite">{scopeError}</Text>
+                    <Pressable accessibilityRole="button" onPress={() => setScopeAttempt(value => value + 1)} style={styles.scopeButton}><Text style={styles.switchText}>Retry future count</Text></Pressable>
+                </View> : null}
+                {mode === 'add' ? <Pressable accessibilityRole="button" onPress={onClose} style={styles.cancelButton}><Text style={styles.switchText}>Cancel</Text></Pressable> : null}
                 {applyError ? <Text style={styles.applyError} accessibilityLiveRegion="assertive">{applyError}</Text> : null}
 
                 <Pressable
-                    onPress={() => void handleSwap()}
+                    onPress={() => void handleApply()}
                     disabled={!canApplySelectedExercise || applying}
                     accessibilityRole="button"
-                    accessibilityState={{ disabled: !canApplySelectedExercise }}
+                    accessibilityState={{ disabled: !canApplySelectedExercise || applying }}
                     style={({ pressed }) => [
                         styles.swapBtn,
                         (!canApplySelectedExercise || applying) && styles.swapBtnDisabled,
@@ -494,9 +519,9 @@ export function SwapExerciseModal({ program, exerciseId, onClose, onSwap, embedd
                     <Text style={styles.swapBtnText}>
                         {applying
                             ? 'Saving…'
-                            : selectedExercise && !canApplySelectedExercise
+                            : selectedExercise && !isCatalogExerciseId(selectedExercise.catalogExerciseId)
                             ? 'Reconnect to Apply'
-                            : 'Apply swap'}
+                            : mode === 'add' ? 'Add' : 'Apply swap'}
                     </Text>
                 </Pressable>
             </View>
@@ -513,7 +538,7 @@ export function SwapExerciseModal({ program, exerciseId, onClose, onSwap, embedd
     return (
         <View style={styles.backdrop}>
             <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-            <KeyboardAvoidingView style={styles.sheet} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <KeyboardAvoidingView accessibilityViewIsModal style={styles.sheet} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                 {content}
             </KeyboardAvoidingView>
         </View>
@@ -524,7 +549,7 @@ function createStyles(theme: Theme) {
     return StyleSheet.create({
         backdrop: {
             flex: 1,
-            backgroundColor: 'rgba(0,0,0,0.82)',
+            backgroundColor: 'transparent',
             justifyContent: 'flex-end',
         },
         embeddedContainer: {
@@ -719,6 +744,7 @@ function createStyles(theme: Theme) {
             fontSize: 13,
         },
 
+        cancelButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
         footer: {
             paddingHorizontal: 18,
             paddingVertical: 14,

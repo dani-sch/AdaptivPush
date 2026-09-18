@@ -1,6 +1,9 @@
 import type { FrozenWorkoutPrescription, SetOutcome, WorkoutDraftSlot, WorkoutDraft } from './contracts';
 import type { CompletedWorkoutSetCorrection } from './correctionContracts';
 
+import { isRemoved } from './removals';
+import { occurrenceSetFromEffective } from './structure';
+
 export type WorkoutMode = 'in_progress' | 'completed_view' | 'completed_edit';
 export type OccurrenceState = 'unstarted' | 'in_progress' | 'pending_sync' | 'finalized';
 
@@ -32,6 +35,9 @@ export function createCompletedNavigation() {
 }
 
 export interface OccurrenceSet extends CompletedWorkoutSetCorrection {
+  enteredLoadText?: string;
+  enteredRepsText?: string;
+  enteredRpeText?: string;
   outcome: SetOutcome;
   prescribed: boolean;
 }
@@ -50,15 +56,15 @@ export function projectCompletedOccurrence(
   names: ReadonlyMap<string, string> = new Map(),
 ): { exercises: OccurrenceExercise[]; missingPrescription: boolean } {
   const consumed = new Set<string>();
-  const exercises: OccurrenceExercise[] = (snapshot?.slots ?? []).map(slot => {
+  const exercises: OccurrenceExercise[] = (snapshot?.slots ?? []).filter(slot => !isRemoved(snapshot?.removals, slot.slotId)).map(slot => {
     const effective: WorkoutDraftSlot | undefined = snapshot?.effectiveSlots?.find(s => s.slotId === slot.slotId);
     const exerciseId = effective?.actualExerciseId ?? slot.prescribedExerciseId;
     const first = slot.sets?.[0];
     return {
       slotId: slot.slotId, exerciseId,
       name: names.get(exerciseId) ?? effective?.replacementExerciseName ?? slot.exerciseName ?? 'Prescribed exercise',
-      prescription: `${slot.prescribedSetCount} × ${first ? `${first.plannedRepsMin}–${first.plannedRepsMax}` : 'prescribed reps'}`,
-      sets: (slot.sets ?? []).map(set => {
+      prescription: `${(slot.sets ?? []).filter(set => !isRemoved(snapshot?.removals, slot.slotId, set.setId)).length} × ${first ? `${first.plannedRepsMin}–${first.plannedRepsMax}` : 'prescribed reps'}`,
+      sets: (slot.sets ?? []).filter(set => !isRemoved(snapshot?.removals, slot.slotId, set.setId)).map(set => {
         const actual = actuals.find(a => a.actualSetId === set.setId
           || (a.prescriptionSlotId === slot.slotId && a.order === set.order));
         if (actual) consumed.add(actual.actualSetId);
@@ -68,14 +74,29 @@ export function projectCompletedOccurrence(
         return {
           prescriptionSlotId: slot.slotId,
           prescribedExerciseId: slot.prescribedExerciseId, exerciseId,
-          order: set.order, reps: 0, loadValue: null, loadUnit: set.loadUnit ?? 'none',
-          loadKind: set.loadKind ?? 'unknown', loadSide: set.loadSide ?? 'unknown', rpe: null, loggedAt: '',
+          order: set.order, reps: 0, loadValue: null, loadUnit: saved?.loadUnit ?? set.loadUnit ?? 'none',
+          loadKind: saved?.loadKind ?? set.loadKind ?? 'unknown', loadSide: saved?.loadSide ?? set.loadSide ?? 'unknown', rpe: null, loggedAt: '',
           ...actual, actualSetId: set.setId, outcome, prescribed: true,
         };
       }),
     };
   });
-  for (const actual of actuals.filter(s => !consumed.has(s.actualSetId))) {
+  for (const slot of snapshot?.effectiveSlots ?? []) {
+    if (isRemoved(snapshot?.removals, slot.slotId)) continue;
+    let exercise = exercises.find(e => e.slotId === slot.slotId);
+    if (!exercise) { exercise = { slotId: slot.slotId, exerciseId: slot.actualExerciseId,
+      name: names.get(slot.actualExerciseId) ?? slot.replacementExerciseName ?? slot.exerciseName ?? 'Added exercise', prescription: 'Added work', sets: [] }; exercises.push(exercise); }
+    for (const set of slot.sets) {
+      if (isRemoved(snapshot?.removals, slot.slotId, set.setId)) continue;
+      const existing = exercise.sets.find(s => s.actualSetId === set.setId);
+      const actual = actuals.find(s => s.actualSetId === set.setId);
+      if (actual) consumed.add(actual.actualSetId);
+      if (existing) {
+        if (!actual && existing.outcome !== 'performed') Object.assign(existing, occurrenceSetFromEffective(set, slot, existing.prescribed), { outcome: existing.outcome });
+      } else exercise.sets.push({ ...occurrenceSetFromEffective(set, slot, false), ...actual, outcome: actual ? 'performed' : set.outcome === 'skipped' ? 'skipped' : 'not_attempted' });
+    }
+  }
+  for (const actual of actuals.filter(s => !consumed.has(s.actualSetId) && !isRemoved(snapshot?.removals, s.prescriptionSlotId ?? s.exerciseId, s.actualSetId))) {
     let exercise = exercises.find(e => e.slotId === (actual.prescriptionSlotId ?? actual.exerciseId));
     if (!exercise) {
       exercise = { slotId: actual.prescriptionSlotId ?? actual.exerciseId, exerciseId: actual.exerciseId,
@@ -84,5 +105,13 @@ export function projectCompletedOccurrence(
     }
     exercise.sets.push({ ...actual, outcome: 'performed', prescribed: false });
   }
-  return { exercises, missingPrescription: !snapshot?.slots?.length || snapshot.slots.some(s => !s.sets?.length) };
+  for (const exercise of exercises) {
+    const identities = new Set(exercise.sets.map(set => set.exerciseId));
+    if (!snapshot?.effectiveSlots?.some(slot => slot.slotId === exercise.slotId)
+      && identities.size === 1 && exercise.sets.some(set => set.outcome === 'performed')) {
+      exercise.exerciseId = exercise.sets[0].exerciseId;
+      exercise.name = names.get(exercise.exerciseId) ?? exercise.name;
+    }
+  }
+  return { exercises: exercises.filter(e => e.sets.length > 0), missingPrescription: !snapshot?.slots?.length || snapshot.slots.some(s => !s.sets?.length) };
 }

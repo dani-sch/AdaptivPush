@@ -1,19 +1,44 @@
 # AdaptivPush overview
 
-AdaptivPush is an Expo Router strength-training application backed by Supabase. Its product direction combines useful planning, accurate workout records and explained adaptive proposals while preserving user agency. Free training remains complete; premium sells advanced customization, equipment precision and automation.
+AdaptivPush is an Expo Router strength-training planner and workout logger backed by Supabase. Its product direction combines useful planning, accurate workout records, and explained adaptive proposals while preserving user agency. Free training remains complete; premium is reserved for advanced customization, equipment precision, and automation.
+
+## Current release boundary
+
+The trusted catalog and durable workout/program foundations are deployed. Completed-workout correction, scoped set/exercise removal, durable exercise/set additions, and composed future program edits are also deployed to the verified hosted project `thfxcvxcsfvrzdysdnkq`.
+
+| Boundary | Current fact |
+|---|---|
+| Hosted capabilities | correction 2, removal 1, structure 1 |
+| Hosted ledger | Nine supported migrations through `20260918160000_workout_structure.sql` |
+| Active client behavior | Resilient auth/session hydration; owner-scoped draft and pending-operation recovery; stable occurrence routing; detailed Add/Swap picker; atomic Finish/Save with receipt verification |
+| Current automated evidence | 157 application cases, strict TypeScript, and lint with zero errors and three known warnings |
+| Current acceptance limit | Physical iPhone/Expo presentation, native restart/interruption, keyboard/accessibility, and the user's exact past-program route remain user-led and unverified |
+| Next product slices | AP-04 dated schedules/manual deviations, then AP-05 authoritative history/progression |
+
+Implementation and tested behavior take precedence over older planning language. The September 17 and 18 reports retain the exact release, recovery, migration, and regression evidence; plans now describe the remaining work rather than treating deployed behavior as proposed.
+
+## What the latest work changed
+
+Workout capture and completed editing now preserve raw input, explicit performed/skipped/not-attempted outcomes, stable original prescription evidence, and durable added structure. Removal, swaps, and additions can be composed into one future-program revision while completed ancestors remain unchanged. Recovery waits for exact pending operations and authoritative saved values before reporting success.
+
+The Add flow reuses the detailed exercise picker, loads the complete catalog, keeps duplicate additions distinct, and requires an explicit scope confirmation. Restoration accepts unfinished measurements without hiding the editor; validation remains at Check/Finish. Auth hydration distinguishes transient connectivity failures from sign-out, and native clients reject loopback backend configuration.
+
+These changes do not implement dated scheduling, a new progression worker, public/community features, health integration, purchases, or broader AP-04/AP-05 policy.
 
 ## Read next
 
+- [Current state](/dev-doc/main/CURRENT-STATE.md): exact hosted/source posture and remaining limits.
+- [Active task board](/dev-doc/main/TODO.md): the only immediate execution queue.
 - [Plan index](/dev-doc/plans/active/PLAN-INDEX.md): canonical ownership and provenance.
-- [Master plan](/dev-doc/plans/active/ADAPTIVPUSH-MASTER-PLAN.md): implementation contract under approved decisions.
-- [Execution register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md): neutral AP slices and release gates.
-- [Implementation status](/dev-doc/plans/active/ADAPTIVPUSH-IMPLEMENTATION-STATUS.md): code facts and defects.
-- [Architecture](/dev-doc/main/ARCHITECTURE.md), [current state](/dev-doc/main/CURRENT-STATE.md), [roadmap](/dev-doc/main/ROADMAP.md), [TODO](/dev-doc/main/TODO.md), [file index](/dev-doc/main/TOC.md), [command routing](/dev-doc/main/COMMAND-TOC.md).
+- [Master plan](/dev-doc/plans/active/ADAPTIVPUSH-MASTER-PLAN.md): approved behavior and boundaries.
+- [Execution register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md): stable AP slices and release gates.
+- [Implementation status](/dev-doc/plans/active/ADAPTIVPUSH-IMPLEMENTATION-STATUS.md): code-backed working, partial, and missing facts.
+- [Architecture](/dev-doc/main/ARCHITECTURE.md), [roadmap](/dev-doc/main/ROADMAP.md), [file index](/dev-doc/main/TOC.md), and [command routing](/dev-doc/main/COMMAND-TOC.md).
 
-## Current execution boundary
+## Evidence
 
-AP-01.3 baseline and catalog authority are released. The hosted AP-02/AP-03 packet is deployed to `thfxcvxcsfvrzdysdnkq`. The normal `.env` enables both writers, and the freshly served iOS bundle verifies the expected hosted backend, public client key and true/true flags with no privileged key. The user authorized this rollout after agent-run recovery and technical checks, replacing earlier pre-migration local/manual/QA-account, signing, standalone-build and distribution requirements. Physical acceptance follows deployment with the existing account through ordinary `npm start` and its Expo Go QR. Physical iPhone cold launch, five-action UI/reopen acceptance and accessibility remain unverified. Thirty-two pre-existing non-rest days have no exercises (five in active programs); they were preserved, not populated with invented prescriptions. Complete persisted workouts can use their database identities; empty legacy days remain unstartable. AP-04/AP-05 remain out of scope. [Current packet evidence](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md) owns recovery, exact migrations, verification and integration. Route next work through TODO, CURRENT-STATE and the register.
-
-## Released completed-workout editing
-
-Past-workout editing is released to `thfxcvxcsfvrzdysdnkq`. Authorized migrations `20260915190000` and `20260915210000` are deployed; authenticated capability is integer `2`. The existing editor supports explicit outcomes and loading semantics, same-session corrections, exact retry and stale-revision recovery. Authenticated hosted browser edit/cancel/save/reopen and all completed-workout entry points passed. Fresh encrypted backup and isolated restore matched all 57 captured relations; original data was preserved. [September 17 release evidence](/dev-doc/reports/ADAPTIVPUSH-EDIT-PAST-WORKOUT-RELEASE-2026-09-17.md) owns hashes, security, 96 passing application cases, eight concurrency checks, SQL verification and limits. Physical iPhone acceptance remains open. AP-04/AP-05 remain queued.
+- [September 18 workout editing and detailed Add](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-EDITING-2026-09-18.md)
+- [September 17 iPhone/session recovery](/dev-doc/reports/ADAPTIVPUSH-IPHONE-RECOVERY-2026-09-17.md)
+- [September 17 scoped-removal release](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-REMOVAL-RELEASE-2026-09-17.md)
+- [September 17 completed-workout correction release](/dev-doc/reports/ADAPTIVPUSH-EDIT-PAST-WORKOUT-RELEASE-2026-09-17.md)
+- [September 14 AP-02/AP-03 release](/dev-doc/reports/ADAPTIVPUSH-AP-02-AP-03-RELEASE-2026-09-14.md)

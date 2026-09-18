@@ -2,11 +2,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { createClient } from '@supabase/supabase-js'
 import 'react-native-url-polyfill/auto'
+import { Platform } from 'react-native'
+import { backendConfigurationIssue } from '@/features/auth/backendConfiguration'
 
 import { persistedSessionOwnerId } from '@/features/auth/persistedSession'
 import { resilientSupabaseFetch } from '@/utils/supabaseResilience'
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!
+export const supabaseConfigurationIssue = backendConfigurationIssue(supabaseUrl, Platform.OS)
 const supabaseAuthStorageKey = `sb-${new URL(supabaseUrl).hostname.split('.')[0]}-auth-token`
 const supabaseAuthStorage = typeof window === 'undefined'
   ? {
@@ -21,7 +24,10 @@ export const supabase = createClient(
   process.env.EXPO_PUBLIC_SUPABASE_KEY!,
   {
     global: {
-      fetch: resilientSupabaseFetch,
+      fetch: (input, init) => {
+        if (supabaseConfigurationIssue) return Promise.reject(new Error(`AP_BACKEND_CONFIGURATION: ${supabaseConfigurationIssue}`))
+        return resilientSupabaseFetch(input, init)
+      },
     },
     auth: {
       storage: supabaseAuthStorage,

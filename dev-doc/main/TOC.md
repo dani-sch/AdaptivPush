@@ -10,18 +10,18 @@
 | Category | Files |
 |----------|-------|
 | Project Root | 4 |
-| Tests | 19 |
-| Top-level Scripts | 33 |
+| Tests | 24 |
+| Top-level Scripts | 35 |
 | Automation Scripts | 24 |
 | Tool Scripts | 27 |
 | Power Automate Scripts | 1 |
 | VBA Scripts | 5 |
 | Documentation | 44 |
-| Configuration | 8 |
+| Configuration | 9 |
 | Skills | 62 |
 | Agents | 17 |
 | Commands | 8 |
-| **Total** | **252** |
+| **Total** | **260** |
 
 ---
 
@@ -47,6 +47,7 @@ _Test suite_
     ├── availability/
     │   ├── profileResilience.test.ts — import assert from 'node:assert/strict';
     │   ├── programAvailability.test.ts — import assert from 'node:assert/strict';
+    │   ├── sessionRecovery.test.ts — import assert from 'node:assert/strict';
     │   └── supabaseResilience.test.ts — import assert from 'node:assert/strict';
     ├── catalog/
     │   └── resolveCatalogExercises.test.ts — import assert from 'node:assert/strict';
@@ -60,11 +61,15 @@ _Test suite_
     │   └── rollout.test.ts — import assert from 'node:assert/strict';
     └── workouts/
         ├── correction.test.ts — import assert from 'node:assert/strict';
+        ├── editDraftStore.test.ts — import assert from 'node:assert/strict';
         ├── effectiveCurrentWorkout.test.ts — import assert from 'node:assert/strict';
         ├── finalization.test.ts — import assert from 'node:assert/strict';
+        ├── loadPresentation.test.ts — import assert from 'node:assert/strict';
         ├── nextWorkoutCard.test.ts — import assert from 'node:assert/strict';
         ├── occurrence.test.ts — import assert from 'node:assert/strict';
         ├── persistedSession.test.ts — import assert from 'node:assert/strict';
+        ├── removalCapability.test.ts — import assert from 'node:assert/strict';
+        ├── removals.test.ts — import assert from 'node:assert/strict';
         ├── routeResolution.test.ts — import assert from 'node:assert/strict';
         ├── swapInteraction.test.ts — import assert from 'node:assert/strict';
         └── swapRecovery.test.ts — import { confirmedSwapMessage } from '../../features/workouts/swapRecovery';
@@ -106,11 +111,13 @@ _Standalone utility scripts_
     ├── seedManualQa.ts — // Synthetic public catalog only. This script has no remote-target option.
     ├── Start-ApIosQa.ps1 — param(
     ├── Start-ApManualQa.ps1 — param(
+    ├── startLocalWebQa.mjs — // Local database fixtures are browser-only. Never advertise this server on LAN.
     ├── sync-all-clones.sh — sync-all-clones.sh - Fast-forward all CHAOS clones to a selected origin branch.
     ├── tsconfig.json — {
     ├── verifyDurableConcurrency.mjs — // Nonvisual integration proof. Only the named local Supabase container is used.
     ├── verifyIosProgramFlows.ts — // Exercises the shipped repository + commands against LAN-reachable synthetic Supabase.
-    └── verifyLegacyMigration.ts — // Real AP-01 -> AP-02/AP-03 upgrade on a separate synthetic local database.
+    ├── verifyLegacyMigration.ts — // Real AP-01 -> AP-02/AP-03 upgrade on a separate synthetic local database.
+    └── verifyRemovalConcurrency.mjs — // Nonvisual integration proof. Only the named local Supabase container is used.
 ```
 
 ---
@@ -306,6 +313,7 @@ _Living documents and active plans_
 _Build, lint, test, and infrastructure config_
 
 ```
+├── .gitattributes — supabase/migrations/20260917180000_scoped_workout_removals.sql text eol=lf
 ├── .gitignore — # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 ├── app.json — {
 ├── eslint.config.js — // https://docs.expo.dev/guides/using-eslint/

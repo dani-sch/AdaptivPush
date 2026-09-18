@@ -74,7 +74,7 @@ test('future revision failure leaves a distinct unavailable outcome', async () =
   assert.deepEqual(outcome, {
     status: 'unavailable',
     failure: { category: 'offline', retryable: true, status: undefined, code: undefined },
-    message: 'You appear to be offline. Check your connection and try again.',
+    message: 'Could not connect to AdaptivPush. Check Wi-Fi or cellular access and try again. If other apps work, verify the app server connection. Your workout drafts are still on this device.',
   });
 });
 

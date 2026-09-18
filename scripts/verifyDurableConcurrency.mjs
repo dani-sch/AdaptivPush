@@ -93,6 +93,42 @@ try {
   assert.match(rejected.reason.message, /stale_revision/);
   assert.equal(await sql(`SELECT count(*) FROM public.programs WHERE user_id='${owner}' AND is_active`), '1');
   console.log('PASS competing installations preserve one active program and return stale conflict');
+  const active = replacements.find(r => r.status === 'fulfilled').value;
+  const activeDay = await sql(`SELECT id FROM public.program_days WHERE program_revision_id='${active.revisionId}' AND stable_day_id='${days[0]}'`);
+  const originalSet = { ...workout.slots[0].sets[0], setId: randomUUID(), logged: false, outcome: 'not_attempted', actualReps: null, actualLoad: null };
+  const extra = { ...originalSet, setId: randomUUID(), order: 2, logged: true, outcome: 'performed', actualReps: 8, actualLoad: 25, loadUnit: 'kg' };
+  const addedId = randomUUID();
+  const originalSlot = { ...workout.slots[0], slotId: slots[0], sets: [originalSet] };
+  const effectiveSlots = [{ ...originalSlot, actualExerciseId: exercises[1], sets: [originalSet, extra] },
+    { slotId: addedId, prescribedExerciseId: exercises[1], actualExerciseId: exercises[1], prescribedSetCount: 0,
+      sets: [{ ...originalSet, setId: randomUUID(), actualExerciseId: exercises[1] }] }];
+  const combined = { ...workout, operationId: randomUUID(), draftId: randomUUID(), structureVersion: 1,
+    programDayId: activeDay, prescriptionRevisionId: active.revisionId, frozenPrescription: { slots: [originalSlot] }, slots: effectiveSlots,
+    removals: { version: 1, slots: [], sets: [{ slotId: slots[0], setId: originalSet.setId, order: 1 }] },
+    programRemoval: { programId: active.programId, expectedRevision: 1, expectedRevisionId: active.revisionId, currentStableDayId: days[0],
+      targets: [{ slotId: slots[0], order: 1 }], swaps: [{ slotId: slots[0], exerciseId: exercises[1] }],
+      additions: [{ slotId: addedId, exerciseId: exercises[1], setCount: 1 }] } };
+  const combinedReceipt = await race(`public.finalize_workout_structure_v1(${json(combined)})`);
+  assert.equal(combinedReceipt.setCount, 1);
+  assert.equal(combinedReceipt.completionClass, 'partial');
+  assert.equal(await sql(`SELECT current_revision FROM public.programs WHERE id='${active.programId}'`), '2');
+  assert.equal(await sql(`SELECT count(*) FROM public.program_day_exercises WHERE addition_lineage='${addedId}'`), '2');
+  console.log('PASS simultaneous combined Finish replays one occurrence and one swap/removal/addition revision');
+  const correctedSlots = structuredClone(effectiveSlots);
+  correctedSlots[1].sets.push({ ...originalSet, setId: randomUUID(), order: 2, actualExerciseId: exercises[1] });
+  const structuralCorrection = { schemaVersion: 1, sessionId: combinedReceipt.sessionId, expectedRevision: 0,
+    effectiveSlots: correctedSlots, removals: combined.removals, sets: [{ actualSetId: extra.setId,
+      prescriptionSlotId: slots[0], prescribedExerciseId: exercises[0], exerciseId: extra.actualExerciseId,
+      order: 2, reps: 8, loadValue: 25, loadUnit: 'kg', loadKind: 'external', loadSide: 'external_total', rpe: null, loggedAt: workout.endedAt }] };
+  const candidates = [0,1].map(() => ({ ...structuralCorrection, operationId: randomUUID() }));
+  const structuralRace = await Promise.allSettled(candidates.map(p => rpc(`public.correct_workout_structure_v1(${json(p)})`)));
+  assert.equal(structuralRace.filter(r => r.status === 'fulfilled').length, 1);
+  assert.match(structuralRace.find(r => r.status === 'rejected').reason.message, /stale_revision/);
+  const winner = candidates[structuralRace.findIndex(r => r.status === 'fulfilled')];
+  assert.equal((await rpc(`public.correct_workout_structure_v1(${json(winner)})`)).replayed, true);
+  assert.equal(await sql(`SELECT count(*) FROM public.workout_correction_audit WHERE workout_session_id='${combinedReceipt.sessionId}'`), '1');
+  assert.equal(await sql(`SELECT jsonb_array_length(prescription_snapshot->'effectiveSlots'->1->'sets') FROM public.workout_sessions WHERE id='${combinedReceipt.sessionId}'`), '2');
+  console.log('PASS competing structural corrections preserve a blank extra, reject stale intent, and replay one audit');
 } finally {
   await sql(`DROP TRIGGER IF EXISTS ap_release_install_delay ON public.programs;
     DROP TRIGGER IF EXISTS ap_release_workout_delay ON public.workout_sessions;

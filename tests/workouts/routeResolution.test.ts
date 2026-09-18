@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createWorkoutDraft } from '../../features/workouts/contracts';
+import { createWorkoutDraft, updateWorkoutSet, validateWorkoutDraft } from '../../features/workouts/contracts';
 import { activeWorkoutDraftMatches, workoutDraftMatches } from '../../features/workouts/draftStore';
 import {
   draftLookupForRoute,
@@ -231,4 +231,149 @@ test('an active frozen draft can bridge a successor revision only by owner, prog
     programId: program.id,
     stableDayId,
   }), false);
+});
+
+
+// Exercise the same asynchronous restoration/recovery boundary used by the screen.
+import { createWorkoutEditingState, resolveWorkoutEditingSession } from '../../features/workouts/editingState';
+import { resumableWorkoutDraftMatches } from '../../features/workouts/routeResolution';
+import { matchingActiveWorkoutDraft, matchingOccurrenceWorkoutDraft } from '../../features/workouts/effectiveCurrentWorkout';
+import { finalizeWorkout } from '../../features/workouts/commands';
+import type { WorkoutDraftStore } from '../../features/workouts/draftStore';
+import type { WorkoutRepository } from '../../features/workouts/repository';
+
+const available = (value: typeof draft | null, resolutionLoading = false, resolutionError: string | null = null) => workoutAvailability({
+  authLoading: false, programLoading: false, program, programWorkout: program.workouts[0],
+  draft: value, ownerId, route, resolutionLoading, resolutionError,
+});
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(done => { resolve = done; });
+  return { promise, resolve };
+}
+function lifecycle(value = draft) {
+  const state = createWorkoutEditingState(); state.select('target');
+  const input = { state, key: 'target', isCurrent: () => true, load: async () => value,
+    matches: (d: typeof draft) => resumableWorkoutDraftMatches(d, ownerId, draftLookupForRoute(route)),
+    recover: async (_d: typeof draft): Promise<unknown> => null, installed: (_d: typeof draft) => {} };
+  return { state, input };
+}
+
+for (const text of ['', '.', '3.5']) test(`resume checked-row deletion/partial reps ${JSON.stringify(text)} reaches ready; Finish reports a field error`, async () => {
+  let value = updateWorkoutSet(draft, { setId, reps: 8, load: 30, logged: true });
+  value = updateWorkoutSet(value, { setId, reps: text === '3.5' ? 3.5 : null, enteredRepsText: text });
+  const { state, input } = lifecycle(JSON.parse(JSON.stringify(value)));
+  assert.equal((await resolveWorkoutEditingSession(input)).status, 'ready');
+  assert.equal(available(state.read()), 'ready');
+  assert.equal(matchingActiveWorkoutDraft(program, program.workouts[0], ownerId, state.read())?.draftId, value.draftId);
+  assert.equal(matchingOccurrenceWorkoutDraft(program, program.workouts[0], ownerId, state.read())?.draftId, value.draftId);
+  assert.equal(validateWorkoutDraft(state.read()!).ok, false);
+  const store: WorkoutDraftStore = { load: async () => null, loadMatching: async () => null, save: async () => {}, remove: async () => {} };
+  const repository: WorkoutRepository = { finalize: async submitted => ({ operationId: submitted.operationId, sessionId: 'session',
+    draftId: draft.draftId, revision: 1, setCount: 1, completionClass: 'complete', finalizedAt: '2026-09-11T13:00:00Z', replayed: false }) };
+  assert.equal((await finalizeWorkout(repository, store, state.read()!, '2026-09-11T13:00:00Z')).status, 'validation');
+  state.replace(updateWorkoutSet(state.read()!, { setId, reps: 8, enteredRepsText: '8' }));
+  assert.equal(available(state.read()), 'ready');
+  assert.equal((await finalizeWorkout(repository, store, state.read()!, '2026-09-11T13:00:00Z')).status, 'finalized');
+});
+
+test('cancellation after installation resumes exact recovery on Retry without replacing newer typing', async () => {
+  const { state, input } = lifecycle();
+  const pending = { operationId: 'exact-operation', request: { revisionId, payload: ['unchanged'] } };
+  const recovery = deferred<unknown>(); let current = true;
+  const started = deferred<void>();
+  const first = resolveWorkoutEditingSession({ ...input, isCurrent: () => current,
+    recover: async () => { started.resolve(); return recovery.promise; } });
+  await started.promise;
+  assert.equal(available(state.read(), true), 'loading');
+  state.replace(updateWorkoutSet(state.read()!, { setId, enteredLoadText: '3.' }));
+  current = false; recovery.resolve(pending);
+  assert.equal((await first).status, 'cancelled');
+  const retry = await resolveWorkoutEditingSession({ ...input, load: async () => { throw new Error('must not reload installed draft'); }, recover: async () => pending });
+  assert.deepEqual(retry, { status: 'ready', recovery: pending });
+  assert.equal(available(state.read()), 'ready');
+  assert.equal(state.read()!.slots[0].sets[0].enteredLoadText, '3.');
+  assert.equal(state.read()!.operationId, draft.operationId);
+});
+
+test('recovery failure remains unavailable until existing-draft Retry settles successfully', async () => {
+  const { state, input } = lifecycle();
+  await assert.rejects(resolveWorkoutEditingSession({ ...input, recover: async () => { throw new Error('read failed'); } }), /read failed/);
+  assert.equal(available(state.read(), false, 'read failed'), 'unavailable');
+  assert.equal((await resolveWorkoutEditingSession(input)).status, 'ready');
+  assert.equal(available(state.read()), 'ready');
+});
+
+test('delayed program refresh sharing an earlier empty read still creates and settles a draft', async () => {
+  const { state, input } = lifecycle(); const storage = deferred<typeof draft | null>();
+  let current = true;
+  const first = resolveWorkoutEditingSession({ ...input, isCurrent: () => current, load: () => storage.promise });
+  current = false;
+  const refreshed = resolveWorkoutEditingSession(input);
+  storage.resolve(null);
+  assert.equal((await first).status, 'cancelled');
+  assert.equal((await refreshed).status, 'ready');
+  assert.equal(available(state.read()), 'ready');
+});
+
+test('account change during recovery discards readiness and preserves the other account draft', async () => {
+  const { state, input } = lifecycle(); const recovery = deferred<unknown>(); const started = deferred<void>();
+  const first = resolveWorkoutEditingSession({ ...input, recover: () => { started.resolve(); return recovery.promise; } });
+  await started.promise;
+  state.select('other-account');
+  const other = { ...draft, ownerId: 'other-account' }; state.hydrate('other-account', other);
+  recovery.resolve({ operationId: 'first-account-operation' });
+  assert.equal((await first).status, 'cancelled');
+  assert.equal(state.read(), other);
+  assert.equal(available(state.read()), 'unavailable');
+});
+
+test('finalized occurrences redirect on re-entry and when program refresh reveals their session', async () => {
+  const { state, input } = lifecycle(); await resolveWorkoutEditingSession(input);
+  const result = await resolveWorkoutEditingSession({ ...input, completedSessionId: 'completed-session', recover: async () => { throw new Error('must redirect'); } });
+  assert.deepEqual(result, { status: 'completed', sessionId: 'completed-session' });
+  assert.equal(state.read()!.operationId, draft.operationId);
+  const finalized = lifecycle({ ...draft, lifecycle: 'finalized', finalizedReceipt: { operationId: draft.operationId,
+    sessionId: 'stored-session', draftId: draft.draftId, revision: 1, setCount: 1, completionClass: 'complete', finalizedAt: '', replayed: false } });
+  assert.deepEqual(await resolveWorkoutEditingSession(finalized.input), { status: 'completed', sessionId: 'stored-session' });
+});
+
+test('same-revision wrong row, empty target, wrong program/day and malformed structure remain unavailable', async () => {
+  for (const target of [{}, { ...route, programDayId: 'wrong' }, { ...route, programId: 'wrong' }, { ...route, stableDayId: 'wrong' }]) {
+    assert.equal(workoutAvailability({ authLoading: false, programLoading: false, program, programWorkout: null, draft, ownerId, route: target }), 'unavailable');
+  }
+  const invalid = lifecycle({ ...draft, slots: [] });
+  await assert.rejects(resolveWorkoutEditingSession(invalid.input), /invalid/);
+  assert.equal(invalid.state.read(), null);
+});
+
+test('a finalized receipt follows the same owned occurrence across successor revisions', async () => {
+  const value = { ...draft, lifecycle: 'finalized' as const, finalizedReceipt: { operationId: draft.operationId,
+    sessionId: 'original-session', draftId: draft.draftId, revision: 1, setCount: 1,
+    completionClass: 'complete' as const, finalizedAt: '', replayed: false } };
+  const { input } = lifecycle(value);
+  const successor = { ...route, revisionId: 'successor', programDayId: 'successor-row' };
+  assert.deepEqual(await resolveWorkoutEditingSession({ ...input,
+    matches: d => resumableWorkoutDraftMatches(d, ownerId, draftLookupForRoute(successor)),
+  }), { status: 'completed', sessionId: 'original-session' });
+  assert.equal(resumableWorkoutDraftMatches(value, 'other-owner', draftLookupForRoute(successor)), false);
+  assert.equal(resumableWorkoutDraftMatches(value, ownerId, draftLookupForRoute({ ...successor, stableDayId: 'other-day' })), false);
+});
+
+test('a successor route waits for in-flight draft creation and preserves its exact identities', async () => {
+  const { state, input } = lifecycle();
+  const save = deferred<void>(); const started = deferred<void>();
+  let stored: typeof draft | null = null;
+  const first = resolveWorkoutEditingSession({ ...input, load: async () => {
+    started.resolve(); await save.promise; stored = draft; return stored;
+  } });
+  await started.promise;
+  state.select('successor');
+  let reads = 0;
+  const next = resolveWorkoutEditingSession({ ...input, key: 'successor', load: async () => { reads++; return stored; } });
+  assert.equal(reads, 0);
+  save.resolve();
+  assert.equal((await first).status, 'cancelled');
+  assert.equal((await next).status, 'ready');
+  assert.equal(reads, 1); assert.equal(state.read(), draft);
 });
