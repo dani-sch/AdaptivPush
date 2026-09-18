@@ -6,6 +6,7 @@ export function createWorkoutEditingState() {
   let target = '';
   let current: WorkoutDraft | null = null;
   const restoring = new Map<string, Promise<WorkoutDraft | null>>();
+  let restorationQueue = Promise.resolve();
   return {
     select(key: string) { if (target !== key) { target = key; current = null; } },
     read: () => current,
@@ -13,7 +14,11 @@ export function createWorkoutEditingState() {
     restore(key: string, load: () => Promise<WorkoutDraft | null>): Promise<WorkoutDraft | null> {
       const existing = restoring.get(key);
       if (existing) return existing;
-      const request = load().finally(() => { if (restoring.get(key) === request) restoring.delete(key); });
+      // A changed route/account must wait for an already-started local save before
+      // reading storage; otherwise it can manufacture a second occurrence.
+      const request = restorationQueue.then(() => target === key ? load() : null)
+        .finally(() => { if (restoring.get(key) === request) restoring.delete(key); });
+      restorationQueue = request.then(() => undefined, () => undefined);
       restoring.set(key, request);
       return request;
     },

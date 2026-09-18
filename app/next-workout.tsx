@@ -161,7 +161,12 @@ export default function NextWorkoutScreen() {
     stableDayId?: string;
     programDayId?: string;
   }>();
-  const { program, loading, refresh, failureCategory } = useCurrentProgram();
+  const auth = useAuth();
+  const authLoading = auth.phase === 'hydrating';
+  const ownerId = auth.ownerId;
+  const { program: loadedProgram, ownerId: programOwnerId, loading: programLoading, refresh, failureCategory } = useCurrentProgram();
+  const program = programOwnerId === ownerId ? loadedProgram : null;
+  const loading = programLoading || Boolean(ownerId && programOwnerId !== ownerId);
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const routeTarget = useMemo<WorkoutRouteTarget>(() => ({
@@ -193,9 +198,6 @@ export default function NextWorkoutScreen() {
   const setDraft = useCallback((value: WorkoutDraft | null) => { editingState.replace(value); renderDraft(value); }, [editingState]);
   const exercises = useMemo(() => draft ? draftToExercises(draft, programWorkout ?? undefined) : [], [draft, programWorkout]);
   const [draftLoading, setDraftLoading] = useState(true);
-  const auth = useAuth();
-  const authLoading = auth.phase === 'hydrating';
-  const ownerId = auth.ownerId;
   useEffect(() => { ownerIdRef.current = ownerId; }, [ownerId]);
   const [resolutionAttempt, setResolutionAttempt] = useState(0);
   const [resolvedTargetKey, setResolvedTargetKey] = useState<string | null>(null);

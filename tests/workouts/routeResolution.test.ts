@@ -346,3 +346,34 @@ test('same-revision wrong row, empty target, wrong program/day and malformed str
   await assert.rejects(resolveWorkoutEditingSession(invalid.input), /invalid/);
   assert.equal(invalid.state.read(), null);
 });
+
+test('a finalized receipt follows the same owned occurrence across successor revisions', async () => {
+  const value = { ...draft, lifecycle: 'finalized' as const, finalizedReceipt: { operationId: draft.operationId,
+    sessionId: 'original-session', draftId: draft.draftId, revision: 1, setCount: 1,
+    completionClass: 'complete' as const, finalizedAt: '', replayed: false } };
+  const { input } = lifecycle(value);
+  const successor = { ...route, revisionId: 'successor', programDayId: 'successor-row' };
+  assert.deepEqual(await resolveWorkoutEditingSession({ ...input,
+    matches: d => resumableWorkoutDraftMatches(d, ownerId, draftLookupForRoute(successor)),
+  }), { status: 'completed', sessionId: 'original-session' });
+  assert.equal(resumableWorkoutDraftMatches(value, 'other-owner', draftLookupForRoute(successor)), false);
+  assert.equal(resumableWorkoutDraftMatches(value, ownerId, draftLookupForRoute({ ...successor, stableDayId: 'other-day' })), false);
+});
+
+test('a successor route waits for in-flight draft creation and preserves its exact identities', async () => {
+  const { state, input } = lifecycle();
+  const save = deferred<void>(); const started = deferred<void>();
+  let stored: typeof draft | null = null;
+  const first = resolveWorkoutEditingSession({ ...input, load: async () => {
+    started.resolve(); await save.promise; stored = draft; return stored;
+  } });
+  await started.promise;
+  state.select('successor');
+  let reads = 0;
+  const next = resolveWorkoutEditingSession({ ...input, key: 'successor', load: async () => { reads++; return stored; } });
+  assert.equal(reads, 0);
+  save.resolve();
+  assert.equal((await first).status, 'cancelled');
+  assert.equal((await next).status, 'ready');
+  assert.equal(reads, 1); assert.equal(state.read(), draft);
+});
