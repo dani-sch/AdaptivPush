@@ -1,5 +1,5 @@
 import { createWorkoutEditingState, resolveWorkoutEditingSession, parseEntry } from '@/features/workouts/editingState';
-import { addWorkoutExercise, addWorkoutSet, composeProgramSwap } from '@/features/workouts/structure';
+import { addWorkoutExerciseWithScope, addWorkoutSet, composeProgramSwap } from '@/features/workouts/structure';
 import { useWorkoutStructure } from '@/hooks/useWorkoutStructure';
 import { previewAddition } from '@/features/workouts/structureRepository';
 import { preserveWorkoutRecovery } from '@/features/workouts/recoveryStorage';
@@ -14,7 +14,7 @@ import { AppAlert as Alert } from '@/components/ui/AppDialog';
 import { draftToExercises } from '@/features/workouts/workoutPresentation';
 import { haptic, Haptics } from "@/utils/haptic";
 import { ExerciseHistoryModal } from "@/components/ExerciseHistoryModal";
-import { SwapExerciseModal } from "@/components/SwapExerciseModal";
+import { SwapExerciseModal, type AddExerciseSelection } from "@/components/SwapExerciseModal";
 import { useCurrentProgram } from "@/hooks/useCurrentProgram";
 import type { CurrentProgram, ProgramWorkout } from "@/types/program";
 import { supabase } from "@/utils/supabase";
@@ -180,13 +180,11 @@ export default function NextWorkoutScreen() {
   const removalCapability = useRemovalCapability();
   const canRemove = removalCapability.available;
   const structure = useWorkoutStructure();
-  const [addition, setAddition] = useState<{ id: string; name: string } | null>(null);
-  const [additionPreview, setAdditionPreview] = useState<RemovalPreview>();
+  const [additionTarget, setAdditionTarget] = useState<string | null>(null);
   const [removal, setRemoval] = useState<RemovalSelection | null>(null);
   const [removalPreview, setRemovalPreview] = useState<RemovalPreview>();
   const [setPicker, setSetPicker] = useState<string | null>(null);
-  const additionRequest = useRef(0);
-  const closeSetPicker = () => { additionRequest.current++; setAddition(null); setSetPicker(null); };
+  const closeSetPicker = () => setSetPicker(null);
   const [setCatalog, setSetCatalog] = useState<{ id: string; name: string }[]>([]);
   const [setSearch, setSetSearch] = useState('');
   const ownerIdRef = useRef<string | null>(null);
@@ -485,25 +483,35 @@ export default function NextWorkoutScreen() {
     } catch (error) { setSyncMessage(error instanceof Error ? error.message : 'Removal could not be saved. Try again.'); }
     finally { removalBusyRef.current = false; setRemovalBusy(false); }
   };
-  const confirmAddition = async (wholeProgram: boolean) => {
+  const loadAdditionScope = useCallback(async () => {
     const current = editingState.read();
-    if (!current || !addition || removalBusyRef.current || !structure.available) return;
+    if (!current || current.ownerId !== ownerId || !editingState.isTarget(resolutionTargetKey)) throw new Error('Workout changed. Reopen Add exercise.');
+    return previewAddition(current.programId, current.stableDayId);
+  }, [editingState, ownerId, resolutionTargetKey]);
+
+  const confirmAddition = async ({ exercise, scope, preview, isCurrent }: AddExerciseSelection) => {
+    const current = editingState.read();
+    if (!isCurrent() || !current || current.ownerId !== ownerId || !canFinishWorkout || removalBusyRef.current || !structure.available) return false;
+    const wholeProgram = scope === 'rest_of_program';
+    const next = addWorkoutExerciseWithScope(current, exercise, wholeProgram, preview);
     removalBusyRef.current = true; setRemovalBusy(true);
+    // Commit the selected local edit synchronously. A later save completion cannot
+    // replace typing, close a reopened picker, or install it in another account.
+    setDraft(next);
     try {
-      const next = addWorkoutExercise(current, addition); const slot = next.slots.at(-1)!;
-      if (wholeProgram) {
-        next.removals ??= emptyRemovals();
-        if (!additionPreview?.futureCount) throw new Error('No eligible future workouts.');
-        if (current.programRemoval && current.programRemoval.expectedRevisionId !== additionPreview.expectedRevisionId) throw new Error('The program changed. Your existing changes are preserved.');
-        next.programRemoval = { ...additionPreview, ...current.programRemoval, targets: current.programRemoval?.targets ?? [],
-          additions: [...(current.programRemoval?.additions ?? []), { slotId: slot.slotId, exerciseId: addition.id, setCount: 1 }] };
-      }
       await persistDraft(next);
-      if (ownerIdRef.current !== current.ownerId) return;
-      setDraft(next); setAddition(null); setSetPicker(null);
-      setSyncMessage(wholeProgram ? 'Exercise added. Future occurrences update together when you Finish.' : 'Exercise added to this workout.');
-    } catch (error) { setSyncMessage(error instanceof Error ? error.message : 'Addition could not be saved.'); }
-    finally { removalBusyRef.current = false; setRemovalBusy(false); }
+      if (isCurrent() && ownerIdRef.current === current.ownerId) {
+        setSyncMessage(wholeProgram ? 'Exercise added. Future occurrences update together when you Finish.' : 'Exercise added to this workout.');
+      }
+    } catch {
+      if (ownerIdRef.current === current.ownerId && editingState.isTarget(resolutionTargetKey)) {
+        setSyncMessage('Exercise added locally, but could not be saved on this device. Keep this workout open and retry saving.');
+      }
+    } finally {
+      removalBusyRef.current = false;
+      setRemovalBusy(false);
+    }
+    return true;
   };
   const toggleExerciseComplete = (exerciseId: string) => {
     const draft = editingState.read();
@@ -1062,10 +1070,9 @@ export default function NextWorkoutScreen() {
           ))}
 
           <Pressable accessibilityRole="button" accessibilityLabel="Add exercise"
-            disabled={!draft || !structure.available || saving || removalBusy || Boolean(pendingSwap) || Boolean(draft?.finalizationEndedAt) || draft?.lifecycle === 'finalized'}
+            disabled={!canFinishWorkout || !draft || !structure.available || saving || removalBusy || Boolean(pendingSwap) || Boolean(draft?.finalizationEndedAt) || draft?.lifecycle === 'finalized'}
             style={styles.secondaryButton} onPress={() => {
-              additionRequest.current++; setAddition(null); setSetSearch(''); setSetPicker('add');
-              void loadCorrectionCatalog(supabase).then(result => setSetCatalog(result.data ?? []));
+              setAdditionTarget(resolutionTargetKey);
             }}><Text style={styles.secondaryButtonText}>Add exercise</Text></Pressable>
           {!structure.available ? <Pressable accessibilityRole="button" onPress={structure.retry}><Text style={styles.syncBannerText}>{structure.message} Tap to retry.</Text></Pressable> : null}
           <Pressable
@@ -1097,25 +1104,18 @@ export default function NextWorkoutScreen() {
       </KeyboardAvoidingView>
 
       <RemovalScopeSheet selection={removal} busy={saving || removalBusy} onCancel={() => { if (!removalBusyRef.current) setRemoval(null); }} onConfirm={whole => void confirmRemoval(whole)} />
+      <Modal visible={additionTarget === resolutionTargetKey} transparent animationType="none" onRequestClose={() => setAdditionTarget(null)}>
+        {additionTarget === resolutionTargetKey ? <SwapExerciseModal
+          mode="add" onClose={() => setAdditionTarget(null)} loadAdditionScope={loadAdditionScope} onAdd={confirmAddition}
+        /> : null}
+      </Modal>
       <Modal visible={setPicker !== null} transparent animationType="none" onRequestClose={closeSetPicker}>
         <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'transparent' }}><View style={{ maxHeight: '80%', padding: 24, backgroundColor: theme.surfaceBg, borderWidth: 1, borderColor: theme.border }} accessibilityViewIsModal>
-          {addition ? <View>
-            <Text style={{ color: theme.textPrimary }}>Add {addition.name}</Text>
-            <Text style={{ color: theme.text }}>One blank set. Whole program includes this workout and {additionPreview?.futureCount ?? 0} later uncompleted occurrences of this day.</Text>
-            {(['This workout only', 'Whole program — this day'] as const).map((label, index) => <Pressable key={label} accessibilityRole="button" disabled={removalBusy || (index === 1 && !additionPreview?.futureCount)} style={{ minHeight: 48 }} onPress={() => void confirmAddition(index === 1)}><Text style={{ color: theme.primary }}>{label}</Text></Pressable>)}
-          </View> : <>
           <TextInput accessibilityLabel="Search exercises" style={{ color: theme.textPrimary, minHeight: 48 }} value={setSearch} onChangeText={setSetSearch} placeholder="Search exercises" />
           <ScrollView keyboardShouldPersistTaps="handled">{setCatalog.filter(e => e.name.toLowerCase().includes(setSearch.toLowerCase())).map(e => <Pressable key={e.id} accessibilityRole="button" style={{ minHeight: 48, justifyContent: 'center' }} onPress={() => {
-            if (setPicker === 'add') {
-              const current = editingState.read(); if (!current || removalBusy) return;
-              const request = ++additionRequest.current;
-              setRemovalBusy(true);
-              void previewAddition(current.programId, current.stableDayId).then(preview => { if (request === additionRequest.current && ownerIdRef.current === current.ownerId) { setAdditionPreview(preview); setAddition(e); } }).catch(() => { if (request === additionRequest.current) setSyncMessage('Addition scope could not be checked. Reconnect and retry.'); }).finally(() => setRemovalBusy(false));
-              return;
-            }
             if (draft && setPicker && !saving && !removalBusyRef.current && !pendingSwap && !draft.finalizationEndedAt && draft.lifecycle !== 'finalized') { const next = updateWorkoutSet(draft, { setId: setPicker, actualExerciseId: e.id, actualExerciseName: e.name }); setDraft(next);  void persistDraft(next); }
             closeSetPicker();
-          }}><Text style={{ color: theme.text }}>{e.name}</Text></Pressable>)}</ScrollView></>}
+          }}><Text style={{ color: theme.text }}>{e.name}</Text></Pressable>)}</ScrollView>
           <Pressable accessibilityRole="button" style={{ minHeight: 48 }} onPress={closeSetPicker}><Text style={{ color: theme.primary }}>Cancel</Text></Pressable>
         </View></View>
       </Modal>

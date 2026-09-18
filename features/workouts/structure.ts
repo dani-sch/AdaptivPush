@@ -4,6 +4,8 @@ import type { FrozenWorkoutPrescription, WorkoutDraft, WorkoutDraftSlot, Workout
 import type { OccurrenceExercise, OccurrenceSet } from './effectiveOccurrence';
 import type { EditableCorrectionSet } from './correctionEditor';
 import type { ProgramRemovalRequest } from './removals';
+import { emptyRemovals } from './removals';
+import type { RemovalPreview } from './removalRepository';
 
 export function addWorkoutSet(draft: WorkoutDraft, slotId: string): WorkoutDraft {
   if (draft.finalizationEndedAt || draft.lifecycle !== 'draft') throw new Error('This workout is awaiting synchronization.');
@@ -26,6 +28,21 @@ export function addWorkoutExercise(draft: WorkoutDraft, exercise: { id: string; 
   const slot: WorkoutDraftSlot = { slotId, actualExerciseId: exercise.id, prescribedExerciseId: exercise.id,
     exerciseName: exercise.name, order: Math.max(0, ...draft.slots.map(s => s.order)) + 1, prescribedSetCount: 0, sets: [] };
   return addWorkoutSet({ ...draft, slots: [...draft.slots, slot] }, slotId);
+}
+
+export function addWorkoutExerciseWithScope(draft: WorkoutDraft, exercise: { id: string; name: string },
+  wholeProgram: boolean, preview?: RemovalPreview): WorkoutDraft {
+  const next = addWorkoutExercise(draft, exercise);
+  if (!wholeProgram) return next;
+  if (!preview?.futureCount) throw new Error('No eligible future workouts.');
+  if (preview.programId !== draft.programId || preview.currentStableDayId !== draft.stableDayId
+    || (draft.programRemoval && draft.programRemoval.expectedRevisionId !== preview.expectedRevisionId)) {
+    throw new Error('The program changed. Your existing changes are preserved. Reopen Add exercise.');
+  }
+  next.removals ??= emptyRemovals();
+  next.programRemoval = { ...preview, ...draft.programRemoval, targets: draft.programRemoval?.targets ?? [],
+    additions: [...(draft.programRemoval?.additions ?? []), { slotId: next.slots.at(-1)!.slotId, exerciseId: exercise.id, setCount: 1 }] };
+  return next;
 }
 
 export function composeProgramSwap(current: ProgramRemovalRequest | undefined, context: Omit<ProgramRemovalRequest, 'targets'>,

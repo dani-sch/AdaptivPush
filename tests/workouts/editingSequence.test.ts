@@ -4,7 +4,7 @@ import { createWorkoutDraft, updateWorkoutSet, amendWorkoutExercise, validateWor
 import { draftToExercises } from '../../features/workouts/workoutPresentation';
 import { removeDraftWork } from '../../features/workouts/removals';
 import { createWorkoutEditingState } from '../../features/workouts/editingState';
-import { addWorkoutExercise, addWorkoutSet, composeProgramSwap, correctionEffectiveSlots } from '../../features/workouts/structure';
+import { addWorkoutExercise, addWorkoutExerciseWithScope, addWorkoutSet, composeProgramSwap, correctionEffectiveSlots } from '../../features/workouts/structure';
 import { projectCompletedOccurrence } from '../../features/workouts/effectiveOccurrence';
 import { createRecoveryCheckpoint } from '../../features/workouts/recoveryCheckpoint';
 import { createModalHandoff } from '../../features/workouts/modalHandoff';
@@ -19,6 +19,34 @@ function fixture() {
       sets: [1, 2, 3].map(order => ({ setId: `set-${order}`, order, plannedRepsMin: 8, plannedRepsMax: 12,
         plannedLoad: null, loadKind: 'external', loadUnit: 'lb', loadSide: 'external_total' })) }] });
 }
+
+test('shared Add preserves blank defaults, duplicates, frozen prescription and composed future changes', () => {
+  const base = fixture();
+  const preview = { programId: base.programId, expectedRevision: 1, expectedRevisionId: base.prescriptionRevisionId,
+    currentStableDayId: base.stableDayId, futureCount: 3 };
+  const withRemoval = removeDraftWork(base, 'slot', 'set-2', { ...preview, targets: [{ slotId: 'slot', order: 2 }] });
+  withRemoval.programRemoval = composeProgramSwap(withRemoval.programRemoval, preview, 'slot', 'row', true);
+  const local = addWorkoutExerciseWithScope(withRemoval, { id: 'press', name: 'Press' }, false);
+  const wider = addWorkoutExerciseWithScope(local, { id: 'press', name: 'Press' }, true, preview);
+  assert.equal(wider.operationId, base.operationId); assert.equal(wider.frozenPrescription, base.frozenPrescription);
+  assert.notEqual(wider.slots[1].slotId, wider.slots[2].slotId);
+  assert.notEqual(wider.slots[1].sets[0].setId, wider.slots[2].sets[0].setId);
+  for (const slot of wider.slots.slice(1)) {
+    assert.equal(slot.prescribedSetCount, 0); assert.equal(slot.sets.length, 1);
+    assert.equal(slot.sets[0].logged, false); assert.equal(slot.sets[0].outcome, 'not_attempted');
+    assert.equal(slot.sets[0].enteredLoadText, ''); assert.equal(slot.sets[0].enteredRepsText, '');
+    assert.equal(slot.sets[0].actualLoad, null); assert.equal(slot.sets[0].actualReps, null);
+  }
+  assert.deepEqual(wider.programRemoval?.targets, withRemoval.programRemoval?.targets);
+  assert.deepEqual(wider.programRemoval?.swaps, withRemoval.programRemoval?.swaps);
+  assert.deepEqual(wider.programRemoval?.additions, [{ slotId: wider.slots[2].slotId, exerciseId: 'press', setCount: 1 }]);
+  for (const invalid of [{ ...preview, futureCount: 0 }, { ...preview, expectedRevisionId: 'changed' },
+    { ...preview, programId: 'other' }, { ...preview, currentStableDayId: 'other' }]) {
+    assert.throws(() => addWorkoutExerciseWithScope(withRemoval, { id: 'press', name: 'Press' }, true, invalid));
+  }
+  assert.equal(withRemoval.slots.length, 1);
+  assert.throws(() => addWorkoutExerciseWithScope({ ...base, finalizationEndedAt: '2026-09-18T11:00:00Z' }, { id: 'press', name: 'Press' }, false), /synchronization/);
+});
 
 for (const swapped of [false, true]) test(`typing restored skipped rows after first check and removal, swapped=${swapped}`, () => {
   let d = updateWorkoutSet(fixture(), { setId: 'set-1', load: 30, reps: 8, logged: true });
