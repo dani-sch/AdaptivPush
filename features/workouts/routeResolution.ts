@@ -67,6 +67,13 @@ export function resolveProgramWorkout(
 
 export type WorkoutAvailability = 'loading' | 'ready' | 'unavailable';
 
+export function resumableWorkoutDraftMatches(draft: WorkoutDraft, ownerId: string, lookup: WorkoutDraftLookup): boolean {
+  if (!lookup.stableDayId && !lookup.programDayId) return false;
+  return workoutDraftMatches(draft, ownerId, lookup)
+    || (draft.prescriptionRevisionId !== lookup.prescriptionRevisionId
+      && activeWorkoutDraftMatches(draft, ownerId, lookup));
+}
+
 export function workoutAvailability(input: {
   authLoading: boolean;
   programLoading: boolean;
@@ -75,13 +82,15 @@ export function workoutAvailability(input: {
   draft: WorkoutDraft | null;
   ownerId: string | null;
   route: WorkoutRouteTarget;
+  resolutionLoading?: boolean;
+  resolutionError?: string | null;
 }): WorkoutAvailability {
-  if (input.authLoading) return 'loading';
+  if (input.authLoading || input.resolutionLoading) return 'loading';
+  if (input.resolutionError) return 'unavailable';
   if (input.draft && input.ownerId) {
     const lookup = draftLookupForRoute(input.route, input.programWorkout ?? undefined);
-    if (validateWorkoutDraft(input.draft).ok
-      && (workoutDraftMatches(input.draft, input.ownerId, lookup)
-        || activeWorkoutDraftMatches(input.draft, input.ownerId, lookup))) {
+    if (validateWorkoutDraft(input.draft, false).ok
+      && resumableWorkoutDraftMatches(input.draft, input.ownerId, lookup)) {
       return 'ready';
     }
   }

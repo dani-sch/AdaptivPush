@@ -1,4 +1,4 @@
-import { createWorkoutEditingState, parseEntry } from '@/features/workouts/editingState';
+import { createWorkoutEditingState, resolveWorkoutEditingSession, parseEntry } from '@/features/workouts/editingState';
 import { addWorkoutExercise, addWorkoutSet, composeProgramSwap } from '@/features/workouts/structure';
 import { useWorkoutStructure } from '@/hooks/useWorkoutStructure';
 import { previewAddition } from '@/features/workouts/structureRepository';
@@ -24,7 +24,6 @@ import {
   amendWorkoutExercise,
   createWorkoutDraft,
   updateWorkoutSet,
-  validateWorkoutDraft,
   type WorkoutDraft,
 } from "@/features/workouts/contracts";
 import { finalizeWorkout } from "@/features/workouts/commands";
@@ -32,6 +31,7 @@ import { externalActualSets } from "@/features/workouts/actualLoads";
 import { workoutDraftStore } from "@/features/workouts/draftStore";
 import {
   draftLookupForRoute,
+  resumableWorkoutDraftMatches,
   resolveProgramWorkout,
   workoutAvailability,
   type WorkoutRouteTarget,
@@ -48,7 +48,6 @@ import {
   workoutSwapOperationStore,
 } from '@/features/workouts/swapOperationStore';
 import {
-  isNoFutureWorkoutsDetail,
   confirmedSwapMessage,
   workoutOnlyReconciliationStep,
   workoutSwapSyncDisposition,
@@ -262,109 +261,102 @@ export default function NextWorkoutScreen() {
       setSyncMessage(null);
       setDraftLoading(true);
       setResolvedTargetKey(null);
+      pendingSwapRef.current = null;
+      setPendingSwap(null);
+      swapSyncGenerationRef.current++;
     }
     if (authLoading) return () => { cancelled = true; };
-    if (editingState.read()) return () => { cancelled = true; };
     (async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      setDraftLoading(true);
       let settled = false;
       try {
         if (!ownerId) throw new Error('Sign in to restore this workout draft.');
-        await preserveWorkoutRecovery(ownerId);
         const lookup = draftLookupForRoute(routeTarget, programWorkout ?? undefined);
-        const stored = await workoutDraftStore.loadMatching(ownerId, lookup);
-        const completedSessionId = programWorkout?.sessionId ?? stored?.finalizedReceipt?.sessionId;
-        if (completedSessionId) {
-          settled = true;
-          if (!cancelled) router.replace({ pathname: '/edit-workout', params: { sessionId: completedSessionId } });
-          return;
-        }
-        if (stored) {
-          const validation = validateWorkoutDraft(stored, false);
-          if (!validation.ok) {
-            throw new Error(`Stored workout draft is invalid. ${validation.errors.join(' ')}`);
-          }
-          settled = true;
-          if (cancelled || !editingState.hydrate(resolutionTargetKey, stored)) return;
-          renderDraft(stored);
-          setElapsed(Math.max(0, Math.floor((Date.now() - new Date(stored.startedAt).getTime()) / 1000)));
-          
-          setWorkoutName(stored.workoutName);
-          setResolutionError(null);
-          const recoveredSwap = await workoutSwapOperationStore.load(stored.ownerId, stored.draftId);
-          if (recoveredSwap && isNoFutureWorkoutsDetail(recoveredSwap.lastError)) {
-            await workoutSwapOperationStore.removeIfCurrent(
-              recoveredSwap.ownerId,
-              recoveredSwap.draftId,
-              recoveredSwap.pendingId,
-            );
-            if (!cancelled) setPendingSwap(null);
-          } else if (!cancelled) {
-            setPendingSwap(recoveredSwap);
-          }
-          if (stored.lifecycle === 'finalized') setSyncMessage('This workout is already finalized.');
-          return;
-        }
-        if (loading) return;
-        settled = true;
-        if (failureCategory) throw new Error(supabaseUserMessage({ category: failureCategory, retryable: false }, 'The plan could not be loaded. Check your connection and refresh.'));
-        const entryIssue = workoutEntryIssue(program, programWorkout);
-        if (entryIssue) throw new Error(entryIssue);
-        if (!program || !programWorkout?.prescriptionRevisionId || !programWorkout.stableDayId) {
-          throw new Error('Return to Plan and select a current workout.');
-        }
-        if (programWorkout.exercises.length === 0) {
-          throw new Error('This requested workout has no exercise prescription. Refresh the plan and try again.');
-        }
-        let nextDraft = createWorkoutDraft({
-          ownerId,
-          programId: program.id,
-          programDayId: programWorkout.id,
-          stableDayId: programWorkout.stableDayId,
-          prescriptionRevisionId: programWorkout.prescriptionRevisionId,
-          workoutName: programWorkout.name,
-          startedAt: new Date().toISOString(),
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-          slots: programWorkout.exercises.map((exercise, slotIndex) => {
-            if (!exercise.exerciseId) throw new Error(`${exercise.name} has no catalog exercise identity.`);
-            const repMatch = (exercise.reps ?? '8-12').match(/(\d+)\D+(\d+)/);
-            const min = Number(repMatch?.[1] ?? 8);
-            const max = Number(repMatch?.[2] ?? min);
-            const setCount = exercise.sets ?? 3;
-            return {
-              slotId: exercise.stableSlotId ?? exercise.id,
-              prescribedExerciseId: exercise.exerciseId,
-              exerciseName: exercise.name,
-              order: slotIndex + 1,
-              prescribedSetCount: setCount,
-              sets: Array.from({ length: setCount }, (_, setIndex) => {
-                const plannedLoad = exercise.perSetWeights?.[setIndex] ?? exercise.weight ?? null;
+        const result = await resolveWorkoutEditingSession({
+          state: editingState,
+          key: resolutionTargetKey,
+          isCurrent: () => !cancelled,
+          matches: value => resumableWorkoutDraftMatches(value, ownerId, lookup),
+          completedSessionId: programWorkout?.sessionId,
+          installed: value => {
+            renderDraft(value);
+            setElapsed(Math.max(0, Math.floor((Date.now() - new Date(value.startedAt).getTime()) / 1000)));
+            setWorkoutName(value.workoutName);
+          },
+          recover: value => workoutSwapOperationStore.load(value.ownerId, value.draftId),
+          load: async () => {
+            await preserveWorkoutRecovery(ownerId);
+            const stored = await workoutDraftStore.loadMatching(ownerId, lookup);
+            if (stored) return stored;
+            if (loading) return null;
+            if (failureCategory) throw new Error(supabaseUserMessage({ category: failureCategory, retryable: false }, 'The plan could not be loaded. Check your connection and refresh.'));
+            const entryIssue = workoutEntryIssue(program, programWorkout);
+            if (entryIssue) throw new Error(entryIssue);
+            if (!program || !programWorkout?.prescriptionRevisionId || !programWorkout.stableDayId) {
+              throw new Error('Return to Plan and select a current workout.');
+            }
+            if (programWorkout.exercises.length === 0) {
+              throw new Error('This requested workout has no exercise prescription. Refresh the plan and try again.');
+            }
+            let nextDraft = createWorkoutDraft({
+              ownerId,
+              programId: program.id,
+              programDayId: programWorkout.id,
+              stableDayId: programWorkout.stableDayId,
+              prescriptionRevisionId: programWorkout.prescriptionRevisionId,
+              workoutName: programWorkout.name,
+              startedAt: new Date().toISOString(),
+              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+              slots: programWorkout.exercises.map((exercise, slotIndex) => {
+                if (!exercise.exerciseId) throw new Error(`${exercise.name} has no catalog exercise identity.`);
+                const repMatch = (exercise.reps ?? '8-12').match(/(\d+)\D+(\d+)/);
+                const min = Number(repMatch?.[1] ?? 8);
+                const max = Number(repMatch?.[2] ?? min);
+                const setCount = exercise.sets ?? 3;
                 return {
-                  setId: createOperationId(),
-                  order: setIndex + 1,
-                  plannedRepsMin: min,
-                  plannedRepsMax: max,
-                  plannedLoad,
-                  ...entryLoadDefaults(exercise.loadKind ?? (exercise.equipment === 'Bodyweight' ? 'bodyweight' : 'external'), exercise.loadUnit),
-                  loadSide: exercise.loadSide ?? 'unknown',
+                  slotId: exercise.stableSlotId ?? exercise.id,
+                  prescribedExerciseId: exercise.exerciseId,
+                  exerciseName: exercise.name,
+                  order: slotIndex + 1,
+                  prescribedSetCount: setCount,
+                  sets: Array.from({ length: setCount }, (_, setIndex) => {
+                    const plannedLoad = exercise.perSetWeights?.[setIndex] ?? exercise.weight ?? null;
+                    return {
+                      setId: createOperationId(),
+                      order: setIndex + 1,
+                      plannedRepsMin: min,
+                      plannedRepsMax: max,
+                      plannedLoad,
+                      ...entryLoadDefaults(exercise.loadKind ?? (exercise.equipment === 'Bodyweight' ? 'bodyweight' : 'external'), exercise.loadUnit),
+                      loadSide: exercise.loadSide ?? 'unknown',
+                    };
+                  }),
                 };
               }),
-            };
-          }),
+            });
+            const removals = emptyRemovals();
+            for (const exercise of programWorkout.exercises) {
+              const mask = exercise.removalMask; const slot = nextDraft.slots.find(s => s.slotId === (exercise.stableSlotId ?? exercise.id));
+              if (!mask || !slot) continue;
+              if (mask.removed) removals.slots.push(slot.slotId);
+              for (const set of slot.sets) if (mask.orders.includes(set.order)) removals.sets.push({ slotId: slot.slotId, setId: set.setId, order: set.order });
+            }
+            if (removals.slots.length || removals.sets.length) nextDraft = { ...nextDraft, removals };
+            if (!editingState.isTarget(resolutionTargetKey)) return null;
+            await workoutDraftStore.save(nextDraft);
+            return nextDraft;
+          },
         });
-        const removals = emptyRemovals();
-        for (const exercise of programWorkout.exercises) {
-          const mask = exercise.removalMask; const slot = nextDraft.slots.find(s => s.slotId === (exercise.stableSlotId ?? exercise.id));
-          if (!mask || !slot) continue;
-          if (mask.removed) removals.slots.push(slot.slotId);
-          for (const set of slot.sets) if (mask.orders.includes(set.order)) removals.sets.push({ slotId: slot.slotId, setId: set.setId, order: set.order });
+        if (result.status === 'cancelled' || result.status === 'waiting') return;
+        settled = true;
+        if (result.status === 'completed') {
+          router.replace({ pathname: '/edit-workout', params: { sessionId: result.sessionId } });
+          return;
         }
-        if (removals.slots.length || removals.sets.length) nextDraft = { ...nextDraft, removals };
-        await workoutDraftStore.save(nextDraft);
-        if (cancelled || !editingState.hydrate(resolutionTargetKey, nextDraft)) return;
-        renderDraft(nextDraft);
-        setElapsed(Math.max(0, Math.floor((Date.now() - new Date(nextDraft.startedAt).getTime()) / 1000)));
-        
-        setWorkoutName(nextDraft.workoutName);
+        pendingSwapRef.current = result.recovery;
+        setPendingSwap(result.recovery);
         setResolutionError(null);
       } catch (error) {
         settled = true;
@@ -381,7 +373,9 @@ export default function NextWorkoutScreen() {
 
   const availability = workoutAvailability({
     authLoading,
-    programLoading: loading || draftLoading || resolvedTargetKey !== resolutionTargetKey,
+    programLoading: loading,
+    resolutionLoading: draftLoading || resolvedTargetKey !== resolutionTargetKey,
+    resolutionError,
     program,
     programWorkout,
     draft,
@@ -791,7 +785,7 @@ export default function NextWorkoutScreen() {
 
   const handleFinish = async () => {
     const draft = editingState.read();
-    if (!auth.canRequest || saving || removalBusyRef.current || pendingSwapRef.current) return;
+    if (!canFinishWorkout || removalBusyRef.current || pendingSwapRef.current) return;
     if (intervalRef.current) clearInterval(intervalRef.current);
     setShowFinishModal(false);
     setSaving(true);
@@ -942,7 +936,8 @@ export default function NextWorkoutScreen() {
               onPress={() => {
                 setDraftLoading(true);
                 setResolutionError(null);
-                void refresh().finally(() => setResolutionAttempt((attempt) => attempt + 1));
+                setResolutionAttempt((attempt) => attempt + 1);
+                void refresh();
               }}
               accessibilityRole="button"
               accessibilityLabel="Retry requested workout"
@@ -958,7 +953,7 @@ export default function NextWorkoutScreen() {
     );
   }
 
-  if (availability === 'loading' && exercises.length === 0) {
+  if (availability === 'loading') {
     return (
       <SafeAreaView style={styles.safeArea} edges={["top"]}>
         <View style={styles.loadingContainer}>
