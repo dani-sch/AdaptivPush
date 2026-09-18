@@ -2,7 +2,7 @@
 
 ## Resume and detailed Add client follow-up
 
-The September 18 follow-up fixes two demonstrated client defects. No migration, hosted data, device storage, credentials or workout records were changed for testing. `20260918160000` remains deployed with structure 1/removal 1/correction 2. The unrelated `components/ExerciseHistoryModal.tsx` edit is preserved byte-for-byte (SHA-256 `91a68215a6b921ff4ab81cf8bb74910cad60dde12118bbd4310f4dff5838e754`).
+The September 18 follow-up fixes two demonstrated client defects. No migration, hosted data, device storage, credentials or workout records were changed for testing. `20260918160000` remains deployed with structure 1/removal 1/correction 2. The unrelated `components/ExerciseHistoryModal.tsx` edit was preserved byte-for-byte (SHA-256 `91a68215a6b921ff4ab81cf8bb74910cad60dde12118bbd4310f4dff5838e754`) and later incorporated unchanged as cleanup commit `41dd083` when the user requested one consolidated draft PR.
 
 | Cause | Implemented behavior |
 |---|---|
@@ -32,7 +32,7 @@ No user workout was created or edited for hosted verification, and no phone stor
 
 ## Implementation handoff before deployment
 
-Implementation is committed on `codex/workout-editing-sept18`, integrated through the canonical integrator, and copied by fast-forward into the requested `C:/workout-app/AdaptivPush` checkout. PR #58 remains a draft against `main`. The unrelated `components/ExerciseHistoryModal.tsx` modification is preserved outside these commits.
+At this pre-deployment checkpoint, implementation was committed on `codex/workout-editing-sept18`, integrated through the canonical integrator, and copied by fast-forward into the requested `C:/workout-app/AdaptivPush` checkout. PR #58 remained a draft against `main`, and the unrelated `components/ExerciseHistoryModal.tsx` modification was still outside those commits. The later cleanup commit above supersedes only that Git-state sentence; the implementation and deployment evidence in this section remains historical.
 
 The user stopped agent visual testing and will perform Expo acceptance. No further browser/device acceptance is claimed after that instruction. New hosted migration `20260918160000_workout_structure.sql` is prepared and rehearsed, **not deployed or authorized**. Add exercise and structural completed edits are gated by its integer-1 capability. The already deployed removal migration remains present; removal capability 1 and correction capability 2 were reverified in a read-only hosted transaction.
 

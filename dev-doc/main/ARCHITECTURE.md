@@ -1,5 +1,7 @@
 # AdaptivPush architecture summary
 
+The current integration boundary is deployed through correction capability 2, removal capability 1, and structure capability 1. The client-side architecture below is verified by 157 application cases, strict TypeScript, and lint with zero errors. Physical Expo/iPhone behavior remains an acceptance boundary, not an architectural assumption.
+
 ## Durable editing structure and composed program changes
 
 Restoration/readiness is separate from submission validation. `resolveWorkoutEditingSession` in `editingState.ts` serializes restoration, fills only an empty matching target, and recovers pending operations even when an earlier attempt already installed the draft. Readiness waits for recovery; program-owner mismatches cannot seed a new draft. `routeResolution.ts` and Home matching accept unfinished measurements while retaining owned program/day identity and finalized-session routing. Finish retains full measurement validation.

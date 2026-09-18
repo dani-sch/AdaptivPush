@@ -18,12 +18,12 @@ programmed load when coverage is incomplete. Only performed actual rows contribu
 volume and PRs. Corrections recompute effective session facts without advancing
 the program, and missing legacy prescription context remains unknown.
 
-These are local data-integrity and conservative fallback checks. They do not
-calibrate a progression threshold, validate a personalized training algorithm,
-introduce repeated-partial adaptation or missed-work debt, or finish AP-05's
-authoritative progression/cohort work. The two supporting migrations remain
-local-only; authenticated/device acceptance and authorized hosted rollout are
-still open. No new literature search, source verification, expert review or
+These are deployed data-integrity constraints and conservative client fallback
+checks. They do not calibrate a progression threshold, validate a personalized
+training algorithm, introduce repeated-partial adaptation or missed-work debt,
+or finish AP-05's authoritative progression/cohort work. Correction, removal,
+and structure migrations are hosted; physical-device acceptance remains open.
+No new literature search, source verification, expert review or
 research-strength claim was made. The numerical heuristic and bibliography
 review obligations below remain unchanged.
 
