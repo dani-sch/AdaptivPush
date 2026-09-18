@@ -48,6 +48,12 @@ export function isNoFutureWorkoutsDetail(detail: string | null): boolean {
     || detail?.toLowerCase().includes('no later uncompleted occurrences'));
 }
 
+/** A deterministic no-change receipt needs no Retry panel. Keep persisted bytes
+ * intact; every genuinely pending request is returned unchanged for exact retry. */
+export function pendingSwapForRecovery<T extends { lastError: string | null }>(pending: T | null): T | null {
+  return pending && isNoFutureWorkoutsDetail(pending.lastError) ? null : pending;
+}
+
 export type WorkoutOnlyReconciliationStep =
   | { status: 'complete' }
   | { status: 'retry'; detail: string }

@@ -48,6 +48,7 @@ import {
   workoutSwapOperationStore,
 } from '@/features/workouts/swapOperationStore';
 import {
+  pendingSwapForRecovery,
   confirmedSwapMessage,
   workoutOnlyReconciliationStep,
   workoutSwapSyncDisposition,
@@ -285,7 +286,7 @@ export default function NextWorkoutScreen() {
             setElapsed(Math.max(0, Math.floor((Date.now() - new Date(value.startedAt).getTime()) / 1000)));
             setWorkoutName(value.workoutName);
           },
-          recover: value => workoutSwapOperationStore.load(value.ownerId, value.draftId),
+          recover: async value => pendingSwapForRecovery(await workoutSwapOperationStore.load(value.ownerId, value.draftId)),
           load: async () => {
             await preserveWorkoutRecovery(ownerId);
             const stored = await workoutDraftStore.loadMatching(ownerId, lookup);
