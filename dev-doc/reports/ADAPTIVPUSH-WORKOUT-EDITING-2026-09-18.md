@@ -1,5 +1,25 @@
 # September 18 workout editing implementation
 
+## Resume and detailed Add client follow-up
+
+The September 18 follow-up fixes two demonstrated client defects. No migration, hosted data, device storage, credentials or workout records were changed for testing. `20260918160000` remains deployed with structure 1/removal 1/correction 2. The unrelated `components/ExerciseHistoryModal.tsx` edit is preserved byte-for-byte (SHA-256 `91a68215a6b921ff4ab81cf8bb74910cad60dde12118bbd4310f4dff5838e754`).
+
+| Cause | Implemented behavior |
+|---|---|
+| Hydration allowed unfinished measurements, but availability and Home applied submission validation. Deleting reps on a checked row made a resumable draft appear malformed. | Restoration and matching validate structure; checks/Finish report named measurement errors. Automated resume reaches ready, rejects invalid Finish, and finalizes after correction. |
+| Retry returned immediately for an installed draft. Cancellation after installation skipped pending recovery; visible cards could mask unresolved loading. | One tested resolver handles new/existing drafts, retries recovery without replacing newer typing, and settles readiness only after recovery. Loading cannot display an apparently ready editor. |
+| A route/account change could overlap local creation; a finalized draft from an earlier revision still belongs to the same occurrence. | Restoration is serialized; previous-owner program data cannot seed drafts. Owned stable-day matching bridges successor revisions and routes finalized receipts to their completed session. Empty/wrong-owner/program/day/row targets stay unavailable. |
+| Add used a separate name-only inline list and scope buttons that immediately submitted. | Explicit Add mode in the existing detailed component shares cards, all instructions/images/equipment, expansion, search, virtualized list, selection, loading/error states and footer. All catalog pages load in stable order; Swap retains muscle/exclusion rules and equipment ranking. |
+| Async selection/preview/apply work could outlive a picker session. | Scoped lifetimes invalidate catalog, future count and apply callbacks on close/unmount/account change. A synchronous gate prevents duplicate Add; an explicit Add action confirms the chosen scope. |
+
+Add needs no replacement exercise. It supports repeated catalog choices with distinct occurrence/set identities and offers `This workout only`, `Whole program — this day`, eligible future count, Cancel and Add. The existing structure capability, blank/unperformed defaults, immutable original prescription and composed atomic future-change request remain intact. A local Add installs synchronously so save completion cannot overwrite later editing. A local-save failure retains the edit and reports that it has not been saved.
+
+Feature commits: `2523b47` (resume validation/recovery), `f60b6a3` (detailed Add), `4b309b7` (owner/successor resolution), `e763f4c` (retain deterministic no-change Swap behavior without rewriting stored requests). Canonical integrator merges: `7959aa4` and `656257f`; no conflicts. The feature is based on the existing client release and remote `origin/main` remains the default integration baseline.
+
+Automated verification passes locally and in the integrator: 157 cases (106 workout, 20 program, 20 availability, 9 catalog, 2 dependency), `npx tsc --noEmit --strict`, and `npm run lint` with zero errors and the same three existing unused-variable warnings. Regression cases exercise the resolver used by the screen, availability/Home matching, Finish, canceled/failed recovery, existing-draft Retry, delayed refresh, account changes, successor/finalized routes, wrong targets, complete pagination, late-page failure, closed requests, duplicate/stale Apply and composed scoped additions. Tests use synthetic in-memory data and mocked repository/catalog boundaries. The final bounded Swap recovery follow-up reran its 28 relevant cases, strict TypeScript and lint in both checkouts.
+
+No browser or physical-device visual tests were run. Keyboard layout, card presentation, native modal behavior, accessibility and the user's existing Expo drafts remain user acceptance items. Automated results establish client behavior under controlled lifecycles, not a claim that the actual device contents were inspected. The prior release evidence below remains historical provenance.
+
 ## Authorized hosted deployment
 
 The user's subsequent instruction, "apply the migration", authorized this exact packet. Migration `20260918160000_workout_structure.sql` was committed with its ledger entry in one transaction to `thfxcvxcsfvrzdysdnkq` at **2026-09-18 16:21:39 UTC**. SHA-256 remains `3180df8274dc35edbcce6da8e71bf5b9fa8d190763b283f26e5ea94b8caa7d99`.

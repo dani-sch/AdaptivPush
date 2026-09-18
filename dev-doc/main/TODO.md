@@ -1,5 +1,12 @@
 # AdaptivPush active task board
 
+## [USER ACCEPTANCE] Resume and detailed Add follow-up
+
+- [IMPLEMENTED] Separate restoration from measurement validation; settle recovery and readiness on entry, refresh and Retry, including cancellation/account/revision changes.
+- [IMPLEMENTED] Use the detailed Swap picker in Add mode, with full pagination, duplicate occurrence identities, eligible future count and explicit Add/Cancel.
+- [AUTOMATED VERIFIED] Client regressions, strict TypeScript and lint; [evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-EDITING-2026-09-18.md#resume-and-detailed-add-client-follow-up).
+- [USER ACCEPTANCE] Test in Expo. No agent browser/device tests, storage clearing, credentials reset, user workout changes or migration redeployment.
+
 ## [HOSTED DEPLOYED; USER ACCEPTANCE OPEN] September 18 editing
 
 - [COMPLETE] Implement skipped-row raw input, authoritative draft state, dismissal handoff, unified future changes, scoped Add exercise, durable completed structure and receipt verification; integrator `f3bd828`.
