@@ -80,6 +80,7 @@ export interface WorkoutDraftSlot {
 }
 
 export interface WorkoutDraft {
+  structureVersion?: 1;
   removals?: WorkoutRemovals;
   programRemoval?: ProgramRemovalRequest;
   schemaVersion: typeof WORKOUT_SCHEMA_VERSION;
@@ -320,7 +321,7 @@ function requireEditableWorkout(draft: WorkoutDraft): void {
   }
 }
 
-export function validateWorkoutDraft(draft: WorkoutDraft): { ok: boolean; errors: string[] } {
+export function validateWorkoutDraft(draft: WorkoutDraft, measurements = true): { ok: boolean; errors: string[] } {
   const errors: string[] = [];
   if (!draft.ownerId || !draft.programDayId || !draft.prescriptionRevisionId) {
     errors.push('Owner, program day, and prescription revision identity are required.');
@@ -340,25 +341,26 @@ export function validateWorkoutDraft(draft: WorkoutDraft): { ok: boolean; errors
       errors.push(`Slot ${slot.slotId || '(unknown)'} does not preserve its prescribed set count.`);
     }
     for (const set of slot.sets) {
+      if (!set.setId || setIds.has(set.setId)) errors.push('Stable set identities must be present and unique.');
+      setIds.add(set.setId);
+      if (!measurements) continue;
       const label = `${slot.replacementExerciseName ?? slot.exerciseName ?? 'Exercise'}, set ${set.order}`;
       if (set.logged) {
         for (const [field, raw] of [['load', set.enteredLoadText], ['reps', set.enteredRepsText], ['RPE', set.enteredRpeText]]) {
           if (raw && !/^\d+(?:\.\d*)?$/.test(raw.trim())) errors.push(`${label}: enter a valid ${field}.`);
         }
       }
-      if (!set.setId || setIds.has(set.setId)) errors.push('Stable set identities must be present and unique.');
-      setIds.add(set.setId);
       if (set.logged && (!Number.isInteger(set.actualReps) || (set.actualReps ?? 0) <= 0)) {
         errors.push(`${label}: enter positive whole-number reps.`);
       }
       if (set.logged && (set.loadKind === 'external' || set.loadKind === 'assistance') && (set.actualLoad === null || set.loadUnit === 'none')) {
         errors.push(`${label}: enter a load and measurement unit.`);
       }
-      if (set.actualLoad !== null && (!Number.isFinite(set.actualLoad) || set.actualLoad < 0)) {
-        errors.push(`Set ${set.setId} has an invalid actual load.`);
+      if (set.logged && set.actualLoad !== null && (!Number.isFinite(set.actualLoad) || set.actualLoad < 0)) {
+        errors.push(`${label}: enter a nonnegative load.`);
       }
-      if (set.actualRpe !== null && (!Number.isFinite(set.actualRpe) || set.actualRpe < 0 || set.actualRpe > 10)) {
-        errors.push(`Set ${set.setId} has an invalid RPE.`);
+      if (set.logged && set.actualRpe !== null && (!Number.isFinite(set.actualRpe) || set.actualRpe < 0 || set.actualRpe > 10)) {
+        errors.push(`${label}: RPE must be between 0 and 10, or blank.`);
       }
     }
   }
@@ -370,6 +372,7 @@ export function workoutFinalizationPayload(draft: WorkoutDraft, endedAt: string)
   const ended = new Date(endedAt).getTime();
   return {
     operationId: draft.operationId,
+    structureVersion: draft.structureVersion,
     draftId: draft.draftId,
     schemaVersion: draft.schemaVersion,
     policyVersion: draft.policyVersion,

@@ -2,6 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { supabase } from '@/utils/supabase';
 import { OperationFailureError, runSupabaseOperation } from '@/utils/supabaseResilience';
+import { loadCompletedWorkout } from './occurrenceRepository';
+import { verifyCorrectionReceipt } from './receiptVerification';
 import type {
   CompletedWorkoutCorrectionReceipt,
   CompletedWorkoutCorrectionRequest,
@@ -24,14 +26,17 @@ export function createWorkoutCorrectionRepository(client: SupabaseClient): Worko
       }
       const { ownerId: _ownerId, ...payload } = request;
       const { data, error } = await runSupabaseOperation(
-        (signal) => client.rpc(request.removals || request.programRemoval ? 'correct_workout_removals_v1' : 'correct_completed_workout_v1', { p_payload: payload })
+        (signal) => client.rpc(request.effectiveSlots ? 'correct_workout_structure_v1' : request.removals || request.programRemoval ? 'correct_workout_removals_v1' : 'correct_completed_workout_v1', { p_payload: payload })
           .setHeader('Authorization', `Bearer ${session.access_token}`)
           .abortSignal(signal),
         { kind: 'write', operation: 'workout.correct_completed' },
       );
       if (error) throw error;
       if (!data || typeof data !== 'object') throw new Error('Workout correction returned no receipt.');
-      return data as unknown as CompletedWorkoutCorrectionReceipt;
+      const receipt = data as unknown as CompletedWorkoutCorrectionReceipt;
+      const saved = await loadCompletedWorkout(client, request.ownerId, request.sessionId);
+      verifyCorrectionReceipt(request, receipt, { revision: saved.session.correction_revision, snapshot: saved.snapshot, sets: saved.sets });
+      return receipt;
     },
   };
 }
