@@ -4,7 +4,7 @@
 
 `editingState.ts` is the active screen's synchronous draft authority; `workoutPresentation.ts` derives cards. `modalHandoff.ts` queues one action after dismissal. `recoveryCheckpoint.ts` preserves exact owner-scoped local records before hydration. `structure.ts` creates stable occurrence additions/extras and explicit completed effective slots, distinct from frozen prescriptions and actual results. Repositories compare receipts with authoritative reconstructed structure and actual values before clearing recovery.
 
-Prepared migration `20260918160000` extends existing atomic Finish/Save with one revision containing future removal masks, swaps and additions. Addition lineage survives later revision clones. Capability `workout_structure_capability_v1` gates the new controls independently of existing removal/correction capabilities. It is not yet deployed; [September 18 evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-EDITING-2026-09-18.md) owns the exact packet and user-led Expo acceptance boundary.
+Hosted migration `20260918160000` extends existing atomic Finish/Save with one revision containing future removal masks, swaps and additions. Addition lineage survives later revision clones. Capability `workout_structure_capability_v1` gates the new controls independently of existing removal/correction capabilities. It was deployed under explicit user authorization on September 18; [September 18 evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-EDITING-2026-09-18.md) owns the exact packet and user-led Expo acceptance boundary.
 
 ## Auth recovery and shared workout input boundary
 

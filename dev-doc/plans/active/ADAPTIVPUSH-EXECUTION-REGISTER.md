@@ -1,8 +1,8 @@
 # AdaptivPush modular execution register
 
-## September 18 implementation; user-led Expo acceptance
+## September 18 hosted deployment; user-led Expo acceptance
 
-The editing implementation is integrated through `f3bd828`: preserved raw input, coordinated modal dismissal, unified future changes, durable Add exercise and completed structural edits, and authoritative confirmation before recovery clears. The new migration `20260918160000` is prepared, rehearsed and awaiting separate authorization; existing hosted removal 1/correction 2 remain deployed. The user will test in Expo and has stopped agent visual testing. Native runtime cause and the exact past-program route remain unconfirmed. [September 18 implementation evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-EDITING-2026-09-18.md) owns the packet, verification and limitations. AP-04/AP-05 scope is unchanged.
+The editing implementation is integrated through `f3bd828`: preserved raw input, coordinated modal dismissal, unified future changes, durable Add exercise and completed structural edits, and authoritative confirmation before recovery clears. Migration `20260918160000` is now deployed under explicit follow-up authorization. Fresh encrypted recovery, isolated restore, schema/security and existing-data preservation passed; capabilities are structure 1/removal 1/correction 2. The user will test in Expo and has stopped agent visual testing. Native runtime cause and the exact past-program route remain unconfirmed. [September 18 implementation evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-EDITING-2026-09-18.md) owns the packet, verification and limitations. AP-04/AP-05 scope is unchanged.
 
 ## iPhone recovery and workout fixes: integrated, hosted removal deployed
 

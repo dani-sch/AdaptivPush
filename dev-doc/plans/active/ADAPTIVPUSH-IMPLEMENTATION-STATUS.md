@@ -1,8 +1,8 @@
 # AdaptivPush code-backed implementation status
 
-## September 18 workout editing implementation; hosted update pending
+## September 18 workout editing: hosted update deployed
 
-Skipped-row input loss, modal handoff, composed future edits and durable Add exercise/extra-set structure are implemented and integrated through `f3bd828`. The original checkout contains the implementation and preserves the unrelated History edit. New migration `20260918160000_workout_structure.sql` is rehearsed but **not deployed or authorized**; its capability gates additions and completed structural edits. Existing hosted removal 1/correction 2 were reverified. The user will test in Expo and has stopped agent visual testing. Native-client identity/startup cause and the exact past-program route remain unconfirmed. [September 18 implementation and packet evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-EDITING-2026-09-18.md) owns causes, regression evidence, recovery and release boundaries.
+Skipped-row input loss, modal handoff, composed future edits and durable Add exercise/extra-set structure are implemented and integrated through `f3bd828`. The original checkout contains the implementation and preserves the unrelated History edit. Following explicit user authorization, migration `20260918160000_workout_structure.sql` is deployed to `thfxcvxcsfvrzdysdnkq`. Structure capability 1 now enables additions and completed structural edits; removal 1/correction 2 remain available. Fresh encrypted backup, isolated restore, forward rehearsal and hosted security/data-preservation checks passed. The user will test in Expo and has stopped agent visual testing. Native-client identity/startup cause and the exact past-program route remain unconfirmed. [September 18 implementation and packet evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-EDITING-2026-09-18.md) owns causes, regression evidence, recovery and release boundaries.
 
 
 ## iPhone recovery and workout fixes: integrated, hosted removal deployed
