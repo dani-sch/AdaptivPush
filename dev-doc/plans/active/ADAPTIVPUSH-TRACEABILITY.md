@@ -6,12 +6,12 @@ The approved [decision record](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECO
 
 ## Reading the crosswalk in either direction
 
-The September 14/15 reports retain their original baseline and locally verified extension evidence. [September 17 release evidence](/dev-doc/reports/ADAPTIVPUSH-EDIT-PAST-WORKOUT-RELEASE-2026-09-17.md) now owns the authorized deployment of `20260915190000` and `20260915210000`, capability integer `2`, fresh encrypted recovery/isolated restore, 96 passing application cases, eight concurrency checks, five SQL variants on fresh/restored/hosted targets and authenticated browser correction/reopen acceptance. Physical iPhone/native interruption/accessibility acceptance remains unperformed. Broader AP-04/AP-05 work is outside this release.
+The September 14/15 reports retain their original baseline evidence. The later release chain deploys correction/effective occurrences (`20260915190000`, `20260915210000`), scoped removals (`20260917180000`), and explicit workout structure/composed future edits (`20260918160000`). Hosted capabilities are correction 2, removal 1, and structure 1. The current client additionally implements resilient session/draft recovery and detailed scoped Add/Swap selection. Current verification passes 157 application cases, strict TypeScript, and lint with zero errors and three known warnings. The [September 17 correction release](/dev-doc/reports/ADAPTIVPUSH-EDIT-PAST-WORKOUT-RELEASE-2026-09-17.md), [scoped-removal release](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-REMOVAL-RELEASE-2026-09-17.md), and [September 18 structure report](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-EDITING-2026-09-18.md) own exact evidence. Physical iPhone/native interruption/accessibility acceptance remains unperformed. Broader AP-04/AP-05 work is outside these releases.
 
-| Affected acceptance | September 17 released correction / remaining evidence |
+| Affected acceptance | Current released workout-record behavior / remaining evidence |
 |---|---|
-| AC-TR-008/009/010/011 | Exact correction replay/stale conflict, explicit performed/skipped/not-attempted outcomes, required-slot completion and finalized partial reconciliation have local and hosted SQL evidence. Actual performed rows remain separate from effective snapshots. Correction updates one audited session without advancement. Active workout-only state is device-local until finalization; finalized snapshots reconstruct across devices. Browser edit/cancel/save/reopen and separate-process command response-loss recovery passed; physical interruption/restart remains open. |
-| AC-TR-012/013/014 | Stable original slot lineage supports repeat wider swaps while protecting completed ancestors and preserving performed exercise/load. Selected-only scope remains exact. Home actions, full exercise expansion, completed-route draft prevention and History/Plan modal and rapid-tap guards have local coverage plus authenticated completed-workout browser navigation acceptance. Physical timing, final-week, keyboard, mixed-set, account-switch and accessibility evidence remains open. |
+| AC-TR-008/009/010/011 | Exact correction/finalization replay, stale conflict, explicit performed/skipped/not-attempted outcomes, required-slot completion, removals, additions/extras, and finalized partial reconciliation have local and hosted SQL evidence. Actual performed rows remain separate from frozen and effective structure. Correction updates one audited session without advancement. Owner-scoped local drafts/pending requests recover without treating transient auth failures as sign-out. Physical interruption/restart remains open. |
+| AC-TR-012/013/014 | Stable original/addition lineage supports repeat wider swaps and composed removals/additions while protecting completed ancestors and performed exercise/load. Add and Swap share the detailed picker; Add loads the complete catalog and confirms workout-only or eligible future scope. Home actions, completed-route guards, recovery, pagination, duplicate-apply prevention, and no-change final-week behavior have automated coverage. Physical timing, keyboard, mixed-set, account-switch, and accessibility evidence remains open. |
 | AC-TR-016/024 | Immutable selected-occurrence successors and full-program effective occurrence reconciliation have local evidence. Completed-workout routing passed browser acceptance. Plan distinguishes complete/reduced fulfillment from finalized partial work. Missing correction capability retains viewing and disables Update/Save; version 2 is hosted and authenticated. Missing-capability readable fallback passed against hosted history through a capability-only adapter; old-client/device acceptance remains open. |
 | AC-TR-021/017/018/023 | Restore archive, end/archive, start workout and generate program remain the four user-confirmed baseline flows to preserve. This extension claims no fresh physical-device regression pass. |
 | AC-TR-039/040/042/044/045 and AP-16 release obligations | Missing/partial coverage conservatively holds the existing programmed load even with high readiness. Only performed actual rows count for volume/PRs; correction updates session-owned record effects and resets existing derived receipts without adding a worker. This is partial local counterexample evidence, not calibrated AP-05 progression or cohort/history completion. Fresh recovery and explicitly authorized production deployment passed; physical acceptance remains open. |
@@ -130,12 +130,13 @@ portions. Neither local migration is hosted.
 
 ## AP-03 — Durable programs, identity, and free onboarding
 
-The immutable installer/revision/archive baseline is hosted. The local extension
-adds exact selected-occurrence scope, repeat wider swaps through original slot
-lineage and shared effective occurrence views; it preserves the four user-confirmed
-archive/end/start/generate flows as regression requirements. Both newer migrations
-remain local-only; physical iPhone/E2E and old-client acceptance remain open. See
-the [lifecycle evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-LIFECYCLE-2026-09-15.md).
+The immutable installer/revision/archive baseline is hosted. Deployed extensions
+add exact selected-occurrence scope, repeat wider swaps through original/addition
+lineage, scoped removals, composed future additions, and shared effective occurrence
+views; they preserve the four user-confirmed archive/end/start/generate flows as
+regression requirements. Correction 2, removal 1, and structure 1 are hosted.
+Physical iPhone/E2E and old-client acceptance remain open. See the
+[September 18 evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-EDITING-2026-09-18.md).
 
 | Requirement / legacy locator | Disposition and decision | Behavior / contract; database authority; code | Acceptance scenario and expected evidence |
 |---|---|---|---|
