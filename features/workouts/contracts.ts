@@ -230,9 +230,13 @@ export function updateWorkoutSet(
         enteredRepsText: update.enteredRepsText === undefined ? set.enteredRepsText : update.enteredRepsText,
         enteredRpeText: update.enteredRpeText === undefined ? set.enteredRpeText : update.enteredRpeText,
       };
-      next.outcome = update.outcome ?? (update.logged === undefined ? set.outcome ?? (set.logged ? 'performed' : 'not_attempted') : update.logged ? 'performed' : 'not_attempted');
+      const editing = update.enteredLoadText !== undefined || update.enteredRepsText !== undefined
+        || update.enteredRpeText !== undefined || update.reps !== undefined || update.load !== undefined || update.rpe !== undefined;
+      next.outcome = update.outcome ?? (update.logged === undefined
+        ? editing && set.outcome === 'skipped' ? 'not_attempted' : set.outcome ?? (set.logged ? 'performed' : 'not_attempted')
+        : update.logged ? 'performed' : 'not_attempted');
       next.logged = next.outcome === 'performed';
-      if (next.outcome === 'skipped') {
+      if (update.outcome === 'skipped') {
         next.actualReps = null;
         next.actualLoad = null;
         next.actualRpe = null;
@@ -325,7 +329,10 @@ export function validateWorkoutDraft(draft: WorkoutDraft): { ok: boolean; errors
     errors.push('Workout draft must contain at least one exercise slot.');
   }
   const setIds = new Set<string>();
+  const slotIds = new Set<string>();
   for (const slot of draft.slots) {
+    if (slotIds.has(slot.slotId)) errors.push('Stable exercise identities must be unique.');
+    slotIds.add(slot.slotId);
     if (!slot.slotId || !slot.prescribedExerciseId || !slot.actualExerciseId) {
       errors.push('Every slot requires stable prescription and actual exercise identity.');
     }
@@ -333,13 +340,19 @@ export function validateWorkoutDraft(draft: WorkoutDraft): { ok: boolean; errors
       errors.push(`Slot ${slot.slotId || '(unknown)'} does not preserve its prescribed set count.`);
     }
     for (const set of slot.sets) {
+      const label = `${slot.replacementExerciseName ?? slot.exerciseName ?? 'Exercise'}, set ${set.order}`;
+      if (set.logged) {
+        for (const [field, raw] of [['load', set.enteredLoadText], ['reps', set.enteredRepsText], ['RPE', set.enteredRpeText]]) {
+          if (raw && !/^\d+(?:\.\d*)?$/.test(raw.trim())) errors.push(`${label}: enter a valid ${field}.`);
+        }
+      }
       if (!set.setId || setIds.has(set.setId)) errors.push('Stable set identities must be present and unique.');
       setIds.add(set.setId);
       if (set.logged && (!Number.isInteger(set.actualReps) || (set.actualReps ?? 0) <= 0)) {
-        errors.push(`Logged set ${set.setId} requires positive integer reps.`);
+        errors.push(`${label}: enter positive whole-number reps.`);
       }
       if (set.logged && (set.loadKind === 'external' || set.loadKind === 'assistance') && (set.actualLoad === null || set.loadUnit === 'none')) {
-        errors.push(`Logged set ${set.setId} requires a load and measurement unit.`);
+        errors.push(`${label}: enter a load and measurement unit.`);
       }
       if (set.actualLoad !== null && (!Number.isFinite(set.actualLoad) || set.actualLoad < 0)) {
         errors.push(`Set ${set.setId} has an invalid actual load.`);

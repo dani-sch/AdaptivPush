@@ -172,7 +172,7 @@ export default function EditWorkoutScreen() {
       const set = exercises.flatMap(e => e.sets).find(s => s.actualSetId === id);
       const defaults = field === 'weight' && set && set.outcome !== 'performed' && set.loadKind !== 'bodyweight'
         ? entryLoadDefaults(set.loadKind, set.loadUnit) : {};
-      patchSet(id, { ...defaults, [field === 'weight' ? 'loadText' : field === 'reps' ? 'repsText' : 'rpeText']: String(value) });
+      patchSet(id, { ...defaults, ...(set?.outcome === 'skipped' ? { outcome: 'not_attempted' as const } : {}), [field === 'weight' ? 'loadText' : field === 'reps' ? 'repsText' : 'rpeText']: String(value) });
     }
   };
   const cancel = () => { if (savingRef.current) return; if (ownerId && sessionId) void workoutEditDraftStore.remove(ownerId, sessionId); removalRequest.current++; setExercises(structuredClone(original.current)); setMode('completed_view'); setPickerSetId(null); setRemovals(originalRemovals.current); setProgramRemoval(undefined); setRemoval(null); };

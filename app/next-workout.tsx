@@ -1,3 +1,4 @@
+import { createWorkoutEditingState, parseEntry } from '@/features/workouts/editingState';
 import { useRemovalCapability } from '@/hooks/useRemovalCapability';
 import { entryLoadDefaults } from '@/features/workouts/loadPresentation';
 import { useAuth } from '@/contexts/AuthContext';
@@ -53,7 +54,7 @@ import { reportSupabaseFailure, supabaseUserMessage } from "@/utils/supabaseResi
 import { workoutEntryIssue } from '@/features/workouts/routeResolution';
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     ActivityIndicator,
     KeyboardAvoidingView,
@@ -67,7 +68,7 @@ import {
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import ExerciseCard, { Exercise, WorkoutSet } from "../components/ExerciseCard";
+import ExerciseCard, { WorkoutSet } from "../components/ExerciseCard";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { Theme } from "@/constants/themes";
 
@@ -172,7 +173,7 @@ export default function NextWorkoutScreen() {
     () => resolveProgramWorkout(program, routeTarget),
     [program, routeTarget],
   );
-  const [exercises, setExercises] = useState<Exercise[]>([]);
+  
   const [workoutName, setWorkoutName] = useState("Workout");
   const removalCapability = useRemovalCapability();
   const canRemove = removalCapability.available;
@@ -182,7 +183,10 @@ export default function NextWorkoutScreen() {
   const [setCatalog, setSetCatalog] = useState<{ id: string; name: string }[]>([]);
   const [setSearch, setSetSearch] = useState('');
   const ownerIdRef = useRef<string | null>(null);
-  const [draft, setDraft] = useState<WorkoutDraft | null>(null);
+  const [editingState] = useState(createWorkoutEditingState);
+  const [draft, renderDraft] = useState<WorkoutDraft | null>(null);
+  const setDraft = useCallback((value: WorkoutDraft | null) => { editingState.replace(value); renderDraft(value); }, [editingState]);
+  const exercises = useMemo(() => draft ? draftToExercises(draft, programWorkout ?? undefined) : [], [draft, programWorkout]);
   const [draftLoading, setDraftLoading] = useState(true);
   const auth = useAuth();
   const authLoading = auth.phase === 'hydrating';
@@ -243,14 +247,16 @@ export default function NextWorkoutScreen() {
     let cancelled = false;
     if (hydratedTargetRef.current !== resolutionTargetKey) {
       hydratedTargetRef.current = resolutionTargetKey;
+      editingState.select(resolutionTargetKey);
       setDraft(null);
-      setExercises([]);
+      
       setResolutionError(null);
       setSyncMessage(null);
       setDraftLoading(true);
       setResolvedTargetKey(null);
     }
     if (authLoading) return () => { cancelled = true; };
+    if (editingState.read()) return () => { cancelled = true; };
     (async () => {
       let settled = false;
       try {
@@ -272,7 +278,7 @@ export default function NextWorkoutScreen() {
           if (cancelled) return;
           setDraft(stored);
           setElapsed(Math.max(0, Math.floor((Date.now() - new Date(stored.startedAt).getTime()) / 1000)));
-          setExercises(draftToExercises(stored, programWorkout ?? undefined));
+          
           setWorkoutName(stored.workoutName);
           setResolutionError(null);
           const recoveredSwap = await workoutSwapOperationStore.load(stored.ownerId, stored.draftId);
@@ -348,7 +354,7 @@ export default function NextWorkoutScreen() {
         if (cancelled) return;
         setDraft(nextDraft);
         setElapsed(Math.max(0, Math.floor((Date.now() - new Date(nextDraft.startedAt).getTime()) / 1000)));
-        setExercises(draftToExercises(nextDraft, programWorkout));
+        
         setWorkoutName(nextDraft.workoutName);
         setResolutionError(null);
       } catch (error) {
@@ -362,7 +368,7 @@ export default function NextWorkoutScreen() {
       }
     })();
     return () => { cancelled = true; };
-  }, [authLoading, failureCategory, loading, ownerId, program, programWorkout, resolutionAttempt, resolutionTargetKey, routeTarget]);
+  }, [authLoading, failureCategory, loading, ownerId, program, programWorkout, resolutionAttempt, resolutionTargetKey, routeTarget, editingState, setDraft]);
 
   const availability = workoutAvailability({
     authLoading,
@@ -425,7 +431,7 @@ export default function NextWorkoutScreen() {
   ) => {
     if (!draft || draft.finalizationEndedAt || draft.lifecycle === 'finalized' || saving || removalBusyRef.current || pendingSwap) return;
     try {
-      const asNumber = (input: string): number | null => input.trim() === '' ? null : Number(input);
+      const asNumber = parseEntry;
       const update = field === 'weight'
         ? { enteredLoadText: String(value), load: asNumber(String(value)) }
         : field === 'reps'
@@ -440,8 +446,8 @@ export default function NextWorkoutScreen() {
       const checked = field === 'logged' && value && current ? { load: current.loadKind === 'bodyweight' ? null : asNumber(current.enteredLoadText), reps: asNumber(current.enteredRepsText), rpe: asNumber(current.enteredRpeText) } : {};
       const nextDraft = updateWorkoutSet(draft, { setId, ...checked, ...update });
       setDraft(nextDraft);
-      setExercises(draftToExercises(nextDraft, programWorkout ?? undefined));
-      persistDraft(nextDraft);
+      
+      void persistDraft(nextDraft).catch(() => setSyncMessage('Edits could not be saved on this device. Keep this workout open and retry.'));
     } catch (error) {
       Alert.alert('Check this set', error instanceof Error ? error.message : 'Enter valid set details before logging it.');
     }
@@ -462,6 +468,7 @@ export default function NextWorkoutScreen() {
     finally { removalBusyRef.current = false; setRemovalBusy(false); }
   };
   const confirmRemoval = async (wholeProgram: boolean) => {
+    const draft = editingState.read();
     if (!draft || !removal || saving || removalBusyRef.current || pendingSwap || draft.finalizationEndedAt || draft.lifecycle === 'finalized') return;
     removalBusyRef.current = true; setRemovalBusy(true);
     try {
@@ -469,7 +476,7 @@ export default function NextWorkoutScreen() {
       const next = removeDraftWork(draft, removal.slotId, removal.setId, wholeProgram ? intent : undefined);
       await persistDraft(next);
       if (ownerIdRef.current !== draft.ownerId) return;
-      setDraft(next); setExercises(draftToExercises(next, programWorkout ?? undefined)); setRemoval(null);
+      setDraft(next);  setRemoval(null);
       setSyncMessage(wholeProgram ? 'Removal saved on this device. Matching future workouts update together when you Finish.' : 'Removed from this workout.');
     } catch (error) { setSyncMessage(error instanceof Error ? error.message : 'Removal could not be saved. Try again.'); }
     finally { removalBusyRef.current = false; setRemovalBusy(false); }
@@ -490,7 +497,7 @@ export default function NextWorkoutScreen() {
         });
       }
       setDraft(nextDraft);
-      setExercises(draftToExercises(nextDraft, programWorkout ?? undefined));
+      
       persistDraft(nextDraft);
     } catch (error) {
       Alert.alert('Check these sets', error instanceof Error ? error.message : 'Enter valid set details before logging them.');
@@ -679,7 +686,7 @@ export default function NextWorkoutScreen() {
         throw error;
       }
       setDraft(nextDraft);
-      setExercises(draftToExercises(nextDraft, programWorkout ?? undefined));
+      
       setCurrentPendingSwap(pending);
       setProgramUpdating(true);
       setSyncMessage('Updating program…');
@@ -693,7 +700,7 @@ export default function NextWorkoutScreen() {
     const earlierPending = pendingSwapRef.current;
     await persistDraft(nextDraft);
     setDraft(nextDraft);
-    setExercises(draftToExercises(nextDraft, programWorkout ?? undefined));
+    
     setSyncMessage('Exercise swapped for this workout.');
     if (earlierPending) {
       setProgramUpdating(true);
@@ -992,9 +999,9 @@ export default function NextWorkoutScreen() {
               onRemoveSet={auth.canRequest && canRemove && !saving && !removalBusy && !pendingSwap && !draft?.finalizationEndedAt && draft?.lifecycle !== 'finalized' ? id => void requestRemoval(exercise.id, id) : undefined}
               onRemoveExercise={auth.canRequest && canRemove && !saving && !removalBusy && !pendingSwap && !draft?.finalizationEndedAt && draft?.lifecycle !== 'finalized' ? () => void requestRemoval(exercise.id) : undefined}
               onAddSet={canRemove && !saving && !removalBusy && !pendingSwap && !draft?.finalizationEndedAt && draft?.lifecycle !== 'finalized' ? () => {
-                if (!draft) return; const slot = draft.slots.find(s => s.slotId === exercise.id); const prior = slot?.sets.at(-1); if (!slot || !prior) return;
+                const draft = editingState.read(); if (!draft) return; const slot = draft.slots.find(s => s.slotId === exercise.id); const prior = slot?.sets.at(-1); if (!slot || !prior) return;
                 const next = { ...draft, revision: nextRevision(draft.revision), slots: draft.slots.map(s => s.slotId !== slot.slotId ? s : { ...s, sets: [...s.sets, { ...prior, setId: createOperationId(), order: Math.max(...s.sets.map(row => row.order)) + 1, logged: false, outcome: 'not_attempted' as const, actualLoad: null, actualReps: null, actualRpe: null, enteredLoadText: '', enteredRepsText: '', enteredRpeText: '', loggedAt: null }] }) };
-                setDraft(next); setExercises(draftToExercises(next, programWorkout ?? undefined)); void persistDraft(next);
+                setDraft(next);  void persistDraft(next);
               } : undefined}
               onSetExercise={id => { setSetPicker(id); setSetSearch(''); void loadCorrectionCatalog(supabase).then(result => setSetCatalog(result.data ?? [])); }}
               key={exercise.id}
@@ -1044,7 +1051,7 @@ export default function NextWorkoutScreen() {
         <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'transparent' }}><View style={{ maxHeight: '80%', padding: 24, backgroundColor: theme.surfaceBg, borderWidth: 1, borderColor: theme.border }} accessibilityViewIsModal>
           <TextInput accessibilityLabel="Search exercises" style={{ color: theme.textPrimary, minHeight: 48 }} value={setSearch} onChangeText={setSetSearch} placeholder="Search exercises" />
           <ScrollView keyboardShouldPersistTaps="handled">{setCatalog.filter(e => e.name.toLowerCase().includes(setSearch.toLowerCase())).map(e => <Pressable key={e.id} accessibilityRole="button" style={{ minHeight: 48, justifyContent: 'center' }} onPress={() => {
-            if (draft && setPicker && !saving && !removalBusyRef.current && !pendingSwap && !draft.finalizationEndedAt && draft.lifecycle !== 'finalized') { const next = updateWorkoutSet(draft, { setId: setPicker, actualExerciseId: e.id, actualExerciseName: e.name }); setDraft(next); setExercises(draftToExercises(next, programWorkout ?? undefined)); void persistDraft(next); }
+            if (draft && setPicker && !saving && !removalBusyRef.current && !pendingSwap && !draft.finalizationEndedAt && draft.lifecycle !== 'finalized') { const next = updateWorkoutSet(draft, { setId: setPicker, actualExerciseId: e.id, actualExerciseName: e.name }); setDraft(next);  void persistDraft(next); }
             setSetPicker(null);
           }}><Text style={{ color: theme.text }}>{e.name}</Text></Pressable>)}</ScrollView>
           <Pressable accessibilityRole="button" style={{ minHeight: 48 }} onPress={() => setSetPicker(null)}><Text style={{ color: theme.primary }}>Close</Text></Pressable>
