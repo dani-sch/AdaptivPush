@@ -1,6 +1,16 @@
 # September 18 workout editing implementation
 
-## Delivery boundary
+## Authorized hosted deployment
+
+The user's subsequent instruction, "apply the migration", authorized this exact packet. Migration `20260918160000_workout_structure.sql` was committed with its ledger entry in one transaction to `thfxcvxcsfvrzdysdnkq` at **2026-09-18 16:21:39 UTC**. SHA-256 remains `3180df8274dc35edbcce6da8e71bf5b9fa8d190763b283f26e5ea94b8caa7d99`.
+
+Fresh encrypted backup at 16:18:45 UTC: `C:/Users/dani2/AdaptivPush-secure-backups/Scoped-Workout-Removals/20260918T161832Z`. Database plaintext SHA-256 `657ad0f6b94cdeb49b4b398addd624171dcec077e0d0af7467bc61e6cd6dc202`; encrypted SHA-256 `208532643d9b8b9884d9f709a81ce47617d9b615ff8041c71c08e1063d9669fa`. AES-256-GCM and DPAPI CurrentUser custody remain unchanged. An isolated PostgreSQL 17 restore matched 59/59 relations. Forward application, the structural SQL suite and comparison with the previously reviewed schema passed, preserving all original fingerprints.
+
+Live preflight found zero schema/security drift and the expected eight-entry ledger. Deployment preserved all 58 non-ledger relations, including all 23 public relations. All seven post-migration schema/security inventories match the rehearsed result. The ledger now has nine entries. Authenticated capabilities are structure 1, removal 1, correction 2. Ordinary authenticated clients can invoke the new entrypoints; anonymous clients and direct private-helper calls remain denied. Follow-up checks at 16:21:51 UTC confirmed owned reads, cross-owner denial, unchanged public fingerprints and PostgREST recognition of the new capability endpoint (anonymous HTTP 401 / 42501).
+
+No user workout was created or edited for hosted verification, and no phone storage was touched. No visual tests were run for deployment; Expo acceptance remains with the user. Reload Expo or retry the workout editing support check to refresh an already-mounted capability result. Private deployment/verification manifests remain under `C:/Users/dani2/AppData/Local/AdaptivPush/release-evidence/2026-09-18-structure-release`. The earlier implementation handoff below is retained as historical evidence of the pre-authorization boundary.
+
+## Implementation handoff before deployment
 
 Implementation is committed on `codex/workout-editing-sept18`, integrated through the canonical integrator, and copied by fast-forward into the requested `C:/workout-app/AdaptivPush` checkout. PR #58 remains a draft against `main`. The unrelated `components/ExerciseHistoryModal.tsx` modification is preserved outside these commits.
 

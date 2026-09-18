@@ -1,9 +1,9 @@
 # AdaptivPush active task board
 
-## [IMPLEMENTED; HOSTED UPDATE PENDING] September 18 editing
+## [HOSTED DEPLOYED; USER ACCEPTANCE OPEN] September 18 editing
 
 - [COMPLETE] Implement skipped-row raw input, authoritative draft state, dismissal handoff, unified future changes, scoped Add exercise, durable completed structure and receipt verification; integrator `f3bd828`.
-- [PREPARED] New migration `20260918160000`, exact hash/recovery/security/rehearsal evidence in the [implementation report](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-EDITING-2026-09-18.md). Do not deploy under the prior removal approval.
+- [COMPLETE] Apply migration `20260918160000` under the user's explicit follow-up authorization. Structure 1/removal 1/correction 2, nine-entry ledger, schema/security and unchanged existing data verified; fresh recovery evidence in the [implementation report](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-EDITING-2026-09-18.md).
 - [USER ACCEPTANCE] User will test in Expo. Stop agent visual testing. Preserve device storage and exact pending requests; no reinstall or reset.
 - [OPEN] Confirm physical client/build, first native missing-module failure, and actual route behind editing a past program. No physical-device diagnosis is claimed.
 
