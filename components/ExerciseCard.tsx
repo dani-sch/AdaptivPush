@@ -1,7 +1,8 @@
 import { exerciseLoadLabel, loadUnitLabel } from '@/features/workouts/loadPresentation';
+import { createModalHandoff } from '@/features/workouts/modalHandoff';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useRef, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import ReanimatedSwipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { MuscleGroup } from '@/types/program';
@@ -96,9 +97,16 @@ function SetRow({ set, index, exercise, onUpdateSet, onSettings, onRemove }: {
 export default function ExerciseCard({ exercise, onUpdateSet, onPressHistory, onPressSwap, onSetExercise, onRemoveSet, onRemoveExercise, onAddSet }: ExerciseCardProps) {
   const { theme } = useTheme();
   const [menu, setMenu] = useState<string | null>(null);
+  const [handoff] = useState(createModalHandoff);
+  useEffect(() => {
+    if (menu !== null || Platform.OS === 'ios') return;
+    const frame = requestAnimationFrame(() => handoff.dismiss());
+    return () => cancelAnimationFrame(frame);
+  }, [menu, handoff]);
+  useEffect(() => () => handoff.cancel(), [handoff]);
   const selected = exercise.sets.find(set => set.id === menu);
   useEffect(() => { if (exercise.readOnly) void Promise.resolve().then(() => setMenu(null)); }, [exercise.readOnly]);
-  const closeThen = (action?: () => void) => { setMenu(null); action?.(); };
+  const closeThen = (action?: () => void) => { if (!handoff.enqueue(action)) return; Keyboard.dismiss(); setMenu(null); };
   const button = (label: string, action: () => void) => <Pressable key={label} accessibilityRole="button" style={styles.menuAction} onPress={action}><Text style={{ color: theme.primary }}>{label}</Text></Pressable>;
   return <View style={[styles.card, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
     <View style={styles.header}>
@@ -112,7 +120,7 @@ export default function ExerciseCard({ exercise, onUpdateSet, onPressHistory, on
       {['REPS', 'RPE'].map(label => <Text key={label} style={[styles.column, { flex: 1, color: theme.placeholder }]}>{label}</Text>)}<View style={{ width: 44 }} /></View>
     {exercise.sets.map((set, index) => <SetRow key={set.id} {...{ set, index, exercise, onUpdateSet }} onSettings={() => setMenu(set.id)} onRemove={onRemoveSet ? () => onRemoveSet(set.id) : undefined} />)}
     {!exercise.readOnly && onAddSet ? button('Add set', onAddSet) : null}
-    <Modal visible={menu !== null} transparent animationType="none" presentationStyle="overFullScreen" onRequestClose={() => setMenu(null)}>
+    <Modal visible={menu !== null} transparent animationType="none" presentationStyle="overFullScreen" onDismiss={() => handoff.dismiss()} onRequestClose={() => closeThen()}>
       <View style={styles.backdrop} accessibilityViewIsModal aria-modal role="dialog"><Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={() => setMenu(null)} />
         <View style={[styles.sheet, { backgroundColor: theme.surfaceBg, borderColor: theme.border }]}>
           <ScrollView keyboardShouldPersistTaps="handled">

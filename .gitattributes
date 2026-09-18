@@ -1,1 +1,2 @@
 supabase/migrations/20260917180000_scoped_workout_removals.sql text eol=lf
+supabase/migrations/20260918160000_workout_structure.sql text eol=lf

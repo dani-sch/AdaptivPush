@@ -13,6 +13,8 @@ export interface ProgramRemovalRequest {
   expectedRevisionId: string;
   currentStableDayId: string;
   targets: { slotId: string; order: number | null }[];
+  swaps?: { slotId: string; exerciseId: string }[];
+  additions?: { slotId: string; exerciseId: string; setCount: number }[];
 }
 export const emptyRemovals = (): WorkoutRemovals => ({ version: 1, slots: [], sets: [] });
 export function isRemoved(removals: WorkoutRemovals | undefined, slotId: string, setId?: string): boolean {
@@ -30,6 +32,11 @@ export function removeDraftWork(draft: WorkoutDraft, slotId: string, setId?: str
   const slot = draft.slots.find(s => s.slotId === slotId);
   const set = slot?.sets.find(s => s.setId === setId);
   if (!slot || (setId && !set)) throw new Error('Workout item is no longer available.');
+  if (!draft.frozenPrescription.slots.some(s => s.slotId === slotId) && !setId) {
+    return { ...draft, revision: nextRevision(draft.revision), slots: draft.slots.filter(s => s.slotId !== slotId),
+      programRemoval: draft.programRemoval ? { ...draft.programRemoval, additions: draft.programRemoval.additions?.filter(a => a.slotId !== slotId),
+        swaps: draft.programRemoval.swaps?.filter(a => a.slotId !== slotId) } : undefined };
+  }
   if (set && !draft.frozenPrescription.slots.find(s => s.slotId === slotId)?.sets.some(s => s.setId === setId)) {
     if (programRemoval) throw new Error('Extra sets have no future prescription.');
     return { ...draft, revision: nextRevision(draft.revision), slots: draft.slots.map(s => s.slotId !== slotId ? s : { ...s, sets: s.sets.filter(row => row.setId !== setId) }) };
@@ -47,5 +54,5 @@ export function addProgramRemoval(current: ProgramRemovalRequest | undefined, co
     throw new Error('The program changed. Save or resolve existing changes before removing more work.');
   }
   const targets = current?.targets ?? [];
-  return { ...context, targets: targets.some(t => t.slotId === target.slotId && t.order === target.order) ? targets : [...targets, target] };
+  return { ...current, ...context, targets: targets.some(t => t.slotId === target.slotId && t.order === target.order) ? targets : [...targets, target] };
 }

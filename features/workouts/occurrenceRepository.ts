@@ -53,7 +53,9 @@ export async function loadCompletedWorkout(client: SupabaseClient, ownerId: stri
     actualSetId: row.actual_set_id ?? row.id, prescriptionSlotId: row.prescription_slot_id ?? null,
     prescribedExerciseId: row.prescribed_exercise_id ?? null, exerciseId: row.exercise_id,
     order: row.order_index ?? row.set_number, reps: row.reps,
-    loadValue: row.load_value == null ? row.weight_lb == null ? null : Number(row.weight_lb) : Number(row.load_value),
+    loadValue: row.load_value == null
+      ? row.load_kind === 'bodyweight' || row.load_kind === 'unknown' || row.weight_lb == null ? null : Number(row.weight_lb)
+      : Number(row.load_value),
     loadKind: row.load_kind ?? 'external',
     loadUnit: row.load_kind === 'bodyweight' || row.load_kind === 'unknown' ? 'none' : row.load_unit ?? 'lb',
     loadSide: row.load_side ?? 'unknown',
