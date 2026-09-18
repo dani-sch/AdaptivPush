@@ -1,16 +1,16 @@
 # AdaptivPush modular execution register
 
-## iPhone recovery and workout fixes: integration verified, hosted removal pending
+## iPhone recovery and workout fixes: integrated, hosted removal deployed
 
 The failed phone login is tied by its exact timestamp to the local-test Expo server on 8082, whose iOS bundle embedded phone-localhost Supabase. Hosted Expo remains on 8081; local browser QA is now loopback-only and native clients reject loopback backend configurations. Session hydration now distinguishes outages from sign-out, coordinates foreground refresh and preserves owner-scoped drafts/pending operations. Input focus no longer disables row swiping; removal checks distinguish failed requests from missing server support, and blank applicable loads display LB without inventing measurements.
 
-Feature commits f85d679, 42a9ed9, e04d89a and 2476343 are integrated through 801d7dc. Strict TypeScript, lint (three existing warnings), 119 application tests, iOS export, 12 fresh/restored SQL executions and nine-label concurrency pass. Fresh encrypted restore matches 59 relations; all 23 hosted public relations remain unchanged. [iPhone recovery evidence](/dev-doc/reports/ADAPTIVPUSH-IPHONE-RECOVERY-2026-09-17.md) owns causes, browser outage/reconnect/persistence checks, screenshots and the exact reverified migration packet. Hosted removal is still absent and requires new explicit authorization. Physical iPhone acceptance remains open. No scheduling/progression redesign.
+Feature commits f85d679, 42a9ed9, e04d89a and 2476343 are integrated through 801d7dc. Strict TypeScript, lint (three existing warnings), 119 application tests, iOS export, 12 fresh/restored SQL executions and nine-label concurrency pass. Fresh encrypted restore matches 59 relations; all 23 hosted public relations remain unchanged. [iPhone recovery evidence](/dev-doc/reports/ADAPTIVPUSH-IPHONE-RECOVERY-2026-09-17.md) owns causes, browser outage/reconnect/persistence checks, screenshots and the exact reverified migration packet. The user authorized the exact migration, now deployed with removal capability 1 and correction capability 2; [hosted removal release](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-REMOVAL-RELEASE-2026-09-17.md) owns the fresh recovery, preservation and hosted checks. Physical iPhone acceptance remains open. No scheduling/progression redesign.
 
-## Scoped removals and shared controls: integrated, hosted approval pending
+## Scoped removals and shared controls: integrated and hosted
 
 Active capture and completed edit now share compact rows with explicit checks, on-demand load/exercise settings, swipe set removal and header exercise removal. Occurrence tombstones preserve original prescriptions; selected future changes commit atomically with Save or Finish. Missing attempts hold the affected progression decision without becoming failures. App-owned dialog backdrops are transparent.
 
-The new additive migration 20260917180000 and separate removal capability 1 are locally/integration verified, **not deployed**. Earlier hosted correction capability 2 remains unchanged. The exact packet, encrypted backup/59-relation restore proof, 107 passing tests, SQL/concurrency checks, screenshots, forward recovery and physical-iPhone limitations are recorded in [September 17 removal evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-REMOVALS-2026-09-17.md). Obtain the user's explicit section-11 authorization before a new hosted write. AP-04/AP-05 remain queued.
+Migration 20260917180000 is deployed to thfxcvxcsfvrzdysdnkq under the user's explicit follow-up authorization. Removal capability is 1 and correction capability remains 2. Fresh encrypted backup/59-relation restore, 12 SQL suite executions, zero schema/security drift and all 58 non-ledger relations preserved are recorded in [hosted removal release](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-REMOVAL-RELEASE-2026-09-17.md). Physical iPhone acceptance remains open. AP-04/AP-05 remain queued.
 
 ## Unified workout occurrence boundary
 

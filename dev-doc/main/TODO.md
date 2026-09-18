@@ -3,13 +3,13 @@
 ## [CURRENT] iPhone recovery acceptance and hosted removal
 
 - [INTEGRATION VERIFIED] Auth/session recovery, isolated browser QA, focused-input swiping, typed capability failures, blank LB labels and owner-scoped unsubmitted edit recovery; integrator 801d7dc, 119 application cases and iOS export. [Evidence and packet](/dev-doc/reports/ADAPTIVPUSH-IPHONE-RECOVERY-2026-09-17.md).
-- [AWAITING EXPLICIT AUTHORIZATION] The exact unchanged 20260917180000 packet is reverified with a fresh encrypted backup, 59-relation isolated restore, zero seven-section drift, SQL/security/concurrency proof and forward recovery. Hosted removal remains absent.
+- [COMPLETE] Explicitly authorized 20260917180000 deployed: removal capability 1, correction 2, fresh encrypted backup/59-relation restore, 12 SQL suite executions, zero schema/security drift and all 58 non-ledger relations preserved. See [hosted removal release](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-REMOVAL-RELEASE-2026-09-17.md).
 - [OPEN] Use the hosted Expo server on 8081 for physical iPhone authentication, swiping/scrolling, keyboard, background/foreground, temporary disconnect/reconnect and draft restoration. The failed screenshot came from the previous local-test 8082 server; its replacement is loopback-only. Do not clear device storage.
 
 ## [CURRENT] Scoped removals rollout boundary
 
 - [INTEGRATION VERIFIED] Shared active/edit controls, durable workout/program removals, neutral original evidence and transparent app dialogs. Integrator c2fc22e; 107 application tests plus SQL/security/concurrency gates.
-- [AWAITING EXPLICIT AUTHORIZATION] Deploy only migration 20260917180000 after reviewing the exact hash, fresh encrypted backup, isolated restore and forward-recovery packet in [removal evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-REMOVALS-2026-09-17.md). Hosted removal is not released; existing correction capability remains 2.
+- [COMPLETE] Deploy only migration 20260917180000 under the user's follow-up authorization. Hosted capability/security and public-data preservation passed; [hosted removal release](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-REMOVAL-RELEASE-2026-09-17.md) owns exact evidence.
 - [OPEN] Physical iPhone gestures, keyboard, VoiceOver, dynamic text, modal animations/dismissal and restart. Browser checks are recorded separately.
 
 ## [CURRENT] Resume from the September 17 editing release
