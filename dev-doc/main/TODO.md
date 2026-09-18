@@ -1,5 +1,13 @@
 # AdaptivPush active task board
 
+## [IMPLEMENTED; HOSTED UPDATE PENDING] September 18 editing
+
+- [COMPLETE] Implement skipped-row raw input, authoritative draft state, dismissal handoff, unified future changes, scoped Add exercise, durable completed structure and receipt verification; integrator `f3bd828`.
+- [PREPARED] New migration `20260918160000`, exact hash/recovery/security/rehearsal evidence in the [implementation report](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-EDITING-2026-09-18.md). Do not deploy under the prior removal approval.
+- [USER ACCEPTANCE] User will test in Expo. Stop agent visual testing. Preserve device storage and exact pending requests; no reinstall or reset.
+- [OPEN] Confirm physical client/build, first native missing-module failure, and actual route behind editing a past program. No physical-device diagnosis is claimed.
+
+
 ## [CURRENT] iPhone recovery acceptance and hosted removal
 
 - [INTEGRATION VERIFIED] Auth/session recovery, isolated browser QA, focused-input swiping, typed capability failures, blank LB labels and owner-scoped unsubmitted edit recovery; integrator 801d7dc, 119 application cases and iOS export. [Evidence and packet](/dev-doc/reports/ADAPTIVPUSH-IPHONE-RECOVERY-2026-09-17.md).

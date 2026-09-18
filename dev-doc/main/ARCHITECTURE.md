@@ -1,5 +1,11 @@
 # AdaptivPush architecture summary
 
+## Durable editing structure and composed program changes
+
+`editingState.ts` is the active screen's synchronous draft authority; `workoutPresentation.ts` derives cards. `modalHandoff.ts` queues one action after dismissal. `recoveryCheckpoint.ts` preserves exact owner-scoped local records before hydration. `structure.ts` creates stable occurrence additions/extras and explicit completed effective slots, distinct from frozen prescriptions and actual results. Repositories compare receipts with authoritative reconstructed structure and actual values before clearing recovery.
+
+Prepared migration `20260918160000` extends existing atomic Finish/Save with one revision containing future removal masks, swaps and additions. Addition lineage survives later revision clones. Capability `workout_structure_capability_v1` gates the new controls independently of existing removal/correction capabilities. It is not yet deployed; [September 18 evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-EDITING-2026-09-18.md) owns the exact packet and user-led Expo acceptance boundary.
+
 ## Auth recovery and shared workout input boundary
 
 `contexts/AuthContext.tsx` composes the pure `features/auth/sessionRecovery.ts` controller with Supabase and native AppState. Hydration, ready, recovering and signed-out states distinguish stored owner identity from request authorization; null initial events and transient failures cannot impersonate sign-out. Root routing waits for hydration and retains the route on profile availability errors. Authenticated owner checks remain at server writers. `features/auth/backendConfiguration.ts` rejects native loopback backends; `scripts/startLocalWebQa.mjs` isolates synthetic browser environments.

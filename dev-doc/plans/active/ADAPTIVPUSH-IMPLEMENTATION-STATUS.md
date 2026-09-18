@@ -1,5 +1,10 @@
 # AdaptivPush code-backed implementation status
 
+## September 18 workout editing implementation; hosted update pending
+
+Skipped-row input loss, modal handoff, composed future edits and durable Add exercise/extra-set structure are implemented and integrated through `f3bd828`. The original checkout contains the implementation and preserves the unrelated History edit. New migration `20260918160000_workout_structure.sql` is rehearsed but **not deployed or authorized**; its capability gates additions and completed structural edits. Existing hosted removal 1/correction 2 were reverified. The user will test in Expo and has stopped agent visual testing. Native-client identity/startup cause and the exact past-program route remain unconfirmed. [September 18 implementation and packet evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-EDITING-2026-09-18.md) owns causes, regression evidence, recovery and release boundaries.
+
+
 ## iPhone recovery and workout fixes: integrated, hosted removal deployed
 
 The failed phone login is tied by its exact timestamp to the local-test Expo server on 8082, whose iOS bundle embedded phone-localhost Supabase. Hosted Expo remains on 8081; local browser QA is now loopback-only and native clients reject loopback backend configurations. Session hydration now distinguishes outages from sign-out, coordinates foreground refresh and preserves owner-scoped drafts/pending operations. Input focus no longer disables row swiping; removal checks distinguish failed requests from missing server support, and blank applicable loads display LB without inventing measurements.
