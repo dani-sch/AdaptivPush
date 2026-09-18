@@ -181,7 +181,7 @@ export default function NextWorkoutScreen() {
     () => resolveProgramWorkout(program, routeTarget),
     [program, routeTarget],
   );
-  
+
   const [workoutName, setWorkoutName] = useState("Workout");
   const removalCapability = useRemovalCapability();
   const canRemove = removalCapability.available;
@@ -257,7 +257,7 @@ export default function NextWorkoutScreen() {
       hydratedTargetRef.current = resolutionTargetKey;
       editingState.select(resolutionTargetKey);
       setDraft(null);
-      
+
       setResolutionError(null);
       setSyncMessage(null);
       setDraftLoading(true);
@@ -451,7 +451,7 @@ export default function NextWorkoutScreen() {
       const checked = field === 'logged' && value && current ? { load: current.loadKind === 'bodyweight' ? null : asNumber(current.enteredLoadText), reps: asNumber(current.enteredRepsText), rpe: asNumber(current.enteredRpeText) } : {};
       const nextDraft = updateWorkoutSet(draft, { setId, ...checked, ...update });
       setDraft(nextDraft);
-      
+
       void persistDraft(nextDraft).catch(() => setSyncMessage('Edits could not be saved on this device. Keep this workout open and retry.'));
     } catch (error) {
       Alert.alert('Check this set', error instanceof Error ? error.message : 'Enter valid set details before logging it.');
@@ -533,7 +533,7 @@ export default function NextWorkoutScreen() {
         });
       }
       setDraft(nextDraft);
-      
+
       persistDraft(nextDraft);
     } catch (error) {
       Alert.alert('Check these sets', error instanceof Error ? error.message : 'Enter valid set details before logging them.');
@@ -738,7 +738,7 @@ export default function NextWorkoutScreen() {
         throw error;
       }
       setDraft(nextDraft);
-      
+
       setCurrentPendingSwap(pending);
       setProgramUpdating(true);
       setSyncMessage('Updating program…');
@@ -752,7 +752,7 @@ export default function NextWorkoutScreen() {
     const earlierPending = pendingSwapRef.current;
     await persistDraft(nextDraft);
     setDraft(nextDraft);
-    
+
     setSyncMessage('Exercise swapped for this workout.');
     if (earlierPending) {
       setProgramUpdating(true);
