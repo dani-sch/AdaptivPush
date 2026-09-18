@@ -712,4 +712,3 @@ BEGIN
  END IF;
 END $$;
 REVOKE ALL ON FUNCTION public.validate_workout_removals(jsonb,jsonb,jsonb,jsonb,uuid,uuid) FROM PUBLIC,anon,authenticated;
-
