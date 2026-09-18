@@ -1,5 +1,9 @@
 # AdaptivPush code-backed implementation status
 
+## Resume readiness and detailed Add exercise
+
+Client fixes restore unfinished measurements without hiding the editor, settle pending-operation recovery on entry/refresh/Retry, and reuse the detailed exercise picker for Add with complete catalog pagination and explicit scope confirmation. Stable occurrence identities, frozen prescriptions and pending requests remain intact. Automated verification and integrator evidence are recorded in the [September 18 report](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-EDITING-2026-09-18.md#resume-and-detailed-add-client-follow-up). Expo visual acceptance remains with the user; the deployed migration is unchanged.
+
 ## September 18 workout editing: hosted update deployed
 
 Skipped-row input loss, modal handoff, composed future edits and durable Add exercise/extra-set structure are implemented and integrated through `f3bd828`. The original checkout contains the implementation and preserves the unrelated History edit. Following explicit user authorization, migration `20260918160000_workout_structure.sql` is deployed to `thfxcvxcsfvrzdysdnkq`. Structure capability 1 now enables additions and completed structural edits; removal 1/correction 2 remain available. Fresh encrypted backup, isolated restore, forward rehearsal and hosted security/data-preservation checks passed. The user will test in Expo and has stopped agent visual testing. Native-client identity/startup cause and the exact past-program route remain unconfirmed. [September 18 implementation and packet evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-EDITING-2026-09-18.md) owns causes, regression evidence, recovery and release boundaries.

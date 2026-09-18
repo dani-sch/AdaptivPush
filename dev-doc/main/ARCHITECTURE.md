@@ -2,6 +2,10 @@
 
 ## Durable editing structure and composed program changes
 
+Restoration/readiness is separate from submission validation. `resolveWorkoutEditingSession` in `editingState.ts` serializes restoration, fills only an empty matching target, and recovers pending operations even when an earlier attempt already installed the draft. Readiness waits for recovery; program-owner mismatches cannot seed a new draft. `routeResolution.ts` and Home matching accept unfinished measurements while retaining owned program/day identity and finalized-session routing. Finish retains full measurement validation.
+
+`SwapExerciseModal` has distinct Add and Swap prop contracts sharing one detailed card/list/footer implementation. Add reads the complete paginated catalog through `loadExercisePickerCatalog`, without Swap filters or an invented replacement target. `InteractionScope` and the shared apply gate discard stale callbacks and prevent duplicate submissions. Scoped additions remain local draft commands; wider changes commit atomically through the existing Finish transaction.
+
 `editingState.ts` is the active screen's synchronous draft authority; `workoutPresentation.ts` derives cards. `modalHandoff.ts` queues one action after dismissal. `recoveryCheckpoint.ts` preserves exact owner-scoped local records before hydration. `structure.ts` creates stable occurrence additions/extras and explicit completed effective slots, distinct from frozen prescriptions and actual results. Repositories compare receipts with authoritative reconstructed structure and actual values before clearing recovery.
 
 Hosted migration `20260918160000` extends existing atomic Finish/Save with one revision containing future removal masks, swaps and additions. Addition lineage survives later revision clones. Capability `workout_structure_capability_v1` gates the new controls independently of existing removal/correction capabilities. It was deployed under explicit user authorization on September 18; [September 18 evidence](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-EDITING-2026-09-18.md) owns the exact packet and user-led Expo acceptance boundary.
