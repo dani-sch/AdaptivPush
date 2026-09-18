@@ -2,7 +2,7 @@
 
 ## Source and hosted runtime
 
-The current integration tree contains the September 17 scoped-removal/session-recovery work, the September 18 workout-structure release, and the later resume/detailed-Add fixes. Draft PR #58 is the single review boundary against `main`; its source branch is being advanced to the current integration tip rather than opening a competing PR.
+The current integration tree contains the September 17 scoped-removal/session-recovery work, the September 18 workout-structure release, and the later resume/detailed-Add fixes. Draft PR #58 is the single review boundary against `main`; its source branch has been advanced to the current integration tip rather than opening a competing PR. Redundant local/remote feature branches and the clean September 18 worktree have been retired; `main`, the active PR branch, and the canonical `integrator` worktree remain.
 
 The verified hosted project is `thfxcvxcsfvrzdysdnkq`. Its supported ledger has nine entries: `20260910175317`, `20260910190000`, `20260910210000`, `20260911120000`, `20260915151000`, `20260915190000`, `20260915210000`, `20260917180000`, and `20260918160000`. Authenticated capabilities are correction 2, removal 1, and structure 1. The normal local environment enables both durable writers; credentials remain untracked.
 
