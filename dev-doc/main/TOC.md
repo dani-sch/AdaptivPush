@@ -16,12 +16,12 @@
 | Tool Scripts | 27 |
 | Power Automate Scripts | 1 |
 | VBA Scripts | 5 |
-| Documentation | 45 |
+| Documentation | 44 |
 | Configuration | 9 |
 | Skills | 62 |
 | Agents | 17 |
 | Commands | 8 |
-| **Total** | **262** |
+| **Total** | **261** |
 
 ---
 
@@ -251,7 +251,6 @@ _Living documents and active plans_
     │   └── TODO.md — AdaptivPush active task board
     ├── plans/
     │   ├── active/
-    │   │   ├── ADAPTIVPUSH-AP04-AP05-HISTORY-EXECUTION-PROMPT.md — AP-04 scheduling and AP-05.1 history execution prompt
     │   │   ├── ADAPTIVPUSH-DATABASE-PLAN.md — AdaptivPush database and migration plan
     │   │   ├── ADAPTIVPUSH-DOCUMENT-INVENTORY.md — AdaptivPush planning-document inventory and archive map
     │   │   ├── ADAPTIVPUSH-EXECUTION-REGISTER.md — AdaptivPush modular execution register

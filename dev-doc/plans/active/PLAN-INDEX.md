@@ -18,7 +18,7 @@ The living spine summarizes these owners. Historical source plans never override
 
 ## Current lane
 
-The September 25 approved next session combines AP-04.1-AP-04.3 with AP-05.1 and includes deployment of every required in-scope migration to production Supabase project `thfxcvxcsfvrzdysdnkq`. The [task-specific execution prompt](/dev-doc/plans/active/ADAPTIVPUSH-AP04-AP05-HISTORY-EXECUTION-PROMPT.md) records the user's authorization, phase order, contracts, technical deployment checks, and closeout requirements. It is unexecuted intake, not completion evidence or a replacement for the owning plans. AP-05.2/05.3 remain deferred.
+The September 25 approved next session combines AP-04.1-AP-04.3 with AP-05.1 and includes deployment of every required in-scope migration to production Supabase project `thfxcvxcsfvrzdysdnkq`. The user requested the execution prompt in chat only; prompts are not repository artifacts. This approval does not establish implementation or deployment completion. AP-05.2/05.3 remain deferred.
 
 [TODO](/dev-doc/main/TODO.md) routes immediate work. AP-01 catalog authority and the AP-02/AP-03 durable workout/program baseline are deployed. Subsequent bounded record extensions are also deployed: completed correction and effective occurrences (`20260915190000`, `20260915210000`), scoped removals (`20260917180000`), and durable workout structure/composed future edits (`20260918160000`). PRs #54-#58 are merged into `main`; the hosted ledger has nine entries and exposes correction 2, removal 1, and structure 1.
 
