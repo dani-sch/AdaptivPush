@@ -98,6 +98,8 @@ export default function NotificationsScreen() {
   const flatListRef = useRef<FlatList>(null);
 
   const [pushEnabled, setPushEnabled] = useState(DEFAULT_NOTIFICATION_PREFERENCES.pushEnabled);
+  const [emailEnabled, setEmailEnabled] = useState(DEFAULT_NOTIFICATION_PREFERENCES.emailEnabled);
+  const [smsEnabled, setSmsEnabled] = useState(DEFAULT_NOTIFICATION_PREFERENCES.smsEnabled);
   const [reminderTime, setReminderTime] = useState(DEFAULT_NOTIFICATION_PREFERENCES.reminderTime);
   const [workoutReminder, setWorkoutReminder] = useState(
     DEFAULT_NOTIFICATION_PREFERENCES.workoutReminder,
@@ -148,6 +150,8 @@ export default function NotificationsScreen() {
         );
 
         setPushEnabled(preferences.pushEnabled);
+        setEmailEnabled(preferences.emailEnabled);
+        setSmsEnabled(preferences.smsEnabled);
         setReminderTime(preferences.reminderTime);
         setWorkoutReminder(preferences.workoutReminder);
         setDeloadReminder(preferences.deloadReminder);
@@ -222,8 +226,8 @@ export default function NotificationsScreen() {
 
       const nextPreferences = {
         pushEnabled,
-        emailEnabled: false,
-        smsEnabled: false,
+        emailEnabled,
+        smsEnabled,
         workoutReminder,
         reminderTime,
         deloadReminder,
