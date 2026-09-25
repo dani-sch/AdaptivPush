@@ -42,6 +42,7 @@ test('legacy undated entry only remains available when absence is confirmed', ()
   assert.equal(canStartUndatedWorkout(placed, false), false);
   assert.equal(canStartUndatedWorkout({ state: 'conflict', reason: 'pending' }, false), false);
   assert.equal(canStartUndatedWorkout({ state: 'unavailable', reason: 'Offline' }, false), false);
+  assert.equal(canStartUndatedWorkout({ state: 'conflict', reason: 'Unsupported schedule version' }, false), false);
   assert.equal(canStartUndatedWorkout({ state: 'unplaced' }, false), true);
   assert.equal(canStartUndatedWorkout({ state: 'unplaced' }, true), false);
 });

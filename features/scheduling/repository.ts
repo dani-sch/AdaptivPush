@@ -174,7 +174,9 @@ export function createScheduleRepository(client: SupabaseClient) {
         }
         throw capability.error;
       }
-      if (capability.data !== 1) return { state: 'unavailable', reason: UNAVAILABLE };
+      if (capability.data !== 1) {
+        return { state: 'conflict', reason: 'This client does not understand the server schedule version. Update the app before starting a workout.' };
+      }
       const schedules = await client.from('program_schedules')
         .select('id,user_id,program_id,revision,timezone')
         .eq('user_id', ownerId).eq('program_id', programId).limit(2).returns<ScheduleRow[]>();
