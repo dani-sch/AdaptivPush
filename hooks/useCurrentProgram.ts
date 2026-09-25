@@ -121,8 +121,6 @@ function useCurrentProgramState() {
     const [actionError, setActionError] = useState<string | null>(null);
     const [ownerId, setOwnerId] = useState<string | null>(null);
 
-    const prevWeekRef = useRef<number>(0);
-    const applyProgressionRef = useRef<(() => Promise<void>) | undefined>(undefined);
     const programRef = useRef<CurrentProgram | null>(null);
     const ownerIdRef = useRef<string | null>(null);
     const refreshControllerRef = useRef<AbortController | null>(null);
@@ -168,7 +166,6 @@ function useCurrentProgramState() {
                 ownerIdRef.current = requestOwnerId;
                 programRef.current = null;
                 setProgram(null);
-                prevWeekRef.current = 0;
             }
 
             // Get active program
@@ -503,11 +500,6 @@ function useCurrentProgramState() {
             setUnavailable(false);
             setFailureCategory(null);
 
-            // Trigger progression when week advances
-            if (mapped.currentWeek > prevWeekRef.current && prevWeekRef.current !== 0) {
-                applyProgressionRef.current?.();
-            }
-            prevWeekRef.current = mapped.currentWeek;
         } catch (e) {
             const failure = classifySupabaseError(e);
             if (failure.category === 'cancelled' || generation !== refreshGenerationRef.current) return;
@@ -538,7 +530,6 @@ function useCurrentProgramState() {
             setProgram(null);
             setUnavailable(false);
             setFailureCategory(null);
-            prevWeekRef.current = 0;
             setTimeout(() => void refresh(), 0);
         });
         return () => {
@@ -741,8 +732,6 @@ function useCurrentProgramState() {
         await Promise.all(updates);
         await refresh();
     }, [program, refresh]);
-
-    applyProgressionRef.current = applyProgressionToNextWeek;
 
     const swapExercise = useCallback(
         async ({ exerciseId, replacement, scope, startedWorkout = false }: SwapArgs) => {
@@ -1081,15 +1070,21 @@ function useCurrentProgramState() {
             return;
         }
 
-        console.log('[advanceToNextWeek] Success, refreshing');
+        try {
+            await applyProgressionToNextWeek();
+        } catch (progressionError) {
+            reportSupabaseFailure('program.advance_week_progression', progressionError);
+            setActionError(supabaseUserMessage(progressionError, 'The next week started, but its progression could not be updated.'));
+            await refresh();
+            return;
+        }
         setActionError(null);
-        await refresh();
 
         // Every 4th week is a deload — notify the user when transitioning into one
         if (nextWeek % 4 === 0) {
             void notifyDeloadWeek();
         }
-    }, [program, refresh]);
+    }, [program, refresh, applyProgressionToNextWeek]);
 
     const availabilityMessage = useMemo(
         () => failureCategory
