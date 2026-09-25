@@ -114,9 +114,8 @@ export function selectScheduleToday(read: ScheduleRead, now: Date): TodaySchedul
   if (read.state === 'unplaced') {
     return { state: 'unplaced', message: 'This program has no confirmed dated placement. Your next workout is not assigned to today.' };
   }
-  let today: string;
   try {
-    today = todayInScheduleZone(now, read.timeZone);
+    todayInScheduleZone(now, read.timeZone);
   } catch {
     return { state: 'conflict', message: 'The schedule timezone is invalid. Dates cannot be shown safely.' };
   }
