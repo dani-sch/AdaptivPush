@@ -42,6 +42,18 @@ function parse(value: string, ownerId: string, programId: string): PendingSchedu
   ) {
     throw new Error('Stored schedule operation cannot be safely replayed');
   }
+  const request: unknown = JSON.parse(operation.requestJson);
+  if (
+    typeof request !== 'object' ||
+    request === null ||
+    Array.isArray(request) ||
+    !('operationId' in request) ||
+    !('expectedRevision' in request) ||
+    request.operationId !== operation.operationId ||
+    request.expectedRevision !== operation.expectedRevision
+  ) {
+    throw new Error('Stored schedule request differs from its recovery identity');
+  }
   return operation as PendingScheduleOperation;
 }
 

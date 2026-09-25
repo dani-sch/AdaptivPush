@@ -45,4 +45,6 @@ test('corrupt or unsupported pending operation is never silently discarded', asy
   const key = [...data.keys()][0];
   data.set(key, JSON.stringify({ ...operation, schemaVersion: 2 }));
   await assert.rejects(store.load('owner-a', 'program-a'), /safely replayed/);
+  data.set(key, JSON.stringify({ ...operation, requestJson: '{"operationId":"different","expectedRevision":4}' }));
+  await assert.rejects(store.load('owner-a', 'program-a'), /recovery identity/);
 });
