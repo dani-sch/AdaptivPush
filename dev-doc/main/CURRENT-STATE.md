@@ -2,7 +2,7 @@
 
 ## Source and hosted runtime
 
-The current integration tree contains the September 17 scoped-removal/session-recovery work, the September 18 workout-structure release, and the later resume/detailed-Add fixes. Draft PR #58 is the single review boundary against `main`; its source branch has been advanced to the current integration tip rather than opening a competing PR. Redundant local/remote feature branches and the clean September 18 worktree have been retired; `main`, the active PR branch, and the canonical `integrator` worktree remain.
+`origin/main` contains the complete September 11-18 release sequence through merge commit `ec848e6`. PRs #54-#58 are merged; PR #58 brought the September 17 scoped-removal/session-recovery work, the September 18 workout-structure release, and the later resume/detailed-Add fixes into the default branch. Its remote feature branch has been deleted. There were no later product commits through the September 25 refresh, and there is no active release PR for this boundary.
 
 The verified hosted project is `thfxcvxcsfvrzdysdnkq`. Its supported ledger has nine entries: `20260910175317`, `20260910190000`, `20260910210000`, `20260911120000`, `20260915151000`, `20260915190000`, `20260915210000`, `20260917180000`, and `20260918160000`. Authenticated capabilities are correction 2, removal 1, and structure 1. The normal local environment enables both durable writers; credentials remain untracked.
 
@@ -21,7 +21,7 @@ The latest deployment preserved all 58 preexisting non-ledger relations and all 
 
 ## Verification posture
 
-The current checkout passes 157 application cases: 106 workout, 20 program, 20 availability, 9 catalog, and 2 dependency. `npx tsc --noEmit --strict` passes. `npm run lint` has zero errors and three preexisting unused-variable warnings. The mandated `ruff check scripts/ tests/ src/` reaches only the known missing-path error for absent `src/`; there are no Python files under the applicable `scripts/` or `tests/` paths.
+The September 25 rerun on current `main` passes 157 application cases: 106 workout, 20 program, 20 availability, 9 catalog, and 2 dependency. `npx tsc --noEmit --strict` passes. `npm run lint` has zero errors and three preexisting unused-variable warnings. The mandated `ruff check scripts/ tests/ src/` remains inapplicable to this documentation-only refresh: there are no Python files under the applicable `scripts/` or `tests/` paths and the repository has no `src/` directory.
 
 The latest dated database evidence includes 14 structural SQL suite executions across fresh/restored targets plus concurrency, role, replay, stale-revision, schema, and preservation checks. Those checks were not repeated by documentation cleanup and remain owned by the release report.
 
@@ -35,4 +35,4 @@ The latest dated database evidence includes 14 structural SQL suite executions a
 
 ## Review and continuation
 
-PR #56 and PR #57 are merged. Draft [PR #58](https://github.com/dani-sch/AdaptivPush/pull/58) is the active consolidated review for all later workout editing, removal, recovery, structure, and detailed-Add work. Continue only from [TODO](/dev-doc/main/TODO.md); use the [execution register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) for later slice scope and the dated reports for historical evidence.
+PRs #54-#58 are merged into `main`; [PR #58](https://github.com/dani-sch/AdaptivPush/pull/58) is closed as the consolidated publication boundary for later workout editing, removal, recovery, structure, and detailed-Add work. The [September 25 two-week product status](/dev-doc/reports/ADAPTIVPUSH-TWO-WEEK-PRODUCT-STATUS-2026-09-25.md) translates that boundary into user abilities and an ordered next path. Continue only from [TODO](/dev-doc/main/TODO.md); use the [execution register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) for slice scope and dated reports for historical evidence.

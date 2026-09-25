@@ -2,19 +2,12 @@
 
 ## [USER ACCEPTANCE] Current Expo/iPhone release
 
-- [AUTOMATED VERIFIED] 157 application cases, strict TypeScript, and lint with zero errors and three known warnings pass on the current integration tree.
+- [AUTOMATED VERIFIED] The September 25 rerun on current `main` passes 157 application cases, strict TypeScript, and lint with zero errors and three known warnings.
 - [HOSTED VERIFIED] Supported ledger has nine entries through `20260918160000`; capabilities are correction 2, removal 1, and structure 1. Latest recovery, schema/security, and data-preservation evidence is in the [September 18 report](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-EDITING-2026-09-18.md).
 - [USER ACCEPTANCE] With the ordinary hosted Expo server and existing account, verify cold launch/login, Continue Workout, unfinished-field restoration, Check/Finish validation, Add/Swap/Remove scopes, completed edit Save/Cancel/reopen, keyboard behavior, background/foreground, temporary disconnect/reconnect, and draft restoration.
 - [USER ACCEPTANCE] Check VoiceOver, dynamic type, modal dismissal/animation, swipe/scroll coexistence, and native restart/interruption.
 - [CONSTRAINT] Preserve device storage, credentials, user workouts, and exact pending requests. Do not reinstall/reset, create synthetic user data in the user's account, or redeploy migrations for acceptance.
 - [OPEN] Identify the installed phone client/build and capture the exact route/session for any remaining native startup or past-program editing failure before diagnosing it.
-
-## [REVIEW] Consolidated draft PR
-
-- [COMPLETE] Preserve and commit the existing `ExerciseHistoryModal` import-order cleanup without altering its behavior.
-- [COMPLETE] Reconcile living docs and active plans to deployed/tested behavior; retain every plan file and historical report.
-- [COMPLETE] Keep draft PR #58 as the single review boundary and advance its branch to the current integration tip.
-- [COMPLETE] Remove only branch/worktree references proven fully contained by the consolidated draft branch; retain `main`, the active PR branch, and the canonical `integrator` worktree.
 
 ## [NEXT] AP-04 dated scheduling and manual control
 
@@ -41,5 +34,6 @@
 - [COMPLETE] Completed-workout correction and stable effective occurrences (`20260915190000`, `20260915210000`).
 - [COMPLETE] Scoped workout removals and shared controls (`20260917180000`).
 - [COMPLETE] Durable workout structure, composed future changes, detailed Add, and resilient resume/recovery (`20260918160000` plus client follow-ups).
+- [COMPLETE] PRs #54-#58 merged to `main`; PR #58 is the consolidated source publication boundary for the September workout releases.
 
-Historical evidence remains in [DEV-LOG](/dev-doc/reports/DEV-LOG.md) and the dated release reports. Completed work is not an instruction to repeat hosted writes or synthetic-account operations.
+The [September 25 two-week product status](/dev-doc/reports/ADAPTIVPUSH-TWO-WEEK-PRODUCT-STATUS-2026-09-25.md) gives the user-action summary and ordered AP-04/AP-05 path. Historical evidence remains in [DEV-LOG](/dev-doc/reports/DEV-LOG.md) and the dated release reports. Completed work is not an instruction to repeat hosted writes or synthetic-account operations.
