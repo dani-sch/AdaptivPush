@@ -40,7 +40,7 @@ const CardHeader: React.FC<{
 }> = ({ title, duration, onPressCalendar, styles, theme }) => (
   <View style={styles.header}>
     <View style={styles.headerLeft}>
-      <Text style={styles.label}>Next Workout</Text>
+      <Text style={styles.label}>Next workout · not a dated Today assignment</Text>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.duration}>{duration} min</Text>
     </View>
@@ -48,6 +48,8 @@ const CardHeader: React.FC<{
       onPress={onPressCalendar}
       style={styles.calendarButton}
       hitSlop={8}
+      accessibilityRole="button"
+      accessibilityLabel="View program plan"
     >
       <SymbolView name="calendar" size={24} tintColor={theme.white} />
     </Pressable>

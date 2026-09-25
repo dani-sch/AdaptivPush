@@ -17,6 +17,8 @@ import { X, Search, Check, ChevronDown, ChevronUp } from 'lucide-react-native';
 import type { CurrentProgram, WorkoutExercise, MuscleGroup, Equipment } from '@/types/program';
 import { getAlternativesFor, exercisesByMuscleGroup } from '@/lib/exerciseDatabase';
 import { supabase } from '@/utils/supabase';
+import { fetchExerciseHistory } from '@/utils/fetchExerciseHistory';
+import { reportSupabaseFailure } from '@/utils/supabaseResilience';
 import { useAuth } from '@/contexts/AuthContext';
 import { loadExercisePickerCatalog } from '@/features/workouts/occurrenceRepository';
 import type { RemovalPreview } from '@/features/workouts/removalRepository';
@@ -174,6 +176,7 @@ function ExercisePicker(props: Props) {
     const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null);
     const [applying, setApplying] = useState(false);
     const [applyError, setApplyError] = useState<string | null>(null);
+    const [historyIssue, setHistoryIssue] = useState<{ exerciseId: string; message: string } | null>(null);
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const historyCacheRef = useRef(new OptionalValueCache<string, LoadSuggestion>());
     const applyGateRef = useRef(new SingleFlightGate());
@@ -294,26 +297,27 @@ function ExercisePicker(props: Props) {
     );
 
     const loadHistorySuggestion = useCallback(async (catalogExerciseId: string): Promise<LoadSuggestion | undefined> => {
-        const { data: historyRows } = await supabase.from('workout_exercise_sets')
-            .select('load_value, load_unit, load_kind, load_side')
-            .eq('exercise_id', catalogExerciseId)
-            .in('load_kind', ['external', 'assistance'])
-            .not('load_value', 'is', null)
-            .order('logged_at', { ascending: false })
-            .limit(1);
-        const history = historyRows?.[0];
-        if (!history
-            || !Number.isFinite(Number(history.load_value))
-            || (history.load_unit !== 'lb' && history.load_unit !== 'kg')
-            || (history.load_kind !== 'external' && history.load_kind !== 'assistance')) {
+        try {
+            const history = await fetchExerciseHistory(catalogExerciseId, undefined, supabase);
+            if (history.unavailable || history.partial || history.truncated || history.errors.length) {
+                throw history.errors[0] ?? new Error('Complete exercise history is unavailable.');
+            }
+            setHistoryIssue(previous => previous?.exerciseId === catalogExerciseId ? null : previous);
+            for (const entry of history.entries) {
+                for (const set of [...entry.sets].reverse()) {
+                    if (set.loadValue == null || !Number.isFinite(set.loadValue)
+                        || (set.loadUnit !== 'lb' && set.loadUnit !== 'kg')
+                        || (set.loadKind !== 'external' && set.loadKind !== 'assistance')) continue;
+                    return { value: set.loadValue, unit: set.loadUnit, kind: set.loadKind,
+                        side: set.loadSide === 'total' ? 'external_total' : set.loadSide ?? 'unknown' };
+                }
+            }
             return undefined;
+        } catch (error) {
+            reportSupabaseFailure('swap.exercise_history', error);
+            setHistoryIssue({ exerciseId: catalogExerciseId, message: 'Recent load could not be checked; no historical load will be suggested.' });
+            throw error;
         }
-        return {
-            value: Number(history.load_value),
-            unit: history.load_unit,
-            kind: history.load_kind,
-            side: history.load_side ?? 'unknown',
-        };
     }, []);
 
     useEffect(() => {
@@ -504,6 +508,8 @@ function ExercisePicker(props: Props) {
                 </View> : null}
                 {mode === 'add' ? <Pressable accessibilityRole="button" onPress={onClose} style={styles.cancelButton}><Text style={styles.switchText}>Cancel</Text></Pressable> : null}
                 {applyError ? <Text style={styles.applyError} accessibilityLiveRegion="assertive">{applyError}</Text> : null}
+                {historyIssue && historyIssue.exerciseId === selectedExercise?.catalogExerciseId
+                    ? <Text style={styles.applyError} accessibilityLiveRegion="polite">{historyIssue.message}</Text> : null}
 
                 <Pressable
                     onPress={() => void handleApply()}

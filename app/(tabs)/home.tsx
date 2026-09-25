@@ -4,7 +4,7 @@ import { occurrenceAction, occurrenceState } from '@/features/workouts/effective
 import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
 import { router, useFocusEffect } from "expo-router";
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Dimensions,
   Modal,
@@ -26,6 +26,11 @@ import { supabase } from "../../utils/supabase";
 import { computeCyclePhase } from "../../utils/cyclePhase";
 import { workoutEntryIssue, workoutRouteParams } from "@/features/workouts/routeResolution";
 import { workoutDraftStore } from "@/features/workouts/draftStore";
+import { useProgramSchedule } from "@/hooks/useProgramSchedule";
+import { canStartUndatedWorkout, reminderPlanForSchedule, scheduledOutcomeLabel } from "@/features/scheduling/repository";
+import { scheduleOperationStore } from "@/features/scheduling/operationStore";
+import { parseNotificationPreferences } from "@/utils/profilePreferences";
+import { reconcileWorkoutReminders } from "@/utils/notifications";
 import {
   effectiveCurrentWorkout,
   matchingActiveWorkoutDraft,
@@ -87,7 +92,7 @@ const NextWorkoutSection: React.FC<{
       hasActiveDraft={hasActiveDraft}
       workout={workout}
       onPressStart={onPressStart}
-      onPressCalendar={() => console.log("Calendar pressed")}
+      onPressCalendar={() => router.push('/(tabs)/plan')}
     />
   );
 };
@@ -620,6 +625,7 @@ export default function HomeScreen() {
   const [lastWorkoutId, setLastWorkoutId] = useState<string | null>(null);
   const [lastWorkoutDate, setLastWorkoutDate] = useState<string | null>(null);
   const [loadedDraft, setLoadedDraft] = useState<WorkoutDraft | null>(null);
+  const [reminderIssue, setReminderIssue] = useState<{ ownerId: string; programId: string; revision: number } | null>(null);
   const homeFocusGenerationRef = useRef(0);
 
   const {
@@ -633,6 +639,36 @@ export default function HomeScreen() {
     applyReadinessAdjustmentOnly,
     advanceToNextWeek,
   } = useCurrentProgram();
+  const schedule = useProgramSchedule(ownerId, program?.id ?? null);
+  const refreshSchedule = schedule.refresh;
+  const acceptedSchedule = schedule.read?.state === 'ready' && !schedule.pending ? schedule.read : null;
+  const currentProgramId = program?.id ?? null;
+
+  useEffect(() => {
+    if (!ownerId || !currentProgramId || !acceptedSchedule) return;
+    let active = true;
+    const requestOwner = ownerId;
+    const requestProgram = currentProgramId;
+    void (async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        if (!active) return;
+        if (session?.user.id !== requestOwner) throw new Error('Schedule account changed before reminder reconciliation.');
+        const pending = await scheduleOperationStore.load(requestOwner, requestProgram);
+        if (!active || pending) return;
+        const preferences = parseNotificationPreferences(session.user.user_metadata?.notification_preferences);
+        const plan = reminderPlanForSchedule(acceptedSchedule, requestOwner, requestProgram, preferences);
+        await reconcileWorkoutReminders(plan);
+        if (active) setReminderIssue(null);
+      } catch (error) {
+        if (!active) return;
+        reportSupabaseFailure('schedule.reminders', error);
+        setReminderIssue({ ownerId: requestOwner, programId: requestProgram, revision: acceptedSchedule.revision });
+      }
+    })();
+    return () => { active = false; };
+  }, [ownerId, currentProgramId, acceptedSchedule]);
 
   const fetchLastWorkout = useCallback(async (requestOwnerId: string, signal: AbortSignal) => {
     try {
@@ -748,6 +784,10 @@ export default function HomeScreen() {
     };
   }, [refresh, fetchLastWorkout, fetchHomeData, ownerId]));
 
+  useFocusEffect(useCallback(() => {
+    void refreshSchedule();
+  }, [refreshSchedule]));
+
   // workouts[0] is always the next uncompleted workout (hook sorts completed last)
   const nextWorkout = program?.workouts.find((w) => !w.isFinalized && !w.isCompleted);
 
@@ -776,6 +816,7 @@ export default function HomeScreen() {
   }, [nextWorkout, ownerId, program]));
 
   const activeDraft = matchingActiveWorkoutDraft(program, nextWorkout ?? null, ownerId, loadedDraft);
+  const canStartUndated = canStartUndatedWorkout(schedule.read, schedule.pending);
   const effectiveWorkout = effectiveCurrentWorkout(program, nextWorkout ?? null, ownerId, loadedDraft);
   const nextWorkoutSummary: WorkoutSummary | undefined = effectiveWorkout
     ? {
@@ -793,6 +834,7 @@ export default function HomeScreen() {
   const occurrenceDraft = matchingOccurrenceWorkoutDraft(program, nextWorkout ?? null, ownerId, loadedDraft);
   const homeState = occurrenceState(occurrenceDraft);
   const handleStartWorkout = () => {
+    if (!canStartUndated) return;
     if (occurrenceDraft?.finalizedReceipt) {
       router.push({ pathname: '/edit-workout', params: { sessionId: occurrenceDraft.finalizedReceipt.sessionId } });
       return;
@@ -859,6 +901,35 @@ export default function HomeScreen() {
             {actionError}
           </Text>
         ) : null}
+        {reminderIssue?.ownerId === ownerId && reminderIssue.programId === program?.id
+          && acceptedSchedule?.revision === reminderIssue.revision ? (
+          <Text style={{ color: theme.errorLight, marginHorizontal: 16, marginBottom: 12 }}>
+            Dated reminders could not be updated. Check notification permission and refresh the dated plan.
+          </Text>
+        ) : null}
+        {program ? (
+          <View style={{ backgroundColor: theme.mutedBg, borderColor: theme.border, borderWidth: 1, borderRadius: 14, padding: 16, marginHorizontal: 16, marginBottom: 12 }}>
+            <Text style={{ color: theme.textPrimary, fontWeight: '700', marginBottom: 5 }}>Today · Dated plan</Text>
+            <Text style={{ color: theme.text, lineHeight: 20 }}>
+              {!schedule.today ? 'Checking dated schedule…'
+                : schedule.today.state === 'workout'
+                  ? `Workout placed for ${schedule.today.localDate}. Starting scheduled workouts is unavailable until Finish can link the occurrence atomically.`
+                  : schedule.today.state === 'rest'
+                    ? `Rest day · ${schedule.today.localDate}`
+                    : schedule.today.state === 'fulfilled'
+                      ? `${scheduledOutcomeLabel(schedule.today.day)} · ${schedule.today.localDate}`
+                      : 'message' in schedule.today ? schedule.today.message : 'Dated schedule unavailable.'}
+            </Text>
+            {activeDraft && !canStartUndated ? (
+              <Text style={{ color: theme.text, lineHeight: 20, marginTop: 6 }}>
+                Your in-progress draft is still saved. It cannot be finished as a scheduled occurrence in this client.
+              </Text>
+            ) : null}
+            <Pressable onPress={() => void refreshSchedule()} accessibilityRole="button" accessibilityLabel="Retry dated schedule" style={{ minHeight: 44, justifyContent: 'center' }}>
+              <Text style={{ color: theme.primaryLight, fontWeight: '700' }}>Refresh dated plan</Text>
+            </Pressable>
+          </View>
+        ) : null}
         {program && program.workouts.every((w) => w.isFinalized || w.isCompleted) && program.workouts.length > 0 ? (
           <>
             <View style={styles.weekCompleteCard}>
@@ -868,7 +939,7 @@ export default function HomeScreen() {
                 All workouts this week have ended. Partial workouts stay marked partial in your history.
               </Text>
             </View>
-            {program.currentWeek < program.totalWeeks && (
+            {canStartUndated && program.currentWeek < program.totalWeeks && (
               <Pressable
                 style={({ pressed }) => [
                   styles.startNextWeekBtn,
@@ -884,13 +955,13 @@ export default function HomeScreen() {
             )}
           </>
         ) : (
-          <NextWorkoutSection
+          canStartUndated ? <NextWorkoutSection
             actionLabel={occurrenceAction(homeState, canCorrectWorkout)}
             entryIssue={workoutEntryIssue(program, nextWorkout ?? null)}
             hasActiveDraft={activeDraft !== null}
             workout={nextWorkoutSummary}
             onPressStart={handleStartWorkout}
-          />
+          /> : null
         )}
         {lastWorkoutId && lastWorkoutOwner === ownerId ? <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/edit-workout', params: { sessionId: lastWorkoutId } })} style={{ padding: 16 }}>
           <Text style={{ color: theme.primary, fontWeight: '700' }}>Last Workout · {lastWorkoutDate} · {occurrenceAction('finalized', canCorrectWorkout)}</Text>

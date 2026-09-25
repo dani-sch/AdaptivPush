@@ -6,6 +6,10 @@ import {
   withSavingState,
 } from '../../features/profile/resilience';
 import { runSupabaseOperation } from '../../utils/supabaseResilience';
+import {
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  parseNotificationPreferences,
+} from '../../utils/profilePreferences';
 
 test('independent profile sections retain partial success', async () => {
   let renderedValue: string | null = null;
@@ -45,4 +49,11 @@ test('profile saving state settles after success, error, timeout, and cancellati
     await withSavingState((saving) => states.push(saving), operation).catch(() => undefined);
     assert.deepEqual(states, [true, false]);
   }
+});
+
+test('reminder time defaults explicitly while preserving older stored preferences', () => {
+  assert.equal(DEFAULT_NOTIFICATION_PREFERENCES.emailEnabled, false);
+  assert.equal(parseNotificationPreferences({ reminderTime: '6:30 PM' }).reminderTime, '6:30 PM');
+  assert.equal(parseNotificationPreferences({ emailEnabled: true }).emailEnabled, true);
+  assert.equal(parseNotificationPreferences({}).reminderTime, '8:00 AM');
 });

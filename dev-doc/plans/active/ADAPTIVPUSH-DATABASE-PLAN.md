@@ -1,6 +1,6 @@
 # AdaptivPush database and migration plan
 
-Status: approved planning direction with AP-01 production baseline/enforcement and the AP-02/AP-03 durable packet deployed. The additive correction/effective-occurrence migrations (`20260915190000`, `20260915210000`), scoped-removal migration (`20260917180000`), and workout-structure migration (`20260918160000`) were separately authorized and deployed after fresh recovery, rehearsal, drift, security, and preservation checks. Hosted capabilities are correction 2, removal 1, and structure 1; the ledger has nine supported entries. The [September 17 correction release](/dev-doc/reports/ADAPTIVPUSH-EDIT-PAST-WORKOUT-RELEASE-2026-09-17.md), [scoped-removal release](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-REMOVAL-RELEASE-2026-09-17.md), and [September 18 structure release](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-EDITING-2026-09-18.md) own exact evidence. This document owns physical-data planning, compatibility, authority and database verification. The [master plan](/dev-doc/plans/active/ADAPTIVPUSH-MASTER-PLAN.md) owns domain behavior, the [register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) owns slice gates, and the [implementation status](/dev-doc/plans/active/ADAPTIVPUSH-IMPLEMENTATION-STATUS.md) owns code facts. [D-12](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECORD-2026-09-08.md#d-12--database-rollout) requires additive, slice-owned work. The 28-table packet is a design inventory, not a batch of approved migrations.
+Status: approved planning direction with AP-01 production baseline/enforcement and the AP-02/AP-03 durable packet deployed. The additive correction/effective-occurrence migrations (`20260915190000`, `20260915210000`), scoped-removal migration (`20260917180000`), and workout-structure migration (`20260918160000`) were separately authorized and deployed after fresh recovery, rehearsal, drift, security, and preservation checks. Hosted capabilities are correction 2, removal 1, and structure 1; the ledger has nine supported entries and was last verified September 18. The [September 17 correction release](/dev-doc/reports/ADAPTIVPUSH-EDIT-PAST-WORKOUT-RELEASE-2026-09-17.md), [scoped-removal release](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-REMOVAL-RELEASE-2026-09-17.md), and [September 18 structure release](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-EDITING-2026-09-18.md) own exact evidence. This document owns physical-data planning, compatibility, authority and database verification. The [master plan](/dev-doc/plans/active/ADAPTIVPUSH-MASTER-PLAN.md) owns domain behavior, the [register](/dev-doc/plans/active/ADAPTIVPUSH-EXECUTION-REGISTER.md) owns slice gates, and the [implementation status](/dev-doc/plans/active/ADAPTIVPUSH-IMPLEMENTATION-STATUS.md) owns code facts. [D-12](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECORD-2026-09-08.md#d-12--database-rollout) requires additive, slice-owned work. The 28-table packet is a design inventory, not a batch of approved migrations.
 
 ## Deployed scoped removal extension
 
@@ -30,14 +30,19 @@ normalized-name collision groups. Public trigger function `handle_new_user()`
 is SECURITY DEFINER without a function-local search path and has broad EXECUTE
 grants; it is not present as a PostgREST RPC.
 
-The Dashboard still reports “Run your first migration,” and no
-`supabase_migrations` namespace is present. Service-internal auth/realtime/storage
-migration relations are not the application ledger. The production Free plan
-currently provides no scheduled backup; PITR and restore-to-new-project are not
-available at this plan level. Supported CLI/dump tools, an isolated restore
-target, device access, and the configured `integrator` are unavailable. These
-facts replace the corresponding `REQUIRES INSPECTION` items with specific open
-gates; they do not satisfy restore, role-write, device, or integration proof.
+At the September 9 AP-01 audit, the Dashboard reported “Run your first migration,”
+and no `supabase_migrations` namespace was present. Service-internal
+auth/realtime/storage migration relations are not the application ledger. The
+production Free plan then offered no scheduled backup, PITR or restore-to-new-project.
+These were dated audit observations, not proof of current migration state.
+
+For the current AP-04/AP-05.1 packet, the linked Supabase CLI identifies project
+`thfxcvxcsfvrzdysdnkq`, but repeated read-only managed-ledger checks fail with
+HTTP 544 while creating a temporary login role. A clean fresh encrypted backup,
+isolated compatible restore, exact migration rehearsal and hosted role probes
+are still required. The `integrator` checkout is available and inspected; physical
+device acceptance remains user-led. Do not use the historical September 18
+recovery artifact as a current backup.
 
 AP-01.2a then implemented the compatible client-first portion locally: generated
 save and developer fixtures now use lookup-only catalog resolution before their

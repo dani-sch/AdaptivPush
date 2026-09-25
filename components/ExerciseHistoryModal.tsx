@@ -4,8 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import type { Theme } from '@/constants/themes';
 import { useTheme } from '@/contexts/ThemeContext';
-import type { ExerciseHistoryEntry } from '@/types/program';
-import { fetchExerciseHistory } from '@/utils/fetchExerciseHistory';
+import { fetchExerciseHistory, type FetchExerciseHistoryResult } from '@/utils/fetchExerciseHistory';
 
 interface ExerciseHistoryModalProps {
   exerciseId: string;
@@ -29,15 +28,26 @@ export function ExerciseHistoryModal({
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const [entries, setEntries] = useState<ExerciseHistoryEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState<{ exerciseId: string; result: FetchExerciseHistoryResult } | null>(null);
+  const result = loaded?.exerciseId === exerciseId ? loaded.result : null;
+  const loading = result === null;
 
   useEffect(() => {
-    fetchExerciseHistory(exerciseId).then((data) => {
-      setEntries(data);
-      setLoading(false);
+    const controller = new AbortController();
+    fetchExerciseHistory(exerciseId, undefined, undefined, controller.signal).then((data) => {
+      if (controller.signal.aborted) return;
+      setLoaded({ exerciseId, result: data });
+    }).catch((err) => {
+      if (controller.signal.aborted) return;
+      setLoaded({ exerciseId, result: { entries: [], errors: [err instanceof Error ? err : new Error(String(err))],
+        unavailable: false, partial: false, aborted: false, truncated: false } });
     });
+    return () => controller.abort();
   }, [exerciseId]);
+
+  const entries = result?.entries ?? [];
+  const errors = result?.errors ?? [];
+  const unavailable = result?.unavailable ?? false;
 
   return (
     <View style={styles.backdrop}>
@@ -78,10 +88,28 @@ export function ExerciseHistoryModal({
               </View>
             ))}
 
-          {/* Empty state */}
-          {!loading && entries.length === 0 && (
+          {/* Unavailable */}
+          {!loading && unavailable && (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyIcon}>🏋️</Text>
+              <Text style={styles.emptyIcon}>!</Text>
+              <Text style={styles.emptyTitle}>History unavailable</Text>
+              <Text style={styles.emptySubtitle}>This exercise history is not available in the current backend.</Text>
+            </View>
+          )}
+
+          {/* Error state */}
+          {!loading && errors.length > 0 && !unavailable && (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyIcon}>!</Text>
+              <Text style={styles.emptyTitle}>Unable to load history</Text>
+              <Text style={styles.emptySubtitle}>Please try again when your connection is available.</Text>
+            </View>
+          )}
+
+          {/* Empty state */}
+          {!loading && entries.length === 0 && errors.length === 0 && !unavailable && (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyIcon}>-</Text>
               <Text style={styles.emptyTitle}>No history yet</Text>
               <Text style={styles.emptySubtitle}>
                 Log a workout with this exercise and your history will appear here.
@@ -89,51 +117,51 @@ export function ExerciseHistoryModal({
             </View>
           )}
 
+          {result?.truncated && <Text style={styles.emptySubtitle}>Showing the most recent sessions only.</Text>}
           {/* Session cards — entries[0] is newest */}
-          {!loading &&
-            entries.map((entry, idx) => {
-              const trendLb =
-                idx < entries.length - 1
-                  ? entry.totalVolumeLb - entries[idx + 1].totalVolumeLb
-                  : null;
+          {!loading && entries.map((entry, idx) => {
+            const trendLb = idx < entries.length - 1 ? entry.totalVolumeLb - entries[idx + 1].totalVolumeLb : null;
 
-              return (
-                <View key={entry.sessionId} style={styles.sessionCard}>
-                  <Text style={styles.sessionHeader}>
-                    {formatSessionDate(entry.completedAt)}
-                    {'  ·  '}
-                    {entry.workoutName}
+            return (
+              <View key={entry.sessionId} style={styles.sessionCard}>
+                <Text style={styles.sessionHeader}>
+                  {formatSessionDate(entry.completedAt)}
+                  {'  ·  '}
+                  {entry.workoutName}
+                </Text>
+
+                {entry.sets.map((s) => (
+                  <Text key={s.setNumber} style={styles.setRow}>
+                    {`Set ${s.setNumber}`}
+                    {'   '}
+                    {s.loadKind === 'bodyweight' ? 'Bodyweight x ' :
+                      s.loadValue !== null && s.loadValue !== undefined && s.loadUnit !== 'none'
+                        ? `${s.loadValue} ${s.loadUnit} ${s.loadKind === 'assistance' ? 'assistance ' : ''}${s.loadSide === 'per_hand' ? 'per hand ' : ''}x `
+                        : ''}
+                    {s.reps !== null ? `${s.reps} reps` : '—'}
+                    {s.rpe !== null ? `   @ RPE ${s.rpe}` : ''}
+                  </Text>
+                ))}
+
+                <View style={styles.volumeRow}>
+                  <Text style={styles.volumeText}>
+                    External volume: {Math.round(entry.totalVolumeLb).toLocaleString()} lb
                   </Text>
 
-                  {entry.sets.map((s) => (
-                    <Text key={s.setNumber} style={styles.setRow}>
-                      {`Set ${s.setNumber}`}
-                      {'   '}
-                      {s.weightLb !== null ? `${s.weightLb} lb × ` : ''}
-                      {s.reps !== null ? `${s.reps} reps` : '—'}
-                      {s.rpe !== null ? `   @ RPE ${s.rpe}` : ''}
+                  {trendLb !== null && (
+                    <Text
+                      style={[
+                        styles.trendText,
+                        { color: trendLb >= 0 ? theme.success : theme.errorLight },
+                      ]}
+                    >
+                      {trendLb >= 0 ? '▲' : '▼'} {Math.abs(trendLb).toLocaleString()} lb
                     </Text>
-                  ))}
-
-                  <View style={styles.volumeRow}>
-                    <Text style={styles.volumeText}>
-                      Total: {entry.totalVolumeLb.toLocaleString()} lb
-                    </Text>
-
-                    {trendLb !== null && (
-                      <Text
-                        style={[
-                          styles.trendText,
-                          { color: trendLb >= 0 ? theme.success : theme.errorLight },
-                        ]}
-                      >
-                        {trendLb >= 0 ? '▲' : '▼'} {Math.abs(trendLb).toLocaleString()} lb
-                      </Text>
-                    )}
-                  </View>
+                  )}
                 </View>
-              );
-            })}
+              </View>
+            );
+          })}
         </ScrollView>
       </View>
     </View>

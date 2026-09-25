@@ -10,8 +10,9 @@ The trusted catalog and durable workout/program foundations are deployed. Comple
 |---|---|
 | Hosted capabilities | correction 2, removal 1, structure 1 |
 | Hosted ledger | Nine supported migrations through `20260918160000_workout_structure.sql` |
+| Source publication | PRs #54-#58 merged; `origin/main` is at the consolidated September release boundary |
 | Active client behavior | Resilient auth/session hydration; owner-scoped draft and pending-operation recovery; stable occurrence routing; detailed Add/Swap picker; atomic Finish/Save with receipt verification |
-| Current automated evidence | 157 application cases, strict TypeScript, and lint with zero errors and three known warnings |
+| Current automated evidence | September 25 rerun: 157 application cases, strict TypeScript, and lint with zero errors and three known warnings |
 | Current acceptance limit | Physical iPhone/Expo presentation, native restart/interruption, keyboard/accessibility, and the user's exact past-program route remain user-led and unverified |
 | Next product slices | AP-04 dated schedules/manual deviations, then AP-05 authoritative history/progression |
 
@@ -24,6 +25,8 @@ Workout capture and completed editing now preserve raw input, explicit performed
 The Add flow reuses the detailed exercise picker, loads the complete catalog, keeps duplicate additions distinct, and requires an explicit scope confirmation. Restoration accepts unfinished measurements without hiding the editor; validation remains at Check/Finish. Auth hydration distinguishes transient connectivity failures from sign-out, and native clients reject loopback backend configuration.
 
 These changes do not implement dated scheduling, a new progression worker, public/community features, health integration, purchases, or broader AP-04/AP-05 policy.
+
+The approved AP-04.1-AP-04.3/AP-05.1 release is **in progress**, not deployed. The branch adds bounded schedule-operation recovery, local adherence and dated-reminder planning, a history reader with explicit coverage, and a no-write-on-read progression guard. A schedule migration is pre-release; dated Today, client schedule commands and hosted enablement remain open. See [current state](/dev-doc/main/CURRENT-STATE.md) and the [requirement-to-test matrix](/dev-doc/reports/ADAPTIVPUSH-SCHEDULE-HISTORY-2026-09-25.md).
 
 ## Read next
 
@@ -38,6 +41,7 @@ These changes do not implement dated scheduling, a new progression worker, publi
 ## Evidence
 
 - [September 18 workout editing and detailed Add](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-EDITING-2026-09-18.md)
+- [September 25 two-week product status and next path](/dev-doc/reports/ADAPTIVPUSH-TWO-WEEK-PRODUCT-STATUS-2026-09-25.md)
 - [September 17 iPhone/session recovery](/dev-doc/reports/ADAPTIVPUSH-IPHONE-RECOVERY-2026-09-17.md)
 - [September 17 scoped-removal release](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-REMOVAL-RELEASE-2026-09-17.md)
 - [September 17 completed-workout correction release](/dev-doc/reports/ADAPTIVPUSH-EDIT-PAST-WORKOUT-RELEASE-2026-09-17.md)

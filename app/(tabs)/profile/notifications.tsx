@@ -3,10 +3,8 @@ import { router } from 'expo-router';
 import {
   ArrowLeft,
   Bell,
-  CalendarClock,
   Check,
   ChevronRight,
-  Mail,
   MoonStar,
   Smartphone,
   Sparkles,
@@ -102,6 +100,7 @@ export default function NotificationsScreen() {
   const [pushEnabled, setPushEnabled] = useState(DEFAULT_NOTIFICATION_PREFERENCES.pushEnabled);
   const [emailEnabled, setEmailEnabled] = useState(DEFAULT_NOTIFICATION_PREFERENCES.emailEnabled);
   const [smsEnabled, setSmsEnabled] = useState(DEFAULT_NOTIFICATION_PREFERENCES.smsEnabled);
+  const [reminderTime, setReminderTime] = useState(DEFAULT_NOTIFICATION_PREFERENCES.reminderTime);
   const [workoutReminder, setWorkoutReminder] = useState(
     DEFAULT_NOTIFICATION_PREFERENCES.workoutReminder,
   );
@@ -125,8 +124,10 @@ export default function NotificationsScreen() {
   const [saveMessage, setSaveMessage] = useState('');
 
   // Time picker modal
-  const [timePickerTarget, setTimePickerTarget] = useState<'start' | 'end' | null>(null);
-  const pickerValue = timePickerTarget === 'start' ? quietHoursStart : quietHoursEnd;
+  const [timePickerTarget, setTimePickerTarget] = useState<'start' | 'end' | 'reminder' | null>(null);
+  const pickerValue = timePickerTarget === 'start'
+    ? quietHoursStart
+    : timePickerTarget === 'end' ? quietHoursEnd : reminderTime;
 
   useEffect(() => {
     const load = async () => {
@@ -151,6 +152,7 @@ export default function NotificationsScreen() {
         setPushEnabled(preferences.pushEnabled);
         setEmailEnabled(preferences.emailEnabled);
         setSmsEnabled(preferences.smsEnabled);
+        setReminderTime(preferences.reminderTime);
         setWorkoutReminder(preferences.workoutReminder);
         setDeloadReminder(preferences.deloadReminder);
         setPrCelebrations(preferences.prCelebrations);
@@ -202,6 +204,7 @@ export default function NotificationsScreen() {
   const handleTimeSelect = (time: string) => {
     if (timePickerTarget === 'start') setQuietHoursStart(time);
     else if (timePickerTarget === 'end') setQuietHoursEnd(time);
+    else if (timePickerTarget === 'reminder') setReminderTime(time);
     setTimePickerTarget(null);
   };
 
@@ -226,6 +229,7 @@ export default function NotificationsScreen() {
         emailEnabled,
         smsEnabled,
         workoutReminder,
+        reminderTime,
         deloadReminder,
         prCelebrations,
         quietHoursEnabled,
@@ -260,7 +264,7 @@ export default function NotificationsScreen() {
 
       if (nextPreferences.pushEnabled) {
         await sendTestNotification();
-        setSaveMessage('Settings saved — background the app to see a test notification.');
+        setSaveMessage('Settings saved. Workout reminders require an accepted dated schedule; the test alert does not confirm a workout reminder.');
       } else {
         setSaveMessage('Notification settings saved.');
       }
@@ -317,32 +321,33 @@ export default function NotificationsScreen() {
             value={pushEnabled}
             onValueChange={handlePushToggle}
           />
-          <ToggleRow
-            label="Email Summaries"
-            hint="Weekly highlights and milestone recaps"
-            icon={<Mail color={theme.placeholder} size={18} />}
-            value={emailEnabled}
-            onValueChange={setEmailEnabled}
-          />
-          <ToggleRow
-            label="SMS Reminders"
-            hint="Text reminders for training sessions"
-            icon={<CalendarClock color={theme.placeholder} size={18} />}
-            value={smsEnabled}
-            onValueChange={setSmsEnabled}
-          />
+          <Text style={styles.toggleHint}>
+            Email and SMS delivery are not available. Only on-device alerts are supported.
+          </Text>
         </View>
 
         <Text style={styles.sectionTitle}>Training Alerts</Text>
         <View style={styles.sectionCard}>
           <ToggleRow
             label="Workout Reminder"
-            hint="Heads-up before your planned session"
+            hint="Requires an accepted dated schedule; no daily fallback alert"
             icon={<Bell color={theme.placeholder} size={18} />}
             value={workoutReminder}
             onValueChange={setWorkoutReminder}
             disabled={!pushEnabled}
           />
+          <Pressable
+            style={({ pressed }) => [styles.timeRow, pressed && styles.pressed]}
+            onPress={() => setTimePickerTarget('reminder')}
+            accessibilityRole="button"
+            accessibilityLabel={`Reminder time, ${reminderTime}`}
+          >
+            <Text style={styles.timeLabel}>Reminder Time</Text>
+            <View style={styles.timeValueWrap}>
+              <Text style={styles.timeValue}>{reminderTime}</Text>
+              <ChevronRight color={theme.placeholder} size={18} />
+            </View>
+          </Pressable>
           <ToggleRow
             label="Deload Week Reminder"
             hint="Reminder when recovery week begins"
@@ -442,7 +447,7 @@ export default function NotificationsScreen() {
             <View style={styles.pickerHandle} />
             <View style={styles.pickerHeader}>
               <Text style={styles.pickerTitle}>
-                {timePickerTarget === 'start' ? 'Start Time' : 'End Time'}
+                {timePickerTarget === 'start' ? 'Start Time' : timePickerTarget === 'end' ? 'End Time' : 'Reminder Time'}
               </Text>
               <Pressable
                 onPress={() => setTimePickerTarget(null)}

@@ -1,5 +1,11 @@
 # AdaptivPush — Development Log
 
+## 2026-09-25 - Two-week product status refresh
+
+Reconciled `origin/main`, active plans, and the September 11-18 release reports into a user-action status summary. PRs #54-#58 are merged; `ec848e6` remains the latest product commit through September 25. The released technical boundary includes durable generated/manual program installation, archive/restore, owner-scoped workout resume, explicit set outcomes, scoped Add/Swap/Remove, atomic Finish/Save, and same-session completed-workout correction. Physical iPhone/Expo, native interruption, keyboard/accessibility, and the exact past-program route remain acceptance gaps; AP-04 dated scheduling and AP-05 authoritative history/progression remain next.
+
+Fresh source verification passed 157/157 application cases, strict TypeScript, and lint with zero errors and three known warnings. No migration, hosted write, user-data mutation, or application-source change occurred. [Full two-week product status and ordered next path](/dev-doc/reports/ADAPTIVPUSH-TWO-WEEK-PRODUCT-STATUS-2026-09-25.md).
+
 ## 2026-09-15 - Reconciled progress, integration and draft PR closeout
 
 ### Preserved implementation and direction

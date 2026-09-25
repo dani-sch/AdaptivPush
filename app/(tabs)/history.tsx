@@ -28,6 +28,7 @@ import { supabase } from '@/utils/supabase';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
 import { reportSupabaseFailure, supabaseUserMessage } from '@/utils/supabaseResilience';
+import { fetchPaginatedWorkoutHistory, type HistoryItem, type WorkoutHistoryTable } from '@/features/history/historyService';
 
 interface WorkoutHistoryRow {
   id?: string;
@@ -55,6 +56,8 @@ interface WorkoutHistoryRow {
 
 interface WorkoutEntry {
   id: string;
+  sessionId: string | null;
+  source: WorkoutHistoryTable;
   title: string;
   completedAt: string;
   durationMin: number;
@@ -83,7 +86,36 @@ interface MonthSection {
   workouts: WorkoutEntry[];
 }
 
-type WorkoutHistoryTable = 'workout_sessions' | 'workout_history';
+interface PersonalRecordRow {
+  id: string;
+  exercise_id: string;
+  weight_lb: number | string;
+  reps: number;
+  achieved_at: string;
+}
+
+async function loadPersonalRecords(userId: string): Promise<PersonalRecordRow[]> {
+  const records: PersonalRecordRow[] = [];
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase.from('personal_records')
+      .select('id, exercise_id, weight_lb, reps, achieved_at')
+      .eq('user_id', userId).order('id')
+      .range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    records.push(...(data ?? []));
+    if ((data ?? []).length < pageSize) return records;
+  }
+}
+
+function createDetailRequests() {
+  let generation = 0;
+  return {
+    next: () => ++generation,
+    isCurrent: (value: number) => value === generation,
+    cancel: () => { generation++; },
+  };
+}
 
 const parseNumericValue = (value: number | string | null | undefined): number | null => {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -187,57 +219,34 @@ const formatWorkoutDate = (dateValue: string): string => {
   });
 };
 
-const toWorkoutEntry = (row: WorkoutHistoryRow, index: number): WorkoutEntry => ({
-  id: row.id || `workout-${index}`,
+const toWorkoutEntry = ({ row, source, compositeId }: HistoryItem): WorkoutEntry => ({
+  id: compositeId,
+  sessionId: source === 'workout_sessions' ? row.id : null,
+  source,
   title: row.workout_name || row.title || row.name || 'Workout',
-  completedAt: row.ended_at || row.completed_at || row.created_at || new Date().toISOString(),
+  completedAt: row.ended_at || row.completed_at || row.created_at || '',
   durationMin: parseDuration(row),
   totalVolumeLb: parseVolume(row),
   personalRecords: parsePrCount(row),
 });
 
-const isMissingTableError = (
-  error: { code?: string | null; message?: string | null } | null | undefined,
-  tableName: WorkoutHistoryTable,
-): boolean => {
-  if (!error) {
-    return false;
-  }
-
-  if (error.code === 'PGRST205') {
-    return true;
-  }
-
-  return Boolean(
-    error.message?.toLowerCase().includes(`could not find the table 'public.${tableName}'`),
-  );
-};
-
-const fetchRowsFromTable = async (
-  tableName: WorkoutHistoryTable,
-  userId: string,
-): Promise<{
-  rows: WorkoutHistoryRow[];
-  error: { code?: string | null; message?: string | null } | null;
-}> => {
-  const orderColumn = tableName === 'workout_sessions' ? 'ended_at' : 'completed_at';
-
-  const { data, error } = await supabase
-    .from(tableName)
-    .select('*')
-    .eq('user_id', userId)
-    .order(orderColumn, { ascending: false });
-
-  return {
-    rows: (data ?? []) as WorkoutHistoryRow[],
-    error,
-  };
-};
-
 const fetchSessionExercises = async (sessionId: string): Promise<SessionExercise[]> => {
-  const { data, error } = await supabase
-    .from('workout_exercise_sets')
-    .select(`
+  const rows: {
+    set_number: number;
+    actual_set_id: string | null;
+    load_value: number | null;
+    load_unit: SessionExerciseSet['loadUnit'];
+    load_kind: SessionExerciseSet['loadKind'];
+    reps: number | null;
+    rpe: number | null;
+    exercise_id: string;
+    exercises: { id: string; name: string }[];
+  }[] = [];
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase
+      .from('workout_exercise_sets')
+      .select(`
       set_number,
       actual_set_id,
       load_value,
@@ -248,21 +257,25 @@ const fetchSessionExercises = async (sessionId: string): Promise<SessionExercise
       exercise_id,
       exercises ( id, name )
     `)
-    .eq('session_id', sessionId)
-    .order('set_number', { ascending: true });
-
-  if (error || !data) return [];
+      .eq('session_id', sessionId)
+      .order('set_number', { ascending: true })
+      .order('actual_set_id', { ascending: true })
+      .range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    rows.push(...(data ?? []));
+    if ((data ?? []).length < pageSize) break;
+  }
 
   // Group sets by exercise
   const map = new Map<string, SessionExercise>();
-  for (const row of data as any[]) {
+  for (const row of rows) {
     const exId: string = row.exercise_id;
-    const exName: string = row.exercises?.name ?? 'Unknown exercise';
+    const exName: string = row.exercises?.[0]?.name ?? 'Unknown exercise';
     if (!map.has(exId)) {
       map.set(exId, { exerciseId: exId, name: exName, sets: [] });
     }
     map.get(exId)!.sets.push({
-      setId: row.actual_set_id,
+      setId: row.actual_set_id ?? `${sessionId}:${row.exercise_id}:${row.set_number}`,
       setNumber: row.set_number,
       loadValue: row.load_value != null ? Number(row.load_value) : null,
       loadUnit: row.load_unit,
@@ -312,6 +325,7 @@ export default function HistoryScreen() {
   const [workouts, setWorkouts] = useState<WorkoutEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [coverageNotice, setCoverageNotice] = useState<string | null>(null);
 
   // Session detail sheet state
   const [pendingEdit] = useState(createCompletedNavigation);
@@ -323,13 +337,16 @@ export default function HistoryScreen() {
   const [detailWorkout, setDetailWorkout] = useState<WorkoutEntry | null>(null);
   const [sessionExercises, setSessionExercises] = useState<SessionExercise[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [detailRequests] = useState(createDetailRequests);
 
   // Exercise history modal state (drill-down from detail sheet)
   const [historyExerciseId, setHistoryExerciseId] = useState<string | null>(null);
   const [historyExerciseName, setHistoryExerciseName] = useState<string | null>(null);
 
   const editWorkout = () => {
-    if (!detailWorkout || !pendingEdit.request(detailWorkout.id)) return;
+    if (!detailWorkout?.sessionId || !pendingEdit.request(detailWorkout.sessionId)) return;
+    detailRequests.cancel();
     setHistoryExerciseId(null);
     setHistoryExerciseName(null);
     setSessionExercises([]);
@@ -343,27 +360,43 @@ export default function HistoryScreen() {
   }, [detailWorkout, navigateAfterDismiss, pendingEdit]);
 
   // PR count from personal_records table
-  const [prCount, setPrCount] = useState(0);
+  const [prCount, setPrCount] = useState<number | null>(null);
 
   // PR history modal state
   const [showPrModal, setShowPrModal] = useState(false);
   const [prRecords, setPrRecords] = useState<{ exerciseName: string; weightLb: number; reps: number; achievedAt: string }[]>([]);
   const [prLoading, setPrLoading] = useState(false);
+  const [prError, setPrError] = useState<string | null>(null);
 
-  const handleOpenDetail = async (workout: WorkoutEntry) => {
+  const handleOpenDetail = useCallback(async (workout: WorkoutEntry) => {
+    const generation = detailRequests.next();
     pendingEdit.reset();
     setDetailWorkout(workout);
     setSessionExercises([]);
+    setDetailError(null);
+    if (!workout.sessionId) {
+      setDetailError('Detailed sets are not available for this legacy record.');
+      return;
+    }
     setDetailLoading(true);
-    const exercises = await fetchSessionExercises(workout.id);
-    setSessionExercises(exercises);
-    setDetailLoading(false);
-  };
+    try {
+      const exercises = await fetchSessionExercises(workout.sessionId);
+      if (detailRequests.isCurrent(generation)) setSessionExercises(exercises);
+    } catch (cause) {
+      if (detailRequests.isCurrent(generation)) {
+        reportSupabaseFailure('history.detail', cause);
+        setDetailError(supabaseUserMessage(cause, 'Unable to load workout details.'));
+      }
+    } finally {
+      if (detailRequests.isCurrent(generation)) setDetailLoading(false);
+    }
+  }, [pendingEdit, detailRequests]);
 
-  const handleCloseDetail = () => {
+  const handleCloseDetail = useCallback(() => {
+    detailRequests.cancel();
     setDetailWorkout(null);
     setSessionExercises([]);
-  };
+  }, [detailRequests]);
 
   const handleOpenExerciseHistory = (exerciseId: string, exerciseName: string) => {
     setHistoryExerciseId(exerciseId);
@@ -378,46 +411,35 @@ export default function HistoryScreen() {
   const handleOpenPrHistory = async () => {
     setShowPrModal(true);
     setPrLoading(true);
+    setPrError(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const user = session?.user;
-      if (!user) { setPrLoading(false); return; }
+      if (!user) { setPrError('Unable to load user session.'); return; }
 
       // Fetch all PR rows for this user
-      const { data: prRows, error: prErr } = await supabase
-        .from('personal_records')
-        .select('exercise_id, weight_lb, reps, achieved_at')
-        .eq('user_id', user.id)
-        .order('achieved_at', { ascending: false });
-
-      if (prErr) {
-        console.warn('PR fetch error:', prErr.message);
-        setPrLoading(false);
-        return;
-      }
-
-      if (!prRows || prRows.length === 0) {
+      const prRows = await loadPersonalRecords(user.id);
+      if (prRows.length === 0) {
         setPrRecords([]);
-        setPrLoading(false);
         return;
       }
 
-      // Get unique exercise IDs and fetch names
-      const exIds = [...new Set(prRows.map((r: any) => r.exercise_id))];
-      const { data: exRows } = await supabase
-        .from('exercises')
-        .select('id, name')
-        .in('id', exIds);
+      const exIds = [...new Set(prRows.map(row => row.exercise_id))];
+      const catalogIds = exIds.filter(id =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id));
 
       const nameMap = new Map<string, string>();
-      for (const ex of (exRows ?? []) as any[]) {
-        nameMap.set(ex.id, ex.name);
+      for (let offset = 0; offset < catalogIds.length; offset += 500) {
+        const { data: exRows, error: exError } = await supabase
+          .from('exercises').select('id, name').in('id', catalogIds.slice(offset, offset + 500));
+        if (exError) throw exError;
+        for (const ex of exRows ?? []) nameMap.set(ex.id, ex.name);
       }
 
       // Group by exercise, keep best per exercise
       const bestMap = new Map<string, { exerciseName: string; weightLb: number; reps: number; achievedAt: string }>();
-      for (const row of prRows as any[]) {
-        const name = nameMap.get(row.exercise_id) ?? 'Unknown';
+      for (const row of prRows) {
+        const name = nameMap.get(row.exercise_id) ?? row.exercise_id;
         const w = Number(row.weight_lb) || 0;
         const r = Number(row.reps) || 0;
         const existing = bestMap.get(row.exercise_id);
@@ -425,23 +447,33 @@ export default function HistoryScreen() {
           bestMap.set(row.exercise_id, { exerciseName: name, weightLb: w, reps: r, achievedAt: row.achieved_at });
         }
       }
+      const { data: current } = await supabase.auth.getSession();
+      if (current.session?.user.id !== user.id) throw new Error('Account changed while loading personal records.');
       setPrRecords(Array.from(bestMap.values()).sort((a, b) => a.exerciseName.localeCompare(b.exerciseName)));
     } catch (err) {
-      console.warn('PR history fetch failed:', err);
+      reportSupabaseFailure('history.pr', err);
+      setPrError(supabaseUserMessage(err, 'Unable to load personal records.'));
     } finally {
       setPrLoading(false);
     }
   };
 
-  const fetchWorkoutHistory = useCallback(async () => {
+  const fetchWorkoutHistory = useCallback(async (signal: AbortSignal) => {
     try {
       setLoading(true);
       setError(null);
+      setCoverageNotice(null);
+      setWorkouts([]);
+      setPrCount(null);
+      detailRequests.cancel();
+      setDetailWorkout(null);
+      setSessionExercises([]);
 
       const {
         data: { session },
         error: authError,
       } = await supabase.auth.getSession();
+      if (signal.aborted) return;
       const user = session?.user;
 
       if (authError || !user) {
@@ -451,63 +483,47 @@ export default function HistoryScreen() {
       }
 
       // Fetch PR count directly from personal_records table
-      const { data: prRows } = await supabase
-        .from('personal_records')
-        .select('exercise_id')
-        .eq('user_id', user.id);
-      setPrCount(new Set((prRows ?? []).map(row => row.exercise_id)).size);
-
-      const sessionsResult = await fetchRowsFromTable('workout_sessions', user.id);
-      const sessionsMissing = isMissingTableError(sessionsResult.error, 'workout_sessions');
-      if (sessionsResult.error && !sessionsMissing) {
-        reportSupabaseFailure('history.sessions', sessionsResult.error);
-        setError(supabaseUserMessage(sessionsResult.error, 'Unable to refresh workout history.'));
-        return;
+      let prCountError: unknown = null;
+      let prRows: PersonalRecordRow[] = [];
+      try {
+        prRows = await loadPersonalRecords(user.id);
+      } catch (cause) {
+        prCountError = cause;
       }
+      if (signal.aborted) return;
+      if (prCountError) reportSupabaseFailure('history.pr.count', prCountError);
+      setPrCount(prCountError ? null : new Set(prRows.map(row => row.exercise_id)).size);
 
-      const shouldTryLegacyHistory =
-        sessionsMissing || sessionsResult.rows.length === 0;
-
-      if (shouldTryLegacyHistory) {
-        const historyResult = await fetchRowsFromTable('workout_history', user.id);
-        const historyMissing = isMissingTableError(historyResult.error, 'workout_history');
-
-        if (historyResult.error && !historyMissing) {
-          reportSupabaseFailure('history.legacy', historyResult.error);
-          setError(supabaseUserMessage(historyResult.error, 'Unable to refresh workout history.'));
-          return;
-        }
-
-        if (historyResult.rows.length > 0) {
-          setWorkouts(historyResult.rows.map(toWorkoutEntry));
-          setError(null);
-          return;
-        }
-
-        if (sessionsResult.rows.length > 0) {
-          setWorkouts(sessionsResult.rows.map(toWorkoutEntry));
-          setError(null);
-          return;
-        }
-
+      const result = await fetchPaginatedWorkoutHistory({ supabaseClient: supabase, userId: user.id, signal });
+      if (signal.aborted || result.aborted) return;
+      if (!result.complete && result.items.length === 0) {
+        const cause = result.errors[0]?.error ?? new Error('Workout session history is unavailable.');
+        reportSupabaseFailure('history.union', cause);
+        setError(supabaseUserMessage(cause, 'Unable to refresh workout history.'));
         setWorkouts([]);
-        setError(null);
         return;
       }
-
-      setWorkouts(sessionsResult.rows.map(toWorkoutEntry));
-      setError(null);
+      setWorkouts(result.items.map(toWorkoutEntry));
+      setCoverageNotice(!result.complete
+        ? 'Some history could not be loaded. Totals below reflect only the records shown.'
+        : result.unavailable.includes('workout_history')
+          ? 'Legacy history is not available on this server; showing supported workout sessions.'
+          : null);
     } catch (fetchError) {
+      if (signal.aborted) return;
       reportSupabaseFailure('history.load', fetchError);
       setError(supabaseUserMessage(fetchError, 'Unable to refresh workout history.'));
+      setWorkouts([]);
     } finally {
-      setLoading(false);
+      if (!signal.aborted) setLoading(false);
     }
-  }, []);
+  }, [detailRequests]);
 
   useFocusEffect(
     useCallback(() => {
-      void fetchWorkoutHistory();
+      const controller = new AbortController();
+      void fetchWorkoutHistory(controller.signal);
+      return () => controller.abort();
     }, [fetchWorkoutHistory]),
   );
 
@@ -558,7 +574,7 @@ export default function HistoryScreen() {
           <SummaryMetricCard
             icon={<CalendarDays color={theme.primary} size={24} />}
             value={`${summary.totalWorkouts}`}
-            label="Total Workouts"
+            label={coverageNotice ? 'Loaded Workouts' : 'Total Workouts'}
           />
           <SummaryMetricCard
             icon={<Clock3 color={theme.secondary} size={24} />}
@@ -572,11 +588,12 @@ export default function HistoryScreen() {
           />
           <SummaryMetricCard
             icon={<Medal color="#ffc200" size={24} />}
-            value={`${summary.personalRecords}`}
+            value={summary.personalRecords === null ? 'Unknown' : `${summary.personalRecords}`}
             label="PRs"
             onPress={handleOpenPrHistory}
           />
         </View>
+        {coverageNotice && <Text style={styles.stateText}>{coverageNotice}</Text>}
 
         {loading ? (
           <View style={styles.stateCard}>
@@ -666,14 +683,14 @@ export default function HistoryScreen() {
                   {detailWorkout ? formatWorkoutDate(detailWorkout.completedAt) : ''}
                 </Text>
               </View>
-              <Pressable
+              {detailWorkout?.sessionId && <Pressable
                 style={styles.editWorkoutBtn}
                 onPress={editWorkout}
                 accessibilityRole="button"
                 accessibilityLabel="Edit completed workout"
               >
                 <Text style={styles.editWorkoutText}>Edit workout</Text>
-              </Pressable>
+              </Pressable>}
               <Pressable
                 style={styles.sheetCloseBtn}
                 onPress={handleCloseDetail}
@@ -693,6 +710,10 @@ export default function HistoryScreen() {
                 <View style={styles.sheetStateWrap}>
                   <ActivityIndicator size="small" color={theme.primary} />
                   <Text style={styles.sheetStateText}>Loading exercises…</Text>
+                </View>
+              ) : detailError ? (
+                <View style={styles.sheetStateWrap}>
+                  <Text style={styles.sheetStateText}>{detailError}</Text>
                 </View>
               ) : sessionExercises.length === 0 ? (
                 <View style={styles.sheetStateWrap}>
@@ -764,6 +785,10 @@ export default function HistoryScreen() {
               {prLoading ? (
                 <View style={styles.sheetStateWrap}>
                   <ActivityIndicator size="large" color={theme.primary} />
+                </View>
+              ) : prError ? (
+                <View style={styles.sheetStateWrap}>
+                  <Text style={styles.sheetStateText}>{prError}</Text>
                 </View>
               ) : prRecords.length === 0 ? (
                 <View style={styles.sheetStateWrap}>
