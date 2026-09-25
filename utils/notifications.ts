@@ -44,37 +44,20 @@ export async function getDevicePushToken(): Promise<string | null> {
   }
 }
 
-export async function scheduleWorkoutReminder(): Promise<void> {
-  try {
-    await Notifications.cancelScheduledNotificationAsync(WORKOUT_REMINDER_ID).catch(() => {});
-    await Notifications.scheduleNotificationAsync({
-      identifier: WORKOUT_REMINDER_ID,
-      content: {
-        title: 'Time to train',
-        body: "Your workout is scheduled for today. Let's go!",
-        sound: true,
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour: 8,
-        minute: 0,
-      },
-    });
-  } catch {
-    // Scheduling not supported (simulator / web)
-  }
-}
-
 export async function cancelWorkoutReminder(): Promise<void> {
-  await Notifications.cancelScheduledNotificationAsync(WORKOUT_REMINDER_ID).catch(() => {});
+  const existing = await Notifications.getAllScheduledNotificationsAsync();
+  if (existing.some(notification => notification.identifier === WORKOUT_REMINDER_ID)) {
+    await Notifications.cancelScheduledNotificationAsync(WORKOUT_REMINDER_ID);
+  }
 }
 
 export async function applyNotificationPreferences(prefs: NotificationPreferences): Promise<void> {
   if (Platform.OS === 'web') return;
-  if (prefs.pushEnabled && prefs.workoutReminder) {
-    await scheduleWorkoutReminder();
-  } else {
-    await cancelWorkoutReminder();
+  // A daily 8 AM alert cannot represent a dated accepted schedule.
+  // Remove the legacy repeating alert until accepted dated occurrences are available.
+  await cancelWorkoutReminder();
+  if (prefs.pushEnabled && prefs.workoutReminder && !(await canNotify())) {
+    throw new Error('Notification permission is not granted');
   }
 }
 
