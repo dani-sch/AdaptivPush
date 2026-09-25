@@ -7,6 +7,9 @@ import { Plus, ChevronRight, MoreVertical, LayoutList, Archive } from 'lucide-re
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useCurrentProgram } from '@/hooks/useCurrentProgram';
+import { useProgramSchedule } from '@/hooks/useProgramSchedule';
+import { canStartUndatedWorkout, scheduledOutcomeLabel, type ScheduledDay } from '@/features/scheduling/repository';
+import type { ProgramWorkout } from '@/types/program';
 import { WorkoutTemplateModal } from '@/components/WorkoutTemplateModal';
 import { GenerateProgramModal } from '@/components/GenerateProgramModal';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -14,6 +17,14 @@ import type { Theme } from '@/constants/themes';
 import { workoutRouteParams } from '@/features/workouts/routeResolution';
 import { createCompletedNavigation } from '@/features/workouts/effectiveOccurrence';
 import { reportSupabaseFailure, supabaseSaveFailureMessage } from '@/utils/supabaseResilience';
+
+function placementLabel(workout: ProgramWorkout, days: ScheduledDay[]): string {
+    const day = days.find((item) => item.stableDayId === workout.stableDayId && item.programDayId === workout.id);
+    if (!day) return 'No confirmed placement for this program day';
+    return day.localDate
+        ? `${day.localDate} · ${day.kind} · ${day.status}`
+        : `${day.kind} · ${day.status} (no date)`;
+}
 
 function LoadingState({ styles }: { styles: ReturnType<typeof createStyles> }) {
     return (
@@ -164,6 +175,7 @@ export default function PlanScreen() {
 
     const {
         program,
+        ownerId,
         loading,
         refreshing,
         unavailable,
@@ -172,8 +184,12 @@ export default function PlanScreen() {
         swapExercise,
         endCurrentProgram,
     } = useCurrentProgram();
+    const schedule = useProgramSchedule(ownerId, program?.id ?? null);
+    const refreshSchedule = schedule.refresh;
+    const scheduledDays = schedule.read?.state === 'ready' ? schedule.read.days : null;
 
     useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
+    useFocusEffect(useCallback(() => { void refreshSchedule(); }, [refreshSchedule]));
 
     const completedCount = program?.workouts.filter((w) => w.isCompleted).length ?? 0;
     const partialCount = program?.workouts.filter(w => w.isFinalized && !w.isCompleted).length ?? 0;
@@ -349,6 +365,18 @@ export default function PlanScreen() {
                 </View>
 
                 {/* Week View */}
+                <View style={[styles.section, { backgroundColor: theme.mutedBg, borderRadius: 14, padding: 14 }]}>
+                    <Text style={{ color: theme.text, lineHeight: 20 }}>
+                        {!schedule.today ? 'Checking dated placement…'
+                            : schedule.today.state === 'workout'
+                                ? `Placed workout on ${schedule.today.localDate}. Scheduled Finish is not available in this client yet.`
+                                : schedule.today.state === 'rest'
+                                    ? `Rest day on ${schedule.today.localDate}.`
+                                    : schedule.today.state === 'fulfilled'
+                                        ? `${scheduledOutcomeLabel(schedule.today.day)} on ${schedule.today.localDate}.`
+                                        : 'message' in schedule.today ? schedule.today.message : 'Dated schedule unavailable.'}
+                    </Text>
+                </View>
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>This Week&apos;s Workouts</Text>
 
@@ -389,6 +417,11 @@ export default function PlanScreen() {
                                             <Text style={styles.workoutMeta}>
                                                 Day {idx + 1} • {workout.estimatedTime} min
                                             </Text>
+                                            {scheduledDays ? (
+                                                <Text style={styles.workoutMeta}>
+                                                    {placementLabel(workout, scheduledDays)}
+                                                </Text>
+                                            ) : null}
                                         </View>
                                     </View>
 
@@ -445,6 +478,10 @@ export default function PlanScreen() {
                         onStart={() => {
                             if (selectedWorkoutObj.sessionId) {
                                 if (pendingEdit.request(selectedWorkoutObj.sessionId)) setSelectedWorkout(null);
+                                return;
+                            }
+                            if (!canStartUndatedWorkout(schedule.read, schedule.pending)) {
+                                Alert.alert('Workout start unavailable', 'Dated placement cannot be confirmed or linked at Finish. Your workout and draft have not been changed.');
                                 return;
                             }
                             setSelectedWorkout(null);
