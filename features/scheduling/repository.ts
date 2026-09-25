@@ -1,9 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { asLocalDate, validateTimeZone } from '../kernel/localDate';
-import { classifySupabaseError } from '@/utils/supabaseResilience';
+import { classifySupabaseError, runSupabaseOperation } from '@/utils/supabaseResilience';
 import type { NotificationPreferences } from '@/utils/profilePreferences';
 import type { ReminderPlan } from '@/features/consistency/reminders';
+import {
+  type CreateProgramSchedulePayload, type ProgramDayIdentity,
+} from './placementPreview';
 
 export interface ScheduledDay {
   id: string;
@@ -46,6 +49,76 @@ export interface ScheduledDayRow {
 }
 
 const UNAVAILABLE = 'Dated scheduling is not available on this server yet. No dates have been inferred.';
+export const scheduleWriterEnabled = process.env.EXPO_PUBLIC_AP04_SCHEDULE_WRITER === 'true';
+
+export interface EligibleScheduleDays {
+  revisionId: string;
+  durationWeeks: number;
+  days: ProgramDayIdentity[];
+}
+
+export function scheduleCapabilityMissing(read: ScheduleRead | null): boolean {
+  return read?.state === 'unavailable' && read.reason === UNAVAILABLE;
+}
+
+export interface CreateScheduleReceipt {
+  operationId: string;
+  programId: string;
+  scheduleId: string;
+  revision: number;
+  replayed: boolean;
+}
+
+async function requireOwner(client: SupabaseClient, ownerId: string): Promise<void> {
+  const { data: { session }, error } = await client.auth.getSession();
+  if (error) throw error;
+  if (!session || session.user.id !== ownerId) throw new Error('Schedule account changed. Sign in again.');
+}
+
+async function currentProgram(client: SupabaseClient, ownerId: string, programId: string) {
+  const { data, error } = await client.from('programs')
+    .select('current_revision_id,duration_weeks,is_active,lifecycle,schema_version')
+    .eq('id', programId).eq('user_id', ownerId)
+    .maybeSingle<{ current_revision_id: string | null; duration_weeks: number; is_active: boolean; lifecycle: string; schema_version: number }>();
+  if (error) throw error;
+  if (!data?.is_active || data.lifecycle !== 'active' || !data.current_revision_id) {
+    throw new Error('Active program revision is unavailable. Refresh before scheduling.');
+  }
+  return { ...data, current_revision_id: data.current_revision_id };
+}
+
+async function allProgramDays(client: SupabaseClient, programId: string,
+  revisionId?: string): Promise<ProgramDayIdentity[]> {
+  const rows: ProgramDayIdentity[] = [];
+  for (let offset = 0; ; offset += 500) {
+    let query = client.from('program_days')
+      .select('id,stable_day_id,program_revision_id,week_number,day_index,workout_name,is_rest_day,program_day_exercises!program_day_exercises_program_day_id_fkey(set_count)')
+      .eq('program_id', programId);
+    if (revisionId) query = query.eq('program_revision_id', revisionId);
+    const page = await query.order('id').range(offset, offset + 499).returns<ProgramDayIdentity[]>();
+    if (page.error) throw page.error;
+    rows.push(...(page.data ?? []));
+    if ((page.data?.length ?? 0) < 500) break;
+  }
+  return rows;
+}
+
+async function finalizedDayIds(client: SupabaseClient, ownerId: string, dayIds: string[]): Promise<Set<string>> {
+  const result = new Set<string>();
+  for (let start = 0; start < dayIds.length; start += 100) {
+    const chunk = dayIds.slice(start, start + 100);
+    for (let offset = 0; ; offset += 500) {
+      const page = await client.from('workout_sessions')
+        .select('program_day_id').eq('user_id', ownerId)
+        .eq('lifecycle', 'finalized').in('program_day_id', chunk)
+        .order('id').range(offset, offset + 499).returns<{ program_day_id: string }[]>();
+      if (page.error) throw page.error;
+      for (const session of page.data ?? []) result.add(session.program_day_id);
+      if ((page.data?.length ?? 0) < 500) break;
+    }
+  }
+  return result;
+}
 
 export function canStartUndatedWorkout(read: ScheduleRead | null, pending: boolean): boolean {
   return !pending && (read?.state === 'unplaced'
@@ -162,6 +235,95 @@ export function parseScheduledDay(row: ScheduledDayRow): ScheduledDay {
 
 export function createScheduleRepository(client: SupabaseClient) {
   return {
+    async loadEligibleDays(ownerId: string, programId: string): Promise<EligibleScheduleDays> {
+      await requireOwner(client, ownerId);
+      const program = await currentProgram(client, ownerId, programId);
+      const current = await allProgramDays(client, programId, program.current_revision_id);
+      const ancestry = await allProgramDays(client, programId);
+      const finalized = await finalizedDayIds(client, ownerId, ancestry.map((day) => day.id));
+      const completedLineage = new Set(ancestry.filter((day) => finalized.has(day.id)).map((day) => day.stable_day_id));
+      const refreshed = await currentProgram(client, ownerId, programId);
+      if (program.current_revision_id !== refreshed.current_revision_id || program.duration_weeks !== refreshed.duration_weeks) {
+        throw new Error('Program changed while loading placement. Refresh and choose dates again.');
+      }
+      if (current.length === 0 || current.some((day) => !day.id || !day.stable_day_id
+        || day.program_revision_id !== program.current_revision_id)) {
+        throw new Error('Complete current program days are required for placement.');
+      }
+      const days = current.filter((day) => !completedLineage.has(day.stable_day_id));
+      return {
+        revisionId: program.current_revision_id,
+        durationWeeks: program.duration_weeks,
+        days: days.map((day) => ({ ...day, program_schema_version: program.schema_version })),
+      };
+    },
+    async assertCreateAvailable(ownerId: string): Promise<void> {
+      if (!scheduleWriterEnabled) throw new Error('Dated schedule saving is not enabled in this build.');
+      await requireOwner(client, ownerId);
+      const capability = await client.rpc('schedule_capability_v1');
+      if (capability.error) throw capability.error;
+      if (capability.data !== 1) throw new Error('This client does not support the server schedule version.');
+    },
+    async currentRevision(ownerId: string, programId: string): Promise<string> {
+      await requireOwner(client, ownerId);
+      return (await currentProgram(client, ownerId, programId)).current_revision_id;
+    },
+    async sendCreate(ownerId: string, requestJson: string): Promise<unknown> {
+      if (!scheduleWriterEnabled) throw new Error('Dated schedule saving is not enabled in this build.');
+      await requireOwner(client, ownerId);
+      const capability = await client.rpc('schedule_capability_v1');
+      if (capability.error) throw capability.error;
+      if (capability.data !== 1) throw new Error('This client does not support the server schedule version.');
+      const payload: unknown = JSON.parse(requestJson);
+      const { data, error } = await runSupabaseOperation(
+        (signal) => client.rpc('create_program_schedule_v1', { p_payload: payload }).abortSignal(signal),
+        { kind: 'write', operation: 'schedule.create' },
+      );
+      if (error) throw error;
+      return data;
+    },
+    async verifyCreate(ownerId: string, payload: CreateProgramSchedulePayload,
+      receipt: CreateScheduleReceipt): Promise<boolean> {
+      await requireOwner(client, ownerId);
+      const { data: schedule, error } = await client.from('program_schedules')
+        .select('id,source_operation_id,program_id,timezone,revision')
+        .eq('user_id', ownerId).eq('program_id', payload.programId)
+        .maybeSingle<{ id: string; source_operation_id: string; program_id: string; timezone: string; revision: number }>();
+      if (error) throw error;
+      if (!schedule) return false;
+      if (schedule.id !== receipt.scheduleId || schedule.source_operation_id !== payload.operationId
+        || schedule.program_id !== payload.programId || schedule.timezone !== payload.timezone
+        || schedule.revision < receipt.revision) return false;
+      const rows: { id: string; original_program_day_id: string | null; original_kind: string;
+        original_local_date: string | null; original_timezone: string;
+        original_placement_provenance: string; original_unplaced_reason: string | null }[] = [];
+      for (let offset = 0; ; offset += 500) {
+        const page = await client.from('scheduled_days')
+          .select('id,original_program_day_id,original_kind,original_local_date,original_timezone,original_placement_provenance,original_unplaced_reason')
+          .eq('user_id', ownerId).eq('program_id', payload.programId).eq('schedule_id', schedule.id)
+          .order('id').range(offset, offset + 499)
+          .returns<typeof rows>();
+        if (page.error) throw page.error;
+        rows.push(...(page.data ?? []));
+        if ((page.data?.length ?? 0) < 500) break;
+      }
+      if (rows.length !== payload.days.length) return false;
+      return payload.days.every((day) => {
+        const row = rows.find((entry) => entry.id === day.occurrenceId);
+        if (!row || row.original_timezone !== payload.timezone) return false;
+        if ('programDayId' in day) {
+          if (row.original_program_day_id !== day.programDayId) return false;
+          if ('status' in day && day.status === 'unplaced') {
+            return row.original_kind === 'workout' && row.original_local_date === null
+              && row.original_placement_provenance === 'legacy_empty_prescription'
+              && row.original_unplaced_reason === day.reason;
+          }
+          return 'localDate' in day && row.original_local_date === day.localDate;
+        }
+        return row.original_program_day_id === null && row.original_kind === 'rest'
+          && row.original_local_date === day.localDate;
+      });
+    },
     async read(ownerId: string, programId: string): Promise<ScheduleRead> {
       if (!ownerId || !programId) throw new Error('Owner and program are required');
       const { data: { session }, error: authError } = await client.auth.getSession();

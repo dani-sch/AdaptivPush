@@ -11,7 +11,7 @@
 
 ## [NEXT] AP-04 dated scheduling and manual control
 
-- [APPROVED 2026-09-25] Execute AP-04.1-AP-04.3 and AP-05.1 together, including all required production Supabase migrations on `thfxcvxcsfvrzdysdnkq`, client enablement, recovery rehearsal, and hosted verification. The user requested the execution prompt in chat only; do not store prompts in the repository. Implementation has not started; AP-05.2/05.3 remain deferred. Existing user-led physical acceptance remains separately open.
+- [IN PROGRESS, APPROVED 2026-09-25] AP-04.1-AP-04.3 and AP-05.1: the branch contains local history, owner-scoped pending operation, adherence and dated-reminder foundations; initial placement, complete manual controls, fulfillment wiring, dated Today, hosted verification and client enablement remain open. A proposed schedule migration must not deploy before full client integration, clean fresh-backup restore/rehearsal and concurrency proof. Linked production migration-ledger access repeatedly fails HTTP 544; the last verified nine-version ledger is September 18 evidence, not current proof. Continue independent implementation while resolving the technical blocker; AP-05.2/05.3 stay deferred. See [current state](/dev-doc/main/CURRENT-STATE.md) and the [requirement-to-test matrix](/dev-doc/reports/ADAPTIVPUSH-SCHEDULE-HISTORY-2026-09-25.md). Do not store execution prompts in the repository.
 
 - [OPEN] Define stable dated workout/rest placement with timezone, original placement, schedule revisions, move/carry/skip/pause semantics, and notification rescheduling.
 - [OPEN] Preserve durable AP-02/AP-03 occurrence identity and all released correction/removal/structure behavior.

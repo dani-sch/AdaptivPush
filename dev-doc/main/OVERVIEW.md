@@ -26,6 +26,8 @@ The Add flow reuses the detailed exercise picker, loads the complete catalog, ke
 
 These changes do not implement dated scheduling, a new progression worker, public/community features, health integration, purchases, or broader AP-04/AP-05 policy.
 
+The approved AP-04.1-AP-04.3/AP-05.1 release is **in progress**, not deployed. The branch adds bounded schedule-operation recovery, local adherence and dated-reminder planning, a history reader with explicit coverage, and a no-write-on-read progression guard. A schedule migration is pre-release; dated Today, client schedule commands and hosted enablement remain open. See [current state](/dev-doc/main/CURRENT-STATE.md) and the [requirement-to-test matrix](/dev-doc/reports/ADAPTIVPUSH-SCHEDULE-HISTORY-2026-09-25.md).
+
 ## Read next
 
 - [Current state](/dev-doc/main/CURRENT-STATE.md): exact hosted/source posture and remaining limits.
