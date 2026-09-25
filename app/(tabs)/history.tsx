@@ -86,6 +86,15 @@ interface MonthSection {
   workouts: WorkoutEntry[];
 }
 
+function createDetailRequests() {
+  let generation = 0;
+  return {
+    next: () => ++generation,
+    isCurrent: (value: number) => value === generation,
+    cancel: () => { generation++; },
+  };
+}
+
 const parseNumericValue = (value: number | string | null | undefined): number | null => {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
@@ -200,9 +209,22 @@ const toWorkoutEntry = ({ row, source, compositeId }: HistoryItem): WorkoutEntry
 });
 
 const fetchSessionExercises = async (sessionId: string): Promise<SessionExercise[]> => {
-  const { data, error } = await supabase
-    .from('workout_exercise_sets')
-    .select(`
+  const rows: Array<{
+    set_number: number;
+    actual_set_id: string | null;
+    load_value: number | null;
+    load_unit: SessionExerciseSet['loadUnit'];
+    load_kind: SessionExerciseSet['loadKind'];
+    reps: number | null;
+    rpe: number | null;
+    exercise_id: string;
+    exercises: { id: string; name: string }[];
+  }> = [];
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase
+      .from('workout_exercise_sets')
+      .select(`
       set_number,
       actual_set_id,
       load_value,
@@ -213,21 +235,25 @@ const fetchSessionExercises = async (sessionId: string): Promise<SessionExercise
       exercise_id,
       exercises ( id, name )
     `)
-    .eq('session_id', sessionId)
-    .order('set_number', { ascending: true });
-
-  if (error) throw error;
+      .eq('session_id', sessionId)
+      .order('set_number', { ascending: true })
+      .order('actual_set_id', { ascending: true })
+      .range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    rows.push(...(data ?? []));
+    if ((data ?? []).length < pageSize) break;
+  }
 
   // Group sets by exercise
   const map = new Map<string, SessionExercise>();
-  for (const row of data ?? []) {
+  for (const row of rows) {
     const exId: string = row.exercise_id;
     const exName: string = row.exercises?.[0]?.name ?? 'Unknown exercise';
     if (!map.has(exId)) {
       map.set(exId, { exerciseId: exId, name: exName, sets: [] });
     }
     map.get(exId)!.sets.push({
-      setId: row.actual_set_id,
+      setId: row.actual_set_id ?? `${sessionId}:${row.exercise_id}:${row.set_number}`,
       setNumber: row.set_number,
       loadValue: row.load_value != null ? Number(row.load_value) : null,
       loadUnit: row.load_unit,
@@ -290,6 +316,7 @@ export default function HistoryScreen() {
   const [sessionExercises, setSessionExercises] = useState<SessionExercise[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [detailRequests] = useState(createDetailRequests);
 
   // Exercise history modal state (drill-down from detail sheet)
   const [historyExerciseId, setHistoryExerciseId] = useState<string | null>(null);
@@ -297,6 +324,7 @@ export default function HistoryScreen() {
 
   const editWorkout = () => {
     if (!detailWorkout?.sessionId || !pendingEdit.request(detailWorkout.sessionId)) return;
+    detailRequests.cancel();
     setHistoryExerciseId(null);
     setHistoryExerciseName(null);
     setSessionExercises([]);
@@ -318,7 +346,8 @@ export default function HistoryScreen() {
   const [prLoading, setPrLoading] = useState(false);
   const [prError, setPrError] = useState<string | null>(null);
 
-  const handleOpenDetail = async (workout: WorkoutEntry) => {
+  const handleOpenDetail = useCallback(async (workout: WorkoutEntry) => {
+    const generation = detailRequests.next();
     pendingEdit.reset();
     setDetailWorkout(workout);
     setSessionExercises([]);
@@ -330,19 +359,22 @@ export default function HistoryScreen() {
     setDetailLoading(true);
     try {
       const exercises = await fetchSessionExercises(workout.sessionId);
-      setSessionExercises(exercises);
+      if (detailRequests.isCurrent(generation)) setSessionExercises(exercises);
     } catch (cause) {
-      reportSupabaseFailure('history.detail', cause);
-      setDetailError(supabaseUserMessage(cause, 'Unable to load workout details.'));
+      if (detailRequests.isCurrent(generation)) {
+        reportSupabaseFailure('history.detail', cause);
+        setDetailError(supabaseUserMessage(cause, 'Unable to load workout details.'));
+      }
     } finally {
-      setDetailLoading(false);
+      if (detailRequests.isCurrent(generation)) setDetailLoading(false);
     }
-  };
+  }, [pendingEdit, detailRequests]);
 
-  const handleCloseDetail = () => {
+  const handleCloseDetail = useCallback(() => {
+    detailRequests.cancel();
     setDetailWorkout(null);
     setSessionExercises([]);
-  };
+  }, [detailRequests]);
 
   const handleOpenExerciseHistory = (exerciseId: string, exerciseName: string) => {
     setHistoryExerciseId(exerciseId);
@@ -426,6 +458,7 @@ export default function HistoryScreen() {
       setCoverageNotice(null);
       setWorkouts([]);
       setPrCount(null);
+      detailRequests.cancel();
       setDetailWorkout(null);
       setSessionExercises([]);
 
