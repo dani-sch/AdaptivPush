@@ -47,6 +47,29 @@ test('unaccepted reduced, partial, and pending work never earn credit', () => {
   assert.equal(result.fraction, null);
 });
 
+test('abandoned work is unresolved and legacy unknown evidence is not counted as partial or complete', () => {
+  const result = selectWeeklyAdherence(window, [
+    { occurrenceId: 'a', localDate: '2026-09-21', kind: 'workout', state: 'finalized', completionClass: 'abandoned' },
+    { occurrenceId: 'b', localDate: '2026-09-22', kind: 'workout', state: 'finalized', completionClass: 'legacy_unknown' },
+  ]);
+  assert.equal(result.abandoned, 1);
+  assert.equal(result.unresolved, 1);
+  assert.equal(result.unknown, 1);
+  assert.equal(result.partial, 0);
+  assert.equal(result.fulfilledWorkouts, 0);
+  assert.equal(result.fraction, null);
+});
+
+test('SQL full earns credit but accepted-reduced needs explicit accepted reduction evidence', () => {
+  const result = selectWeeklyAdherence(window, [
+    { occurrenceId: 'full', localDate: '2026-09-21', kind: 'workout', state: 'finalized', completionClass: 'full' },
+    { occurrenceId: 'unproven', localDate: '2026-09-22', kind: 'workout', state: 'finalized', completionClass: 'accepted_reduced' },
+  ]);
+  assert.equal(result.fulfilledWorkouts, 1);
+  assert.equal(result.partial, 1);
+  assert.equal(result.fraction, 0.5);
+});
+
 test('cross-week move changes reporting week only and correction updates watermark', () => {
   const moved = { occurrenceId: 'cycle-2-pull', localDate: '2026-09-28', kind: 'workout' as const, state: 'finalized' as const, completionClass: 'complete' as const };
   assert.equal(selectWeeklyAdherence(window, [moved]).eligibleWorkouts, 0);

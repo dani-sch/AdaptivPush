@@ -1,3 +1,5 @@
+import { asLocalDate, validateTimeZone } from '../kernel/localDate';
+
 export const CONSISTENCY_POLICY_VERSION = 'weekly-adherence-v1' as const;
 
 export interface EligibleOccurrence {
@@ -5,7 +7,7 @@ export interface EligibleOccurrence {
   localDate: string;
   kind: 'workout' | 'rest';
   state: 'planned' | 'skipped' | 'pending' | 'finalized';
-  completionClass?: 'complete' | 'reduced' | 'partial' | 'abandoned' | 'legacy_unknown';
+  completionClass?: 'full' | 'accepted_reduced' | 'complete' | 'reduced' | 'partial' | 'abandoned' | 'legacy_unknown';
   acceptedReductionId?: string | null;
 }
 
@@ -32,6 +34,8 @@ export interface WeeklyAdherence {
   complete: number;
   acceptedReduced: number;
   partial: number;
+  abandoned: number;
+  unknown: number;
   pending: number;
   unresolved: number;
   restDays: number;
@@ -55,6 +59,9 @@ export function selectWeeklyAdherence(
   ) {
     throw new Error('Invalid consistency window');
   }
+  asLocalDate(window.weekStart);
+  asLocalDate(window.weekEndExclusive);
+  validateTimeZone(window.timezone);
 
   const result: WeeklyAdherence = {
     policyVersion: CONSISTENCY_POLICY_VERSION,
@@ -68,6 +75,8 @@ export function selectWeeklyAdherence(
     complete: 0,
     acceptedReduced: 0,
     partial: 0,
+    abandoned: 0,
+    unknown: 0,
     pending: 0,
     unresolved: 0,
     restDays: 0,
@@ -78,7 +87,11 @@ export function selectWeeklyAdherence(
   const seen = new Set<string>();
   for (const occurrence of occurrences) {
     if (
-      !localDatePattern.test(occurrence.localDate) ||
+      !localDatePattern.test(occurrence.localDate)) {
+      throw new Error('Invalid occurrence local date');
+    }
+    asLocalDate(occurrence.localDate);
+    if (
       occurrence.localDate < window.weekStart ||
       occurrence.localDate >= window.weekEndExclusive
     ) continue;
@@ -94,23 +107,32 @@ export function selectWeeklyAdherence(
     result.eligibleWorkouts++;
     if (occurrence.state === 'pending') {
       result.pending++;
-    } else if (occurrence.state === 'finalized' && occurrence.completionClass === 'complete') {
+    } else if (occurrence.state === 'finalized' &&
+      (occurrence.completionClass === 'full' || occurrence.completionClass === 'complete')) {
       result.complete++;
       result.fulfilledWorkouts++;
     } else if (
       occurrence.state === 'finalized' &&
-      occurrence.completionClass === 'reduced' &&
+      (occurrence.completionClass === 'accepted_reduced' || occurrence.completionClass === 'reduced') &&
       occurrence.acceptedReductionId
     ) {
       result.acceptedReduced++;
       result.fulfilledWorkouts++;
-    } else if (occurrence.state === 'finalized') {
+    } else if (occurrence.state === 'finalized' &&
+      (occurrence.completionClass === 'partial' || occurrence.completionClass === 'reduced' ||
+        occurrence.completionClass === 'accepted_reduced')) {
       result.partial++;
+    } else if (occurrence.state === 'finalized' && occurrence.completionClass === 'abandoned') {
+      result.abandoned++;
+      result.unresolved++;
+    } else if (occurrence.state === 'finalized') {
+      result.unknown++;
     } else {
       result.unresolved++;
     }
   }
-  if (window.sourceCoverage === 'complete' && !window.paused && result.pending === 0 && result.eligibleWorkouts > 0) {
+  if (window.sourceCoverage === 'complete' && !window.paused && result.pending === 0 &&
+    result.unknown === 0 && result.eligibleWorkouts > 0) {
     result.fraction = result.fulfilledWorkouts / result.eligibleWorkouts;
   }
   return result;
