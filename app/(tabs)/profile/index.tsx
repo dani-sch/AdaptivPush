@@ -781,7 +781,7 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.progressItem}>
               <Text style={styles.progressValue}>{progress.weekStreak ?? '-'}</Text>
-              <Text style={styles.progressLabel}>Week Streak</Text>
+              <Text style={styles.progressLabel}>Activity Streak</Text>
             </View>
             <View style={styles.progressItem}>
               <Text style={styles.progressValue}>{progress.prs ?? '-'}</Text>
