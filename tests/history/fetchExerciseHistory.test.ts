@@ -6,7 +6,8 @@ import { fetchExerciseHistory } from '../../utils/fetchExerciseHistory';
 const timestamp = '2026-09-25T10:00:00Z';
 const meta = { user_id: 'owner', workout_name: 'Workout', ended_at: timestamp };
 
-function clientFor(rows: object[], failOffset = -1): SupabaseClient {
+function clientFor(rows: object[], failOffset = -1,
+  error: { message: string; code?: string } = { message: 'read failed' }): SupabaseClient {
   return {
     auth: { getSession: async () => ({ data: { session: { user: { id: 'owner' } } }, error: null }) },
     from: () => {
@@ -15,7 +16,7 @@ function clientFor(rows: object[], failOffset = -1): SupabaseClient {
         eq: () => builder,
         order: () => builder,
         range: async (start: number, end: number) => start === failOffset
-          ? { data: null, error: { message: 'read failed' } }
+          ? { data: null, error }
           : { data: rows.slice(start, end + 1), error: null },
       };
       return builder;
@@ -45,4 +46,19 @@ test('later-page failure does not return incomplete exercise history as a succes
   assert.equal(result.entries.length, 0);
   assert.equal(result.partial, true);
   assert.equal(result.errors.length, 1);
+});
+
+test('missing supported actual-set relation is unavailable, not empty history', async () => {
+  const result = await fetchExerciseHistory('exercise', 10,
+    clientFor([], 0, { code: 'PGRST205', message: 'missing workout_exercise_sets' }));
+  assert.equal(result.unavailable, true);
+  assert.equal(result.entries.length, 0);
+});
+
+test('cancelled exercise history returns no owner data', async () => {
+  const controller = new AbortController();
+  controller.abort();
+  const result = await fetchExerciseHistory('exercise', 10, clientFor([]), controller.signal);
+  assert.equal(result.aborted, true);
+  assert.deepEqual(result.entries, []);
 });

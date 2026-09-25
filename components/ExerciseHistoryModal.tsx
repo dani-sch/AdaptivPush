@@ -98,7 +98,7 @@ export function ExerciseHistoryModal({
           )}
 
           {/* Error state */}
-          {!loading && errors.length > 0 && (
+          {!loading && errors.length > 0 && !unavailable && (
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>!</Text>
               <Text style={styles.emptyTitle}>Unable to load history</Text>
