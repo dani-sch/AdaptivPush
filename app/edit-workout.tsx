@@ -57,6 +57,7 @@ export default function EditWorkoutScreen() {
   const [title, setTitle] = useState('Workout');
   const [summary, setSummary] = useState('');
   const [revision, setRevision] = useState(0);
+  const [expectedScheduleRevision, setExpectedScheduleRevision] = useState<number>();
   const [exercises, setExercises] = useState<EditableExercise[]>([]);
   const original = useRef<EditableExercise[]>([]);
   const [mode, setMode] = useState<WorkoutMode>('completed_view');
@@ -115,6 +116,7 @@ export default function EditWorkoutScreen() {
       setOwnerId(session.user.id);
       setTitle(loaded.session.workout_name);
       setRevision(loaded.session.correction_revision ?? 0);
+      setExpectedScheduleRevision(loaded.scheduleLink?.revision);
       setSummary(`${new Date(loaded.session.ended_at).toLocaleDateString()} · ${loaded.session.completion_class ?? 'Recorded'}`);
       setCatalog(catalogResult.data ?? []);
       setCanCorrect(loaded.canCorrect && !recovered.issue);
@@ -130,7 +132,7 @@ export default function EditWorkoutScreen() {
       setCanCorrect(false);
       setExercises([]);
       original.current = [];
-      setTitle('Workout'); setSummary(''); setMode('completed_view');
+      setTitle('Workout'); setSummary(''); setMode('completed_view'); setExpectedScheduleRevision(undefined);
       setStatus(supabaseUserMessage(error, 'Workout could not be loaded for this account. Retry.'));
       return false;
     } finally { if (request === generation.current) setLoading(false); }
@@ -206,6 +208,7 @@ export default function EditWorkoutScreen() {
       if (entryErrors.length) { setStatus(entryErrors.join(' ')); return; }
       const all = exercises.flatMap(e => e.sets);
       const request = recovered ?? createCompletedWorkoutCorrection({ ownerId, sessionId, expectedRevision: revision,
+        expectedScheduleRevision,
         removals, programRemoval,
         effectiveSlots: structure.available ? correctionEffectiveSlots(snapshot.current, exercises) : undefined,
         sets: all.filter(s => s.outcome === 'performed' && !isRemoved(removals, s.prescriptionSlotId ?? s.exerciseId, s.actualSetId)).map(s => ({

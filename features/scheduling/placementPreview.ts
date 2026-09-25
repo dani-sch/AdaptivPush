@@ -14,6 +14,7 @@ export interface ProgramDayIdentity {
 
 export type ExplicitPlacement =
   | { occurrenceId: string; programDayId: string; localDate: string }
+  | { occurrenceId: string; programDayId: string; kind: 'workout'; status: 'unplaced'; reason: string }
   | { occurrenceId: string; kind: 'rest'; cycleWeek: number; localDate: string };
 
 export interface CreateProgramSchedulePayload {
@@ -28,6 +29,7 @@ export interface CreateProgramSchedulePayload {
 export interface PlacementPreviewInput {
   programId: string;
   expectedProgramRevisionId: string;
+  programSchemaVersion: number;
   durationWeeks: number;
   uncompletedProgramDays: readonly ProgramDayIdentity[];
   explicitPlacements: readonly ExplicitPlacement[];
@@ -36,7 +38,7 @@ export interface PlacementPreviewInput {
 
 export class UnsupportedEmptyWorkoutError extends Error {
   constructor() {
-    super('An uncompleted workout has no exercises. Its original date is unknown; dated placement is unavailable until explicit unplaced support is confirmed.');
+    super('Only a legacy schema-v1 workout may remain explicitly unplaced when its prescription is empty.');
     this.name = 'UnsupportedEmptyWorkoutError';
   }
 }
@@ -47,9 +49,10 @@ export function hasTrainablePrescription(day: ProgramDayIdentity): boolean {
 }
 
 export function validateExplicitPlacements(input: PlacementPreviewInput): void {
-  const { programId, expectedProgramRevisionId, durationWeeks, uncompletedProgramDays,
+  const { programId, expectedProgramRevisionId, programSchemaVersion, durationWeeks, uncompletedProgramDays,
     explicitPlacements, timezone } = input;
   if (!programId || !expectedProgramRevisionId) throw new Error('An active program revision is required.');
+  if (!Number.isSafeInteger(programSchemaVersion) || programSchemaVersion < 1) throw new Error('Invalid program schema version.');
   if (!Number.isSafeInteger(durationWeeks) || durationWeeks < 1) throw new Error('Invalid program duration.');
   if (!timezone || timezone === 'Factory' || timezone === 'localtime') throw new Error('Select a named timezone.');
   validateTimeZone(timezone);
@@ -68,7 +71,7 @@ export function validateExplicitPlacements(input: PlacementPreviewInput): void {
       || typeof day.is_rest_day !== 'boolean') {
       throw new Error('Program days or revision changed. Reload the plan.');
     }
-    if (!day.is_rest_day && !hasTrainablePrescription(day)) {
+    if (!day.is_rest_day && !hasTrainablePrescription(day) && programSchemaVersion !== 1) {
       throw new UnsupportedEmptyWorkoutError();
     }
     uncompleted.set(day.id, day);
@@ -78,19 +81,27 @@ export function validateExplicitPlacements(input: PlacementPreviewInput): void {
   const dates = new Set<string>();
   const placed = new Set<string>();
   for (const selection of explicitPlacements) {
-    if (!selection || typeof selection.occurrenceId !== 'string'
-      || typeof selection.localDate !== 'string') throw new Error('Select a date for every placement.');
+    if (!selection || typeof selection.occurrenceId !== 'string') throw new Error('Select an identity for every placement.');
     asOperationId(selection.occurrenceId);
-    asLocalDate(selection.localDate);
-    if (ids.has(selection.occurrenceId) || dates.has(selection.localDate)) {
-      throw new Error('Every occurrence and date must be unique.');
-    }
+    if ('localDate' in selection) asLocalDate(selection.localDate);
+    if (ids.has(selection.occurrenceId)
+      || ('localDate' in selection && dates.has(selection.localDate))) throw new Error('Every occurrence and date must be unique.');
     ids.add(selection.occurrenceId);
-    dates.add(selection.localDate);
+    if ('localDate' in selection) dates.add(selection.localDate);
     if ('programDayId' in selection) {
-      if (!uncompleted.has(selection.programDayId) || placed.has(selection.programDayId)
-        || 'kind' in selection || 'cycleWeek' in selection) {
+      const day = uncompleted.get(selection.programDayId);
+      if (!day || placed.has(selection.programDayId) || 'cycleWeek' in selection) {
         throw new Error('Placement must reference one uncompleted current program day.');
+      }
+      const emptyLegacyWorkout = !day.is_rest_day && !hasTrainablePrescription(day);
+      if (emptyLegacyWorkout) {
+        if (programSchemaVersion !== 1 || !('status' in selection)
+          || selection.status !== 'unplaced' || selection.kind !== 'workout'
+          || 'localDate' in selection || selection.reason.trim().length < 1 || selection.reason.trim().length > 256) {
+          throw new UnsupportedEmptyWorkoutError();
+        }
+      } else if (!('localDate' in selection) || 'status' in selection || 'kind' in selection || 'reason' in selection) {
+        throw new Error('Trainable workouts and prescribed rest require an explicit date.');
       }
       placed.add(selection.programDayId);
     } else if (selection.kind !== 'rest' || !Number.isSafeInteger(selection.cycleWeek)

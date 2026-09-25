@@ -24,6 +24,7 @@ test('eligible placement excludes finalized ancestor lineage without dating hist
     program_revision_id: revision, day_index: 3, is_rest_day: true,
   };
   let remainingIsEmpty = false;
+  let schemaVersion = 1;
   const queries: string[] = [];
   const client = {
     auth: { getSession: async () => ({ data: { session: { user: { id: 'owner-a' } } }, error: null }) },
@@ -53,7 +54,7 @@ test('eligible placement excludes finalized ancestor lineage without dating hist
           return { returns: async () => ({ data, error: null }) };
         },
         maybeSingle: async () => ({
-          data: { current_revision_id: revision, duration_weeks: 1, is_active: true, lifecycle: 'active' },
+          data: { current_revision_id: revision, duration_weeks: 1, schema_version: schemaVersion, is_active: true, lifecycle: 'active' },
           error: null,
         }),
       };
@@ -62,12 +63,16 @@ test('eligible placement excludes finalized ancestor lineage without dating hist
   } as unknown as SupabaseClient;
   const result = await createScheduleRepository(client).loadEligibleDays('owner-a', programId);
   assert.equal(result.revisionId, revision);
+  assert.equal(result.schemaVersion, 1);
   assert.deepEqual(result.days.map((day) => day.id), [remaining.id, rest.id]);
   assert.deepEqual(queries, ['program_days', 'program_days', 'workout_sessions']);
   remainingIsEmpty = true;
+  const legacy = await createScheduleRepository(client).loadEligibleDays('owner-a', programId);
+  assert.equal(legacy.days.find((day) => day.id === remaining.id)?.program_day_exercises.length, 0);
+  schemaVersion = 2;
   await assert.rejects(
     createScheduleRepository(client).loadEligibleDays('owner-a', programId),
-    /original date is unknown/,
+    /legacy schema-v1/,
   );
   await assert.rejects(
     createScheduleRepository(client).loadEligibleDays('owner-b', programId),

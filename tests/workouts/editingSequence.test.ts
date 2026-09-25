@@ -105,6 +105,22 @@ test('authoritative receipt comparison rejects lost structure and mismatched rec
   assert.deepEqual(correctionEntryErrors([{ name: 'Press', sets: [{ ...editable, outcome: 'not_attempted' }] }]), []);
 });
 
+test('scheduled correction verification binds the receipt to the current occurrence and incremented revision', () => {
+  const set = { actualSetId: 'set-1', prescriptionSlotId: 'slot', prescribedExerciseId: 'press', exerciseId: 'press', order: 1,
+    reps: 8, loadValue: 30, loadUnit: 'kg' as const, loadKind: 'external' as const, loadSide: 'external_total' as const, rpe: null, loggedAt: '2026-09-18T10:00:00Z' };
+  const request = createCompletedWorkoutCorrection({ ownerId: 'owner', sessionId: 'session', expectedRevision: 0,
+    expectedScheduleRevision: 4, sets: [set] });
+  const receipt = { operationId: request.operationId, sessionId: 'session', revision: 1, setCount: 1, totalVolumeLb: 0,
+    completionClass: 'partial' as const, correctedAt: '', replayed: false,
+    scheduleOccurrenceId: '77777777-7777-4777-8777-777777777777', scheduleRevision: 5 };
+  const saved = { revision: 1, snapshot: null, sets: [set],
+    scheduleLink: { occurrenceId: receipt.scheduleOccurrenceId, revision: 5 } };
+  assert.doesNotThrow(() => verifyCorrectionReceipt(request, receipt, saved));
+  assert.throws(() => verifyCorrectionReceipt(request, { ...receipt, scheduleRevision: 6 }, saved), /Dated schedule confirmation/);
+  assert.throws(() => verifyCorrectionReceipt({ ...request, expectedScheduleRevision: undefined }, receipt, saved),
+    /Unexpected dated schedule confirmation/);
+});
+
 test('combined edits preserve unchecked extras, duplicate catalog additions, and distinct original evidence after reopening', () => {
   let d = updateWorkoutSet(fixture(), { setId: 'set-1', reps: 8, load: 30, logged: true });
   d = amendWorkoutExercise(d, { slotId: 'slot', replacementExerciseId: 'row', amendedAt: '' });

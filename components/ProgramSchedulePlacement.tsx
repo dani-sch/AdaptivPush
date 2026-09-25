@@ -24,7 +24,8 @@ const command = createScheduleCommand(repository, scheduleOperationStore);
 interface DateSelection {
   occurrenceId: string;
   programDayId: string;
-  localDate: string;
+  localDate?: string;
+  unplacedReason?: string;
 }
 
 interface ExtraRest {
@@ -72,7 +73,10 @@ export function ProgramSchedulePlacement({
       }
       setSnapshot(data);
       setDates(data.days.map((day) => ({
-        occurrenceId: createOperationId(), programDayId: day.id, localDate: '',
+        occurrenceId: createOperationId(), programDayId: day.id,
+        ...(day.is_rest_day || day.program_day_exercises.some((exercise) => exercise.set_count > 0)
+          ? { localDate: '' }
+          : { unplacedReason: 'Legacy workout has no trainable prescription; original date is unknown.' }),
       })));
       setIssue(data.days.length ? null : 'There are no uncompleted program days to place.');
     }).catch((error) => {
@@ -89,7 +93,11 @@ export function ProgramSchedulePlacement({
 
   function choices(): ExplicitPlacement[] {
     return [
-      ...dates,
+      ...dates.map((selection): ExplicitPlacement => selection.unplacedReason
+        ? { occurrenceId: selection.occurrenceId, programDayId: selection.programDayId,
+            kind: 'workout', status: 'unplaced', reason: selection.unplacedReason }
+        : { occurrenceId: selection.occurrenceId, programDayId: selection.programDayId,
+            localDate: selection.localDate ?? '' }),
       ...extraRest.map((rest) => ({
         occurrenceId: rest.occurrenceId, kind: 'rest' as const,
         cycleWeek: Number(rest.week), localDate: rest.localDate,
@@ -103,7 +111,7 @@ export function ProgramSchedulePlacement({
       const selected = choices();
       buildCreateProgramSchedulePayload({
         programId, expectedProgramRevisionId: snapshot.revisionId,
-        durationWeeks: snapshot.durationWeeks, uncompletedProgramDays: snapshot.days,
+        programSchemaVersion: snapshot.schemaVersion, durationWeeks: snapshot.durationWeeks, uncompletedProgramDays: snapshot.days,
         explicitPlacements: selected, timezone,
       });
       setPreview(selected);
@@ -121,7 +129,7 @@ export function ProgramSchedulePlacement({
     try {
       const outcome = await command.create(ownerId, {
         programId, expectedProgramRevisionId: snapshot.revisionId,
-        durationWeeks: snapshot.durationWeeks, uncompletedProgramDays: snapshot.days,
+        programSchemaVersion: snapshot.schemaVersion, durationWeeks: snapshot.durationWeeks, uncompletedProgramDays: snapshot.days,
         explicitPlacements: preview, timezone,
       });
       if (outcome.status === 'created' || outcome.status === 'replayed') {
@@ -174,7 +182,7 @@ export function ProgramSchedulePlacement({
             return (
               <View key={day.id} style={{ marginTop: 12 }}>
                 <Text style={text}>{title(day)}</Text>
-                <TextInput
+                {selection?.unplacedReason ? <Text style={[text, { marginTop: 6 }]}>This legacy empty workout will remain unplaced. Its original date is unknown and it cannot be started until it has a real prescription.</Text> : <TextInput
                   value={selection?.localDate ?? ''}
                   onChangeText={(value) => {
                     setDates((current) => current.map((item) =>
@@ -183,7 +191,7 @@ export function ProgramSchedulePlacement({
                   }}
                   style={input} accessibilityLabel={`Date for ${title(day)}`}
                   placeholder="YYYY-MM-DD" placeholderTextColor={theme.placeholder}
-                />
+                />}
               </View>
             );
           })}
@@ -224,10 +232,10 @@ export function ProgramSchedulePlacement({
               <Text style={{ color: theme.textPrimary, fontWeight: '700' }}>Confirm these dates · {timezone}</Text>
               {preview.map((item) => (
                 <Text key={item.occurrenceId} style={text}>
-                  {item.localDate} · {'programDayId' in item ? 'Program day' : `Extra rest · week ${item.cycleWeek}`}
+                  {'status' in item ? 'Unplaced · unknown original date' : `${item.localDate} · ${'programDayId' in item ? 'Program day' : `Extra rest · week ${item.cycleWeek}`}`}
                 </Text>
               ))}
-              <Text style={text}>Only uncompleted days are placed. Historical sessions and dates are not changed. Starting a scheduled workout remains unavailable in this client.</Text>
+              <Text style={text}>Only uncompleted days are placed. Historical sessions and dates are not changed. Finish preserves the accepted occurrence and schedule revision.</Text>
               {!canSave ? (
                 <Text style={text}>Saving is unavailable until this build and the authenticated server support dated schedules.</Text>
               ) : null}

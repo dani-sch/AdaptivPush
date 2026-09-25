@@ -161,6 +161,8 @@ export default function NextWorkoutScreen() {
     revisionId?: string;
     stableDayId?: string;
     programDayId?: string;
+    scheduleOccurrenceId?: string;
+    expectedScheduleRevision?: string;
   }>();
   const auth = useAuth();
   const authLoading = auth.phase === 'hydrating';
@@ -176,7 +178,11 @@ export default function NextWorkoutScreen() {
     revisionId: params.revisionId,
     stableDayId: params.stableDayId,
     programDayId: params.programDayId,
-  }), [params.programDayId, params.programId, params.revisionId, params.stableDayId, params.workoutId]);
+    scheduleOccurrenceId: params.scheduleOccurrenceId,
+    expectedScheduleRevision: params.expectedScheduleRevision === undefined
+      ? undefined : Number(params.expectedScheduleRevision),
+  }), [params.expectedScheduleRevision, params.programDayId, params.programId, params.revisionId,
+    params.scheduleOccurrenceId, params.stableDayId, params.workoutId]);
   const programWorkout = useMemo(
     () => resolveProgramWorkout(program, routeTarget),
     [program, routeTarget],
@@ -233,6 +239,8 @@ export default function NextWorkoutScreen() {
       routeTarget.stableDayId,
       routeTarget.programDayId,
       routeTarget.workoutId,
+      routeTarget.scheduleOccurrenceId,
+      routeTarget.expectedScheduleRevision,
     ]),
     [ownerId, routeTarget],
   );
@@ -290,7 +298,36 @@ export default function NextWorkoutScreen() {
           load: async () => {
             await preserveWorkoutRecovery(ownerId);
             const stored = await workoutDraftStore.loadMatching(ownerId, lookup);
-            if (stored) return stored;
+            const scheduledRoute = routeTarget.scheduleOccurrenceId !== undefined
+              || routeTarget.expectedScheduleRevision !== undefined;
+            if (scheduledRoute && (!routeTarget.scheduleOccurrenceId
+              || !Number.isSafeInteger(routeTarget.expectedScheduleRevision)
+              || routeTarget.expectedScheduleRevision! < 1)) {
+              throw new Error('The scheduled occurrence link is invalid. Return to Plan and refresh.');
+            }
+            if (stored) {
+              if (!scheduledRoute) {
+                if (stored.scheduleOccurrenceId) {
+                  throw new Error('Resume this workout from its dated placement so Finish keeps the accepted occurrence link.');
+                }
+                return stored;
+              }
+              if ((stored.scheduleOccurrenceId && stored.scheduleOccurrenceId !== routeTarget.scheduleOccurrenceId)
+                || (stored.expectedScheduleRevision !== undefined
+                  && stored.expectedScheduleRevision !== routeTarget.expectedScheduleRevision)) {
+                throw new Error('This draft belongs to a different accepted schedule revision. Refresh before continuing.');
+              }
+              if (!stored.scheduleOccurrenceId) {
+                if (stored.finalizationEndedAt || stored.lifecycle === 'finalized' || stored.lifecycle === 'finalizing') {
+                  throw new Error('This already-submitted draft cannot be rebound to a dated occurrence. Retry its exact submission first.');
+                }
+                const bound = { ...stored, scheduleOccurrenceId: routeTarget.scheduleOccurrenceId,
+                  expectedScheduleRevision: routeTarget.expectedScheduleRevision };
+                await workoutDraftStore.save(bound);
+                return bound;
+              }
+              return stored;
+            }
             if (loading) return null;
             if (failureCategory) throw new Error(supabaseUserMessage({ category: failureCategory, retryable: false }, 'The plan could not be loaded. Check your connection and refresh.'));
             const entryIssue = workoutEntryIssue(program, programWorkout);
@@ -307,6 +344,8 @@ export default function NextWorkoutScreen() {
               programDayId: programWorkout.id,
               stableDayId: programWorkout.stableDayId,
               prescriptionRevisionId: programWorkout.prescriptionRevisionId,
+              scheduleOccurrenceId: routeTarget.scheduleOccurrenceId,
+              expectedScheduleRevision: routeTarget.expectedScheduleRevision,
               workoutName: programWorkout.name,
               startedAt: new Date().toISOString(),
               timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',

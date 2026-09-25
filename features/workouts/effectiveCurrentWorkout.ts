@@ -91,5 +91,9 @@ export function workoutRouteParamsForDraft(draft: WorkoutDraft) {
     revisionId: draft.prescriptionRevisionId,
     stableDayId: draft.stableDayId,
     programDayId: draft.programDayId,
+    ...(draft.scheduleOccurrenceId && draft.expectedScheduleRevision !== undefined ? {
+      scheduleOccurrenceId: draft.scheduleOccurrenceId,
+      expectedScheduleRevision: String(draft.expectedScheduleRevision),
+    } : {}),
   };
 }

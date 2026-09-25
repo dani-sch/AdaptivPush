@@ -35,6 +35,12 @@ function placementLabel(workout: ProgramWorkout, days: ScheduledDay[]): string {
         : `${day.kind} · ${day.status} (no date)`;
 }
 
+function scheduledWorkoutTarget(workout: ProgramWorkout, days: ScheduledDay[]): ScheduledDay | null {
+    const matches = days.filter((day) => day.programDayId === workout.id && day.kind === 'workout'
+        && (day.status === 'planned' || day.status === 'in_progress'));
+    return matches.length === 1 ? matches[0] : null;
+}
+
 function LoadingState({ styles }: { styles: ReturnType<typeof createStyles> }) {
     return (
         <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -399,7 +405,7 @@ export default function PlanScreen() {
                     <Text style={{ color: theme.text, lineHeight: 20 }}>
                         {!schedule.today ? 'Checking dated placement…'
                             : schedule.today.state === 'workout'
-                                ? `Placed workout on ${schedule.today.localDate}. Scheduled Finish is not available in this client yet.`
+                                ? `Placed workout on ${schedule.today.localDate}. Start it here or from Today; Finish will preserve this occurrence.`
                                 : schedule.today.state === 'rest'
                                     ? `Rest day on ${schedule.today.localDate}.`
                                     : schedule.today.state === 'fulfilled'
@@ -538,12 +544,24 @@ export default function PlanScreen() {
                                 if (pendingEdit.request(selectedWorkoutObj.sessionId)) setSelectedWorkout(null);
                                 return;
                             }
-                            if (!canStartUndatedWorkout(schedule.read, schedule.pending)) {
-                                Alert.alert('Workout start unavailable', 'Dated placement cannot be confirmed or linked at Finish. Your workout and draft have not been changed.');
+                            const scheduledDay = schedule.read?.state === 'ready'
+                                ? scheduledWorkoutTarget(selectedWorkoutObj, schedule.read.days) : null;
+                            if (schedule.read?.state === 'ready' && !scheduledDay) {
+                                Alert.alert('Workout start unavailable', 'This workout has no active dated placement. Refresh or revise the schedule before starting it.');
+                                return;
+                            }
+                            if (!scheduledDay && !canStartUndatedWorkout(schedule.read, schedule.pending)) {
+                                Alert.alert('Workout start unavailable', 'Dated placement cannot be confirmed. Your workout and draft have not been changed.');
                                 return;
                             }
                             setSelectedWorkout(null);
-                            router.push({ pathname: '/next-workout', params: workoutRouteParams(program, selectedWorkoutObj) });
+                            const expectedScheduleRevision = schedule.read?.state === 'ready'
+                                ? schedule.read.revision : undefined;
+                            router.push({ pathname: '/next-workout', params: {
+                                ...workoutRouteParams(program, selectedWorkoutObj),
+                                ...(scheduledDay ? { scheduleOccurrenceId: scheduledDay.id,
+                                    expectedScheduleRevision: String(expectedScheduleRevision) } : {}),
+                            } });
                         }}
                     /> : null}
                 </Modal>

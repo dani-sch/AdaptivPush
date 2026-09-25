@@ -790,10 +790,15 @@ export default function HomeScreen() {
 
   // workouts[0] is always the next uncompleted workout (hook sorts completed last)
   const nextWorkout = program?.workouts.find((w) => !w.isFinalized && !w.isCompleted);
+  const scheduledTodayDay = schedule.today?.state === 'workout' ? schedule.today.day : null;
+  const scheduledTodayWorkout = scheduledTodayDay?.programDayId
+    ? program?.workouts.find((workout) => workout.id === scheduledTodayDay.programDayId)
+    : undefined;
+  const targetWorkout = scheduledTodayDay ? scheduledTodayWorkout : (canStartUndatedWorkout(schedule.read, schedule.pending) ? nextWorkout : undefined);
 
   useFocusEffect(useCallback(() => {
     let active = true;
-    if (!ownerId || !program || !nextWorkout?.stableDayId) {
+    if (!ownerId || !program || !targetWorkout?.stableDayId) {
       setLoadedDraft(null);
       return () => { active = false; };
     }
@@ -801,9 +806,9 @@ export default function HomeScreen() {
     const requestedProgramId = program.id;
     void workoutDraftStore.loadMatching(ownerId, {
       programId: program.id,
-      prescriptionRevisionId: nextWorkout.prescriptionRevisionId,
-      stableDayId: nextWorkout.stableDayId,
-      programDayId: nextWorkout.id,
+      prescriptionRevisionId: targetWorkout.prescriptionRevisionId,
+      stableDayId: targetWorkout.stableDayId,
+      programDayId: targetWorkout.id,
     }).then((draft) => {
       if (active && requestedOwnerId === ownerId && requestedProgramId === program.id) {
         setLoadedDraft(draft);
@@ -813,11 +818,12 @@ export default function HomeScreen() {
       if (active) setLoadedDraft(null);
     });
     return () => { active = false; };
-  }, [nextWorkout, ownerId, program]));
+  }, [ownerId, program, targetWorkout]));
 
-  const activeDraft = matchingActiveWorkoutDraft(program, nextWorkout ?? null, ownerId, loadedDraft);
+  const activeDraft = matchingActiveWorkoutDraft(program, targetWorkout ?? null, ownerId, loadedDraft);
   const canStartUndated = canStartUndatedWorkout(schedule.read, schedule.pending);
-  const effectiveWorkout = effectiveCurrentWorkout(program, nextWorkout ?? null, ownerId, loadedDraft);
+  const canStartScheduled = Boolean(scheduledTodayDay && scheduledTodayWorkout && schedule.read?.state === 'ready');
+  const effectiveWorkout = effectiveCurrentWorkout(program, targetWorkout ?? null, ownerId, loadedDraft);
   const nextWorkoutSummary: WorkoutSummary | undefined = effectiveWorkout
     ? {
         id: effectiveWorkout.stableDayId ?? effectiveWorkout.id,
@@ -831,20 +837,24 @@ export default function HomeScreen() {
       }
     : undefined;
 
-  const occurrenceDraft = matchingOccurrenceWorkoutDraft(program, nextWorkout ?? null, ownerId, loadedDraft);
+  const occurrenceDraft = matchingOccurrenceWorkoutDraft(program, targetWorkout ?? null, ownerId, loadedDraft);
   const homeState = occurrenceState(occurrenceDraft);
   const handleStartWorkout = () => {
-    if (!canStartUndated) return;
+    if (!canStartUndated && !canStartScheduled) return;
     if (occurrenceDraft?.finalizedReceipt) {
       router.push({ pathname: '/edit-workout', params: { sessionId: occurrenceDraft.finalizedReceipt.sessionId } });
       return;
     }
-    if (!program || !nextWorkout || workoutEntryIssue(program, nextWorkout)) return;
+    if (!program || !targetWorkout || workoutEntryIssue(program, targetWorkout)) return;
+    const scheduledParams = scheduledTodayDay && schedule.read?.state === 'ready'
+      ? { scheduleOccurrenceId: scheduledTodayDay.id, expectedScheduleRevision: String(schedule.read.revision) }
+      : {};
     router.push({
       pathname: "/next-workout",
-      params: activeDraft
-        ? workoutRouteParamsForDraft(activeDraft)
-        : workoutRouteParams(program, nextWorkout),
+      params: {
+        ...(activeDraft ? workoutRouteParamsForDraft(activeDraft) : workoutRouteParams(program, targetWorkout)),
+        ...scheduledParams,
+      },
     });
   };
 
@@ -913,16 +923,16 @@ export default function HomeScreen() {
             <Text style={{ color: theme.text, lineHeight: 20 }}>
               {!schedule.today ? 'Checking dated schedule…'
                 : schedule.today.state === 'workout'
-                  ? `Workout placed for ${schedule.today.localDate}. Starting scheduled workouts is unavailable until Finish can link the occurrence atomically.`
+                  ? `Workout placed for ${schedule.today.localDate}. Finish will preserve this accepted occurrence and schedule revision.`
                   : schedule.today.state === 'rest'
                     ? `Rest day · ${schedule.today.localDate}`
                     : schedule.today.state === 'fulfilled'
                       ? `${scheduledOutcomeLabel(schedule.today.day)} · ${schedule.today.localDate}`
                       : 'message' in schedule.today ? schedule.today.message : 'Dated schedule unavailable.'}
             </Text>
-            {activeDraft && !canStartUndated ? (
+            {activeDraft && canStartScheduled && !activeDraft.scheduleOccurrenceId ? (
               <Text style={{ color: theme.text, lineHeight: 20, marginTop: 6 }}>
-                Your in-progress draft is still saved. It cannot be finished as a scheduled occurrence in this client.
+                Your saved draft will be linked to this accepted occurrence when you explicitly resume it.
               </Text>
             ) : null}
             <Pressable onPress={() => void refreshSchedule()} accessibilityRole="button" accessibilityLabel="Retry dated schedule" style={{ minHeight: 44, justifyContent: 'center' }}>
@@ -955,9 +965,9 @@ export default function HomeScreen() {
             )}
           </>
         ) : (
-          canStartUndated ? <NextWorkoutSection
+          (canStartUndated || canStartScheduled) ? <NextWorkoutSection
             actionLabel={occurrenceAction(homeState, canCorrectWorkout)}
-            entryIssue={workoutEntryIssue(program, nextWorkout ?? null)}
+            entryIssue={workoutEntryIssue(program, targetWorkout ?? null)}
             hasActiveDraft={activeDraft !== null}
             workout={nextWorkoutSummary}
             onPressStart={handleStartWorkout}

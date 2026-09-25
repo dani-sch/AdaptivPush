@@ -49,6 +49,52 @@ async function workoutCorrectionIssue(client: SupabaseClient): Promise<string | 
   }
 }
 
+export interface CompletedWorkoutScheduleLink {
+  occurrenceId: string;
+  scheduleId: string;
+  revision: number;
+}
+
+async function loadCompletedWorkoutScheduleLink(
+  client: SupabaseClient,
+  ownerId: string,
+  sessionId: string,
+): Promise<{ scheduleLink: CompletedWorkoutScheduleLink | null; scheduleIssue: string | null }> {
+  try {
+    const capability = await client.rpc('schedule_capability_v1');
+    if (capability.error) {
+      if (classifySupabaseError(capability.error).category === 'schema_unavailable') {
+        return { scheduleLink: null, scheduleIssue: null };
+      }
+      throw capability.error;
+    }
+    if (capability.data !== 1) {
+      return { scheduleLink: null, scheduleIssue: 'Dated schedule consistency could not be confirmed. Reload before updating this workout.' };
+    }
+    const occurrence = await client.from('scheduled_days').select('id,schedule_id')
+      .eq('user_id', ownerId).eq('fulfillment_session_id', sessionId).maybeSingle();
+    if (occurrence.error) throw occurrence.error;
+    if (!occurrence.data) return { scheduleLink: null, scheduleIssue: null };
+    const schedule = await client.from('program_schedules').select('revision')
+      .eq('id', occurrence.data.schedule_id).eq('user_id', ownerId).maybeSingle();
+    if (schedule.error) throw schedule.error;
+    if (!schedule.data || !Number.isSafeInteger(schedule.data.revision) || schedule.data.revision < 1) {
+      return { scheduleLink: null, scheduleIssue: 'This workout has an incomplete dated schedule link. Reload before updating it.' };
+    }
+    return { scheduleLink: {
+      occurrenceId: occurrence.data.id,
+      scheduleId: occurrence.data.schedule_id,
+      revision: schedule.data.revision,
+    }, scheduleIssue: null };
+  } catch (error) {
+    reportSupabaseFailure('workout.schedule_link', error);
+    return { scheduleLink: null, scheduleIssue: supabaseUserMessage(
+      error,
+      'The dated schedule could not be checked. Reload before updating this workout.',
+    ) };
+  }
+}
+
 export async function loadCompletedWorkout(client: SupabaseClient, ownerId: string, sessionId: string) {
   // Read stable columns first: an undeployed correction column must never hide history.
   const { data: session, error } = await client.from('workout_sessions').select('*')
@@ -59,12 +105,15 @@ export async function loadCompletedWorkout(client: SupabaseClient, ownerId: stri
     .select('*').eq('session_id', sessionId).order('set_number');
   if (setsError) throw setsError;
   // A read-only capability function confirms the RPC and snapshot-outcome contract together.
-  const capabilityIssue = await workoutCorrectionIssue(client);
+  const [capabilityIssue, scheduleState] = await Promise.all([
+    workoutCorrectionIssue(client),
+    loadCompletedWorkoutScheduleLink(client, ownerId, sessionId),
+  ]);
   const correctionIssue = session.lifecycle !== 'finalized'
     ? 'Only finalized workouts can be updated.'
     : !Number.isInteger(session.correction_revision) || session.correction_revision < 0
       ? 'This workout is missing the revision information required for safe updates.'
-      : capabilityIssue;
+      : capabilityIssue ?? scheduleState.scheduleIssue;
   const canCorrect = correctionIssue === null;
   const sets: CompletedWorkoutSetCorrection[] = (rows ?? []).map(row => ({
     actualSetId: row.actual_set_id ?? row.id, prescriptionSlotId: row.prescription_slot_id ?? null,
@@ -78,5 +127,6 @@ export async function loadCompletedWorkout(client: SupabaseClient, ownerId: stri
     loadSide: row.load_side ?? 'unknown',
     rpe: row.rpe == null ? null : Number(row.rpe), loggedAt: row.logged_at ?? session.ended_at,
   }));
-  return { session, snapshot: session.prescription_snapshot as FrozenWorkoutPrescription | null, sets, canCorrect, correctionIssue };
+  return { session, snapshot: session.prescription_snapshot as FrozenWorkoutPrescription | null, sets,
+    scheduleLink: scheduleState.scheduleLink, canCorrect, correctionIssue };
 }
