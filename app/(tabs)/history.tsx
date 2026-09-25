@@ -86,6 +86,28 @@ interface MonthSection {
   workouts: WorkoutEntry[];
 }
 
+interface PersonalRecordRow {
+  id: string;
+  exercise_id: string;
+  weight_lb: number | string;
+  reps: number;
+  achieved_at: string;
+}
+
+async function loadPersonalRecords(userId: string): Promise<PersonalRecordRow[]> {
+  const records: PersonalRecordRow[] = [];
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase.from('personal_records')
+      .select('id, exercise_id, weight_lb, reps, achieved_at')
+      .eq('user_id', userId).order('id')
+      .range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    records.push(...(data ?? []));
+    if ((data ?? []).length < pageSize) return records;
+  }
+}
+
 function createDetailRequests() {
   let generation = 0;
   return {
@@ -202,14 +224,14 @@ const toWorkoutEntry = ({ row, source, compositeId }: HistoryItem): WorkoutEntry
   sessionId: source === 'workout_sessions' ? row.id : null,
   source,
   title: row.workout_name || row.title || row.name || 'Workout',
-  completedAt: row.ended_at || row.completed_at || row.created_at || new Date().toISOString(),
+  completedAt: row.ended_at || row.completed_at || row.created_at || '',
   durationMin: parseDuration(row),
   totalVolumeLb: parseVolume(row),
   personalRecords: parsePrCount(row),
 });
 
 const fetchSessionExercises = async (sessionId: string): Promise<SessionExercise[]> => {
-  const rows: Array<{
+  const rows: {
     set_number: number;
     actual_set_id: string | null;
     load_value: number | null;
@@ -219,7 +241,7 @@ const fetchSessionExercises = async (sessionId: string): Promise<SessionExercise
     rpe: number | null;
     exercise_id: string;
     exercises: { id: string; name: string }[];
-  }> = [];
+  }[] = [];
   const pageSize = 500;
   for (let offset = 0; ; offset += pageSize) {
     const { data, error } = await supabase
@@ -396,45 +418,28 @@ export default function HistoryScreen() {
       if (!user) { setPrError('Unable to load user session.'); return; }
 
       // Fetch all PR rows for this user
-      const { data: prRows, error: prErr } = await supabase
-        .from('personal_records')
-        .select('exercise_id, weight_lb, reps, achieved_at')
-        .eq('user_id', user.id)
-        .order('achieved_at', { ascending: false });
-
-      if (prErr) {
-        reportSupabaseFailure('history.pr', prErr);
-        setPrError(supabaseUserMessage(prErr, 'Unable to load personal records.'));
-        return;
-      }
-
-      if (!prRows || prRows.length === 0) {
+      const prRows = await loadPersonalRecords(user.id);
+      if (prRows.length === 0) {
         setPrRecords([]);
-        setPrLoading(false);
         return;
       }
 
-      // Get unique exercise IDs and fetch names
-      const exIds = [...new Set(prRows.map((r: any) => r.exercise_id))];
-      const { data: exRows, error: exError } = await supabase
-        .from('exercises')
-        .select('id, name')
-        .in('id', exIds);
-      if (exError) {
-        reportSupabaseFailure('history.pr.names', exError);
-        setPrError(supabaseUserMessage(exError, 'Unable to load personal record details.'));
-        return;
-      }
+      const exIds = [...new Set(prRows.map(row => row.exercise_id))];
+      const catalogIds = exIds.filter(id =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id));
 
       const nameMap = new Map<string, string>();
-      for (const ex of (exRows ?? []) as any[]) {
-        nameMap.set(ex.id, ex.name);
+      for (let offset = 0; offset < catalogIds.length; offset += 500) {
+        const { data: exRows, error: exError } = await supabase
+          .from('exercises').select('id, name').in('id', catalogIds.slice(offset, offset + 500));
+        if (exError) throw exError;
+        for (const ex of exRows ?? []) nameMap.set(ex.id, ex.name);
       }
 
       // Group by exercise, keep best per exercise
       const bestMap = new Map<string, { exerciseName: string; weightLb: number; reps: number; achievedAt: string }>();
-      for (const row of prRows as any[]) {
-        const name = nameMap.get(row.exercise_id) ?? 'Unknown';
+      for (const row of prRows) {
+        const name = nameMap.get(row.exercise_id) ?? row.exercise_id;
         const w = Number(row.weight_lb) || 0;
         const r = Number(row.reps) || 0;
         const existing = bestMap.get(row.exercise_id);
@@ -442,6 +447,8 @@ export default function HistoryScreen() {
           bestMap.set(row.exercise_id, { exerciseName: name, weightLb: w, reps: r, achievedAt: row.achieved_at });
         }
       }
+      const { data: current } = await supabase.auth.getSession();
+      if (current.session?.user.id !== user.id) throw new Error('Account changed while loading personal records.');
       setPrRecords(Array.from(bestMap.values()).sort((a, b) => a.exerciseName.localeCompare(b.exerciseName)));
     } catch (err) {
       reportSupabaseFailure('history.pr', err);
@@ -476,13 +483,16 @@ export default function HistoryScreen() {
       }
 
       // Fetch PR count directly from personal_records table
-      const { data: prRows, error: prCountError } = await supabase
-        .from('personal_records')
-        .select('exercise_id')
-        .eq('user_id', user.id);
+      let prCountError: unknown = null;
+      let prRows: PersonalRecordRow[] = [];
+      try {
+        prRows = await loadPersonalRecords(user.id);
+      } catch (cause) {
+        prCountError = cause;
+      }
       if (signal.aborted) return;
       if (prCountError) reportSupabaseFailure('history.pr.count', prCountError);
-      setPrCount(prCountError ? null : new Set((prRows ?? []).map(row => row.exercise_id)).size);
+      setPrCount(prCountError ? null : new Set(prRows.map(row => row.exercise_id)).size);
 
       const result = await fetchPaginatedWorkoutHistory({ supabaseClient: supabase, userId: user.id, signal });
       if (signal.aborted || result.aborted) return;
@@ -507,7 +517,7 @@ export default function HistoryScreen() {
     } finally {
       if (!signal.aborted) setLoading(false);
     }
-  }, []);
+  }, [detailRequests]);
 
   useFocusEffect(
     useCallback(() => {
