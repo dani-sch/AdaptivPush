@@ -130,11 +130,12 @@ export function selectScheduleToday(read: ScheduleRead, now: Date): TodaySchedul
   if (days.length > 1) return { state: 'conflict', message: 'Multiple placements claim today. Review the schedule before training.' };
   const day = days[0];
   if (!day) return { state: 'unplaced', message: 'No workout or rest is placed on today. Nothing is inferred from the program order.' };
-  if (day.status === 'fulfilled') return { state: 'fulfilled', day, localDate: today };
+  if (!day.localDate) return { state: 'conflict', message: 'Today has no accepted placement date.' };
+  if (day.status === 'fulfilled') return { state: 'fulfilled', day, localDate: day.localDate };
   if (day.status !== 'planned' && day.status !== 'in_progress') {
     return { state: 'unplaced', message: `Today's placement is ${day.status}; no workout is assigned.` };
   }
-  return { state: day.kind, day, localDate: today };
+  return { state: day.kind, day, localDate: day.localDate };
 }
 
 export function parseScheduledDay(row: ScheduledDayRow): ScheduledDay {

@@ -60,9 +60,10 @@ test('explicit rest without program day remains readable; workout without prescr
 
 test('fixed occurrences retain their own timezone after a schedule timezone change', () => {
   if (placed.state !== 'ready') throw new Error('Invalid test fixture');
-  const fixed = { ...placed.days[0], timeZone: 'America/Los_Angeles' };
-  const now = new Date('2026-09-26T03:30:00Z');
-  assert.equal(selectScheduleToday({ ...placed, timeZone: 'America/New_York', days: [fixed] }, now).state, 'rest');
+  const fixed = { ...placed.days[0], localDate: '2026-09-24', timeZone: 'America/Los_Angeles' };
+  const now = new Date('2026-09-25T06:30:00Z');
+  assert.deepEqual(selectScheduleToday({ ...placed, timeZone: 'America/New_York', days: [fixed] }, now),
+    { state: 'rest', day: fixed, localDate: '2026-09-24' });
 });
 
 test('reminder plan uses accepted revision, actual occurrence dates and zones only', () => {
