@@ -89,4 +89,6 @@ export function createScheduleOperationStore(storage: ScheduleStorage) {
   };
 }
 
+export type ScheduleOperationStore = ReturnType<typeof createScheduleOperationStore>;
+
 export const scheduleOperationStore = createScheduleOperationStore(AsyncStorage);
