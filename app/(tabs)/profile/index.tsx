@@ -37,6 +37,8 @@ import {
   resolveReadinessPreferences,
 } from '@/utils/profilePreferences';
 import { supabase } from '@/utils/supabase';
+import { clearScheduledWorkoutReminders } from '@/utils/notifications';
+import { fetchPaginatedWorkoutHistory, type WorkoutHistoryRow } from '@/features/history/historyService';
 import { uploadAvatar } from '@/utils/uploadAvatar';
 import type { TrainingExperience } from '@/types/database';
 import { useTheme, type AppearancePreference } from '@/contexts/ThemeContext';
@@ -64,26 +66,11 @@ interface UserProfile {
   full_name?: string;
 }
 
-interface WorkoutHistoryRow {
-  ended_at?: string | null;
-  completed_at?: string | null;
-  created_at?: string | null;
-  pr_count?: number | string | null;
-  prs?: number | string | null;
-  personal_records?: number | string | null;
-  personal_record_count?: number | string | null;
-  prs_hit?: number | string | null;
-  is_pr?: boolean | null;
-  notes?: string | null;
-}
-
 interface ProgressSummary {
-  workouts: number;
-  weekStreak: number;
-  prs: number;
+  workouts: number | null;
+  weekStreak: number | null;
+  prs: number | null;
 }
-
-type WorkoutHistoryTable = 'workout_sessions' | 'workout_history';
 
 type ReadinessSource = 'apple' | 'manual';
 type ReadinessQuestionKey = 'sleep' | 'stress' | 'menstrualCycle';
@@ -104,9 +91,9 @@ interface MenuSection {
 }
 
 const DEFAULT_PROGRESS: ProgressSummary = {
-  workouts: 0,
-  weekStreak: 0,
-  prs: 0,
+  workouts: null,
+  weekStreak: null,
+  prs: null,
 };
 
 const MENU_SECTIONS: MenuSection[] = [
@@ -142,52 +129,6 @@ const READINESS_QUESTIONS: { key: ReadinessQuestionKey; label: string }[] = [
   { key: 'stress', label: 'Stress' },
   { key: 'menstrualCycle', label: 'Menstrual Cycle' },
 ];
-
-const parseNumericValue = (value: number | string | null | undefined): number | null => {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value;
-  }
-
-  if (typeof value === 'string') {
-    const cleaned = value.trim();
-    if (cleaned.length === 0) {
-      return null;
-    }
-
-    const numeric = Number(cleaned);
-    return Number.isFinite(numeric) ? numeric : null;
-  }
-
-  return null;
-};
-
-const parsePrCount = (row: WorkoutHistoryRow): number => {
-  const directCount =
-    parseNumericValue(row.pr_count) ??
-    parseNumericValue(row.prs) ??
-    parseNumericValue(row.personal_records) ??
-    parseNumericValue(row.personal_record_count) ??
-    parseNumericValue(row.prs_hit);
-
-  if (directCount !== null) {
-    return Math.max(0, Math.round(directCount));
-  }
-
-  if (row.is_pr) {
-    return 1;
-  }
-
-  if (!row.notes) {
-    return 0;
-  }
-
-  const explicitMatch = row.notes.match(/(\d+)\s*PR/i);
-  if (explicitMatch) {
-    return Number(explicitMatch[1]);
-  }
-
-  return /\bPR\b/i.test(row.notes) ? 1 : 0;
-};
 
 const getWeekKey = (value: string): string => {
   const date = new Date(value);
@@ -243,49 +184,6 @@ const renderMenuIcon = (icon: MenuIcon, iconColor: string) => {
     default:
       return null;
   }
-};
-
-const isMissingTableError = (
-  error: { code?: string | null; message?: string | null } | null | undefined,
-  tableName: WorkoutHistoryTable,
-): boolean => {
-  if (!error) {
-    return false;
-  }
-
-  if (error.code === 'PGRST205') {
-    return true;
-  }
-
-  return Boolean(
-    error.message?.toLowerCase().includes(`could not find the table 'public.${tableName}'`),
-  );
-};
-
-const fetchRowsFromTable = async (
-  tableName: WorkoutHistoryTable,
-  userId: string,
-  signal: AbortSignal,
-): Promise<{
-  rows: WorkoutHistoryRow[];
-  error: { code?: string | null; message?: string | null } | null;
-}> => {
-  const orderColumn = tableName === 'workout_sessions' ? 'ended_at' : 'completed_at';
-
-  const { data, error } = await runSupabaseOperation(
-    (attemptSignal) => supabase
-      .from(tableName)
-      .select('*')
-      .eq('user_id', userId)
-      .order(orderColumn, { ascending: false })
-      .abortSignal(attemptSignal),
-    { kind: 'read', operation: `profile.${tableName}`, signal },
-  );
-
-  return {
-    rows: (data ?? []) as WorkoutHistoryRow[],
-    error,
-  };
 };
 
 const isMissingUserProfileSchemaError = (
@@ -456,8 +354,8 @@ export default function ProfileScreen() {
       })();
 
       const progressTask = (async () => {
-        const [sessionsResult, prResult] = await Promise.all([
-          fetchRowsFromTable('workout_sessions', user.id, controller.signal),
+        const [history, prResult] = await Promise.all([
+          fetchPaginatedWorkoutHistory({ supabaseClient: supabase, userId: user.id, signal: controller.signal }),
           runSupabaseOperation(
             (signal) => supabase
               .from('personal_records')
@@ -467,18 +365,11 @@ export default function ProfileScreen() {
             { kind: 'read', operation: 'profile.personal_records', signal: controller.signal },
           ),
         ]);
-        const sessionsMissing = isMissingTableError(sessionsResult.error, 'workout_sessions');
-        if (sessionsResult.error && !sessionsMissing) throw sessionsResult.error;
-        let rows = sessionsResult.rows;
-        if (sessionsMissing || rows.length === 0) {
-          const historyResult = await fetchRowsFromTable('workout_history', user.id, controller.signal);
-          const historyMissing = isMissingTableError(historyResult.error, 'workout_history');
-          if (historyResult.error && !historyMissing) throw historyResult.error;
-          if (historyResult.rows.length > 0) rows = historyResult.rows;
-        }
+        if (history.aborted || !isCurrent(user.id)) return;
+        if (!history.complete) throw history.errors[0]?.error ?? new Error('Workout history is unavailable.');
         if (prResult.error) throw prResult.error;
-        if (!isCurrent(user.id)) return;
-        setProgress({ workouts: rows.length, weekStreak: computeWeekStreak(rows), prs: prResult.count ?? 0 });
+        const rows = history.items.map(item => item.row);
+        setProgress({ workouts: rows.length, weekStreak: computeWeekStreak(rows), prs: prResult.count });
       })();
 
       const results = await settleIndependentSections([adaptationTask, userProfileTask, progressTask] as const);
@@ -531,6 +422,12 @@ export default function ProfileScreen() {
         return;
       }
 
+      try {
+        await clearScheduledWorkoutReminders();
+      } catch (notificationError) {
+        reportSupabaseFailure('auth.sign_out_reminders', notificationError);
+        Alert.alert('Signed out', 'Some workout reminders could not be removed from this device.');
+      }
       router.replace('/');
     } catch (logoutError) {
       reportSupabaseFailure('auth.sign_out', logoutError);
@@ -879,15 +776,15 @@ export default function ProfileScreen() {
           <Text style={styles.progressTitle}>Your Progress</Text>
           <View style={styles.progressRow}>
             <View style={styles.progressItem}>
-              <Text style={styles.progressValue}>{progress.workouts}</Text>
+              <Text style={styles.progressValue}>{progress.workouts ?? '-'}</Text>
               <Text style={styles.progressLabel}>Workouts</Text>
             </View>
             <View style={styles.progressItem}>
-              <Text style={styles.progressValue}>{progress.weekStreak}</Text>
+              <Text style={styles.progressValue}>{progress.weekStreak ?? '-'}</Text>
               <Text style={styles.progressLabel}>Week Streak</Text>
             </View>
             <View style={styles.progressItem}>
-              <Text style={styles.progressValue}>{progress.prs}</Text>
+              <Text style={styles.progressValue}>{progress.prs ?? '-'}</Text>
               <Text style={styles.progressLabel}>PRs</Text>
             </View>
           </View>
