@@ -11,11 +11,13 @@
 
 ## [NEXT] AP-04 dated scheduling and manual control
 
+- [APPROVED 2026-09-25] Execute AP-04.1-AP-04.3 and AP-05.1 together, including all required production Supabase migrations on `thfxcvxcsfvrzdysdnkq`, client enablement, recovery rehearsal, and hosted verification. [Approved execution prompt](/dev-doc/plans/active/ADAPTIVPUSH-AP04-AP05-HISTORY-EXECUTION-PROMPT.md). Implementation has not started; AP-05.2/05.3 remain deferred. Existing user-led physical acceptance remains separately open.
+
 - [OPEN] Define stable dated workout/rest placement with timezone, original placement, schedule revisions, move/carry/skip/pause semantics, and notification rescheduling.
 - [OPEN] Preserve durable AP-02/AP-03 occurrence identity and all released correction/removal/structure behavior.
 - [OPEN] Add focused policy, repository, migration, recovery, compatibility, and device evidence before any rollout.
 
-## [AFTER AP-04] AP-05 authoritative history and progression
+## [WITH AP-04] AP-05.1 history; [AFTER] AP-05.2/05.3 progression and explanations
 
 - [OPEN] Union and deduplicate supported legacy/new history with explicit unavailable versus empty states.
 - [OPEN] Make progression revision-aware and idempotent with comparable exercise/equipment cohorts, missing-data confidence, deload protection, and transparent applied-decision evidence.
