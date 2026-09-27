@@ -573,17 +573,17 @@ export default function HistoryScreen() {
         <View style={styles.summaryGrid}>
           <SummaryMetricCard
             icon={<CalendarDays color={theme.primary} size={24} />}
-            value={`${summary.totalWorkouts}`}
+            value={coverageNotice && summary.totalWorkouts === 0 ? '-' : `${summary.totalWorkouts}`}
             label={coverageNotice ? 'Loaded Workouts' : 'Total Workouts'}
           />
           <SummaryMetricCard
             icon={<Clock3 color={theme.secondary} size={24} />}
-            value={`${summary.avgDuration}`}
+            value={coverageNotice && summary.totalWorkouts === 0 ? '-' : `${summary.avgDuration}`}
             label="Avg Duration (min)"
           />
           <SummaryMetricCard
             icon={<TrendingUp color={theme.success} size={24} />}
-            value={formatCompactVolume(summary.totalVolumeLb)}
+            value={coverageNotice && summary.totalWorkouts === 0 ? '-' : formatCompactVolume(summary.totalVolumeLb)}
             label="Total Volume (lbs)"
           />
           <SummaryMetricCard
