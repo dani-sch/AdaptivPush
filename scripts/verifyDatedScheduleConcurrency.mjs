@@ -130,6 +130,8 @@ try {
     DELETE FROM public.program_revision_command_receipts WHERE user_id='${owner}';
     DELETE FROM public.program_installation_receipts WHERE user_id='${owner}';
     UPDATE public.programs SET current_revision_id=NULL WHERE user_id='${owner}';
+    DELETE FROM public.program_day_exercises WHERE program_revision_id IN
+      (SELECT id FROM public.program_revisions WHERE user_id='${owner}');
     DELETE FROM public.program_days WHERE program_id IN (SELECT id FROM public.programs WHERE user_id='${owner}');
     UPDATE public.program_revisions SET parent_revision_id=NULL WHERE user_id='${owner}';
     DELETE FROM public.program_revisions WHERE user_id='${owner}';
