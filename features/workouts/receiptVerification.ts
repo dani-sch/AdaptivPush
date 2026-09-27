@@ -9,13 +9,23 @@ function canonical(value: unknown): string {
 export function sameStoredStructure(a: unknown, b: unknown): boolean { return canonical(a) === canonical(b); }
 
 export function verifyCorrectionReceipt(request: CompletedWorkoutCorrectionRequest, receipt: CompletedWorkoutCorrectionReceipt,
-  saved: { revision: number; snapshot: FrozenWorkoutPrescription | null; sets: CompletedWorkoutSetCorrection[] }): void {
+  saved: { revision: number; snapshot: FrozenWorkoutPrescription | null; sets: CompletedWorkoutSetCorrection[];
+    scheduleLink?: { occurrenceId: string; revision: number } | null }): void {
   if (receipt.operationId !== request.operationId || receipt.sessionId !== request.sessionId || receipt.revision !== request.expectedRevision + 1
     || receipt.setCount !== request.sets.length || saved.revision !== receipt.revision || saved.sets.length !== request.sets.length) {
     throw new Error('Workout confirmation does not match the submitted update. Exact recovery is preserved.');
   }
   if (request.effectiveSlots && !sameStoredStructure(request.effectiveSlots, saved.snapshot?.effectiveSlots)) {
     throw new Error('Saved workout structure does not match the submitted update. Exact recovery is preserved.');
+  }
+  if (request.expectedScheduleRevision !== undefined) {
+    if (!saved.scheduleLink || receipt.scheduleOccurrenceId !== saved.scheduleLink.occurrenceId
+      || receipt.scheduleRevision !== request.expectedScheduleRevision + 1
+      || saved.scheduleLink.revision !== receipt.scheduleRevision) {
+      throw new Error('Dated schedule confirmation does not match the submitted update. Exact recovery is preserved.');
+    }
+  } else if (receipt.scheduleOccurrenceId !== undefined || receipt.scheduleRevision !== undefined || saved.scheduleLink) {
+    throw new Error('Unexpected dated schedule confirmation was returned. Exact recovery is preserved.');
   }
   for (const expected of request.sets) {
     const actual = saved.sets.find(s => s.actualSetId === expected.actualSetId);

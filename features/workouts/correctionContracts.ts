@@ -30,6 +30,7 @@ export interface CompletedWorkoutCorrectionRequest {
   ownerId: string;
   sessionId: string;
   expectedRevision: number;
+  expectedScheduleRevision?: number;
   sets: CompletedWorkoutSetCorrection[];
   setOutcomes?: { setId: string; slotId: string; order: number; outcome: 'performed' | 'skipped' | 'not_attempted' }[];
 }
@@ -43,6 +44,8 @@ export interface CompletedWorkoutCorrectionReceipt {
   totalVolumeLb: number;
   correctedAt: string;
   replayed: boolean;
+  scheduleOccurrenceId?: string;
+  scheduleRevision?: number;
 }
 
 export type CompletedWorkoutCorrectionOutcome =
@@ -72,6 +75,10 @@ export function validateCompletedWorkoutCorrection(
   const errors: string[] = [];
   if (request.schemaVersion !== WORKOUT_CORRECTION_SCHEMA_VERSION || !request.operationId || !request.ownerId || !request.sessionId || !Number.isSafeInteger(request.expectedRevision) || request.expectedRevision < 0) {
     errors.push('Owner, workout, and revision identity are required.');
+  }
+  if (request.expectedScheduleRevision !== undefined
+    && (!Number.isSafeInteger(request.expectedScheduleRevision) || request.expectedScheduleRevision < 1)) {
+    errors.push('The dated schedule revision must be a positive integer.');
   }
   const setIds = new Set<string>();
   const slotOrders = new Set<string>();

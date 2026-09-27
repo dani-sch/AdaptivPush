@@ -5,6 +5,7 @@ import { classifySupabaseError, runSupabaseOperation } from '@/utils/supabaseRes
 import type { NotificationPreferences } from '@/utils/profilePreferences';
 import type { ReminderPlan } from '@/features/consistency/reminders';
 import {
+  hasTrainablePrescription, UnsupportedEmptyWorkoutError,
   type CreateProgramSchedulePayload, type ProgramDayIdentity,
 } from './placementPreview';
 
@@ -53,6 +54,7 @@ export const scheduleWriterEnabled = process.env.EXPO_PUBLIC_AP04_SCHEDULE_WRITE
 
 export interface EligibleScheduleDays {
   revisionId: string;
+  schemaVersion: number;
   durationWeeks: number;
   days: ProgramDayIdentity[];
 }
@@ -77,9 +79,9 @@ async function requireOwner(client: SupabaseClient, ownerId: string): Promise<vo
 
 async function currentProgram(client: SupabaseClient, ownerId: string, programId: string) {
   const { data, error } = await client.from('programs')
-    .select('current_revision_id,duration_weeks,is_active,lifecycle,schema_version')
+    .select('current_revision_id,duration_weeks,schema_version,is_active,lifecycle')
     .eq('id', programId).eq('user_id', ownerId)
-    .maybeSingle<{ current_revision_id: string | null; duration_weeks: number; is_active: boolean; lifecycle: string; schema_version: number }>();
+    .maybeSingle<{ current_revision_id: string | null; duration_weeks: number; schema_version: number; is_active: boolean; lifecycle: string }>();
   if (error) throw error;
   if (!data?.is_active || data.lifecycle !== 'active' || !data.current_revision_id) {
     throw new Error('Active program revision is unavailable. Refresh before scheduling.');
@@ -251,10 +253,14 @@ export function createScheduleRepository(client: SupabaseClient) {
         throw new Error('Complete current program days are required for placement.');
       }
       const days = current.filter((day) => !completedLineage.has(day.stable_day_id));
+      if (days.some((day) => !day.is_rest_day && !hasTrainablePrescription(day)) && program.schema_version !== 1) {
+        throw new UnsupportedEmptyWorkoutError();
+      }
       return {
         revisionId: program.current_revision_id,
+        schemaVersion: program.schema_version,
         durationWeeks: program.duration_weeks,
-        days: days.map((day) => ({ ...day, program_schema_version: program.schema_version })),
+        days,
       };
     },
     async assertCreateAvailable(ownerId: string): Promise<void> {
@@ -295,8 +301,8 @@ export function createScheduleRepository(client: SupabaseClient) {
         || schedule.program_id !== payload.programId || schedule.timezone !== payload.timezone
         || schedule.revision < receipt.revision) return false;
       const rows: { id: string; original_program_day_id: string | null; original_kind: string;
-        original_local_date: string | null; original_timezone: string;
-        original_placement_provenance: string; original_unplaced_reason: string | null }[] = [];
+        original_local_date: string | null; original_timezone: string; original_placement_provenance: string;
+        original_unplaced_reason: string | null }[] = [];
       for (let offset = 0; ; offset += 500) {
         const page = await client.from('scheduled_days')
           .select('id,original_program_day_id,original_kind,original_local_date,original_timezone,original_placement_provenance,original_unplaced_reason')
@@ -311,17 +317,17 @@ export function createScheduleRepository(client: SupabaseClient) {
       return payload.days.every((day) => {
         const row = rows.find((entry) => entry.id === day.occurrenceId);
         if (!row || row.original_timezone !== payload.timezone) return false;
-        if ('programDayId' in day) {
-          if (row.original_program_day_id !== day.programDayId) return false;
-          if ('status' in day && day.status === 'unplaced') {
-            return row.original_kind === 'workout' && row.original_local_date === null
-              && row.original_placement_provenance === 'legacy_empty_prescription'
-              && row.original_unplaced_reason === day.reason;
-          }
-          return 'localDate' in day && row.original_local_date === day.localDate;
+        if ('programDayId' in day && 'status' in day) {
+          return row.original_program_day_id === day.programDayId
+            && row.original_kind === 'workout'
+            && row.original_local_date === null
+            && row.original_placement_provenance === 'legacy_empty_prescription'
+            && row.original_unplaced_reason === day.reason.trim();
         }
-        return row.original_program_day_id === null && row.original_kind === 'rest'
-          && row.original_local_date === day.localDate;
+        return row.original_local_date === day.localDate
+          && ('programDayId' in day
+            ? row.original_program_day_id === day.programDayId
+            : row.original_program_day_id === null && row.original_kind === 'rest');
       });
     },
     async read(ownerId: string, programId: string): Promise<ScheduleRead> {

@@ -7,7 +7,7 @@ import { asLocalDate } from '../../features/kernel/localDate';
 
 test('construct and validate move command with valid date', () => {
   const occ = createOccurrenceId();
-  const cmd = makeMove(createOccurrenceId(), 0, occ, asLocalDate('2026-09-30'));
+  const cmd = makeMove('op-1', 0, occ, asLocalDate('2026-09-30'));
   validateCommand(cmd);
 });
 
@@ -19,8 +19,8 @@ test('move command rejects invalid target dates and empty ids', () => {
 test('other command constructors validate shape and guards', () => {
   const occ = createOccurrenceId();
   const cyc = stableCycleId('p', 1);
-  validateCommand(makeCarry(createOccurrenceId(), 0, occ, cyc));
-  validateCommand(makeSwap(createOccurrenceId(), 0, occ, createOccurrenceId()));
-  validateCommand(makeSkip(createOccurrenceId(), 0, occ, 'rest'));
-  validateCommand(makeRecurring(createOccurrenceId(), 0, occ, 2, 'week', { count: 3 }));
+  validateCommand(makeCarry('op-2', 0, occ, cyc));
+  validateCommand(makeSwap('op-3', 0, occ, createOccurrenceId()));
+  validateCommand(makeSkip('op-4', 0, occ, 'rest'));
+  validateCommand(makeRecurring('op-5', 0, occ, 2, 'week', { count: 3 }));
 });

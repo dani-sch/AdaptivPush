@@ -8,6 +8,8 @@ export interface WorkoutRouteTarget {
   stableDayId?: string;
   programDayId?: string;
   workoutId?: string;
+  scheduleOccurrenceId?: string;
+  expectedScheduleRevision?: number;
 }
 
 /** Shared by previews and entry; a readable legacy plan is not yet startable. */

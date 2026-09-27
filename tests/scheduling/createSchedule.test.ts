@@ -11,7 +11,7 @@ function fixture(): PlacementPreviewInput {
   const revision = createOperationId();
   const dayId = createOperationId();
   return {
-    programId: createOperationId(), expectedProgramRevisionId: revision, durationWeeks: 1,
+    programId: createOperationId(), expectedProgramRevisionId: revision, programSchemaVersion: 2, durationWeeks: 1,
     timezone: 'UTC',
     uncompletedProgramDays: [{
       id: dayId, stable_day_id: createOperationId(), program_revision_id: revision,
@@ -119,16 +119,20 @@ test('stale initial program revision and missing capability never create pending
   assert.equal(flow.sent.length, 0);
 });
 
-test('unknown-date empty non-rest day never creates an operation or sends a dated workout', async () => {
+test('unknown-date schema-v1 empty non-rest sends only an explicit unplaced intent', async () => {
   const input = fixture();
   const flow = harness(input);
   const emptyDay = { ...input.uncompletedProgramDays[0], program_day_exercises: [] };
-  await assert.rejects(
-    flow.command.create('owner-a', { ...input, uncompletedProgramDays: [emptyDay] }),
-    /original date is unknown/,
-  );
-  assert.equal(await flow.store.load('owner-a', input.programId), null);
-  assert.deepEqual(flow.sent, []);
+  const occurrenceId = createOperationId();
+  const outcome = await flow.command.create('owner-a', {
+    ...input, programSchemaVersion: 1, uncompletedProgramDays: [emptyDay],
+    explicitPlacements: [{ occurrenceId, programDayId: emptyDay.id, kind: 'workout',
+      status: 'unplaced', reason: 'Legacy empty prescription; original date unknown.' }],
+  });
+  assert.equal(outcome.status, 'created');
+  const request = JSON.parse(flow.sent[0]) as { days: Record<string, unknown>[] };
+  assert.deepEqual(request.days[0], { occurrenceId, programDayId: emptyDay.id, kind: 'workout',
+    status: 'unplaced', reason: 'Legacy empty prescription; original date unknown.' });
 });
 
 test('server revision conflict is retained for exact retry, not silently replaced', async () => {

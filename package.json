@@ -16,6 +16,7 @@
     "test:availability": "tsx --test tests/availability/*.test.ts",
     "test:ap02-ap03": "npm run test:dependencies && npm run test:workouts && npm run test:programs",
     "test:database-concurrency": "node scripts/verifyDurableConcurrency.mjs",
+    "test:ap04-concurrency": "node scripts/verifyDatedScheduleConcurrency.mjs",
     "seed:manual-qa": "tsx scripts/seedManualQa.ts",
     "seed:exercises": "tsx scripts/seedExercises.ts"
   },
@@ -63,7 +64,7 @@
     "dotenv": "^17.3.1",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~57.0.2",
-    "supabase": "2.117.0",
+    "supabase": "2.118.0",
     "tsx": "^4.21.0",
     "typescript": "~6.0.3"
   },

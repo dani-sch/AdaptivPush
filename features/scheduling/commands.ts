@@ -1,10 +1,10 @@
 /* Convenience constructors for schedule commands (pure, versioned payloads). */
 
-import { asOccurrenceId, asRevisionNumber } from './contracts';
+import { asRevisionNumber } from './contracts';
 import type { BaseScheduleCommand, OccurrenceId, CycleId, MovePlacementCommand, CarryPlacementCommand, SwapPlacementsCommand, SkipPlacementCommand, RecurringCommand, LocalDate } from './contracts';
 
 export function makeBase(opId: string, expectedRevision: number): BaseScheduleCommand {
-  return { schemaVersion: 1 as const, operationId: asOccurrenceId(opId), expectedRevision: asRevisionNumber(expectedRevision) } as BaseScheduleCommand;
+  return { schemaVersion: 1 as const, operationId: opId, expectedRevision: asRevisionNumber(expectedRevision) } as BaseScheduleCommand;
 }
 
 export function makeMove(opId: string, expectedRevision: number, occurrenceId: OccurrenceId, targetDate: LocalDate): MovePlacementCommand {

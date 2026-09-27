@@ -18,7 +18,7 @@ function fixture(): PlacementPreviewInput {
     ...first, id: createOperationId(), stable_day_id: createOperationId(), day_index: 3,
   };
   return {
-    programId: createOperationId(), expectedProgramRevisionId: revision, durationWeeks: 2,
+    programId: createOperationId(), expectedProgramRevisionId: revision, programSchemaVersion: 2, durationWeeks: 2,
     timezone: 'America/New_York', uncompletedProgramDays: [first, second],
     explicitPlacements: [
       { occurrenceId: createOperationId(), programDayId: first.id, localDate: '2026-11-01' },
@@ -76,9 +76,9 @@ test('existing program never derives historical dates and completed ancestors mu
 test('rejects missing, duplicate and invalid dates or identities', () => {
   const input = fixture();
   const [first, second] = input.explicitPlacements;
-  const firstDate = '2026-11-01';
+  if (!('localDate' in first) || !('localDate' in second)) throw new Error('fixture requires dated placements');
   assert.throws(() => buildCreateProgramSchedulePayload({
-    ...input, explicitPlacements: [first, { ...second, localDate: firstDate }],
+    ...input, explicitPlacements: [first, { ...second, localDate: first.localDate }],
   }), /unique/);
   assert.throws(() => buildCreateProgramSchedulePayload({
     ...input, explicitPlacements: [first, { ...second, occurrenceId: first.occurrenceId }],
@@ -91,31 +91,37 @@ test('rejects missing, duplicate and invalid dates or identities', () => {
   }), /timezone/);
 });
 
-test('schema-v1 empty non-rest remains explicitly unplaced, never a dated workout or rest', () => {
+test('schema-v1 empty non-rest remains explicitly unknown and unplaced, never dated or rest', () => {
   const input = fixture();
-  const emptyDay = { ...input.uncompletedProgramDays[0], program_day_exercises: [], program_schema_version: 1 };
+  const emptyDay = { ...input.uncompletedProgramDays[0], program_day_exercises: [] };
   const unplaced = {
-    occurrenceId: input.explicitPlacements[0].occurrenceId, programDayId: emptyDay.id,
-    kind: 'workout' as const, status: 'unplaced' as const,
-    reason: 'Legacy workout has no recorded prescription; original date is unknown.',
+    occurrenceId: input.explicitPlacements[0].occurrenceId,
+    programDayId: emptyDay.id,
+    kind: 'workout' as const,
+    status: 'unplaced' as const,
+    reason: 'Legacy workout has no prescription; original date is unknown.',
   };
   const payload = buildCreateProgramSchedulePayload({
-    ...input, uncompletedProgramDays: [emptyDay, input.uncompletedProgramDays[1]],
+    ...input, programSchemaVersion: 1,
+    uncompletedProgramDays: [emptyDay, input.uncompletedProgramDays[1]],
     explicitPlacements: [unplaced, input.explicitPlacements[1]],
   });
   assert.deepEqual(payload.days[0], unplaced);
-  assert.throws(() => buildCreateProgramSchedulePayload({
-    ...input, uncompletedProgramDays: [emptyDay, input.uncompletedProgramDays[1]],
-    explicitPlacements: input.explicitPlacements,
-  }), /unknown original date/);
-  assert.throws(() => buildCreateProgramSchedulePayload({
-    ...input,
+  const invalidPlacements = [
+    { placement: input.explicitPlacements[0], error: /legacy schema-v1/ },
+    { placement: { occurrenceId: input.explicitPlacements[0].occurrenceId, kind: 'rest' as const,
+      cycleWeek: 1, localDate: '2026-11-01' }, error: /Place every/ },
+  ];
+  for (const { placement, error } of invalidPlacements) assert.throws(() => buildCreateProgramSchedulePayload({
+    ...input, programSchemaVersion: 1,
     uncompletedProgramDays: [emptyDay, input.uncompletedProgramDays[1]],
-    explicitPlacements: [input.explicitPlacements[1], {
-      occurrenceId: input.explicitPlacements[0].occurrenceId, kind: 'rest' as const,
-      cycleWeek: 1, localDate: '2026-11-01',
-    }],
-  }), /every uncompleted/);
+    explicitPlacements: [placement, input.explicitPlacements[1]],
+  }), error);
+  assert.throws(() => buildCreateProgramSchedulePayload({
+    ...input, programSchemaVersion: 2,
+    uncompletedProgramDays: [emptyDay, input.uncompletedProgramDays[1]],
+    explicitPlacements: [unplaced, input.explicitPlacements[1]],
+  }), /legacy schema-v1/);
 });
 
 test('stale program revision is rejected before creating an operation', () => {

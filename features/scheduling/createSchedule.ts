@@ -41,15 +41,23 @@ function parseRequest(requestJson: string, programId: string, operationId: strin
       throw new Error('Saved schedule occurrence is incomplete.');
     }
     asOperationId(day.occurrenceId);
-    const isUnplaced = day.status === 'unplaced';
-    if (!isUnplaced && typeof day.localDate !== 'string') throw new Error('Saved schedule occurrence is incomplete.');
-    if (!isUnplaced) asLocalDate(day.localDate as string);
-    if (ids.has(day.occurrenceId) || (!isUnplaced && dates.has(day.localDate as string))) throw new Error('Saved schedule occurrences collide.');
+    const unplaced = day.status === 'unplaced';
+    if (unplaced) {
+      if (typeof day.programDayId !== 'string' || !day.programDayId || day.kind !== 'workout'
+        || typeof day.reason !== 'string' || day.reason.trim().length < 1 || day.reason.trim().length > 256
+        || day.localDate !== undefined || day.cycleWeek !== undefined) {
+        throw new Error('Saved unplaced legacy workout is incomplete.');
+      }
+    } else if (typeof day.localDate !== 'string') {
+      throw new Error('Saved schedule occurrence is incomplete.');
+    } else {
+      asLocalDate(day.localDate);
+    }
+    if (ids.has(day.occurrenceId) || (!unplaced && dates.has(day.localDate as string))) throw new Error('Saved schedule occurrences collide.');
     ids.add(day.occurrenceId);
-    if (!isUnplaced) dates.add(day.localDate as string);
+    if (!unplaced) dates.add(day.localDate as string);
     if (typeof day.programDayId === 'string' && day.programDayId) {
-      if ((day.kind !== undefined && day.kind !== 'workout') || day.cycleWeek !== undefined
-        || (isUnplaced && (typeof day.reason !== 'string' || !day.reason.trim()))) {
+      if (!unplaced && (day.kind !== undefined || day.cycleWeek !== undefined || day.reason !== undefined)) {
         throw new Error('Saved program-day placement has conflicting kind.');
       }
     } else if (day.kind !== 'rest' || !Number.isSafeInteger(day.cycleWeek) || (day.cycleWeek as number) < 1) {

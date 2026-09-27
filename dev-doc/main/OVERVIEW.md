@@ -4,17 +4,18 @@ AdaptivPush is an Expo Router strength-training planner and workout logger backe
 
 ## Current release boundary
 
-The trusted catalog and durable workout/program foundations are deployed. Completed-workout correction, scoped set/exercise removal, durable exercise/set additions, and composed future program edits are also deployed to the verified hosted project `thfxcvxcsfvrzdysdnkq`.
+The trusted catalog, durable workout/program foundations, and AP-04 dated-schedule database authority are deployed to the verified hosted project `thfxcvxcsfvrzdysdnkq`. Completed-workout correction, scoped set/exercise removal, durable exercise/set additions, and composed future program edits remain deployed.
 
 | Boundary | Current fact |
 |---|---|
-| Hosted capabilities | correction 2, removal 1, structure 1 |
-| Hosted ledger | Nine supported migrations through `20260918160000_workout_structure.sql` |
-| Source publication | PRs #54-#58 merged; `origin/main` is at the consolidated September release boundary |
-| Active client behavior | Resilient auth/session hydration; owner-scoped draft and pending-operation recovery; stable occurrence routing; detailed Add/Swap picker; atomic Finish/Save with receipt verification |
-| Current automated evidence | September 25 rerun: 157 application cases, strict TypeScript, and lint with zero errors and three known warnings |
+| Hosted capabilities | correction 2, removal 1, structure 1, schedule 1 |
+| Hosted ledger | Ten supported migrations through `20260925190000_ap04_dated_schedules.sql` |
+| Source publication | PRs #54-#58 merged; AP-04/AP-05.1 client source remains on `codex/ap04-ap05-schedule-history` and is not released |
+| Published client behavior | Resilient auth/session hydration; owner-scoped draft and pending-operation recovery; stable occurrence routing; detailed Add/Swap picker; atomic Finish/Save with receipt verification |
+| Feature-branch client behavior | Explicit initial placement, dated Today/Plan, schedule commands, scheduled Finish/correction, adherence/reminders, and history coverage reporting |
+| Current automated evidence | September 27 branch rerun: 213 application cases, strict TypeScript, and lint with zero errors and two known warnings |
 | Current acceptance limit | Physical iPhone/Expo presentation, native restart/interruption, keyboard/accessibility, and the user's exact past-program route remain user-led and unverified |
-| Next product slices | AP-04 dated schedules/manual deviations, then AP-05 authoritative history/progression |
+| Next product slices | AP-04 client publication/manual-deviation and device acceptance, then AP-05 authoritative progression/explanations |
 
 Implementation and tested behavior take precedence over older planning language. The September 17 and 18 reports retain the exact release, recovery, migration, and regression evidence; plans now describe the remaining work rather than treating deployed behavior as proposed.
 
@@ -24,9 +25,9 @@ Workout capture and completed editing now preserve raw input, explicit performed
 
 The Add flow reuses the detailed exercise picker, loads the complete catalog, keeps duplicate additions distinct, and requires an explicit scope confirmation. Restoration accepts unfinished measurements without hiding the editor; validation remains at Check/Finish. Auth hydration distinguishes transient connectivity failures from sign-out, and native clients reject loopback backend configuration.
 
-These changes do not implement dated scheduling, a new progression worker, public/community features, health integration, purchases, or broader AP-04/AP-05 policy.
+The published client still does not expose dated scheduling. The hosted schema and feature-branch client now implement the bounded AP-04 schedule contracts, but they do not provide a new progression worker, public/community features, health integration, purchases, or broader AP-05 policy.
 
-The approved AP-04.1-AP-04.3/AP-05.1 release is **in progress**, not deployed. The branch adds bounded schedule-operation recovery, local adherence and dated-reminder planning, a history reader with explicit coverage, and a no-write-on-read progression guard. A schedule migration is pre-release; dated Today, client schedule commands and hosted enablement remain open. See [current state](/dev-doc/main/CURRENT-STATE.md) and the [requirement-to-test matrix](/dev-doc/reports/ADAPTIVPUSH-SCHEDULE-HISTORY-2026-09-25.md).
+The AP-04 database migration is deployed and verified; the AP-04.1-AP-04.3/AP-05.1 client release remains **in progress**. The branch adds bounded schedule-operation recovery, dated Today/Plan and commands, scheduled Finish/correction, local adherence and reminders, a history reader with explicit coverage, and a no-write-on-read progression guard. It is not merged or distributed, and physical-device acceptance remains open. See [current state](/dev-doc/main/CURRENT-STATE.md) and the [production evidence and requirement-to-test matrix](/dev-doc/reports/ADAPTIVPUSH-SCHEDULE-HISTORY-2026-09-25.md).
 
 ## Read next
 
@@ -40,6 +41,7 @@ The approved AP-04.1-AP-04.3/AP-05.1 release is **in progress**, not deployed. T
 
 ## Evidence
 
+- [September 27 AP-04 production migration](/dev-doc/reports/ADAPTIVPUSH-SCHEDULE-HISTORY-2026-09-25.md)
 - [September 18 workout editing and detailed Add](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-EDITING-2026-09-18.md)
 - [September 25 two-week product status and next path](/dev-doc/reports/ADAPTIVPUSH-TWO-WEEK-PRODUCT-STATUS-2026-09-25.md)
 - [September 17 iPhone/session recovery](/dev-doc/reports/ADAPTIVPUSH-IPHONE-RECOVERY-2026-09-17.md)

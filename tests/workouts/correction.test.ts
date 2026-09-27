@@ -100,6 +100,15 @@ test('empty set list is a valid explicit correction to an abandoned workout', ()
   assert.equal(validateCompletedWorkoutCorrection(empty).ok, true);
 });
 
+test('scheduled corrections require a positive schedule revision', () => {
+  assert.equal(validateCompletedWorkoutCorrection({ ...request, expectedScheduleRevision: 3 }).ok, true);
+  for (const expectedScheduleRevision of [0, -1, 1.5, NaN, Infinity]) {
+    const result = validateCompletedWorkoutCorrection({ ...request, expectedScheduleRevision });
+    assert.equal(result.ok, false);
+    assert.match(result.errors.join(' '), /schedule revision/i);
+  }
+});
+
 test('assistance survives unit changes and bodyweight clears external measurements', () => {
   const set: EditableCorrectionSet = { ...request.sets[0], prescribed: true, outcome: 'performed', loadText: '25', repsText: '8', rpeText: '8' };
   const assisted = { ...set, ...correctionLoadSelection(set, 'assistance') };
