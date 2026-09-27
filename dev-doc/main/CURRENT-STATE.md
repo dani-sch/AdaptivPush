@@ -2,13 +2,13 @@
 
 ## Source and hosted runtime
 
-`origin/main` contains the complete September 11-18 release sequence through merge commit `ec848e6`. PRs #54-#58 are merged; PR #58 brought the September 17 scoped-removal/session-recovery work, the September 18 workout-structure release, and the later resume/detailed-Add fixes into the default branch. Its remote feature branch has been deleted. There were no later product commits through the September 25 refresh, and there is no active release PR for this boundary.
+`origin/main` contains the complete September 11-18 client release sequence through merge commit `ec848e6`. PRs #54-#58 are merged; PR #58 brought the September 17 scoped-removal/session-recovery work, the September 18 workout-structure release, and the later resume/detailed-Add fixes into the default branch. AP-04/AP-05.1 client source remains on `codex/ap04-ap05-schedule-history`; it is not merged, distributed through Expo, or physically accepted.
 
-The linked project `thfxcvxcsfvrzdysdnkq` was resumed from an automatic pause and read successfully at `2026-09-25T21:36:19Z`. Production remains on the exact nine-migration ledger through `20260918160000`, with correction/removal/structure capabilities `2/1/1`, 23/23 public relations under RLS, 64 policies, and no schedule relations. A later linked operation regressed to PostgreSQL `42501` because the CLI login actor lacks the admin option required to alter its temporary login role. No role or ledger repair was attempted, and AP-04 was not deployed.
+The linked project `thfxcvxcsfvrzdysdnkq` is healthy and, as of `2026-09-27T16:52:52.779Z`, has the exact ten-migration ledger through `20260925190000`. Hosted correction/removal/structure/schedule capabilities are `2/1/1/1`; 26/26 public tables have RLS and 67 public policies exist. `program_schedules`, `scheduled_days`, and `schedule_deviations` are present and empty. The AP-04 migration used Supabase CLI 2.118.0 with password-based Session-pooler authentication, avoiding the blocked temporary-role path. No managed-role or migration-ledger repair occurred.
 
-AP-04.1-AP-04.3 and AP-05.1 remain **in progress** on `codex/ap04-ap05-schedule-history`. Initial placement, explicit legacy-empty unplaced handling, accepted dated Today/Plan reads, scheduled start/Finish/correction contracts, exact recovery, adherence, history, and reminder foundations are implemented locally. A fresh encrypted backup and restored-production plus fresh-database rehearsals passed with zero differences across 57 pre-existing relations; true separate-session schedule/revision/Finish/correction replay tests pass. The pre-release migration is still not deployed because the final linked apply/postflight path is blocked by the CLI temporary-role `42501`. The 213-case application suite and strict TypeScript pass; lint has zero errors and two pre-existing warnings. See the [AP-04 gate evidence](/dev-doc/reports/ADAPTIVPUSH-SCHEDULE-HISTORY-2026-09-25.md).
+AP-04.1-AP-04.3 and AP-05.1 client work remains **in progress** on `codex/ap04-ap05-schedule-history`. Initial placement, explicit legacy-empty unplaced handling, accepted dated Today/Plan reads, scheduled start/Finish/correction contracts, exact recovery, adherence, history, and reminder foundations are implemented and locally verified. The fresh September 27 encrypted backup restored with exact equality across 59 live relations; the exact migration/fixture rehearsal preserved all originals and separate-session schedule/revision/Finish/correction replay passed. Production postflight matched the rehearsed non-ledger target with zero differences. The 213-case application suite and strict TypeScript pass; lint has zero errors and two pre-existing warnings. See the [AP-04 production evidence](/dev-doc/reports/ADAPTIVPUSH-SCHEDULE-HISTORY-2026-09-25.md).
 
-The latest deployment preserved all 58 preexisting non-ledger relations and all 23 public relations, passed schema/security comparison, and followed a fresh encrypted backup plus isolated PostgreSQL 17 restore matching 59/59 relations. Exact hashes, custody, SQL coverage, and recovery limits are recorded in the [September 18 report](/dev-doc/reports/ADAPTIVPUSH-WORKOUT-EDITING-2026-09-18.md).
+The AP-04 deployment preserved all 58 preexisting non-ledger relation fingerprints and the existing 23 public-table data, then added three empty RLS-protected schedule tables. Exact hashes, custody, restore/rehearsal coverage, password-based deployment path, and recovery limits are recorded in the [September 27 AP-04 evidence](/dev-doc/reports/ADAPTIVPUSH-SCHEDULE-HISTORY-2026-09-25.md).
 
 ## Implemented behavior
 
@@ -23,7 +23,7 @@ The latest deployment preserved all 58 preexisting non-ledger relations and all 
 
 ## Verification posture
 
-The September 25 rerun on current `main` passes 157 application cases: 106 workout, 20 program, 20 availability, 9 catalog, and 2 dependency. `npx tsc --noEmit --strict` passes. `npm run lint` has zero errors and three preexisting unused-variable warnings. The mandated `ruff check scripts/ tests/ src/` remains inapplicable to this documentation-only refresh: there are no Python files under the applicable `scripts/` or `tests/` paths and the repository has no `src/` directory.
+The September 27 feature-branch rerun passes 213 application cases: 110 workout, 20 program, 21 availability, 9 catalog, 2 dependency, and 51 scheduling/consistency/history cases. `npx tsc --noEmit --strict` passes. `npm run lint` has zero errors and two preexisting unused-variable warnings. The last published `origin/main` client retains its earlier 157-case evidence; branch verification is not client publication.
 
 The latest dated database evidence includes 14 structural SQL suite executions across fresh/restored targets plus concurrency, role, replay, stale-revision, schema, and preservation checks. Those checks were not repeated by documentation cleanup and remain owned by the release report.
 
@@ -33,7 +33,7 @@ The latest dated database evidence includes 14 structural SQL suite executions a
 - Keyboard layout, card presentation, native modal timing, VoiceOver, dynamic type, background/foreground, disconnect/reconnect, and native restart/interruption remain unverified on the physical device.
 - The installed phone client/build, the cause of the first native missing-module failure, and the exact route meant by editing a past program remain unconfirmed.
 - Thirty-two preexisting non-rest days have no exercises, including five in active programs. They were preserved; complete persisted workouts can use durable identities, while empty legacy days remain unstartable.
-- AP-04 dated scheduling is implemented and rehearsed locally but remains production-pending on the linked temporary-role blocker. Manual deviation UI breadth, physical-device acceptance, and AP-05 authoritative mixed-history progression remain open.
+- AP-04 database authority is deployed, but the client is not merged or distributed. Manual deviation UI breadth, physical-device acceptance, native reminder delivery, and AP-05 authoritative mixed-history progression remain open.
 
 ## Review and continuation
 

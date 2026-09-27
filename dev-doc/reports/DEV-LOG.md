@@ -847,3 +847,13 @@ Base 4c3c447; feature codex/workout-removal-and-shared-controls; implementation 
 Publication: [draft PR #58](https://github.com/dani-sch/AdaptivPush/pull/58); documentation commit c032a98 integrated at ebfa63e with a matching feature tree. The 35-route web export passed. Hosted authorization was requested for the exact hash in the removal report; no deployment was performed.
 
 Final review added fcda8bf for an empty card after individual last-set removal. Integrator c2fc22e passes strict TypeScript, all 107 cases and lint; the database hash is unchanged.
+
+---
+
+## 2026-09-27 — AP-04 production schedule migration
+
+The exact additive `20260925190000_ap04_dated_schedules.sql` migration was deployed once to `thfxcvxcsfvrzdysdnkq` through Supabase CLI 2.118.0 using password-based Session-pooler authentication. No temporary-role alteration, role repair, manual ledger write, reset, or Dashboard SQL execution was used. The remote ledger now has ten entries; hosted capabilities are correction/removal/structure/schedule `2/1/1/1`.
+
+Fresh encrypted recovery at `C:/Users/dani2/AdaptivPush-secure-backups/Dated-Schedules/20260927T164041Z` restored exactly across 59 live relations in a network-isolated PostgreSQL 17.6 target. Exact migration/fixture rehearsal preserved every original relation fingerprint and produced three empty schedule tables, 26/26 public tables under RLS, and 67 policies. Production postflight matched the rehearsed non-ledger target with zero differences; authenticated owner reads passed and anonymous table/function access was denied.
+
+The 213-case application suite, strict TypeScript, lint with zero errors/two pre-existing warnings, and separate-session schedule/revision/Finish/correction replay proof pass. Commit `e43720e` pins CLI 2.118.0. Commit `be74802` corrects isolated concurrency-fixture cleanup ordering after the proof exposed a parent/child deletion error; the rerun removed all synthetic rows. The database migration is complete. AP-04/AP-05.1 client source remains unmerged and undistributed on `codex/ap04-ap05-schedule-history`; physical-device and manual-deviation/reminder acceptance remain open. [Detailed evidence](/dev-doc/reports/ADAPTIVPUSH-SCHEDULE-HISTORY-2026-09-25.md).
