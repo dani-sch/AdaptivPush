@@ -26,6 +26,14 @@ The stage-3 implementation must establish durable owner-scoped, revision-safe au
 
 `REQUIRES INSPECTION`: the exact suggested-next ranking for skipped, unresolved, rest, paused, and manually reordered days; whether existing program revision authority can persist sequence state or an additive durable command/table is necessary; the first-use rest-timer preference shape; and the notification settings, active-draft recovery, and device-permission surfaces to change.
 
+### Contract inspection gate
+
+Source inspection on the `3c560e5` branch found no durable sequence mutation command. Existing immutable `program_revisions` and their revision/operation receipts cover installation and prescription edits, not reorder, skip, rest replacement, unresolved resolution, or pause/resume. `features/programs/revisionStore.ts` is an owner-scoped local pending-operation store, not cross-device authority. Reusing it, program metadata, or the empty dated AP-04 tables would fail the required revision, replay, and owner-isolation contract. **Sequence implementation is blocked** until a separately reviewed additive durable sequence command and owner-scoped state/receipt contract (or an equivalently reviewed immutable revision extension) is authorized. This decision does not authorize a migration, deployment, or schedule-table write.
+
+Proposed selector rule for that review: when paused, suggest no workout; otherwise take the first unresolved workout day in explicitly persisted order, excluding explicit skipped and rest entries and days fulfilled by an actual finalized program session. An alternate selection targets only that selected day and does not change the suggestion or persisted order. Rest remains visible content, not an implicit skip; never fall back to a different workout for a missing/invalid target. `REQUIRES INSPECTION`: whether a finalized partial session resolves its selected day, and how older sessions lacking stable day linkage are reconciled. No selector should ship before these cases and replay/correction behavior are specified.
+
+The current checkout is based on `origin/main` merge `5c7c4fb` (PR #59), which already contains dated client code despite earlier documentation describing that source as unmerged. `app/(tabs)/plan.tsx` still submits schedule creation/revision, Home still reads accepted placements and reconciles dated reminders, and workout entry/Finish/correction still accept optional schedule linkage. Undated Finish/correction remain supported by their existing optional payload branches. Until reviewed replacement and a safe containment path are available, do not distribute this dated client or claim the two-alert policy is implemented.
+
 ## Execution and evidence
 
 1. Disable dated client writers and date-authoritative Home, Plan, Finish, and reminder behavior while retaining historical actual timestamps.
