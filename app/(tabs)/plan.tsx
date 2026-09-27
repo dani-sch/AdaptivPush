@@ -15,6 +15,8 @@ import {
 import { createScheduleCommand } from '@/features/scheduling/createSchedule';
 import { scheduleOperationStore } from '@/features/scheduling/operationStore';
 import { ProgramSchedulePlacement } from '@/components/ProgramSchedulePlacement';
+import { ProgramScheduleDeviationControls } from '@/components/ProgramScheduleDeviationControls';
+import { createScheduleRevisionCommand, isScheduleRevisionRequest } from '@/features/scheduling/reviseSchedule';
 import { supabase } from '@/utils/supabase';
 import type { ProgramWorkout } from '@/types/program';
 import { WorkoutTemplateModal } from '@/components/WorkoutTemplateModal';
@@ -26,6 +28,7 @@ import { createCompletedNavigation } from '@/features/workouts/effectiveOccurren
 import { reportSupabaseFailure, supabaseSaveFailureMessage } from '@/utils/supabaseResilience';
 
 const scheduleCommand = createScheduleCommand(createScheduleRepository(supabase), scheduleOperationStore);
+const scheduleRevisionCommand = createScheduleRevisionCommand(createScheduleRepository(supabase), scheduleOperationStore);
 
 function placementLabel(workout: ProgramWorkout, days: ScheduledDay[]): string {
     const day = days.find((item) => item.stableDayId === workout.stableDayId && item.programDayId === workout.id);
@@ -209,8 +212,15 @@ export default function PlanScreen() {
         if (!ownerId || !program || retryingSchedule || !scheduleWriterEnabled) return;
         setRetryingSchedule(true);
         try {
-            const outcome = await scheduleCommand.retry(ownerId, program.id);
-            if (outcome.status === 'created' || outcome.status === 'replayed') {
+            const pending = await scheduleOperationStore.load(ownerId, program.id);
+            if (!pending) {
+                setScheduleIssue('There is no saved schedule request to reconcile.');
+                return;
+            }
+            const outcome = isScheduleRevisionRequest(pending.requestJson)
+                ? await scheduleRevisionCommand.retry(ownerId, program.id)
+                : await scheduleCommand.retry(ownerId, program.id);
+            if (outcome.status === 'created' || outcome.status === 'revised' || outcome.status === 'replayed') {
                 setScheduleIssue(null);
                 await schedule.refresh();
                 await refresh();
@@ -416,7 +426,7 @@ export default function PlanScreen() {
                 {schedule.pending ? (
                     <View style={[styles.section, { backgroundColor: theme.mutedBg, borderRadius: 14, padding: 14 }]}>
                         <Text style={{ color: theme.text }}>
-                            A dated placement request is saved for this account. Its exact dates and operation ID must be reconciled before another placement.
+                            A dated schedule request is saved for this account. Its exact request and operation ID must be reconciled before another schedule change.
                         </Text>
                         {scheduleIssue ? <Text style={{ color: theme.errorLight }}>{scheduleIssue}</Text> : null}
                         {!scheduleWriterEnabled ? <Text style={{ color: theme.text }}>
@@ -426,7 +436,7 @@ export default function PlanScreen() {
                             disabled={retryingSchedule || !scheduleWriterEnabled} onPress={() => void retrySchedule()}
                             style={{ minHeight: 44, justifyContent: 'center' }}>
                             <Text style={{ color: scheduleWriterEnabled ? theme.primaryLight : theme.placeholder }}>
-                                {retryingSchedule ? 'Reconciling…' : 'Retry the exact saved placement'}
+                                {retryingSchedule ? 'Reconciling…' : 'Retry the exact saved schedule request'}
                             </Text>
                         </Pressable>
                     </View>
@@ -437,6 +447,16 @@ export default function PlanScreen() {
                         programId={program.id}
                         revisionId={program.currentRevisionId}
                         scheduleConfirmedAbsent={schedule.read?.state === 'unplaced'}
+                        onAccepted={() => { void schedule.refresh(); void refresh(); }}
+                        onRecoveryNeeded={() => { void schedule.refresh(); }}
+                    />
+                ) : schedule.read?.state === 'ready' && ownerId && program.currentRevisionId ? (
+                    <ProgramScheduleDeviationControls
+                        key={`${ownerId}/${program.id}/${schedule.read.revision}`}
+                        ownerId={ownerId}
+                        programId={program.id}
+                        programRevisionId={program.currentRevisionId}
+                        schedule={schedule.read}
                         onAccepted={() => { void schedule.refresh(); void refresh(); }}
                         onRecoveryNeeded={() => { void schedule.refresh(); }}
                     />

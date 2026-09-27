@@ -4,6 +4,9 @@ import { asLocalDate, validateTimeZone } from '../kernel/localDate';
 import { classifySupabaseError, runSupabaseOperation } from '@/utils/supabaseResilience';
 import type { NotificationPreferences } from '@/utils/profilePreferences';
 import type { ReminderPlan } from '@/features/consistency/reminders';
+import type {
+  ScheduleRevisionPayload, ScheduleRevisionReceipt,
+} from './reviseSchedule';
 import {
   hasTrainablePrescription, UnsupportedEmptyWorkoutError,
   type CreateProgramSchedulePayload, type ProgramDayIdentity,
@@ -270,6 +273,13 @@ export function createScheduleRepository(client: SupabaseClient) {
       if (capability.error) throw capability.error;
       if (capability.data !== 1) throw new Error('This client does not support the server schedule version.');
     },
+    async assertRevisionAvailable(ownerId: string): Promise<void> {
+      if (!scheduleWriterEnabled) throw new Error('Dated schedule saving is not enabled in this build.');
+      await requireOwner(client, ownerId);
+      const capability = await client.rpc('schedule_capability_v1');
+      if (capability.error) throw capability.error;
+      if (capability.data !== 1) throw new Error('This client does not support the server schedule version.');
+    },
     async currentRevision(ownerId: string, programId: string): Promise<string> {
       await requireOwner(client, ownerId);
       return (await currentProgram(client, ownerId, programId)).current_revision_id;
@@ -284,6 +294,17 @@ export function createScheduleRepository(client: SupabaseClient) {
       const { data, error } = await runSupabaseOperation(
         (signal) => client.rpc('create_program_schedule_v1', { p_payload: payload }).abortSignal(signal),
         { kind: 'write', operation: 'schedule.create' },
+      );
+      if (error) throw error;
+      return data;
+    },
+    async sendRevision(ownerId: string, requestJson: string): Promise<unknown> {
+      if (!scheduleWriterEnabled) throw new Error('Dated schedule saving is not enabled in this build.');
+      await requireOwner(client, ownerId);
+      const payload: unknown = JSON.parse(requestJson);
+      const { data, error } = await runSupabaseOperation(
+        (signal) => client.rpc('revise_program_schedule_v1', { p_payload: payload }).abortSignal(signal),
+        { kind: 'write', operation: 'schedule.revise' },
       );
       if (error) throw error;
       return data;
@@ -328,6 +349,31 @@ export function createScheduleRepository(client: SupabaseClient) {
           && ('programDayId' in day
             ? row.original_program_day_id === day.programDayId
             : row.original_program_day_id === null && row.original_kind === 'rest');
+      });
+    },
+    async verifyRevision(ownerId: string, payload: ScheduleRevisionPayload,
+      receipt: ScheduleRevisionReceipt): Promise<boolean> {
+      await requireOwner(client, ownerId);
+      const { data: deviation, error: deviationError } = await client.from('schedule_deviations')
+        .select('operation_id,program_id,schedule_id,base_revision,resulting_revision')
+        .eq('user_id', ownerId).eq('operation_id', payload.operationId)
+        .maybeSingle<{
+          operation_id: string; program_id: string; schedule_id: string;
+          base_revision: number; resulting_revision: number;
+        }>();
+      if (deviationError) throw deviationError;
+      if (!deviation || deviation.operation_id !== payload.operationId
+        || deviation.program_id !== payload.programId || deviation.schedule_id !== receipt.scheduleId
+        || deviation.base_revision !== payload.expectedRevision
+        || deviation.resulting_revision !== receipt.revision) return false;
+      const read = await this.read(ownerId, payload.programId);
+      if (read.state !== 'ready' || read.revision !== receipt.revision) return false;
+      return payload.changes.every((change) => {
+        const day = read.days.find((candidate) => candidate.id === change.occurrenceId);
+        if (!day) return false;
+        return day.status === change.status
+          && (change.localDate === undefined || day.localDate === change.localDate)
+          && (change.kind === undefined || day.kind === change.kind);
       });
     },
     async read(ownerId: string, programId: string): Promise<ScheduleRead> {

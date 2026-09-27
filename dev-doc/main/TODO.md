@@ -13,7 +13,7 @@
 
 - [HOSTED COMPLETE, CLIENT RELEASE OPEN 2026-09-27] The exact AP-04 schedule migration is deployed with a fresh encrypted 59-relation restore, exact rehearsal, single-file dry-run/apply, owner/anonymous checks, and zero non-ledger postflight differences. Initial placement, legacy-empty unplaced identity, dated Today/Plan, scheduled Finish/correction, history, recovery, adherence, and reminder foundations are implemented on the feature branch but are not merged, distributed, or device-accepted. Manual deviation UI breadth, physical-device acceptance, and AP-05.2/05.3 remain open. See [current state](/dev-doc/main/CURRENT-STATE.md) and [production evidence](/dev-doc/reports/ADAPTIVPUSH-SCHEDULE-HISTORY-2026-09-25.md).
 
-- [OPEN] Complete and accept the remaining move/carry/skip/pause UI breadth and native notification rescheduling against the deployed revisioned schedule commands.
+- [IN PROGRESS] The local deviation foundation previews, confirms, cancels, and exactly replays one planned workout move, skip, or rest replacement against the deployed revisioned command. Complete carry, swap, pause/resume, availability, recurrence, broader rest/work conversion, native notification rescheduling, source integration, and device acceptance.
 - [AUTOMATED VERIFIED] Durable AP-02/AP-03 occurrence identity and released correction/removal/structure behavior remain preserved through scheduled Finish/correction.
 - [OPEN] Publish the reviewed client branch through the normal source/integration lane, then obtain physical-device and accessibility evidence without creating synthetic data in the user's account.
 
