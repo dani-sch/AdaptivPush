@@ -366,13 +366,9 @@ export default function ProfileScreen() {
           ),
         ]);
         if (history.aborted || !isCurrent(user.id)) return;
-        // If history is incomplete/partial, do not compute totals/streaks from partial data.
         if (!history.complete) {
-          reportSupabaseFailure('profile.history_partial', history.errors[0]?.error ?? new Error('Workout history incomplete.'));
-          // Preserve unknowns for workouts and weekStreak; PRs may still be available.
           const prs = prResult.error ? null : prResult.count;
           setProgress({ workouts: null, weekStreak: null, prs });
-          // Surface a truthful message for the user about partial data.
           setError('Some workout history could not be loaded; progress totals are unavailable.');
           return;
         }
