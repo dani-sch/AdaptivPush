@@ -1,5 +1,9 @@
 # AdaptivPush modular execution register
 
+## Flexible sequence execution gate (2026-09-27)
+
+Backend authority is **HOSTED VERIFIED**, not client released: additive version `20260927190000` passed fresh encrypted recovery, isolated exact rehearsal, hosted ledger/schema/security/data preservation, rollback-only owner/anonymous/replay/stale/Finish/ad-hoc probes, and separate-session concurrency. The three dormant AP-04 tables remain empty; only authenticated EXECUTE of two old writer RPCs was revoked. [Backend evidence](/dev-doc/reports/ADAPTIVPUSH-FLEXIBLE-SEQUENCE-AUTHORITY-2026-09-27.md) owns exact facts. The older ten-version and dated-client descriptions below predate this gate. The next bounded packet is replacing dated client authority, running strict TypeScript/lint/full application matrix, then user-led physical-device acceptance; do not distribute before those gates.
+
 ## Current hosted AP-04 database boundary; flexible client replacement and user-led Expo acceptance remain
 
 `origin/main` includes scoped removal/session recovery, durable workout structure, and the later resume/detailed-Add fixes through merged PR #58 (`ec848e6`). AP-04/AP-05.1 client source remains on `codex/ap04-ap05-schedule-history`. Migration `20260925190000` is deployed under explicit authorization after a fresh encrypted 59-relation restore and exact rehearsal. The hosted ledger has ten entries; capabilities are schedule 1, structure 1, removal 1, and correction 2. Hosted owner reads, anonymous denial, schema/security, concurrency, and existing-data preservation passed. Client merge/distribution and physical acceptance remain open.

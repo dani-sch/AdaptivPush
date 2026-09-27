@@ -1,5 +1,11 @@
 # AdaptivPush current state
 
+## Flexible sequence backend gate (2026-09-27)
+
+The additive owner-scoped sequence authority `20260927190000` is deployed and verified: hosted ledger 11 entries, exact migration SHA-256 `c0d1bc62a606c55c49d15363afb7f21584b367200340567270c911685011ed32`, fresh encrypted recovery, isolated restore and exact rehearsal, hosted schema/security and non-ledger data parity, rolled-back authenticated/anonymous/replay/lineage/Finish/correction/ad-hoc checks, and separate-session concurrency. All three AP-04 schedule tables remain empty and untouched. Authenticated access to the two dated schedule-creation/revision RPCs was revoked by explicit user approval, leaving their bodies in place. [Backend authority evidence](/dev-doc/reports/ADAPTIVPUSH-FLEXIBLE-SEQUENCE-AUTHORITY-2026-09-27.md) owns the details.
+
+This clears the **backend** prerequisite, not client acceptance. The merged dated client remains superseded and must not be distributed until its sequence-based replacement and full application gates pass. Native alert and workout acceptance remain user-led. The older ten-migration and not-implemented descriptions below are historical snapshots superseded by this section.
+
 ## Source and hosted runtime
 
 `origin/main` includes PR #59 at merge commit `5c7c4fb`, which brought the dated AP-04/AP-05.1 client source into the default branch. Earlier descriptions of this client as unmerged are stale. Source merge does not establish Expo distribution or physical-device acceptance; the dated client is superseded and must not be distributed as the approved flexible sequence.

@@ -1,5 +1,9 @@
 # Flexible program-sequence decision - 2026-09-27
 
+## Implementation checkpoint
+
+The approved additive backend migration `20260927190000` has since been deployed and verified against its isolated rehearsal, including owner/anonymous, exact retry, concurrency, and unchanged empty AP-04 schedule tables. By separate explicit user approval, authenticated calls to the legacy AP-04 create/revise RPCs are grant-disabled; their function bodies and tables remain intact. [Exact authority evidence](/dev-doc/reports/ADAPTIVPUSH-FLEXIBLE-SEQUENCE-AUTHORITY-2026-09-27.md) supersedes the pre-implementation wording below. The client and device acceptance remain separate, open gates.
+
 ## Authority and scope
 
 This decision supersedes the active AP-04 client requirement for calendar-authoritative workout placement. It refines D-02 only where D-02 requires dated scheduling, accepted schedule revisions, weekly schedule adherence, or schedule-derived notifications. All completed workout timestamps and immutable prescription evidence remain authoritative history.

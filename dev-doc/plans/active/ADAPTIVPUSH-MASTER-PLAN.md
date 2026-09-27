@@ -1,5 +1,9 @@
 # AdaptivPush master implementation plan
 
+## Flexible sequence implementation boundary (2026-09-27)
+
+The additive owner-scoped program-sequence backend authority `20260927190000` is deployed and passed fresh encrypted recovery, isolated exact-packet rehearsal, hosted replay/owner/concurrency and preservation gates. The approved relative-sequence behavior below is **not yet a client release**; source-level replacement, automated app gates, and user-led native alert/workout acceptance remain separate. See [backend evidence](/dev-doc/reports/ADAPTIVPUSH-FLEXIBLE-SEQUENCE-AUTHORITY-2026-09-27.md). Earlier future-tense schema and dated-placement descriptions below are historical planning, not current backend status.
+
 ## Navigation and ownership
 
 This is the canonical implementation contract for AdaptivPush. It translates [approved decisions D-01–D-14](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECORD-2026-09-08.md) into bounded product and engineering behavior. The approved record owns product decisions and supersedes conflicting historical proposals. Consolidation review completed on September 9; bounded implementation is active under the current register. This plan alone does not authorize a hosted mutation or release.

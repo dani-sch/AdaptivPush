@@ -1,5 +1,11 @@
 # AdaptivPush active task board
 
+## [BACKEND VERIFIED; CLIENT OPEN] Flexible program sequence
+
+- [HOSTED VERIFIED] Additive migration `20260927190000` is deployed after fresh encrypted recovery and isolated exact-packet rehearsal. Hosted owner/anonymous, replay/conflict, lineage, Finish/correction/ad-hoc and concurrency gates passed with no persistent synthetic fixtures. Ledger has 11 entries; AP-04 schedule tables remain empty and their dated writer RPCs are grant-disabled, not rewritten. See [authority evidence](/dev-doc/reports/ADAPTIVPUSH-FLEXIBLE-SEQUENCE-AUTHORITY-2026-09-27.md).
+- [OPEN] Replace superseded dated client readers/writers, Finish and reminders against this authority; verify pending retries, partial/alternate/ad-hoc, timer, and notification policy. Do not distribute the dated merged source.
+- [USER ACCEPTANCE] Physical-device workout, restart, permission, inactivity-nudge, and rest-timer checks are outstanding; automated tests cannot establish native alert acceptance.
+
 ## [USER ACCEPTANCE] Current Expo/iPhone release
 
 - [AUTOMATED VERIFIED] The September 27 AP-04/AP-05.1 dated client passed 213 application cases, strict TypeScript, and lint with zero errors and two known warnings. PR #59 merged that superseded source into `origin/main`; source merge is not approved device distribution or flexible-sequence acceptance.

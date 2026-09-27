@@ -1,5 +1,9 @@
 # AdaptivPush code-backed implementation status
 
+## Flexible sequence backend checkpoint
+
+`20260927190000_flexible_program_sequence.sql` is deployed and verified, adding owner-scoped sequence state, days, receipts, explicit relative ordering/pause, and atomic selected-day and ad-hoc finalization. Hosted schema/security and non-ledger data match exact isolated rehearsal; rollback-only role, replay, concurrent mutation, and preservation checks pass. All AP-04 schedule tables remain empty, and the approved change revokes authenticated execute on the two dated schedule writers without changing their bodies. [Backend evidence](/dev-doc/reports/ADAPTIVPUSH-FLEXIBLE-SEQUENCE-AUTHORITY-2026-09-27.md) owns exact gates. The pre-sequence client and ten-ledger claims below are earlier snapshots, not current backend status; replacement client and physical-device acceptance are not implied.
+
 ## Current September 27 implementation and release boundary
 
 The published client restores unfinished measurements without hiding the editor, settles pending-operation recovery on entry/refresh/Retry, and reuses the detailed exercise picker for Add with complete catalog pagination and explicit scope confirmation. Stable occurrence identities, frozen prescriptions, exact pending requests, and composed future edits remain intact. PRs #54-#58 are merged into `main`. The AP-04/AP-05.1 feature branch is not merged or distributed; its September 27 rerun passes 213 application cases (110 workout, 20 program, 21 availability, 9 catalog, 2 dependency, and 51 scheduling/consistency/history), strict TypeScript, and lint with zero errors and two known warnings.
