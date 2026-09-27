@@ -274,7 +274,7 @@ Insights explain source coverage and uncertainty separately from evidence streng
 <a id="mp-12-schedules"></a>
 ## 12. Flexible program sequence, rest, explicit resolution, and completion context
 
-Program authority is the ordered relative prescription/rest sequence plus explicit sequence state and actual completed work. Planned dates are not required. The deployed AP-04 dated tables/RPCs remain empty, dormant, and reversible compatibility infrastructure; they are neither a client writer target nor sequence authority. The exact suggested-next ranking when skipped, unresolved, rest, paused, or manually reordered work coexist is `REQUIRES INSPECTION`.
+Program authority is the ordered relative prescription/rest sequence plus explicit sequence state and actual completed work. Planned dates are not required. The deployed AP-04 dated tables/RPCs remain empty, dormant, and reversible compatibility infrastructure; they are neither a client writer target nor sequence authority. A separately additive sequence authority has user approval for development and gated deployment; it is not yet implemented. When paused there is no workout suggestion; otherwise suggest the first pending workout day in explicit order, excluding skipped/rest entries and any selected day with a finalized linked program workout (complete or partial). Manual alternate selection never changes order or another day's state. Older sessions without reliable day linkage do not imply fulfillment.
 
 | Case | Fixed information | Explicit change and reporting |
 |---|---|---|
@@ -282,12 +282,13 @@ Program authority is the ordered relative prescription/rest sequence plus explic
 | Select other program day | Actual session and selected relative day identity | Fulfill only the user-selected day; keep all other unresolved work visible |
 | Ad-hoc workout | Actual session and timestamp | Record history only; never fulfill, advance, reorder, or skip program work |
 | One or many unresolved days | Completed work and prior explicit states | Offer reorder, skip, replace with rest, or leave unresolved; no debt, compression, or catch-up |
+| Finalize incomplete selected workout | Actual logged sets and selected relative day identity | Ask "Submit workout even if incomplete?" Yes saves a partial and resolves the selected day; No returns to editing. Logged exercises alone may progress; unlogged exercises and weights stay unchanged. No further resolution required |
 | Reorder / replace with rest | Program-day identity and revision history | Persist explicit revision-safe action and reason; no rewrite of actual completed work |
 | Pause / long pause | Actual work and the user-selected pause state | Pause until manual resume. At 14+ days after the last finalized program workout, offer resume unchanged, review/adjust, or new program |
 | Timezone/DST/travel | Actual timestamp and local timer/notification context | Preserve history display and local timer behavior; never change program-day identity or active-program authority |
 | Deload/recovery conflict | Accepted prescription and completed actual work | Preserve recovery intent or require an explicit user amendment; no automatic load/volume reduction |
 
-After Finish, offer Continue, Adjust upcoming program, and Resolve skipped/unresolved work. No finish path automatically changes program state. Availability/travel stay optional generation preferences, not active-program authority. Any future coaching or policy proposal may advise but must use an explicit accepted sequence/program command; automatic recovery is out of scope.
+After Finish, offer Continue and Adjust upcoming program; pending unstarted days remain available for optional explicit control without a mandatory resolution prompt. Authoritatively finalized linked work resolves only its selected day; it does not automatically reorder, skip, pause, or adjust other program state. Availability/travel stay optional generation preferences, not active-program authority. Any future coaching or policy proposal may advise but must use an explicit accepted sequence/program command; automatic recovery is out of scope.
 
 Completion context reports completed, partial, skipped, unresolved, rest, and paused work. It is not a weekly schedule score, streak target, or training-debt signal. Corrections and offline reconciliation recompute transparent context from actual sessions and explicit state only.
 
