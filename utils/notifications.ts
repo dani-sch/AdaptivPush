@@ -5,6 +5,11 @@ import { parseNotificationPreferences } from './profilePreferences';
 import { supabase } from './supabase';
 
 import type { NotificationPreferences } from './profilePreferences';
+import {
+  planDatedReminders,
+  SCHEDULE_REMINDER_PREFIX,
+  type ReminderPlan,
+} from '@/features/consistency/reminders';
 
 const WORKOUT_REMINDER_ID = 'workout-reminder-daily';
 
@@ -44,38 +49,89 @@ export async function getDevicePushToken(): Promise<string | null> {
   }
 }
 
-export async function scheduleWorkoutReminder(): Promise<void> {
-  try {
-    await Notifications.cancelScheduledNotificationAsync(WORKOUT_REMINDER_ID).catch(() => {});
-    await Notifications.scheduleNotificationAsync({
-      identifier: WORKOUT_REMINDER_ID,
-      content: {
-        title: 'Time to train',
-        body: "Your workout is scheduled for today. Let's go!",
-        sound: true,
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour: 8,
-        minute: 0,
-      },
-    });
-  } catch {
-    // Scheduling not supported (simulator / web)
+export async function cancelWorkoutReminder(): Promise<void> {
+  const existing = await Notifications.getAllScheduledNotificationsAsync();
+  if (existing.some(notification => notification.identifier === WORKOUT_REMINDER_ID)) {
+    await Notifications.cancelScheduledNotificationAsync(WORKOUT_REMINDER_ID);
   }
 }
 
-export async function cancelWorkoutReminder(): Promise<void> {
-  await Notifications.cancelScheduledNotificationAsync(WORKOUT_REMINDER_ID).catch(() => {});
+export async function clearScheduledWorkoutReminders(): Promise<void> {
+  if (Platform.OS === 'web') return;
+  const existing = await Notifications.getAllScheduledNotificationsAsync();
+  for (const notification of existing) {
+    if (notification.identifier === WORKOUT_REMINDER_ID ||
+      notification.identifier.startsWith(SCHEDULE_REMINDER_PREFIX)) {
+      await Notifications.cancelScheduledNotificationAsync(notification.identifier);
+    }
+  }
 }
 
 export async function applyNotificationPreferences(prefs: NotificationPreferences): Promise<void> {
   if (Platform.OS === 'web') return;
-  if (prefs.pushEnabled && prefs.workoutReminder) {
-    await scheduleWorkoutReminder();
-  } else {
-    await cancelWorkoutReminder();
+  await clearScheduledWorkoutReminders();
+  if (prefs.pushEnabled && prefs.workoutReminder && !(await canNotify())) {
+    throw new Error('Notification permission is not granted');
   }
+}
+
+async function reconcileOnDevice(plan: ReminderPlan): Promise<{
+  scheduled: number;
+  suppressed: string[];
+  deferred: number;
+}> {
+  if (Platform.OS === 'web') return { scheduled: 0, suppressed: [], deferred: 0 };
+  const { data: auth, error: authError } = await supabase.auth.getSession();
+  if (authError) throw authError;
+  if (auth.session?.user.id !== plan.ownerId) {
+    await clearScheduledWorkoutReminders();
+    throw new Error('Workout reminders belong to a different signed-in account.');
+  }
+  const actual = parseNotificationPreferences(auth.session.user.user_metadata?.notification_preferences);
+  if (actual.pushEnabled !== plan.preferences.pushEnabled ||
+    actual.workoutReminder !== plan.preferences.workoutReminder ||
+    actual.reminderTime !== plan.preferences.reminderTime ||
+    actual.quietHoursEnabled !== plan.preferences.quietHoursEnabled ||
+    actual.quietHoursStart !== plan.preferences.quietHoursStart ||
+    actual.quietHoursEnd !== plan.preferences.quietHoursEnd) {
+    await clearScheduledWorkoutReminders();
+    throw new Error('Notification preferences changed; refresh the accepted schedule.');
+  }
+  const { scheduled, suppressed } = planDatedReminders(plan);
+  const existing = await Notifications.getAllScheduledNotificationsAsync();
+  const allowed = plan.preferences.pushEnabled && plan.preferences.workoutReminder;
+  const permitted = allowed && await canNotify();
+  const active = permitted ? scheduled.slice(0, 60) : [];
+  const desired = new Set(active.map(reminder => reminder.identifier));
+  for (const notification of existing) {
+    if (notification.identifier === WORKOUT_REMINDER_ID ||
+      notification.identifier.startsWith(SCHEDULE_REMINDER_PREFIX) && !desired.has(notification.identifier)) {
+      await Notifications.cancelScheduledNotificationAsync(notification.identifier);
+    }
+  }
+  if (allowed && !permitted) throw new Error('Notification permission is not granted');
+  const present = new Set(existing.map(notification => notification.identifier));
+  for (const reminder of active) {
+    if (present.has(reminder.identifier)) continue;
+    await Notifications.scheduleNotificationAsync({
+      identifier: reminder.identifier,
+      content: { title: 'Workout planned for today', body: 'Your scheduled workout is ready.', sound: true },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: reminder.at },
+    });
+  }
+  return { scheduled: active.length, suppressed, deferred: permitted ? Math.max(0, scheduled.length - active.length) : 0 };
+}
+
+let reminderReconciliation = Promise.resolve();
+
+export function reconcileWorkoutReminders(plan: ReminderPlan): Promise<{
+  scheduled: number;
+  suppressed: string[];
+  deferred: number;
+}> {
+  const next = reminderReconciliation.then(() => reconcileOnDevice(plan));
+  reminderReconciliation = next.then(() => undefined, () => undefined);
+  return next;
 }
 
 export async function notifyPRCelebration(

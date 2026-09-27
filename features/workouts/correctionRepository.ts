@@ -35,7 +35,8 @@ export function createWorkoutCorrectionRepository(client: SupabaseClient): Worko
       if (!data || typeof data !== 'object') throw new Error('Workout correction returned no receipt.');
       const receipt = data as unknown as CompletedWorkoutCorrectionReceipt;
       const saved = await loadCompletedWorkout(client, request.ownerId, request.sessionId);
-      verifyCorrectionReceipt(request, receipt, { revision: saved.session.correction_revision, snapshot: saved.snapshot, sets: saved.sets });
+      verifyCorrectionReceipt(request, receipt, { revision: saved.session.correction_revision, snapshot: saved.snapshot,
+        sets: saved.sets, scheduleLink: saved.scheduleLink });
       return receipt;
     },
   };

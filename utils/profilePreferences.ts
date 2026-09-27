@@ -14,6 +14,7 @@ export interface NotificationPreferences {
   emailEnabled: boolean;
   smsEnabled: boolean;
   workoutReminder: boolean;
+  reminderTime: string;
   deloadReminder: boolean;
   prCelebrations: boolean;
   quietHoursEnabled: boolean;
@@ -46,9 +47,10 @@ export interface SchemaErrorLike {
 
 export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   pushEnabled: true,
-  emailEnabled: true,
+  emailEnabled: false,
   smsEnabled: false,
   workoutReminder: true,
+  reminderTime: '8:00 AM',
   deloadReminder: true,
   prCelebrations: true,
   quietHoursEnabled: false,
@@ -142,6 +144,7 @@ export const parseNotificationPreferences = (value: unknown): NotificationPrefer
       source.workoutReminder,
       DEFAULT_NOTIFICATION_PREFERENCES.workoutReminder,
     ),
+    reminderTime: getString(source.reminderTime, DEFAULT_NOTIFICATION_PREFERENCES.reminderTime),
     deloadReminder: getBoolean(
       source.deloadReminder,
       DEFAULT_NOTIFICATION_PREFERENCES.deloadReminder,

@@ -32,6 +32,29 @@ export const workoutRepository: WorkoutRepository = {
     const receipt = data as unknown as WorkoutFinalizationReceipt;
     if (receipt.operationId !== draft.operationId || receipt.draftId !== draft.draftId || receipt.revision !== draft.revision
       || receipt.setCount !== draft.slots.flatMap(s => s.sets).filter(s => s.logged).length) throw new Error('Workout receipt does not match this submission. Exact recovery is preserved.');
+    if (draft.scheduleOccurrenceId) {
+      if (draft.expectedScheduleRevision === undefined
+        || receipt.scheduleOccurrenceId !== draft.scheduleOccurrenceId
+        || receipt.scheduleRevision !== draft.expectedScheduleRevision + 1) {
+        throw new Error('Scheduled workout receipt does not match this submission. Exact recovery is preserved.');
+      }
+      const occurrence = await supabase.from('scheduled_days')
+        .select('schedule_id,status,fulfillment_session_id')
+        .eq('id', draft.scheduleOccurrenceId).eq('user_id', draft.ownerId)
+        .maybeSingle<{ schedule_id: string; status: string; fulfillment_session_id: string | null }>();
+      if (occurrence.error) throw occurrence.error;
+      const schedule = occurrence.data ? await supabase.from('program_schedules')
+        .select('revision').eq('id', occurrence.data.schedule_id).eq('user_id', draft.ownerId)
+        .single<{ revision: number }>() : null;
+      if (!occurrence.data || occurrence.data.status !== 'fulfilled'
+        || occurrence.data.fulfillment_session_id !== receipt.sessionId
+        || !schedule || schedule.error || schedule.data.revision !== receipt.scheduleRevision) {
+        if (schedule?.error) throw schedule.error;
+        throw new Error('Authoritative scheduled fulfillment could not be verified. Exact recovery is preserved.');
+      }
+    } else if (receipt.scheduleOccurrenceId !== undefined || receipt.scheduleRevision !== undefined) {
+      throw new Error('Unexpected scheduled fulfillment receipt. Exact recovery is preserved.');
+    }
     const saved = await loadCompletedWorkout(supabase, draft.ownerId, receipt.sessionId);
     if (!sameStoredStructure(saved.snapshot?.effectiveSlots, draft.slots) || saved.sets.length !== receipt.setCount) {
       throw new Error('Saved workout structure does not match this submission. Exact recovery is preserved.');

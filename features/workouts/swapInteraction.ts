@@ -9,7 +9,7 @@ export class OptionalValueCache<Key, Value> {
         this.settled.set(key, value);
       })
       .catch(() => {
-        this.settled.set(key, undefined);
+        this.settled.delete(key);
       })
       .finally(() => {
         this.pending.delete(key);

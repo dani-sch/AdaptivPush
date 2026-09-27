@@ -151,6 +151,10 @@ export interface ExerciseHistoryEntry {
   sets: {
     setNumber: number;
     weightLb: number | null;
+    loadValue?: number | null;
+    loadUnit?: 'lb' | 'kg' | 'none';
+    loadKind?: 'external' | 'assistance' | 'bodyweight' | 'unknown';
+    loadSide?: 'per_hand' | 'total' | 'unknown';
     reps: number | null;
     rpe: number | null;
   }[];

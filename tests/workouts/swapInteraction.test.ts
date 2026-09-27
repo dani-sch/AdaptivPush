@@ -18,6 +18,22 @@ test('Apply can proceed without waiting for optional replacement history', async
   assert.equal(cache.peek('replacement-id'), 135);
 });
 
+test('failed optional history lookup can be retried without caching a false empty result', async () => {
+  const cache = new OptionalValueCache<string, number>();
+  let attempts = 0;
+  const load = async () => {
+    attempts += 1;
+    if (attempts === 1) throw new Error('History temporarily unavailable');
+    return 125;
+  };
+  cache.prefetch('replacement-id', load);
+  await new Promise((resolve) => setImmediate(resolve));
+  cache.prefetch('replacement-id', load);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(attempts, 2);
+  assert.equal(cache.peek('replacement-id'), 125);
+});
+
 test('rapid duplicate Apply attempts admit only one durable operation', () => {
   const gate = new SingleFlightGate();
 

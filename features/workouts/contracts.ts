@@ -5,6 +5,7 @@ import { isRemoved, type WorkoutRemovals, type ProgramRemovalRequest } from './r
 
 export const WORKOUT_SCHEMA_VERSION = 2 as const;
 export const WORKOUT_POLICY_VERSION = 'workout-finalize-v2' as const;
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type WorkoutDraftLifecycle =
   | 'draft'
@@ -94,6 +95,8 @@ export interface WorkoutDraft {
   programDayId: string;
   stableDayId: string;
   prescriptionRevisionId: string;
+  scheduleOccurrenceId?: string;
+  expectedScheduleRevision?: number;
   workoutName: string;
   startedAt: string;
   finalizationEndedAt?: string;
@@ -113,6 +116,8 @@ export interface WorkoutFinalizationReceipt {
   finalizedAt: string;
   setCount: number;
   replayed: boolean;
+  scheduleOccurrenceId?: string;
+  scheduleRevision?: number;
 }
 
 export type WorkoutCommandOutcome<T> =
@@ -137,6 +142,8 @@ export function createWorkoutDraft(input: {
   programDayId: string;
   stableDayId: string;
   prescriptionRevisionId: string;
+  scheduleOccurrenceId?: string;
+  expectedScheduleRevision?: number;
   workoutName: string;
   startedAt: string;
   timezone: string;
@@ -162,6 +169,8 @@ export function createWorkoutDraft(input: {
     programDayId: input.programDayId,
     stableDayId: input.stableDayId,
     prescriptionRevisionId: input.prescriptionRevisionId,
+    scheduleOccurrenceId: input.scheduleOccurrenceId,
+    expectedScheduleRevision: input.expectedScheduleRevision,
     workoutName: input.workoutName.trim() || 'Workout',
     startedAt: input.startedAt,
     timezone: input.timezone,
@@ -329,6 +338,13 @@ export function validateWorkoutDraft(draft: WorkoutDraft, measurements = true): 
   if (!draft.ownerId || !draft.programDayId || !draft.prescriptionRevisionId) {
     errors.push('Owner, program day, and prescription revision identity are required.');
   }
+  const hasScheduleOccurrence = typeof draft.scheduleOccurrenceId === 'string';
+  const hasScheduleRevision = draft.expectedScheduleRevision !== undefined;
+  if (hasScheduleOccurrence !== hasScheduleRevision
+    || (hasScheduleOccurrence && !uuidPattern.test(draft.scheduleOccurrenceId!))
+    || (hasScheduleRevision && (!Number.isSafeInteger(draft.expectedScheduleRevision) || draft.expectedScheduleRevision! < 1))) {
+    errors.push('Scheduled occurrence and revision identity must be present together.');
+  }
   if (draft.slots.length === 0) {
     errors.push('Workout draft must contain at least one exercise slot.');
   }
@@ -381,6 +397,10 @@ export function workoutFinalizationPayload(draft: WorkoutDraft, endedAt: string)
     policyVersion: draft.policyVersion,
     revision: draft.revision,
     programDayId: draft.programDayId,
+    ...(draft.scheduleOccurrenceId && draft.expectedScheduleRevision !== undefined ? {
+      scheduleOccurrenceId: draft.scheduleOccurrenceId,
+      expectedScheduleRevision: draft.expectedScheduleRevision,
+    } : {}),
     prescriptionRevisionId: draft.prescriptionRevisionId,
     workoutName: draft.workoutName,
     startedAt: draft.startedAt,
