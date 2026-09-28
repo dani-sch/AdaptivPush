@@ -26,9 +26,8 @@ import { supabase } from "../../utils/supabase";
 import { computeCyclePhase } from "../../utils/cyclePhase";
 import { workoutEntryIssue, workoutRouteParams } from "@/features/workouts/routeResolution";
 import { workoutDraftStore } from "@/features/workouts/draftStore";
-import { useProgramSchedule } from "@/hooks/useProgramSchedule";
-import { canStartUndatedWorkout, scheduledOutcomeLabel } from "@/features/scheduling/repository";
-// Reminder reconciliation and on-device scheduling disabled per Phase 3 client replacement.
+import { programSequenceRepository, type ProgramSequenceState } from '@/features/programs/sequenceRepository';
+import { clearOtherOwnerDraftNotifications, clearScheduledWorkoutReminders } from '@/utils/notifications';
 import {
   effectiveCurrentWorkout,
   matchingActiveWorkoutDraft,
@@ -117,14 +116,12 @@ const StatCard: React.FC<{
 const StatsRow: React.FC<{
   readiness: string;
   lastWorkout: string | null;
-  week: string | null;
   styles: ReturnType<typeof createStyles>;
-}> = ({ readiness, lastWorkout, week, styles }) => {
+}> = ({ readiness, lastWorkout, styles }) => {
   return (
     <View style={styles.statsRow}>
       <StatCard label="Last Workout" value={lastWorkout ?? '—'} styles={styles} />
       <StatCard label="Readiness" value={readiness} showUpArrow styles={styles} />
-      <StatCard label="Week" value={week ?? '—'} styles={styles} />
     </View>
   );
 };
@@ -605,6 +602,10 @@ const ReadinessAdjustmentModal: React.FC<{
 export default function HomeScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  useEffect(() => {
+    void clearScheduledWorkoutReminders().catch(error =>
+      reportSupabaseFailure('notifications.clear_superseded_reminders', error));
+  }, []);
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [readinessScore, setReadinessScore] = useState<string | null>(null);
@@ -616,7 +617,6 @@ export default function HomeScreen() {
   const [pendingAdjustmentScore, setPendingAdjustmentScore] = useState<
     number | null
   >(null);
-  const [swapNudgeDismissed, setSwapNudgeDismissed] = useState(false);
 
   const [canCorrectWorkout, setCanCorrectWorkout] = useState(false);
   const [lastWorkoutOwner, setLastWorkoutOwner] = useState<string | null>(null);
@@ -635,12 +635,31 @@ export default function HomeScreen() {
     ownerId,
     refresh,
     applyReadinessAdjustmentOnly,
-    advanceToNextWeek,
   } = useCurrentProgram();
-  // Keep schedule readable for compatibility but do not treat it as authoritative in the UI.
-  const schedule = useProgramSchedule(ownerId, program?.id ?? null);
-  const refreshSchedule = schedule.refresh;
-  const currentProgramId = program?.id ?? null;
+  const [sequence, setSequence] = useState<ProgramSequenceState | null>(null);
+  const [sequenceError, setSequenceError] = useState<string | null>(null);
+  const sequenceProgramId = program?.id ?? null;
+  useEffect(() => {
+    void clearOtherOwnerDraftNotifications(ownerId).catch(error =>
+      reportSupabaseFailure('notifications.clear_other_owner_drafts', error));
+  }, [ownerId]);
+
+  useFocusEffect(useCallback(() => {
+    let current = true;
+    if (!ownerId || !sequenceProgramId) return () => { current = false; };
+    void programSequenceRepository.get(sequenceProgramId).then(result => {
+      if (current && result.programId === sequenceProgramId) {
+        setSequence(result);
+        setSequenceError(null);
+      }
+    }).catch(error => {
+      if (current) {
+        setSequence(null);
+        setSequenceError(error instanceof Error ? error.message : 'Program sequence is unavailable.');
+      }
+    });
+    return () => { current = false; setSequence(null); };
+  }, [ownerId, sequenceProgramId]));
 
   const fetchLastWorkout = useCallback(async (requestOwnerId: string, signal: AbortSignal) => {
     try {
@@ -756,17 +775,9 @@ export default function HomeScreen() {
     };
   }, [refresh, fetchLastWorkout, fetchHomeData, ownerId]));
 
-  useFocusEffect(useCallback(() => {
-    void refreshSchedule();
-  }, [refreshSchedule]));
-
-  // workouts[0] is always the next uncompleted workout (hook sorts completed last)
-  const nextWorkout = program?.workouts.find((w) => !w.isFinalized && !w.isCompleted);
-  const scheduledTodayDay = schedule.today?.state === 'workout' ? schedule.today.day : null;
-  const scheduledTodayWorkout = scheduledTodayDay?.programDayId
-    ? program?.workouts.find((workout) => workout.id === scheduledTodayDay.programDayId)
+  const targetWorkout = sequence?.nextStableDayId && !sequence.paused
+    ? program?.workouts.find(workout => workout.stableDayId === sequence.nextStableDayId)
     : undefined;
-  const targetWorkout = scheduledTodayDay ? scheduledTodayWorkout : (canStartUndatedWorkout(schedule.read, schedule.pending) ? nextWorkout : undefined);
 
   useFocusEffect(useCallback(() => {
     let active = true;
@@ -793,8 +804,6 @@ export default function HomeScreen() {
   }, [ownerId, program, targetWorkout]));
 
   const activeDraft = matchingActiveWorkoutDraft(program, targetWorkout ?? null, ownerId, loadedDraft);
-  const canStartUndated = canStartUndatedWorkout(schedule.read, schedule.pending);
-  const canStartScheduled = Boolean(scheduledTodayDay && scheduledTodayWorkout && schedule.read?.state === 'ready');
   const effectiveWorkout = effectiveCurrentWorkout(program, targetWorkout ?? null, ownerId, loadedDraft);
   const nextWorkoutSummary: WorkoutSummary | undefined = effectiveWorkout
     ? {
@@ -812,21 +821,15 @@ export default function HomeScreen() {
   const occurrenceDraft = matchingOccurrenceWorkoutDraft(program, targetWorkout ?? null, ownerId, loadedDraft);
   const homeState = occurrenceState(occurrenceDraft);
   const handleStartWorkout = () => {
-    if (!canStartUndated && !canStartScheduled) return;
+    if (!sequence || sequence.paused || targetWorkout?.stableDayId !== sequence.nextStableDayId) return;
     if (occurrenceDraft?.finalizedReceipt) {
       router.push({ pathname: '/edit-workout', params: { sessionId: occurrenceDraft.finalizedReceipt.sessionId } });
       return;
     }
     if (!program || !targetWorkout || workoutEntryIssue(program, targetWorkout)) return;
-    const scheduledParams = scheduledTodayDay && schedule.read?.state === 'ready'
-      ? { scheduleOccurrenceId: scheduledTodayDay.id, expectedScheduleRevision: String(schedule.read.revision) }
-      : {};
     router.push({
       pathname: "/next-workout",
-      params: {
-        ...(activeDraft ? workoutRouteParamsForDraft(activeDraft) : workoutRouteParams(program, targetWorkout)),
-        ...scheduledParams,
-      },
+      params: activeDraft ? workoutRouteParamsForDraft(activeDraft) : workoutRouteParams(program, targetWorkout),
     });
   };
 
@@ -887,96 +890,48 @@ export default function HomeScreen() {
           <View style={{ backgroundColor: theme.mutedBg, borderColor: theme.border, borderWidth: 1, borderRadius: 14, padding: 16, marginHorizontal: 16, marginBottom: 12 }}>
             <Text style={{ color: theme.textPrimary, fontWeight: '700', marginBottom: 5 }}>Suggested · Program sequence</Text>
             <Text style={{ color: theme.text, lineHeight: 20 }}>
-              {nextWorkout ? `Suggested next workout: ${nextWorkout.name}` : 'No suggested workout right now. The program may be paused or week is finished.'}
+              {!sequence || sequence.programId !== program.id
+                ? `Program sequence unavailable${sequenceError ? `: ${sequenceError}` : ''}. Open Plan to check or initialize it.`
+                : sequence.paused ? 'Program paused. No workout is suggested.'
+                  : sequence.nextStableDayId ? targetWorkout
+                    ? `Suggested next workout: ${targetWorkout.name}`
+                    : 'A pending program day is next. Open Plan to select its exact workout.'
+                    : 'No pending program workout is suggested.'}
             </Text>
             {activeDraft ? (
               <Text style={{ color: theme.text, lineHeight: 20, marginTop: 6 }}>
                 Your saved draft will be preserved. Starting a workout only resolves the selected program day when you finalize it.
               </Text>
             ) : null}
-            <Text style={{ color: theme.placeholder, marginTop: 8 }}>
-              Note: dated placements and automated reminders are disabled in this build. Program sequence authority is server-side; changes must be explicit.
-            </Text>
+            <Pressable accessibilityRole="button" onPress={() => router.push('/(tabs)/plan')}
+              style={{ paddingVertical: 10 }}>
+              <Text style={{ color: theme.primary }}>Select another workout day or adjust program</Text>
+            </Pressable>
           </View>
         ) : null}
-        {program && program.workouts.every((w) => w.isFinalized || w.isCompleted) && program.workouts.length > 0 ? (
-          <>
-            <View style={styles.weekCompleteCard}>
-              <Ionicons name="checkmark-circle" size={32} color={theme.primary} />
-              <Text style={styles.weekCompleteTitle}>Week Finished</Text>
-              <Text style={styles.weekCompleteSubtitle}>
-                All workouts this week have ended. Partial workouts stay marked partial in your history.
-              </Text>
-            </View>
-            {canStartUndated && program.currentWeek < program.totalWeeks && (
-              <Pressable
-                style={({ pressed }) => [
-                  styles.startNextWeekBtn,
-                  pressed && { opacity: 0.8 },
-                ]}
-                onPress={advanceToNextWeek}
-                accessibilityRole="button"
-              >
-                <Text style={styles.startNextWeekBtnText}>
-                  Start Week {program.currentWeek + 1}
-                </Text>
-              </Pressable>
-            )}
-          </>
-        ) : (
-          (canStartUndated || canStartScheduled) ? <NextWorkoutSection
+        <Pressable accessibilityRole="button" onPress={() => router.push('/ad-hoc-workout')}
+          style={{ marginHorizontal: 16, marginBottom: 12, padding: 14,
+            backgroundColor: theme.cardBg, borderRadius: 12, borderColor: theme.border, borderWidth: 1 }}>
+          <Text style={{ color: theme.textPrimary }}>Ad-hoc workout</Text>
+          <Text style={{ color: theme.text }}>History only. Does not fulfill or change your program.</Text>
+        </Pressable>
+        {sequence && sequence.programId === program?.id && !sequence.paused && targetWorkout
+          ? <NextWorkoutSection
             actionLabel={occurrenceAction(homeState, canCorrectWorkout)}
             entryIssue={workoutEntryIssue(program, targetWorkout ?? null)}
             hasActiveDraft={activeDraft !== null}
             workout={nextWorkoutSummary}
             onPressStart={handleStartWorkout}
-          /> : null
-        )}
+          /> : null}
         {lastWorkoutId && lastWorkoutOwner === ownerId ? <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/edit-workout', params: { sessionId: lastWorkoutId } })} style={{ padding: 16 }}>
           <Text style={{ color: theme.primary, fontWeight: '700' }}>Last Workout · {lastWorkoutDate} · {occurrenceAction('finalized', canCorrectWorkout)}</Text>
         </Pressable> : null}
         <StatsRow
           readiness={readinessScore ?? '--'}
           lastWorkout={lastWorkoutOwner === ownerId ? lastWorkoutDate : null}
-          week={program ? `${program.currentWeek}/${program.totalWeeks}` : null}
           styles={styles}
         />
         <ReadinessPromptCard todayScore={readinessScore} onPress={handleOpenReadinessModal} styles={styles} />
-
-        {/* Accessory Swap Nudge — hidden on deload weeks (every 4th) */}
-        {program && !swapNudgeDismissed && program.swapIntervalWeeks &&
-          program.currentWeek > 0 &&
-          program.currentWeek % 4 !== 0 &&
-          program.currentWeek % (program.swapIntervalWeeks ?? 4) === 0 && (
-          <View style={{
-            borderRadius: 20, backgroundColor: theme.border,
-            padding: 20, marginTop: 14, marginHorizontal: 16,
-          }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-              <Text style={{ fontSize: 20 }}>🔄</Text>
-              <Text style={{ color: theme.textPrimary, fontSize: 15, fontWeight: '600', flex: 1 }}>
-                Time to swap accessories
-              </Text>
-            </View>
-            <Text style={{ color: theme.text, fontSize: 13, lineHeight: 19, marginBottom: 14 }}>
-              You&apos;ve been on the same accessory exercises for {program.swapIntervalWeeks} weeks. Swapping helps avoid plateaus and keeps training fresh.
-            </Text>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <Pressable
-                onPress={() => { setSwapNudgeDismissed(true); router.push('/(tabs)/plan'); }}
-                style={{ flex: 1, backgroundColor: theme.primary, borderRadius: 12, paddingVertical: 12, alignItems: 'center' }}
-              >
-                <Text style={{ color: theme.white, fontSize: 14, fontWeight: '600' }}>Go to Plan</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setSwapNudgeDismissed(true)}
-                style={{ flex: 1, borderRadius: 12, backgroundColor: theme.mutedBg, paddingVertical: 12, alignItems: 'center' }}
-              >
-                <Text style={{ color: theme.text, fontSize: 14 }}>Dismiss</Text>
-              </Pressable>
-            </View>
-          </View>
-        )}
 
         {/* Menstrual Cycle Phase Recommendation */}
         {todayCyclePhase && todayCyclePhase !== "N/A" &&

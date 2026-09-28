@@ -7,9 +7,6 @@ import { Plus, ChevronRight, MoreVertical, LayoutList, Archive } from 'lucide-re
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useCurrentProgram } from '@/hooks/useCurrentProgram';
-import { useProgramSchedule } from '@/hooks/useProgramSchedule';
-import { canStartUndatedWorkout } from '@/features/scheduling/repository';
-import type { ProgramWorkout } from '@/types/program';
 import { WorkoutTemplateModal } from '@/components/WorkoutTemplateModal';
 import { GenerateProgramModal } from '@/components/GenerateProgramModal';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -17,28 +14,12 @@ import type { Theme } from '@/constants/themes';
 import { workoutRouteParams } from '@/features/workouts/routeResolution';
 import { createCompletedNavigation } from '@/features/workouts/effectiveOccurrence';
 import { reportSupabaseFailure, supabaseSaveFailureMessage } from '@/utils/supabaseResilience';
-import PendingSequenceBanner from './components/PendingSequenceBanner';
-import { programSequenceRepository } from '@/features/programs/sequenceRepository';
-import sequenceService from '@/features/programs/sequenceService';
+import { PendingSequenceBanner } from './components/PendingSequenceBanner';
+import { programSequenceRepository, type ProgramSequenceState } from '@/features/programs/sequenceRepository';
+import sequenceOperations from '@/features/programs/sequenceService';
+import { sequenceOperationStore } from '@/features/programs/sequenceOperationStore';
 import { createOperationId } from '@/features/kernel/operationId';
-
-// Note: dated schedule writers and UI removed per Phase 3 client replacement; sequence authority is server-side. UI shows suggestion only.
-
-function placementLabel(workout: ProgramWorkout, days: any[] | null): string {
-    if (!days) return 'No confirmed placement for this program day';
-    const day = days.find((item: any) => item.stableDayId === workout.stableDayId && item.programDayId === workout.id);
-    if (!day) return 'No confirmed placement for this program day';
-    return day.localDate
-        ? `${day.localDate} · ${day.kind} · ${day.status}`
-        : `${day.kind} · ${day.status} (no date)`;
-}
-
-function scheduledWorkoutTarget(workout: ProgramWorkout, days: any[] | null): any | null {
-    if (!days) return null;
-    const matches = days.filter((day: any) => day.programDayId === workout.id && day.kind === 'workout'
-        && (day.status === 'planned' || day.status === 'in_progress'));
-    return matches.length === 1 ? matches[0] : null;
-}
+import { supabase } from '@/utils/supabase';
 
 function LoadingState({ styles }: { styles: ReturnType<typeof createStyles> }) {
     return (
@@ -198,22 +179,58 @@ export default function PlanScreen() {
         swapExercise,
         endCurrentProgram,
     } = useCurrentProgram();
-    // Keep schedule readable for compatibility, but do not treat dated schedule as authority in the UI.
-    const schedule = useProgramSchedule(ownerId, program?.id ?? null);
-    const refreshSchedule = schedule.refresh;
-    const scheduledDays = schedule.read?.state === 'ready' ? schedule.read.days : null;
+    const [sequence, setSequence] = useState<ProgramSequenceState | null>(null);
+    const [sequenceError, setSequenceError] = useState<string | null>(null);
+    const [sequenceBusy, setSequenceBusy] = useState(false);
+    const [longPause, setLongPause] = useState(false);
+    const sequenceProgramId = program?.id ?? null;
+    const loadSequence = useCallback(async () => {
+        if (!ownerId || !sequenceProgramId) { setSequence(null); return; }
+        try {
+            await programSequenceRepository.capability();
+            const state = await programSequenceRepository.get(sequenceProgramId);
+            if (state.programId !== sequenceProgramId) throw new Error('Program sequence belongs to a different program.');
+            const linked = state.days.flatMap(day => day.sessionId ? [day.sessionId] : []);
+            if (linked.length) {
+                const { data, error } = await supabase.from('workout_sessions')
+                    .select('finalized_at').eq('user_id', ownerId).in('id', linked)
+                    .order('finalized_at', { ascending: false }).limit(1).maybeSingle();
+                if (error) throw error;
+                if (!data?.finalized_at) throw new Error('Last finalized program workout is unavailable.');
+                const finalizedAt = Date.parse(data.finalized_at);
+                if (!Number.isFinite(finalizedAt)) throw new Error('Last finalized program workout time is invalid.');
+                setLongPause(Date.now() - finalizedAt >= 14 * 24 * 60 * 60 * 1000);
+            } else setLongPause(false);
+            setSequence(state);
+            setSequenceError(null);
+        } catch (error) {
+            setSequence(null);
+            setSequenceError(error instanceof Error ? error.message : 'Program sequence could not be loaded.');
+        }
+    }, [ownerId, sequenceProgramId]);
     useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
-    useFocusEffect(useCallback(() => { void refreshSchedule(); }, [refreshSchedule]));
+    useFocusEffect(useCallback(() => { void loadSequence(); }, [loadSequence]));
 
-    const completedCount = program?.workouts.filter((w) => w.isCompleted).length ?? 0;
-    const partialCount = program?.workouts.filter(w => w.isFinalized && !w.isCompleted).length ?? 0;
-    const totalCount = program?.workouts.length ?? 0;
-
-    const progressPct = useMemo(() => {
-        if (!program) return 0;
-        const pct = (program.currentWeek / program.totalWeeks) * 100;
-        return Math.max(0, Math.min(100, pct));
-    }, [program]);
+    const changeSequence = async (kind: 'pause' | 'resume' | 'set_day' | 'reorder',
+        fields: Record<string, unknown> = {}) => {
+        if (!ownerId || !sequence || !program || sequenceBusy) return;
+        setSequenceBusy(true);
+        try {
+            if ((await sequenceOperationStore.listPendingForOwner(ownerId))
+                .some(operation => operation.programId === program.id)) {
+                throw new Error('Retry or verify the pending program operation before making another change.');
+            }
+            await sequenceOperations.change(ownerId, program.id, {
+                schemaVersion: 1, programId: program.id, operationId: createOperationId(),
+                expectedRevision: sequence.revision, kind, ...fields,
+            });
+            await loadSequence();
+        } catch (error) {
+            reportSupabaseFailure('program.sequence_change', error);
+            Alert.alert('Program not changed', error instanceof Error ? error.message : 'Retry the exact pending operation before making another change.');
+            await loadSequence();
+        } finally { setSequenceBusy(false); }
+    };
 
     const selectedWorkoutObj = useMemo(
         () => program?.workouts.find((workout) => workout.id === selectedWorkout) ?? null,
@@ -364,143 +381,130 @@ export default function PlanScreen() {
                     </View>
                 )}
 
-                {/* Progress Bar */}
-                <View style={styles.section}>
-                    <View style={styles.rowBetween}>
-                        <Text style={styles.label}>Progress</Text>
-                        <Text style={styles.label}>
-                            Week {program.currentWeek} of {program.totalWeeks}
-                        </Text>
-                    </View>
-
-                    <View style={styles.progressTrack}>
-                        <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
-                    </View>
-                </View>
-
-                {/* Sequence suggestion (server-side authority). Dated placements and client-side schedule controls removed. */}
                 <View style={[styles.section, { backgroundColor: theme.mutedBg, borderRadius: 14, padding: 14 }]}>
-                    {program.workouts.find((w) => !w.isFinalized && !w.isCompleted) ? (
+                    {sequence ? (
                         <Text style={{ color: theme.text, lineHeight: 20 }}>
-                            Suggested next workout: {program.workouts.find((w) => !w.isFinalized && !w.isCompleted)?.name}. Select another program day from View Full Program or start this suggested workout.
+                            {sequence.paused ? 'Program paused. No workout is suggested.' : sequence.nextStableDayId
+                                ? `Suggested next: ${program.workouts.find(workout => workout.stableDayId === sequence.nextStableDayId)?.name ?? 'a pending program day'}.`
+                                : 'No pending program workout is suggested.'}
                         </Text>
                     ) : (
                         <Text style={{ color: theme.text, lineHeight: 20 }}>
-                            No suggested workout right now. The program may be paused or all workouts this week are finished.
+                            {sequenceError ?? 'Loading program sequence...'} No workout is suggested until sequence authority is available.
                         </Text>
                     )}
-                    <Text style={{ color: theme.placeholder, marginTop: 8 }}>
-                        Note: dated placements and automated reminders are disabled in this build. Program sequence authority is server-side; changes must be explicit.
-                    </Text>
+                    {!sequence && <Pressable accessibilityRole="button" disabled={!ownerId || sequenceBusy}
+                        onPress={async () => {
+                            if (!ownerId) return;
+                            setSequenceBusy(true);
+                            try {
+                                if ((await sequenceOperationStore.listPendingForOwner(ownerId))
+                                    .some(operation => operation.programId === program.id)) {
+                                    throw new Error('Retry the existing sequence operation before initializing again.');
+                                }
+                                await programSequenceRepository.capability();
+                                await sequenceOperations.initialize(ownerId, {
+                                    schemaVersion: 1, programId: program.id, operationId: createOperationId(),
+                                });
+                                await loadSequence();
+                            } catch (error) {
+                                reportSupabaseFailure('program.sequence_initialize', error);
+                                Alert.alert('Sequence not ready', error instanceof Error ? error.message : 'Retry the pending operation.');
+                            } finally { setSequenceBusy(false); }
+                        }} style={{ padding: 12 }}>
+                        <Text style={{ color: theme.primary }}>Initialize this program sequence</Text>
+                    </Pressable>}
+                    {sequence && <Text style={{ color: theme.text, marginTop: 8 }}>
+                        {sequence.counts.completed} completed · {sequence.counts.partial} partial · {sequence.counts.skipped} skipped · {sequence.counts.pending} pending · {sequence.counts.rest + sequence.counts.replacedWithRest} rest
+                    </Text>}
                 </View>
-                <PendingSequenceBanner ownerId={ownerId} refreshProgram={refresh} />
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>This Week&apos;s Workouts</Text>
-
-                    {/* Weekly Progress */}
-                    <View style={styles.section}>
-
-                        <View style={styles.summaryCard}>
-                            <View style={styles.rowBetween}>
-                                <Text style={styles.summaryTitle}>Week {program.currentWeek}</Text>
-                                <Text style={styles.summaryMeta}>
-                                    {completedCount}/{totalCount} complete · {partialCount} partial
-                                </Text>
-                            </View>
-
-                            <View style={styles.progressTrack}>
-                                <View
-                                    style={[
-                                        styles.progressFill,
-                                        { width: `${totalCount ? (completedCount / totalCount) * 100 : 0}%` },
-                                    ]}
-                                />
-                            </View>
-                        </View>
+                {sequence && longPause && (
+                    <View style={[styles.section, { backgroundColor: theme.mutedBg, padding: 14, borderRadius: 12 }]}>
+                        <Text style={{ color: theme.text, marginBottom: 8 }}>
+                            It has been at least 14 days since your last finalized program workout. Nothing changes automatically.
+                        </Text>
+                        <Pressable accessibilityRole="button" onPress={() => {
+                            if (sequence.paused) void changeSequence('resume');
+                            else Alert.alert('Program unchanged', 'Select a pending workout day when ready.');
+                        }} style={{ padding: 10 }}>
+                            <Text style={{ color: theme.primary }}>Resume unchanged</Text>
+                        </Pressable>
+                        <Pressable accessibilityRole="button" onPress={() => router.push('/program-overview')}
+                            style={{ padding: 10 }}>
+                            <Text style={{ color: theme.primary }}>Review/adjust program</Text>
+                        </Pressable>
+                        <Pressable accessibilityRole="button" onPress={() => router.push('/create-program')}
+                            style={{ padding: 10 }}>
+                            <Text style={{ color: theme.primary }}>Start new program</Text>
+                        </Pressable>
                     </View>
-
-                    {/* Workout List */}
+                )}
+                <PendingSequenceBanner key={`${ownerId}-${sequenceBusy}`} ownerId={ownerId}
+                    refreshProgram={() => { void loadSequence(); void refresh(); }} />
+                <Pressable accessibilityRole="button" onPress={() => router.push('/ad-hoc-workout')}
+                    style={[styles.section, { backgroundColor: theme.cardBg, padding: 14, borderRadius: 12 }]}>
+                    <Text style={{ color: theme.text }}>Ad-hoc workout (history only)</Text>
+                </Pressable>
+                {sequence && <Pressable accessibilityRole="button" disabled={sequenceBusy}
+                    onPress={() => void changeSequence(sequence.paused ? 'resume' : 'pause')}
+                    style={[styles.section, { backgroundColor: theme.mutedBg, padding: 14, borderRadius: 12 }]}>
+                    <Text style={{ color: theme.text }}>{sequence.paused ? 'Resume program unchanged' : 'Pause program'}</Text>
+                </Pressable>}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Program sequence</Text>
                     <View style={{ marginTop: 18 }}>
-                        {program.workouts.map((workout, idx) => (
-                            <View key={workout.id} style={[styles.workoutCard, idx > 0 && { marginTop: 12 }]}>
+                        {sequence?.days.map((day, idx) => {
+                            const workout = program.workouts.find(item => item.stableDayId === day.stableDayId);
+                            return <View key={day.stableDayId} style={[styles.workoutCard, idx > 0 && { marginTop: 12 }]}>
                                 <View style={styles.workoutTopRow}>
                                     <View style={styles.workoutLeft}>
                                         <View style={styles.workoutIndexBox}>
                                             <Text style={styles.workoutIndexText}>{idx + 1}</Text>
                                         </View>
-
                                         <View style={{ flex: 1 }}>
-                                            <Text style={styles.workoutName}>{workout.name}</Text>
+                                            <Text style={styles.workoutName}>{workout?.name ?? (day.originalKind === 'rest' ? 'Rest day' : `Program workout ${idx + 1}`)}</Text>
                                             <Text style={styles.workoutMeta}>
-                                                Day {idx + 1} • {workout.estimatedTime} min
+                                                {day.status === 'replaced_with_rest' ? 'Rest replacement' : day.status}
                                             </Text>
-                                            {scheduledDays ? (
-                                                <Text style={styles.workoutMeta}>
-                                                    {placementLabel(workout, scheduledDays)}
-                                                </Text>
-                                            ) : null}
                                         </View>
                                     </View>
-
-                                    <Pressable
+                                    {workout && day.originalKind === 'workout' && <Pressable
                                         onPress={() => { pendingEdit.reset(); setSelectedWorkout(workout.id); }}
                                         style={({ pressed }) => [styles.chevronButton, pressed && { opacity: 0.85 }]}
                                         accessibilityRole="button"
-                                        accessibilityLabel={`Open workout ${workout.name}`}
+                                        accessibilityLabel={`${day.status === 'pending' ? 'Select other workout day' : 'View program day'}: ${workout.name}`}
                                     >
                                         <ChevronRight color={theme.textPrimary} size={20} />
-                                    </Pressable>
+                                    </Pressable>}
                                 </View>
-
-                                <Text style={styles.exerciseCount}>{visibleProgramExercises(workout.exercises).length} exercises</Text>
-                                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                                  <Pressable onPress={async () => {
-                                    try {
-                                      if (!ownerId) throw new Error('Sign in required');
-                                      const supported = await programSequenceRepository.capability();
-                                      if (!supported) throw new Error('Program sequence capability not available.');
-                                      const seq = await programSequenceRepository.get(program.id);
-                                      const op = createOperationId();
-                                      const payload = { schemaVersion: '1', programId: program.id, expectedRevision: seq.revision, operationId: op, kind: 'set_day', stableDayId: workout.stableDayId, status: 'replaced_with_rest' } as Record<string, unknown>;
-                                      await sequenceService.change(ownerId, program.id, payload);
-                                      void refresh();
-                                    } catch (e) { reportSupabaseFailure('program.sequence_action', e); Alert.alert('Action failed', 'Could not apply program change.'); }
-                                  }} style={({ pressed }) => [{ backgroundColor: theme.mutedBg, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10 }, pressed && { opacity: 0.85 }]}>
-                                    <Text style={{ color: theme.text }}>Replace with rest</Text>
-                                  </Pressable>
-
-                                  <Pressable onPress={async () => {
-                                    try {
-                                      if (!ownerId) throw new Error('Sign in required');
-                                      const supported = await programSequenceRepository.capability();
-                                      if (!supported) throw new Error('Program sequence capability not available.');
-                                      const seq = await programSequenceRepository.get(program.id);
-                                      const op = createOperationId();
-                                      const payload = { schemaVersion: '1', programId: program.id, expectedRevision: seq.revision, operationId: op, kind: 'set_day', stableDayId: workout.stableDayId, status: 'skipped' } as Record<string, unknown>;
-                                      await sequenceService.change(ownerId, program.id, payload);
-                                      void refresh();
-                                    } catch (e) { reportSupabaseFailure('program.sequence_action', e); Alert.alert('Action failed', 'Could not apply program change.'); }
-                                  }} style={({ pressed }) => [{ backgroundColor: theme.mutedBg, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10 }, pressed && { opacity: 0.85 }]}>
-                                    <Text style={{ color: theme.text }}>Mark skipped</Text>
-                                  </Pressable>
-
-                                  <Pressable onPress={async () => {
-                                    try {
-                                      if (!ownerId) throw new Error('Sign in required');
-                                      const supported = await programSequenceRepository.capability();
-                                      if (!supported) throw new Error('Program sequence capability not available.');
-                                      const seq = await programSequenceRepository.get(program.id);
-                                      const op = createOperationId();
-                                      const payload = { schemaVersion: '1', programId: program.id, expectedRevision: seq.revision, operationId: op, kind: 'pause' } as Record<string, unknown>;
-                                      await sequenceService.change(ownerId, program.id, payload);
-                                      void refresh();
-                                    } catch (e) { reportSupabaseFailure('program.sequence_action', e); Alert.alert('Action failed', 'Could not apply program change.'); }
-                                  }} style={({ pressed }) => [{ backgroundColor: theme.mutedBg, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10 }, pressed && { opacity: 0.85 }]}>
-                                    <Text style={{ color: theme.text }}>Pause</Text>
-                                  </Pressable>
+                                {workout && <Text style={styles.exerciseCount}>{visibleProgramExercises(workout.exercises).length} exercises</Text>}
+                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                                    {workout && day.status === 'pending' && !sequence.paused &&
+                                        <Pressable accessibilityRole="button" disabled={sequenceBusy}
+                                            onPress={() => { pendingEdit.reset(); setSelectedWorkout(workout.id); }}
+                                            style={{ backgroundColor: theme.mutedBg, padding: 10, borderRadius: 10 }}>
+                                            <Text style={{ color: theme.text }}>Select this workout day</Text>
+                                        </Pressable>}
+                                    {day.originalKind === 'workout' && day.status !== 'completed' && day.status !== 'partial' &&
+                                        (['pending', 'skipped', 'replaced_with_rest'] as const)
+                                            .filter(status => status !== day.status).map(status =>
+                                                <Pressable key={status} accessibilityRole="button" disabled={sequenceBusy}
+                                                    onPress={() => void changeSequence('set_day', { stableDayId: day.stableDayId, status })}
+                                                    style={{ backgroundColor: theme.mutedBg, padding: 10, borderRadius: 10 }}>
+                                                    <Text style={{ color: theme.text }}>{status === 'pending' ? 'Restore pending'
+                                                        : status === 'skipped' ? 'Skip' : 'Replace with rest'}</Text>
+                                                </Pressable>)}
+                                    {idx > 0 && <Pressable accessibilityRole="button" disabled={sequenceBusy}
+                                        onPress={() => {
+                                            const order = sequence.days.map(item => item.stableDayId);
+                                            [order[idx - 1], order[idx]] = [order[idx], order[idx - 1]];
+                                            void changeSequence('reorder', { dayIds: order });
+                                        }} style={{ backgroundColor: theme.mutedBg, padding: 10, borderRadius: 10 }}>
+                                        <Text style={{ color: theme.text }}>Move earlier</Text>
+                                    </Pressable>}
                                 </View>
-                            </View>
-                        ))}
+                            </View>;
+                        })}
                     </View>
                 </View>
 
@@ -543,19 +547,14 @@ export default function PlanScreen() {
                                 if (pendingEdit.request(selectedWorkoutObj.sessionId)) setSelectedWorkout(null);
                                 return;
                             }
-                            const scheduledDay = schedule.read?.state === 'ready'
-                                ? scheduledWorkoutTarget(selectedWorkoutObj, schedule.read.days) : null;
-                            if (!scheduledDay && !canStartUndatedWorkout(schedule.read, schedule.pending)) {
-                                Alert.alert('Workout start unavailable', 'This workout cannot be started right now. Refresh and try again.');
+                            if (!sequence || sequence.paused ||
+                                sequence.days.find(day => day.stableDayId === selectedWorkoutObj.stableDayId)?.status !== 'pending') {
+                                Alert.alert('Workout start unavailable', 'This exact program day is not pending in the current sequence. Refresh the sequence or select a different day.');
                                 return;
                             }
                             setSelectedWorkout(null);
-                            const expectedScheduleRevision = schedule.read?.state === 'ready'
-                                ? schedule.read.revision : undefined;
                             router.push({ pathname: '/next-workout', params: {
                                 ...workoutRouteParams(program, selectedWorkoutObj),
-                                ...(scheduledDay ? { scheduleOccurrenceId: scheduledDay.id,
-                                    expectedScheduleRevision: String(expectedScheduleRevision) } : {}),
                             } });
                         }}
                     /> : null}

@@ -16,7 +16,6 @@ import {
     useRef,
 } from 'react';
 import { supabase } from "@/utils/supabase";
-import { notifyDeloadWeek } from '@/utils/notifications';
 import type { CurrentProgram, ProgramWorkout, WorkoutExercise } from '@/types/program';
 import { computeProgression } from '@/utils/progressionEngine';
 import type { ProgressionContext, LoggedSet } from '@/types/progression';
@@ -235,7 +234,8 @@ function useCurrentProgramState() {
 
             const currentWeek = checkpointWeek(prog.start_date, prog.duration_weeks, prog.archive_checkpoint, todayISODate());
 
-            // Get THIS WEEK's program_days with nested exercises
+            // Revision-backed programs need every relative day: the server sequence,
+            // not the calendar week, decides which prescription is available.
             let currentDaysQuery = supabase
                 .from('program_days')
                 .select(
@@ -273,15 +273,17 @@ function useCurrentProgramState() {
           )
         `,
                 )
-                .eq('program_id', prog.id)
-                .eq('week_number', currentWeek);
+                .eq('program_id', prog.id);
             if (prog.current_revision_id) {
                 currentDaysQuery = currentDaysQuery.eq('program_revision_id', prog.current_revision_id);
+            } else {
+                currentDaysQuery = currentDaysQuery.eq('week_number', currentWeek);
             }
             const currentDaysResult = await runSupabaseOperation(
                 (signal) => currentDaysQuery
-                    .order('day_index', { ascending: true })
+                    .order('week_number', { ascending: true })
                     .order('order_in_week', { ascending: true })
+                    .order('day_index', { ascending: true })
                     .abortSignal(signal)
                     .returns<DbProgramDay[]>(),
                 {
@@ -467,15 +469,20 @@ function useCurrentProgramState() {
                     };
                 }) ?? [];
 
-            // Sort: uncompleted workouts first (preserving order_in_week DB order), completed last
-            workouts.sort((a, b) => {
-                if (a.isCompleted === b.isCompleted) return 0;
-                return a.isCompleted ? 1 : -1;
-            });
+            // Legacy week previews keep their old display ordering; sequence-backed
+            // consumers use the persisted positions instead of sorting by completion.
+            if (!prog.current_revision_id) {
+                workouts.sort((a, b) => {
+                    if (a.isCompleted === b.isCompleted) return 0;
+                    return a.isCompleted ? 1 : -1;
+                });
+            }
 
             // daysPerWeek is not stored on programs; infer from this week’s days count
             // may need to pull from user_profile.days_per_week instead
-            const daysPerWeek = workouts.length;
+            const daysPerWeek = prog.current_revision_id
+                ? (days ?? []).filter(day => day.week_number === 1).length
+                : workouts.length;
 
             const mapped: CurrentProgram = {
                 id: prog.id,
@@ -1080,10 +1087,6 @@ function useCurrentProgramState() {
         }
         setActionError(null);
 
-        // Every 4th week is a deload — notify the user when transitioning into one
-        if (nextWeek % 4 === 0) {
-            void notifyDeloadWeek();
-        }
     }, [program, refresh, applyProgressionToNextWeek]);
 
     const availabilityMessage = useMemo(

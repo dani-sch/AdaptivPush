@@ -1,11 +1,4 @@
-let AsyncStorage: any;
-try {
-  // runtime import; may throw in node test runner
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  AsyncStorage = require('@react-native-async-storage/async-storage');
-} catch (e) {
-  AsyncStorage = undefined as any;
-}
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const PREFIX = '@adaptivpush/rest-timers/v1';
 
@@ -13,30 +6,27 @@ function key(ownerId: string, draftId: string) {
   return `${PREFIX}/${ownerId}/${draftId}`;
 }
 
-const inMemory = new Map<string, string>();
-
 export interface RestTimerEntry {
   ownerId: string;
   draftId: string;
   endAt: string; // ISO
 }
 
+export interface RestTimerPreferences {
+  seconds: number;
+  alertEnabled: boolean;
+}
+
+const DEFAULT_PREFERENCES: RestTimerPreferences = { seconds: 60, alertEnabled: false };
+const DURATIONS = [30, 60, 90, 120, 180] as const;
+
 export const restTimerStore = {
   async save(entry: RestTimerEntry): Promise<void> {
-    const k = key(entry.ownerId, entry.draftId);
-    const v = JSON.stringify(entry);
-    if (AsyncStorage && AsyncStorage.setItem) {
-      await AsyncStorage.setItem(k, v);
-      return;
-    }
-    inMemory.set(k, v);
+    await AsyncStorage.setItem(key(entry.ownerId, entry.draftId), JSON.stringify(entry));
   },
 
   async load(ownerId: string, draftId: string): Promise<RestTimerEntry | null> {
-    const k = key(ownerId, draftId);
-    let serialized: string | null = null;
-    if (AsyncStorage && AsyncStorage.getItem) serialized = await AsyncStorage.getItem(k);
-    else serialized = inMemory.get(k) ?? null;
+    const serialized = await AsyncStorage.getItem(key(ownerId, draftId));
     if (!serialized) return null;
     const parsed = JSON.parse(serialized) as RestTimerEntry;
     if (parsed.ownerId !== ownerId || parsed.draftId !== draftId) throw new Error('Rest timer ownership mismatch.');
@@ -45,8 +35,25 @@ export const restTimerStore = {
 
   async remove(ownerId: string, draftId: string): Promise<void> {
     const k = key(ownerId, draftId);
-    if (AsyncStorage && AsyncStorage.removeItem) await AsyncStorage.removeItem(k);
-    else inMemory.delete(k);
+    await AsyncStorage.removeItem(key(ownerId, draftId));
+  },
+  async getPreferences(ownerId: string): Promise<RestTimerPreferences> {
+    if (!ownerId) throw new Error('Sign in to load rest-timer preferences.');
+    const serialized = await AsyncStorage.getItem(`${PREFIX}/preferences/${ownerId}`);
+    if (!serialized) return DEFAULT_PREFERENCES;
+    const parsed: unknown = JSON.parse(serialized);
+    if (!parsed || typeof parsed !== 'object') throw new Error('Invalid rest-timer preferences.');
+    const preferences = parsed as Partial<RestTimerPreferences>;
+    if (!DURATIONS.some(duration => duration === preferences.seconds)
+      || typeof preferences.alertEnabled !== 'boolean') {
+      throw new Error('Invalid rest-timer preferences.');
+    }
+    return preferences as RestTimerPreferences;
+  },
+  async savePreferences(ownerId: string, preferences: RestTimerPreferences): Promise<void> {
+    if (!ownerId || !DURATIONS.some(duration => duration === preferences.seconds)
+      || typeof preferences.alertEnabled !== 'boolean') throw new Error('Invalid rest-timer preferences.');
+    await AsyncStorage.setItem(`${PREFIX}/preferences/${ownerId}`, JSON.stringify(preferences));
   },
 };
 

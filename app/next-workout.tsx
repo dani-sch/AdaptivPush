@@ -18,8 +18,15 @@ import { SwapExerciseModal, type AddExerciseSelection } from "@/components/SwapE
 import { useCurrentProgram } from "@/hooks/useCurrentProgram";
 import type { CurrentProgram, ProgramWorkout } from "@/types/program";
 import { supabase } from "@/utils/supabase";
-import { notifyPRCelebration, scheduleRestNotification, requestNotificationPermission } from "@/utils/notifications";
+import {
+  cancelInactivityNotification, cancelRestNotification, clearOtherDraftNotifications,
+  scheduleInactivityNotification,
+  scheduleRestNotification, requestNotificationPermission,
+} from "@/utils/notifications";
 import { restTimerStore } from '@/features/workouts/restTimerStore';
+import { extendRestSeconds, restTimeRemaining } from '@/features/workouts/restTimerPolicy';
+import { inactivityStore } from '@/features/workouts/inactivityStore';
+import { updateInactivityNudge } from '@/features/workouts/inactivityPolicy';
 import { createOperationId } from "@/features/kernel/operationId";
 import {
   amendWorkoutExercise,
@@ -120,9 +127,11 @@ const FinishModal: React.FC<{
   >
     <View style={styles.modalOverlay}>
       <View style={styles.modalContainer}>
-        <Text style={styles.modalTitle}>Finish Workout?</Text>
+        <Text style={styles.modalTitle}>
+          {completedCount < totalCount ? 'Submit workout even if incomplete?' : 'Submit workout?'}
+        </Text>
         <Text style={styles.modalBody}>
-          Finish with {completedCount} of {totalCount} sets completed? Unfinished sets will be saved as not completed. {" "}
+          {completedCount} of {totalCount} sets logged. Unlogged work will not be marked completed.{' '}
           {formatTime(elapsed)}
         </Text>
         <View style={styles.modalButtons}>
@@ -133,7 +142,7 @@ const FinishModal: React.FC<{
             ]}
             onPress={onCancel}
           >
-            <Text style={styles.modalCancelText}>Keep Going</Text>
+            <Text style={styles.modalCancelText}>{completedCount < totalCount ? 'No, keep editing' : 'Keep editing'}</Text>
           </Pressable>
           <Pressable
             style={({ pressed }) => [
@@ -144,7 +153,7 @@ const FinishModal: React.FC<{
             disabled={saving}
           >
             <Text style={styles.modalConfirmText}>
-              {saving ? "Saving…" : "Finish"}
+              {saving ? 'Saving...' : completedCount < totalCount ? 'Yes, submit partial' : 'Submit workout'}
             </Text>
           </Pressable>
         </View>
@@ -220,7 +229,8 @@ export default function NextWorkoutScreen() {
   const [swapTargetId, setSwapTargetId] = useState<string | null>(null);
   const [pendingSwap, setPendingSwap] = useState<PendingWorkoutSwap | null>(null);
   const [prExercises, setPrExercises] = useState<string[]>([]); // exercise names with new PRs
-  const [showPrModal, setShowPrModal] = useState(false);
+  const [showFinishActions, setShowFinishActions] = useState(false);
+  const [finishWarning, setFinishWarning] = useState<string | null>(null);
   const [historyExerciseId, setHistoryExerciseId] = useState<string | null>(
     null,
   );
@@ -258,27 +268,80 @@ export default function NextWorkoutScreen() {
     return save;
   };
 
-  // Inactivity nudge (5 minutes)
   const inactivityRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showInactivityNudge, setShowInactivityNudge] = useState(false);
-  const resetInactivity = useCallback(() => {
-    setShowInactivityNudge(false);
+  const currentDraftId = draft?.draftId;
+  const currentDraftStartedAt = draft?.startedAt;
+  const currentDraftLifecycle = draft?.lifecycle;
+  useEffect(() => {
+    if (!ownerId || !currentDraftId || currentDraftLifecycle === 'finalized') return;
+    void clearOtherDraftNotifications(ownerId, currentDraftId).catch(error =>
+      setSyncMessage(error instanceof Error ? error.message : 'Other workout alerts could not be cleared.'));
+  }, [ownerId, currentDraftId, currentDraftLifecycle]);
+  const lastLoggedAt = draft?.slots.flatMap(slot => slot.sets)
+    .filter(set => set.logged && set.loggedAt)
+    .map(set => set.loggedAt as string)
+    .sort().at(-1);
+  const resetInactivity = useCallback(async () => {
     if (inactivityRef.current) clearTimeout(inactivityRef.current);
-    inactivityRef.current = setTimeout(() => setShowInactivityNudge(true), 5 * 60 * 1000);
-  }, []);
+    if (!ownerId || !currentDraftId || !currentDraftStartedAt || currentDraftLifecycle === 'finalized') return;
+    try {
+      const prior = await inactivityStore.load(ownerId, currentDraftId);
+      if (ownerIdRef.current !== ownerId) return;
+      const next = updateInactivityNudge(prior, ownerId, currentDraftId,
+        lastLoggedAt ?? currentDraftStartedAt);
+      await inactivityStore.save(next);
+      if (next.notified) {
+        if (prior && lastLoggedAt && Date.parse(lastLoggedAt) > Date.parse(prior.lastActivityAt)) {
+          setShowInactivityNudge(false);
+        }
+        return;
+      }
+      const remaining = Math.ceil((Date.parse(next.deadlineAt) - Date.now()) / 1000);
+      if (remaining <= 0) {
+        await inactivityStore.save({ ...next, notified: true });
+        await cancelInactivityNotification(ownerId, currentDraftId);
+        setShowInactivityNudge(true);
+        return;
+      }
+      setShowInactivityNudge(false);
+      if (!(await scheduleInactivityNotification(remaining, ownerId, currentDraftId))) {
+        setSyncMessage('Device notifications are unavailable. The five-minute nudge will appear in the workout.');
+      }
+      if (ownerIdRef.current !== ownerId) {
+        await cancelInactivityNotification(ownerId, currentDraftId);
+        return;
+      }
+      inactivityRef.current = setTimeout(() => {
+        void inactivityStore.save({ ...next, notified: true })
+          .then(() => setShowInactivityNudge(true))
+          .catch(error => setSyncMessage(error instanceof Error ? error.message : 'Inactivity nudge could not be saved.'));
+      }, remaining * 1000);
+    } catch (error) {
+      setSyncMessage(error instanceof Error ? error.message : 'Inactivity nudge is unavailable.');
+    }
+  }, [ownerId, currentDraftId, currentDraftStartedAt, currentDraftLifecycle, lastLoggedAt]);
 
   useEffect(() => {
-    // start inactivity watcher when draft or owner changes - defer to avoid setState in render path
-    const handle = setTimeout(() => resetInactivity(), 0);
+    const handle = setTimeout(() => { void resetInactivity(); }, 0);
     return () => { clearTimeout(handle); if (inactivityRef.current) clearTimeout(inactivityRef.current); };
-  }, [draft, ownerId, resetInactivity]);
+  }, [resetInactivity]);
+  useEffect(() => {
+    if (!ownerId || !currentDraftId || currentDraftLifecycle !== 'finalized') return;
+    void Promise.all([
+      cancelInactivityNotification(ownerId, currentDraftId),
+      cancelRestNotification(ownerId, currentDraftId),
+      inactivityStore.remove(ownerId, currentDraftId),
+      restTimerStore.remove(ownerId, currentDraftId),
+    ]).catch(error =>
+      setSyncMessage(error instanceof Error ? error.message : 'Workout alerts could not be cleared.'));
+  }, [ownerId, currentDraftId, currentDraftLifecycle]);
 
-  // Rest timer
   const [restSeconds, setRestSeconds] = useState(60);
   const [restRunning, setRestRunning] = useState(false);
   const restIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const restEndAtRef = useRef<number | null>(null);
 
-  // Restore persisted rest timer for this draft if present
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -286,70 +349,88 @@ export default function NextWorkoutScreen() {
       try {
         const entry = await restTimerStore.load(ownerId, draft.draftId);
         if (!entry) return;
-        const remaining = Math.max(0, Math.round((new Date(entry.endAt).getTime() - Date.now()) / 1000));
+        const endAt = Date.parse(entry.endAt);
+        const remaining = restTimeRemaining(entry.endAt, Date.now());
         if (!mounted) return;
-        if (remaining > 0) {
+        if (remaining > 0 && draft.lifecycle !== 'finalized') {
+          restEndAtRef.current = endAt;
           setRestSeconds(remaining);
           setRestRunning(true);
-          if (restIntervalRef.current) clearInterval(restIntervalRef.current);
-          restIntervalRef.current = setInterval(() => {
-            setRestSeconds((s) => {
-              if (s <= 1) {
-                if (restIntervalRef.current) clearInterval(restIntervalRef.current);
-                setRestRunning(false);
-                void restTimerStore.remove(ownerId, draft.draftId);
-                return 0;
-              }
-              return s - 1;
-            });
-          }, 1000);
+          const preferences = await restTimerStore.getPreferences(ownerId);
+          if (ownerIdRef.current !== ownerId) return;
+          if (preferences.alertEnabled && !(await scheduleRestNotification(remaining, ownerId, draft.draftId))) {
+            setSyncMessage('Rest timer restored without a device alert.');
+          }
         } else {
-          // expired — clean up
           await restTimerStore.remove(ownerId, draft.draftId);
+          if (draft.lifecycle === 'finalized') await cancelRestNotification(ownerId, draft.draftId);
         }
-      } catch {}
+      } catch (error) {
+        if (mounted) setSyncMessage(error instanceof Error ? error.message : 'Rest timer could not be restored.');
+      }
     })();
     return () => { mounted = false; };
-  }, [ownerId, draft]);
-  const startRestTimer = useCallback(async () => {
-    setRestRunning(true);
-    if (restIntervalRef.current) clearInterval(restIntervalRef.current);
-    // persist rest-timer to survive app restart
-    try {
-      if (draft && ownerId) {
-        const endAt = new Date(Date.now() + restSeconds * 1000).toISOString();
-        await restTimerStore.save({ ownerId, draftId: draft.draftId, endAt });
-        const remaining = Math.max(1, Math.round((new Date(endAt).getTime() - Date.now()) / 1000));
-        // request permission; if denied, show UI state (handled by caller)
-        const permitted = await requestNotificationPermission();
-        if (permitted) {
-          void scheduleRestNotification(remaining, 'Your rest timer finished.', `rest-${ownerId}-${draft.draftId}`);
+  }, [ownerId, draft?.draftId, draft?.lifecycle]);
+
+  useEffect(() => {
+    if (!restRunning) return;
+    restIntervalRef.current = setInterval(() => {
+      const remaining = restTimeRemaining(
+        new Date(restEndAtRef.current ?? 0).toISOString(), Date.now());
+      setRestSeconds(remaining);
+      if (remaining === 0) {
+        if (restIntervalRef.current) clearInterval(restIntervalRef.current);
+        setRestRunning(false);
+        if (ownerId && draft) {
+          void restTimerStore.remove(ownerId, draft.draftId).catch(error =>
+            setSyncMessage(error instanceof Error ? error.message : 'Rest timer cleanup failed.'));
         }
       }
-    } catch {}
-    restIntervalRef.current = setInterval(() => {
-      setRestSeconds((s) => {
-        if (s <= 1) {
-          if (restIntervalRef.current) clearInterval(restIntervalRef.current);
-          setRestRunning(false);
-          // Schedule notification as optional background confirmation
-          if (draft && ownerId) void scheduleRestNotification(1, 'Your rest timer finished.', `rest-${ownerId}-${draft.draftId}`);
-          void restTimerStore.remove(ownerId!, draft?.draftId ?? '');
-          return 0;
-        }
-        return s - 1;
-      });
     }, 1000);
-  }, [draft, ownerId, restSeconds]);
+    return () => { if (restIntervalRef.current) clearInterval(restIntervalRef.current); };
+  }, [restRunning, ownerId, draft?.draftId]);
+
+  const startRestTimer = useCallback(async (requestedSeconds?: number) => {
+    if (!draft || !ownerId) return;
+    try {
+      const preferences = await restTimerStore.getPreferences(ownerId);
+      const seconds = requestedSeconds ?? preferences.seconds;
+      const endAt = Date.now() + seconds * 1000;
+      await restTimerStore.save({ ownerId, draftId: draft.draftId, endAt: new Date(endAt).toISOString() });
+      if (preferences.alertEnabled) {
+        if (await requestNotificationPermission()) {
+          if (ownerIdRef.current !== ownerId) return;
+          if (!(await scheduleRestNotification(seconds, ownerId, draft.draftId))) {
+            setSyncMessage('Rest timer started without a device alert.');
+          }
+        } else {
+          await cancelRestNotification(ownerId, draft.draftId);
+          setSyncMessage('Notification permission denied. The rest timer will stay visible without an alert.');
+        }
+      } else {
+        await cancelRestNotification(ownerId, draft.draftId);
+      }
+      restEndAtRef.current = endAt;
+      setRestSeconds(seconds);
+      setRestRunning(true);
+    } catch (error) {
+      setSyncMessage(error instanceof Error ? error.message : 'Rest timer could not start.');
+    }
+  }, [draft?.draftId, ownerId]);
   const stopRestTimer = useCallback(async () => {
-    if (restIntervalRef.current) clearInterval(restIntervalRef.current);
-    restIntervalRef.current = null;
-    setRestRunning(false);
-    setRestSeconds(60);
-    try { if (draft && ownerId) await restTimerStore.remove(ownerId, draft.draftId); } catch {}
-    // cancel any scheduled rest notification for this draft
-    try { if (draft && ownerId) await scheduleRestNotification(0, '', `rest-${ownerId}-${draft.draftId}`); } catch {}
-  }, [draft, ownerId]);
+    if (!draft || !ownerId) return;
+    try {
+      await cancelRestNotification(ownerId, draft.draftId);
+      await cancelInactivityNotification(ownerId, draft.draftId);
+      await restTimerStore.remove(ownerId, draft.draftId);
+      await inactivityStore.remove(ownerId, draft.draftId);
+      restEndAtRef.current = null;
+      setRestRunning(false);
+      setRestSeconds((await restTimerStore.getPreferences(ownerId)).seconds);
+    } catch (error) {
+      setSyncMessage(error instanceof Error ? error.message : 'Rest timer could not be skipped.');
+    }
+  }, [draft?.draftId, ownerId]);
 
   // Resolve the exact owner/revision/stable-day target. A local draft may win while
   // the network-backed program is still loading, but an unrelated workout never does.
@@ -585,7 +666,12 @@ export default function NextWorkoutScreen() {
       const nextDraft = updateWorkoutSet(draft, { setId, ...checked, ...update });
       setDraft(nextDraft);
 
-      void persistDraft(nextDraft).catch(() => setSyncMessage('Edits could not be saved on this device. Keep this workout open and retry.'));
+      void persistDraft(nextDraft).then(() => {
+        if (field === 'logged' && value) {
+          void resetInactivity();
+          void startRestTimer();
+        }
+      }).catch(() => setSyncMessage('Edits could not be saved on this device. Keep this workout open and retry.'));
     } catch (error) {
       Alert.alert('Check this set', error instanceof Error ? error.message : 'Enter valid set details before logging it.');
     }
@@ -979,7 +1065,6 @@ export default function NextWorkoutScreen() {
       // For each exercise, find the best weight×reps set just saved and compare
       // against the user's all-time best for that exercise.
       const newPrNames: string[] = [];
-      const newPrs: { name: string; weight: number; reps: number }[] = [];
       try {
         for (const ex of outcome.status === 'finalized' ? exercises : []) {
           if (!ex.exerciseId) continue;
@@ -1028,16 +1113,11 @@ export default function NextWorkoutScreen() {
               console.warn(`[PR] Insert failed for ${ex.name}:`, prInsertErr.message);
             } else {
               newPrNames.push(ex.name);
-              newPrs.push({ name: ex.name, weight: bestWeight, reps: bestReps });
             }
           }
         }
       } catch (prErr) {
         console.warn("[handleFinish] PR detection failed:", prErr);
-      }
-
-      if (newPrs.length > 0) {
-        void notifyPRCelebration(newPrs);
       }
 
       // PR/progression/analytics work is queued from the durable receipt and cannot roll back capture.
@@ -1046,12 +1126,19 @@ export default function NextWorkoutScreen() {
 
       void haptic(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success));
 
-      if (newPrNames.length > 0) {
-        setPrExercises(newPrNames);
-        setShowPrModal(true);
-      } else {
-        router.back();
+      if (draft && ownerId) {
+        try {
+          await cancelRestNotification(ownerId, draft.draftId);
+          await restTimerStore.remove(ownerId, draft.draftId);
+          restEndAtRef.current = null;
+          setRestRunning(false);
+        } catch (error) {
+          reportSupabaseFailure('workout.rest_alert_cleanup', error);
+          setFinishWarning('Workout submitted, but the pending rest alert could not be cleared on this device.');
+        }
       }
+      setPrExercises(newPrNames);
+      setShowFinishActions(true);
     } catch (err) {
       reportSupabaseFailure('workout.finish', err);
       setSaving(false);
@@ -1157,7 +1244,6 @@ export default function NextWorkoutScreen() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
-          onTouchStart={() => { resetInactivity(); }}
         >
           {removalCapability.message && <View style={styles.syncBanner}>
             <Text style={styles.syncBannerText}>{removalCapability.message}</Text>
@@ -1170,13 +1256,24 @@ export default function NextWorkoutScreen() {
           )}
           {showInactivityNudge && (
             <View style={styles.syncBanner} accessibilityRole="summary">
-              <Text style={styles.syncBannerText}>Looks like you paused. Start a rest timer?</Text>
+              <Text style={styles.syncBannerText}>No sets logged for five minutes. Your workout draft is still here.</Text>
               <View style={styles.unavailableActions}>
-                <Pressable style={styles.secondaryButton} onPress={() => { setShowInactivityNudge(false); resetInactivity(); }}>
-                  <Text style={styles.secondaryButtonText}>Keep working</Text>
+                <Pressable style={styles.secondaryButton} onPress={() => setShowInactivityNudge(false)}>
+                  <Text style={styles.secondaryButtonText}>Continue workout</Text>
                 </Pressable>
-                <Pressable style={styles.secondaryButton} onPress={() => { setShowInactivityNudge(false); startRestTimer(); resetInactivity(); }}>
-                  <Text style={styles.secondaryButtonText}>Start rest</Text>
+              </View>
+            </View>
+          )}
+          {restRunning && (
+            <View style={styles.syncBanner} accessibilityRole="summary">
+              <Text style={styles.syncBannerText}>Rest: {formatTime(restSeconds)}</Text>
+              <View style={styles.unavailableActions}>
+                <Pressable style={styles.secondaryButton} onPress={() => void stopRestTimer()}>
+                  <Text style={styles.secondaryButtonText}>Skip rest</Text>
+                </Pressable>
+                <Pressable style={styles.secondaryButton}
+                  onPress={() => void startRestTimer(extendRestSeconds(restSeconds, 30))}>
+                  <Text style={styles.secondaryButtonText}>Extend 30 sec</Text>
                 </Pressable>
               </View>
             </View>
@@ -1280,31 +1377,25 @@ export default function NextWorkoutScreen() {
         styles={styles}
       />
 
-      {/* PR Celebration Modal */}
-      <Modal visible={showPrModal} transparent animationType="fade">
+      <Modal visible={showFinishActions} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            <Text style={{ fontSize: 40, textAlign: "center", marginBottom: 8 }}>🏆</Text>
-            <Text style={styles.modalTitle}>
-              {prExercises.length === 1 ? "New PR!" : `${prExercises.length} New PRs!`}
+            <Text style={styles.modalTitle}>Workout submitted</Text>
+            <Text style={styles.modalBody}>
+              {prExercises.length ? `${prExercises.length} personal record${prExercises.length === 1 ? '' : 's'} recorded. ` : ''}
+              Your selected program day is resolved. Other pending days remain available.
             </Text>
-            <View style={{ gap: 4, marginBottom: 20 }}>
-              {prExercises.map((name) => (
-                <Text key={name} style={[styles.modalBody, { textAlign: "center", marginBottom: 0 }]}>
-                  {name}
-                </Text>
-              ))}
-            </View>
+            {finishWarning && <Text accessibilityRole="alert" style={styles.modalBody}>{finishWarning}</Text>}
             <Pressable
-              style={({ pressed }) => [{
-                backgroundColor: theme.primary,
-                borderRadius: 14,
-                paddingVertical: 14,
-                alignItems: "center",
-              }, pressed && { opacity: 0.8 }]}
-              onPress={() => { setShowPrModal(false); router.back(); }}
+              style={styles.modalConfirm}
+              accessibilityRole="button"
+              onPress={() => { setShowFinishActions(false); router.back(); }}
             >
-              <Text style={styles.modalConfirmText}>Nice!</Text>
+              <Text style={styles.modalConfirmText}>Continue</Text>
+            </Pressable>
+            <Pressable style={styles.modalCancel} accessibilityRole="button"
+              onPress={() => { setShowFinishActions(false); router.replace('/(tabs)/plan'); }}>
+              <Text style={styles.modalCancelText}>Adjust upcoming program</Text>
             </Pressable>
           </View>
         </View>

@@ -93,6 +93,21 @@ test('Home and Plan serialize the complete immutable workout target', () => {
   assert.equal(resolveProgramWorkout(program, route)?.id, programDayId);
 });
 
+test('a selected later sequence day resolves its exact prescription rather than the calendar week', () => {
+  const laterDay = {
+    ...program.workouts[0],
+    id: '50000000-0000-4000-8000-000000000002',
+    stableDayId: '40000000-0000-4000-8000-000000000002',
+    name: 'Later workout',
+  };
+  const allDays = { ...program, workouts: [...program.workouts, laterDay] };
+  const target = workoutRouteParams(allDays, laterDay);
+
+  assert.equal(resolveProgramWorkout(allDays, target)?.id, laterDay.id);
+  assert.equal(resolveProgramWorkout(allDays, { ...target, programDayId }), null);
+  assert.equal(resolveProgramWorkout(program, target), null);
+});
+
 test('loading never becomes unavailable before program and draft resolution settle', () => {
   assert.equal(workoutAvailability({
     authLoading: false,
