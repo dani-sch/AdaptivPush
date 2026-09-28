@@ -5,6 +5,7 @@
 - [HOSTED VERIFIED] Additive migration `20260927190000` is deployed after fresh encrypted recovery and isolated exact-packet rehearsal. Hosted owner/anonymous, replay/conflict, lineage, Finish/correction/ad-hoc and concurrency gates passed with no persistent synthetic fixtures. Ledger has 11 entries; AP-04 schedule tables remain empty and their dated writer RPCs are grant-disabled, not rewritten. See [authority evidence](/dev-doc/reports/ADAPTIVPUSH-FLEXIBLE-SEQUENCE-AUTHORITY-2026-09-27.md).
 - [OPEN] Replace superseded dated client readers/writers, Finish and reminders against this authority; verify pending retries, partial/alternate/ad-hoc, timer, and notification policy. Do not distribute the dated merged source.
 - [USER ACCEPTANCE] Physical-device workout, restart, permission, inactivity-nudge, and rest-timer checks are outstanding; automated tests cannot establish native alert acceptance.
+- [BLOCKED FOR DISTRIBUTION] Revision-backed program loading now covers every immutable day and exact cross-week route matching is tested; hosted end-to-end cross-week entry, restart, draft-removal, permission/device checks and correction/progression reconciliation remain open. Dedicated history-only ad-hoc capture is source-backed and locally tested; dated correction writes fail closed. Automated gates alone cannot establish native alert behavior or a release.
 
 ## [USER ACCEPTANCE] Current Expo/iPhone release
 

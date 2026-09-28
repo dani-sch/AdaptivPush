@@ -10,8 +10,8 @@
 | Category | Files |
 |----------|-------|
 | Project Root | 4 |
-| Tests | 38 |
-| Top-level Scripts | 36 |
+| Tests | 44 |
+| Top-level Scripts | 37 |
 | Automation Scripts | 24 |
 | Tool Scripts | 27 |
 | Power Automate Scripts | 1 |
@@ -21,7 +21,7 @@
 | Skills | 62 |
 | Agents | 17 |
 | Commands | 8 |
-| **Total** | **276** |
+| **Total** | **283** |
 
 ---
 
@@ -65,7 +65,9 @@ _Test suite_
     │   ├── installation.test.ts — import assert from 'node:assert/strict';
     │   ├── repository.test.ts — import assert from 'node:assert/strict';
     │   ├── revision.test.ts — import assert from 'node:assert/strict';
-    │   └── rollout.test.ts — import assert from 'node:assert/strict';
+    │   ├── rollout.test.ts — import assert from 'node:assert/strict';
+    │   ├── sequenceOperationStore.test.ts — import test from 'node:test';
+    │   └── sequenceSelectors.test.ts — import assert from 'node:assert/strict';
     ├── scheduling/
     │   ├── commands.test.ts — import test from 'node:test';
     │   ├── contracts.test.ts — import test from 'node:test';
@@ -76,17 +78,21 @@ _Test suite_
     │   ├── repositoryEligibility.test.ts — import assert from 'node:assert/strict';
     │   └── reviseSchedule.test.ts — import assert from 'node:assert/strict';
     └── workouts/
+        ├── adHocFlow.test.ts — import assert from 'node:assert/strict';
         ├── correction.test.ts — import assert from 'node:assert/strict';
         ├── editDraftStore.test.ts — import assert from 'node:assert/strict';
         ├── editingSequence.test.ts — import assert from 'node:assert/strict';
         ├── effectiveCurrentWorkout.test.ts — import assert from 'node:assert/strict';
         ├── finalization.test.ts — import assert from 'node:assert/strict';
+        ├── inactivityPolicy.test.ts — import assert from 'node:assert/strict';
         ├── loadPresentation.test.ts — import assert from 'node:assert/strict';
         ├── nextWorkoutCard.test.ts — import assert from 'node:assert/strict';
+        ├── notificationPolicy.test.ts — import assert from 'node:assert/strict';
         ├── occurrence.test.ts — import assert from 'node:assert/strict';
         ├── persistedSession.test.ts — import assert from 'node:assert/strict';
         ├── removalCapability.test.ts — import assert from 'node:assert/strict';
         ├── removals.test.ts — import assert from 'node:assert/strict';
+        ├── restTimerPolicy.test.ts — import assert from 'node:assert/strict';
         ├── routeResolution.test.ts — import assert from 'node:assert/strict';
         ├── swapInteraction.test.ts — import assert from 'node:assert/strict';
         └── swapRecovery.test.ts — import { confirmedSwapMessage } from '../../features/workouts/swapRecovery';
@@ -120,6 +126,7 @@ _Standalone utility scripts_
     ├── manualQaProxy.mjs — // Local-only fault controls for physical-device QA. Never logs headers/payloads.
     ├── prepareManualProgramFixtures.mjs — // Bounded synthetic fixtures. Fixed local container and synthetic account only.
     ├── README.md — scripts/
+    ├── rehearsal_flexible_sequence.ps1 — rehearsal_flexible_sequence.ps1
     ├── run-venv.cmd — @echo off
     ├── run-venv.ps1 — param(
     ├── save_session.py — Parse Copilot CLI events.jsonl into a compact session export.
