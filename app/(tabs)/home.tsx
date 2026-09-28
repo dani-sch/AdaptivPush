@@ -27,10 +27,8 @@ import { computeCyclePhase } from "../../utils/cyclePhase";
 import { workoutEntryIssue, workoutRouteParams } from "@/features/workouts/routeResolution";
 import { workoutDraftStore } from "@/features/workouts/draftStore";
 import { useProgramSchedule } from "@/hooks/useProgramSchedule";
-import { canStartUndatedWorkout, reminderPlanForSchedule, scheduledOutcomeLabel } from "@/features/scheduling/repository";
-import { scheduleOperationStore } from "@/features/scheduling/operationStore";
-import { parseNotificationPreferences } from "@/utils/profilePreferences";
-import { reconcileWorkoutReminders } from "@/utils/notifications";
+import { canStartUndatedWorkout, scheduledOutcomeLabel } from "@/features/scheduling/repository";
+// Reminder reconciliation and on-device scheduling disabled per Phase 3 client replacement.
 import {
   effectiveCurrentWorkout,
   matchingActiveWorkoutDraft,
@@ -625,7 +623,7 @@ export default function HomeScreen() {
   const [lastWorkoutId, setLastWorkoutId] = useState<string | null>(null);
   const [lastWorkoutDate, setLastWorkoutDate] = useState<string | null>(null);
   const [loadedDraft, setLoadedDraft] = useState<WorkoutDraft | null>(null);
-  const [reminderIssue, setReminderIssue] = useState<{ ownerId: string; programId: string; revision: number } | null>(null);
+  // Reminder reconciliation and dated on-device notifications are disabled in this Phase 3 client replacement.
   const homeFocusGenerationRef = useRef(0);
 
   const {
@@ -639,36 +637,10 @@ export default function HomeScreen() {
     applyReadinessAdjustmentOnly,
     advanceToNextWeek,
   } = useCurrentProgram();
+  // Keep schedule readable for compatibility but do not treat it as authoritative in the UI.
   const schedule = useProgramSchedule(ownerId, program?.id ?? null);
   const refreshSchedule = schedule.refresh;
-  const acceptedSchedule = schedule.read?.state === 'ready' && !schedule.pending ? schedule.read : null;
   const currentProgramId = program?.id ?? null;
-
-  useEffect(() => {
-    if (!ownerId || !currentProgramId || !acceptedSchedule) return;
-    let active = true;
-    const requestOwner = ownerId;
-    const requestProgram = currentProgramId;
-    void (async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) throw error;
-        if (!active) return;
-        if (session?.user.id !== requestOwner) throw new Error('Schedule account changed before reminder reconciliation.');
-        const pending = await scheduleOperationStore.load(requestOwner, requestProgram);
-        if (!active || pending) return;
-        const preferences = parseNotificationPreferences(session.user.user_metadata?.notification_preferences);
-        const plan = reminderPlanForSchedule(acceptedSchedule, requestOwner, requestProgram, preferences);
-        await reconcileWorkoutReminders(plan);
-        if (active) setReminderIssue(null);
-      } catch (error) {
-        if (!active) return;
-        reportSupabaseFailure('schedule.reminders', error);
-        setReminderIssue({ ownerId: requestOwner, programId: requestProgram, revision: acceptedSchedule.revision });
-      }
-    })();
-    return () => { active = false; };
-  }, [ownerId, currentProgramId, acceptedSchedule]);
 
   const fetchLastWorkout = useCallback(async (requestOwnerId: string, signal: AbortSignal) => {
     try {
@@ -911,33 +883,20 @@ export default function HomeScreen() {
             {actionError}
           </Text>
         ) : null}
-        {reminderIssue?.ownerId === ownerId && reminderIssue.programId === program?.id
-          && acceptedSchedule?.revision === reminderIssue.revision ? (
-          <Text style={{ color: theme.errorLight, marginHorizontal: 16, marginBottom: 12 }}>
-            Dated reminders could not be updated. Check notification permission and refresh the dated plan.
-          </Text>
-        ) : null}
         {program ? (
           <View style={{ backgroundColor: theme.mutedBg, borderColor: theme.border, borderWidth: 1, borderRadius: 14, padding: 16, marginHorizontal: 16, marginBottom: 12 }}>
-            <Text style={{ color: theme.textPrimary, fontWeight: '700', marginBottom: 5 }}>Today · Dated plan</Text>
+            <Text style={{ color: theme.textPrimary, fontWeight: '700', marginBottom: 5 }}>Suggested · Program sequence</Text>
             <Text style={{ color: theme.text, lineHeight: 20 }}>
-              {!schedule.today ? 'Checking dated schedule…'
-                : schedule.today.state === 'workout'
-                  ? `Workout placed for ${schedule.today.localDate}. Finish will preserve this accepted occurrence and schedule revision.`
-                  : schedule.today.state === 'rest'
-                    ? `Rest day · ${schedule.today.localDate}`
-                    : schedule.today.state === 'fulfilled'
-                      ? `${scheduledOutcomeLabel(schedule.today.day)} · ${schedule.today.localDate}`
-                      : 'message' in schedule.today ? schedule.today.message : 'Dated schedule unavailable.'}
+              {nextWorkout ? `Suggested next workout: ${nextWorkout.name}` : 'No suggested workout right now. The program may be paused or week is finished.'}
             </Text>
-            {activeDraft && canStartScheduled && !activeDraft.scheduleOccurrenceId ? (
+            {activeDraft ? (
               <Text style={{ color: theme.text, lineHeight: 20, marginTop: 6 }}>
-                Your saved draft will be linked to this accepted occurrence when you explicitly resume it.
+                Your saved draft will be preserved. Starting a workout only resolves the selected program day when you finalize it.
               </Text>
             ) : null}
-            <Pressable onPress={() => void refreshSchedule()} accessibilityRole="button" accessibilityLabel="Retry dated schedule" style={{ minHeight: 44, justifyContent: 'center' }}>
-              <Text style={{ color: theme.primaryLight, fontWeight: '700' }}>Refresh dated plan</Text>
-            </Pressable>
+            <Text style={{ color: theme.placeholder, marginTop: 8 }}>
+              Note: dated placements and automated reminders are disabled in this build. Program sequence authority is server-side; changes must be explicit.
+            </Text>
           </View>
         ) : null}
         {program && program.workouts.every((w) => w.isFinalized || w.isCompleted) && program.workouts.length > 0 ? (

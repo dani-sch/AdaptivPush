@@ -137,59 +137,50 @@ export function reconcileWorkoutReminders(plan: ReminderPlan): Promise<{
 export async function notifyPRCelebration(
   prs: Array<{ name: string; weight: number; reps: number }>,
 ): Promise<void> {
-  if (prs.length === 0) return;
-  const prefs = await getPrefs();
-  if (!prefs?.pushEnabled || !prefs?.prCelebrations) return;
-  if (!(await canNotify())) return;
-
-  const title =
-    prs.length === 1 ? `New PR — ${prs[0].name}!` : `${prs.length} new PRs today!`;
-  const body =
-    prs.length === 1
-      ? `${prs[0].weight} lbs × ${prs[0].reps} reps — a new personal best!`
-      : prs.map((p) => `${p.name}: ${p.weight} lbs × ${p.reps}`).join('\n');
-
-  try {
-    await Notifications.scheduleNotificationAsync({
-      content: { title, body, sound: true },
-      trigger: null,
-    });
-  } catch {}
+  // Disabled by Phase 3 client replacement: PR notifications suppressed.
+  return;
 }
 
 export async function notifyDeloadWeek(): Promise<void> {
-  const prefs = await getPrefs();
-  if (!prefs?.pushEnabled || !prefs?.deloadReminder) return;
-  if (!(await canNotify())) return;
-
-  try {
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'Deload week — time to recover',
-        body: 'Lower volume this week. Rest up and come back stronger.',
-        sound: true,
-      },
-      trigger: null,
-    });
-  } catch {}
+  // Disabled by Phase 3 client replacement: deload reminders suppressed.
+  return;
 }
 
 // Fires a notification 5 seconds from now so the user can confirm the stack works.
 // Background the app after saving to see it.
 export async function sendTestNotification(): Promise<void> {
+  // Disabled in Phase 3 replacement.
+  return;
+}
+
+// Schedule a rest-timer completion notification after `seconds` seconds.
+// Accept an optional identifier. If provided, cancel any existing scheduled notification
+// with the same identifier to guarantee a single active rest notification per identifier.
+export async function scheduleRestNotification(seconds: number, body?: string, identifier?: string): Promise<void> {
+  if (Platform.OS === 'web') return;
   try {
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'Notifications are working',
-        body: 'Your settings were saved successfully.',
-        sound: true,
-      },
+    if (identifier) {
+      const existing = await Notifications.getAllScheduledNotificationsAsync();
+      for (const n of existing) {
+        if (n.identifier === identifier) {
+          await Notifications.cancelScheduledNotificationAsync(identifier);
+        }
+      }
+    }
+    const id = await Notifications.scheduleNotificationAsync({
+      identifier: identifier,
+      content: { title: 'Rest timer complete', body: body ?? 'Your rest timer finished.', sound: true },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-        seconds: 5,
+        seconds,
       },
     });
+    // On some runtimes the returned id may differ from the requested identifier; if identifier provided, attempt to harmonize
+    if (identifier && id !== identifier) {
+      try { await Notifications.cancelScheduledNotificationAsync(id); } catch {}
+    }
   } catch {
-    // Simulator / web — ignore
+    // ignore
   }
 }
+

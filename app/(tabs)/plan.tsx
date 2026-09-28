@@ -8,16 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useCurrentProgram } from '@/hooks/useCurrentProgram';
 import { useProgramSchedule } from '@/hooks/useProgramSchedule';
-import {
-    canStartUndatedWorkout, createScheduleRepository, scheduleCapabilityMissing,
-    scheduleWriterEnabled, scheduledOutcomeLabel, type ScheduledDay,
-} from '@/features/scheduling/repository';
-import { createScheduleCommand } from '@/features/scheduling/createSchedule';
-import { scheduleOperationStore } from '@/features/scheduling/operationStore';
-import { ProgramSchedulePlacement } from '@/components/ProgramSchedulePlacement';
-import { ProgramScheduleDeviationControls } from '@/components/ProgramScheduleDeviationControls';
-import { createScheduleRevisionCommand, isScheduleRevisionRequest } from '@/features/scheduling/reviseSchedule';
-import { supabase } from '@/utils/supabase';
+import { canStartUndatedWorkout } from '@/features/scheduling/repository';
 import type { ProgramWorkout } from '@/types/program';
 import { WorkoutTemplateModal } from '@/components/WorkoutTemplateModal';
 import { GenerateProgramModal } from '@/components/GenerateProgramModal';
@@ -26,20 +17,25 @@ import type { Theme } from '@/constants/themes';
 import { workoutRouteParams } from '@/features/workouts/routeResolution';
 import { createCompletedNavigation } from '@/features/workouts/effectiveOccurrence';
 import { reportSupabaseFailure, supabaseSaveFailureMessage } from '@/utils/supabaseResilience';
+import PendingSequenceBanner from './components/PendingSequenceBanner';
+import { programSequenceRepository } from '@/features/programs/sequenceRepository';
+import sequenceService from '@/features/programs/sequenceService';
+import { createOperationId } from '@/features/kernel/operationId';
 
-const scheduleCommand = createScheduleCommand(createScheduleRepository(supabase), scheduleOperationStore);
-const scheduleRevisionCommand = createScheduleRevisionCommand(createScheduleRepository(supabase), scheduleOperationStore);
+// Note: dated schedule writers and UI removed per Phase 3 client replacement; sequence authority is server-side. UI shows suggestion only.
 
-function placementLabel(workout: ProgramWorkout, days: ScheduledDay[]): string {
-    const day = days.find((item) => item.stableDayId === workout.stableDayId && item.programDayId === workout.id);
+function placementLabel(workout: ProgramWorkout, days: any[] | null): string {
+    if (!days) return 'No confirmed placement for this program day';
+    const day = days.find((item: any) => item.stableDayId === workout.stableDayId && item.programDayId === workout.id);
     if (!day) return 'No confirmed placement for this program day';
     return day.localDate
         ? `${day.localDate} · ${day.kind} · ${day.status}`
         : `${day.kind} · ${day.status} (no date)`;
 }
 
-function scheduledWorkoutTarget(workout: ProgramWorkout, days: ScheduledDay[]): ScheduledDay | null {
-    const matches = days.filter((day) => day.programDayId === workout.id && day.kind === 'workout'
+function scheduledWorkoutTarget(workout: ProgramWorkout, days: any[] | null): any | null {
+    if (!days) return null;
+    const matches = days.filter((day: any) => day.programDayId === workout.id && day.kind === 'workout'
         && (day.status === 'planned' || day.status === 'in_progress'));
     return matches.length === 1 ? matches[0] : null;
 }
@@ -190,8 +186,6 @@ export default function PlanScreen() {
     }, [selectedWorkout, navigateAfterDismiss, pendingEdit]);
     const [showMenu, setShowMenu] = useState(false);
     const [showGenModal, setShowGenModal] = useState(false);
-    const [retryingSchedule, setRetryingSchedule] = useState(false);
-    const [scheduleIssue, setScheduleIssue] = useState<string | null>(null);
 
     const {
         program,
@@ -204,36 +198,10 @@ export default function PlanScreen() {
         swapExercise,
         endCurrentProgram,
     } = useCurrentProgram();
+    // Keep schedule readable for compatibility, but do not treat dated schedule as authority in the UI.
     const schedule = useProgramSchedule(ownerId, program?.id ?? null);
     const refreshSchedule = schedule.refresh;
     const scheduledDays = schedule.read?.state === 'ready' ? schedule.read.days : null;
-
-    const retrySchedule = useCallback(async () => {
-        if (!ownerId || !program || retryingSchedule || !scheduleWriterEnabled) return;
-        setRetryingSchedule(true);
-        try {
-            const pending = await scheduleOperationStore.load(ownerId, program.id);
-            if (!pending) {
-                setScheduleIssue('There is no saved schedule request to reconcile.');
-                return;
-            }
-            const outcome = isScheduleRevisionRequest(pending.requestJson)
-                ? await scheduleRevisionCommand.retry(ownerId, program.id)
-                : await scheduleCommand.retry(ownerId, program.id);
-            if (outcome.status === 'created' || outcome.status === 'revised' || outcome.status === 'replayed') {
-                setScheduleIssue(null);
-                await schedule.refresh();
-                await refresh();
-            } else if ('message' in outcome) {
-                setScheduleIssue(outcome.message);
-            }
-        } catch (error) {
-            reportSupabaseFailure('schedule.retry', error);
-            setScheduleIssue('Saved schedule request could not be reconciled. Try again when connected.');
-        } finally {
-            setRetryingSchedule(false);
-        }
-    }, [ownerId, program, retryingSchedule, schedule, refresh]);
     useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
     useFocusEffect(useCallback(() => { void refreshSchedule(); }, [refreshSchedule]));
 
@@ -410,57 +378,22 @@ export default function PlanScreen() {
                     </View>
                 </View>
 
-                {/* Week View */}
+                {/* Sequence suggestion (server-side authority). Dated placements and client-side schedule controls removed. */}
                 <View style={[styles.section, { backgroundColor: theme.mutedBg, borderRadius: 14, padding: 14 }]}>
-                    <Text style={{ color: theme.text, lineHeight: 20 }}>
-                        {!schedule.today ? 'Checking dated placement…'
-                            : schedule.today.state === 'workout'
-                                ? `Placed workout on ${schedule.today.localDate}. Start it here or from Today; Finish will preserve this occurrence.`
-                                : schedule.today.state === 'rest'
-                                    ? `Rest day on ${schedule.today.localDate}.`
-                                    : schedule.today.state === 'fulfilled'
-                                        ? `${scheduledOutcomeLabel(schedule.today.day)} on ${schedule.today.localDate}.`
-                                        : 'message' in schedule.today ? schedule.today.message : 'Dated schedule unavailable.'}
+                    {program.workouts.find((w) => !w.isFinalized && !w.isCompleted) ? (
+                        <Text style={{ color: theme.text, lineHeight: 20 }}>
+                            Suggested next workout: {program.workouts.find((w) => !w.isFinalized && !w.isCompleted)?.name}. Select another program day from View Full Program or start this suggested workout.
+                        </Text>
+                    ) : (
+                        <Text style={{ color: theme.text, lineHeight: 20 }}>
+                            No suggested workout right now. The program may be paused or all workouts this week are finished.
+                        </Text>
+                    )}
+                    <Text style={{ color: theme.placeholder, marginTop: 8 }}>
+                        Note: dated placements and automated reminders are disabled in this build. Program sequence authority is server-side; changes must be explicit.
                     </Text>
                 </View>
-                {schedule.pending ? (
-                    <View style={[styles.section, { backgroundColor: theme.mutedBg, borderRadius: 14, padding: 14 }]}>
-                        <Text style={{ color: theme.text }}>
-                            A dated schedule request is saved for this account. Its exact request and operation ID must be reconciled before another schedule change.
-                        </Text>
-                        {scheduleIssue ? <Text style={{ color: theme.errorLight }}>{scheduleIssue}</Text> : null}
-                        {!scheduleWriterEnabled ? <Text style={{ color: theme.text }}>
-                            Retry is unavailable until schedule support is enabled in this build and server.
-                        </Text> : null}
-                        <Pressable accessibilityRole="button" accessibilityState={{ disabled: retryingSchedule || !scheduleWriterEnabled }}
-                            disabled={retryingSchedule || !scheduleWriterEnabled} onPress={() => void retrySchedule()}
-                            style={{ minHeight: 44, justifyContent: 'center' }}>
-                            <Text style={{ color: scheduleWriterEnabled ? theme.primaryLight : theme.placeholder }}>
-                                {retryingSchedule ? 'Reconciling…' : 'Retry the exact saved schedule request'}
-                            </Text>
-                        </Pressable>
-                    </View>
-                ) : (schedule.read?.state === 'unplaced' || scheduleCapabilityMissing(schedule.read)) && ownerId && program.currentRevisionId ? (
-                    <ProgramSchedulePlacement
-                        key={`${ownerId}/${program.id}/${program.currentRevisionId}`}
-                        ownerId={ownerId}
-                        programId={program.id}
-                        revisionId={program.currentRevisionId}
-                        scheduleConfirmedAbsent={schedule.read?.state === 'unplaced'}
-                        onAccepted={() => { void schedule.refresh(); void refresh(); }}
-                        onRecoveryNeeded={() => { void schedule.refresh(); }}
-                    />
-                ) : schedule.read?.state === 'ready' && ownerId && program.currentRevisionId ? (
-                    <ProgramScheduleDeviationControls
-                        key={`${ownerId}/${program.id}/${schedule.read.revision}`}
-                        ownerId={ownerId}
-                        programId={program.id}
-                        programRevisionId={program.currentRevisionId}
-                        schedule={schedule.read}
-                        onAccepted={() => { void schedule.refresh(); void refresh(); }}
-                        onRecoveryNeeded={() => { void schedule.refresh(); }}
-                    />
-                ) : null}
+                <PendingSequenceBanner ownerId={ownerId} refreshProgram={refresh} />
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>This Week&apos;s Workouts</Text>
 
@@ -520,6 +453,52 @@ export default function PlanScreen() {
                                 </View>
 
                                 <Text style={styles.exerciseCount}>{visibleProgramExercises(workout.exercises).length} exercises</Text>
+                                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                                  <Pressable onPress={async () => {
+                                    try {
+                                      if (!ownerId) throw new Error('Sign in required');
+                                      const supported = await programSequenceRepository.capability();
+                                      if (!supported) throw new Error('Program sequence capability not available.');
+                                      const seq = await programSequenceRepository.get(program.id);
+                                      const op = createOperationId();
+                                      const payload = { schemaVersion: '1', programId: program.id, expectedRevision: seq.revision, operationId: op, kind: 'set_day', stableDayId: workout.stableDayId, status: 'replaced_with_rest' } as Record<string, unknown>;
+                                      await sequenceService.change(ownerId, program.id, payload);
+                                      void refresh();
+                                    } catch (e) { reportSupabaseFailure('program.sequence_action', e); Alert.alert('Action failed', 'Could not apply program change.'); }
+                                  }} style={({ pressed }) => [{ backgroundColor: theme.mutedBg, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10 }, pressed && { opacity: 0.85 }]}>
+                                    <Text style={{ color: theme.text }}>Replace with rest</Text>
+                                  </Pressable>
+
+                                  <Pressable onPress={async () => {
+                                    try {
+                                      if (!ownerId) throw new Error('Sign in required');
+                                      const supported = await programSequenceRepository.capability();
+                                      if (!supported) throw new Error('Program sequence capability not available.');
+                                      const seq = await programSequenceRepository.get(program.id);
+                                      const op = createOperationId();
+                                      const payload = { schemaVersion: '1', programId: program.id, expectedRevision: seq.revision, operationId: op, kind: 'set_day', stableDayId: workout.stableDayId, status: 'skipped' } as Record<string, unknown>;
+                                      await sequenceService.change(ownerId, program.id, payload);
+                                      void refresh();
+                                    } catch (e) { reportSupabaseFailure('program.sequence_action', e); Alert.alert('Action failed', 'Could not apply program change.'); }
+                                  }} style={({ pressed }) => [{ backgroundColor: theme.mutedBg, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10 }, pressed && { opacity: 0.85 }]}>
+                                    <Text style={{ color: theme.text }}>Mark skipped</Text>
+                                  </Pressable>
+
+                                  <Pressable onPress={async () => {
+                                    try {
+                                      if (!ownerId) throw new Error('Sign in required');
+                                      const supported = await programSequenceRepository.capability();
+                                      if (!supported) throw new Error('Program sequence capability not available.');
+                                      const seq = await programSequenceRepository.get(program.id);
+                                      const op = createOperationId();
+                                      const payload = { schemaVersion: '1', programId: program.id, expectedRevision: seq.revision, operationId: op, kind: 'pause' } as Record<string, unknown>;
+                                      await sequenceService.change(ownerId, program.id, payload);
+                                      void refresh();
+                                    } catch (e) { reportSupabaseFailure('program.sequence_action', e); Alert.alert('Action failed', 'Could not apply program change.'); }
+                                  }} style={({ pressed }) => [{ backgroundColor: theme.mutedBg, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10 }, pressed && { opacity: 0.85 }]}>
+                                    <Text style={{ color: theme.text }}>Pause</Text>
+                                  </Pressable>
+                                </View>
                             </View>
                         ))}
                     </View>
@@ -566,12 +545,8 @@ export default function PlanScreen() {
                             }
                             const scheduledDay = schedule.read?.state === 'ready'
                                 ? scheduledWorkoutTarget(selectedWorkoutObj, schedule.read.days) : null;
-                            if (schedule.read?.state === 'ready' && !scheduledDay) {
-                                Alert.alert('Workout start unavailable', 'This workout has no active dated placement. Refresh or revise the schedule before starting it.');
-                                return;
-                            }
                             if (!scheduledDay && !canStartUndatedWorkout(schedule.read, schedule.pending)) {
-                                Alert.alert('Workout start unavailable', 'Dated placement cannot be confirmed. Your workout and draft have not been changed.');
+                                Alert.alert('Workout start unavailable', 'This workout cannot be started right now. Refresh and try again.');
                                 return;
                             }
                             setSelectedWorkout(null);

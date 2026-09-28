@@ -18,7 +18,8 @@ import { SwapExerciseModal, type AddExerciseSelection } from "@/components/SwapE
 import { useCurrentProgram } from "@/hooks/useCurrentProgram";
 import type { CurrentProgram, ProgramWorkout } from "@/types/program";
 import { supabase } from "@/utils/supabase";
-import { notifyPRCelebration } from "@/utils/notifications";
+import { notifyPRCelebration, scheduleRestNotification, requestNotificationPermission } from "@/utils/notifications";
+import { restTimerStore } from '@/features/workouts/restTimerStore';
 import { createOperationId } from "@/features/kernel/operationId";
 import {
   amendWorkoutExercise,
@@ -257,6 +258,99 @@ export default function NextWorkoutScreen() {
     return save;
   };
 
+  // Inactivity nudge (5 minutes)
+  const inactivityRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showInactivityNudge, setShowInactivityNudge] = useState(false);
+  const resetInactivity = useCallback(() => {
+    setShowInactivityNudge(false);
+    if (inactivityRef.current) clearTimeout(inactivityRef.current);
+    inactivityRef.current = setTimeout(() => setShowInactivityNudge(true), 5 * 60 * 1000);
+  }, []);
+
+  useEffect(() => {
+    // start inactivity watcher when draft or owner changes - defer to avoid setState in render path
+    const handle = setTimeout(() => resetInactivity(), 0);
+    return () => { clearTimeout(handle); if (inactivityRef.current) clearTimeout(inactivityRef.current); };
+  }, [draft, ownerId, resetInactivity]);
+
+  // Rest timer
+  const [restSeconds, setRestSeconds] = useState(60);
+  const [restRunning, setRestRunning] = useState(false);
+  const restIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Restore persisted rest timer for this draft if present
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (!ownerId || !draft) return;
+      try {
+        const entry = await restTimerStore.load(ownerId, draft.draftId);
+        if (!entry) return;
+        const remaining = Math.max(0, Math.round((new Date(entry.endAt).getTime() - Date.now()) / 1000));
+        if (!mounted) return;
+        if (remaining > 0) {
+          setRestSeconds(remaining);
+          setRestRunning(true);
+          if (restIntervalRef.current) clearInterval(restIntervalRef.current);
+          restIntervalRef.current = setInterval(() => {
+            setRestSeconds((s) => {
+              if (s <= 1) {
+                if (restIntervalRef.current) clearInterval(restIntervalRef.current);
+                setRestRunning(false);
+                void restTimerStore.remove(ownerId, draft.draftId);
+                return 0;
+              }
+              return s - 1;
+            });
+          }, 1000);
+        } else {
+          // expired — clean up
+          await restTimerStore.remove(ownerId, draft.draftId);
+        }
+      } catch {}
+    })();
+    return () => { mounted = false; };
+  }, [ownerId, draft]);
+  const startRestTimer = useCallback(async () => {
+    setRestRunning(true);
+    if (restIntervalRef.current) clearInterval(restIntervalRef.current);
+    // persist rest-timer to survive app restart
+    try {
+      if (draft && ownerId) {
+        const endAt = new Date(Date.now() + restSeconds * 1000).toISOString();
+        await restTimerStore.save({ ownerId, draftId: draft.draftId, endAt });
+        const remaining = Math.max(1, Math.round((new Date(endAt).getTime() - Date.now()) / 1000));
+        // request permission; if denied, show UI state (handled by caller)
+        const permitted = await requestNotificationPermission();
+        if (permitted) {
+          void scheduleRestNotification(remaining, 'Your rest timer finished.', `rest-${ownerId}-${draft.draftId}`);
+        }
+      }
+    } catch {}
+    restIntervalRef.current = setInterval(() => {
+      setRestSeconds((s) => {
+        if (s <= 1) {
+          if (restIntervalRef.current) clearInterval(restIntervalRef.current);
+          setRestRunning(false);
+          // Schedule notification as optional background confirmation
+          if (draft && ownerId) void scheduleRestNotification(1, 'Your rest timer finished.', `rest-${ownerId}-${draft.draftId}`);
+          void restTimerStore.remove(ownerId!, draft?.draftId ?? '');
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+  }, [draft, ownerId, restSeconds]);
+  const stopRestTimer = useCallback(async () => {
+    if (restIntervalRef.current) clearInterval(restIntervalRef.current);
+    restIntervalRef.current = null;
+    setRestRunning(false);
+    setRestSeconds(60);
+    try { if (draft && ownerId) await restTimerStore.remove(ownerId, draft.draftId); } catch {}
+    // cancel any scheduled rest notification for this draft
+    try { if (draft && ownerId) await scheduleRestNotification(0, '', `rest-${ownerId}-${draft.draftId}`); } catch {}
+  }, [draft, ownerId]);
+
   // Resolve the exact owner/revision/stable-day target. A local draft may win while
   // the network-backed program is still loading, but an unrelated workout never does.
   useEffect(() => {
@@ -389,7 +483,7 @@ export default function NextWorkoutScreen() {
             return nextDraft;
           },
         });
-        if (result.status === 'cancelled' || result.status === 'waiting') return;
+              if (result.status === 'cancelled' || result.status === 'waiting') return;
         settled = true;
         if (result.status === 'completed') {
           router.replace({ pathname: '/edit-workout', params: { sessionId: result.sessionId } });
@@ -1063,6 +1157,7 @@ export default function NextWorkoutScreen() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          onTouchStart={() => { resetInactivity(); }}
         >
           {removalCapability.message && <View style={styles.syncBanner}>
             <Text style={styles.syncBannerText}>{removalCapability.message}</Text>
@@ -1071,6 +1166,19 @@ export default function NextWorkoutScreen() {
           {syncMessage && (
             <View style={styles.syncBanner} accessibilityLiveRegion="polite">
               <Text style={styles.syncBannerText}>{syncMessage}</Text>
+            </View>
+          )}
+          {showInactivityNudge && (
+            <View style={styles.syncBanner} accessibilityRole="summary">
+              <Text style={styles.syncBannerText}>Looks like you paused. Start a rest timer?</Text>
+              <View style={styles.unavailableActions}>
+                <Pressable style={styles.secondaryButton} onPress={() => { setShowInactivityNudge(false); resetInactivity(); }}>
+                  <Text style={styles.secondaryButtonText}>Keep working</Text>
+                </Pressable>
+                <Pressable style={styles.secondaryButton} onPress={() => { setShowInactivityNudge(false); startRestTimer(); resetInactivity(); }}>
+                  <Text style={styles.secondaryButtonText}>Start rest</Text>
+                </Pressable>
+              </View>
             </View>
           )}
           {pendingSwap && !programUpdating ? (
