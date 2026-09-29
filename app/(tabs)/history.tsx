@@ -28,7 +28,8 @@ import { supabase } from '@/utils/supabase';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
 import { reportSupabaseFailure, supabaseUserMessage } from '@/utils/supabaseResilience';
-import { fetchPaginatedWorkoutHistory, type HistoryItem, type WorkoutHistoryTable } from '@/features/history/historyService';
+import { fetchPaginatedWorkoutHistory, historyDisplayState, type HistoryItem, type WorkoutHistoryTable } from '@/features/history/historyService';
+import { fetchSessionExercises, type SessionExercise } from '@/features/history/sessionExercises';
 
 interface WorkoutHistoryRow {
   id?: string;
@@ -63,22 +64,6 @@ interface WorkoutEntry {
   durationMin: number;
   totalVolumeLb: number;
   personalRecords: number;
-}
-
-interface SessionExerciseSet {
-  setId: string;
-  setNumber: number;
-  loadValue: number | null;
-  loadUnit: 'lb' | 'kg' | 'none';
-  loadKind: 'external' | 'bodyweight' | 'assistance' | 'unknown';
-  reps: number | null;
-  rpe: number | null;
-}
-
-interface SessionExercise {
-  exerciseId: string;
-  name: string;
-  sets: SessionExerciseSet[];
 }
 
 interface MonthSection {
@@ -230,64 +215,6 @@ const toWorkoutEntry = ({ row, source, compositeId }: HistoryItem): WorkoutEntry
   personalRecords: parsePrCount(row),
 });
 
-const fetchSessionExercises = async (sessionId: string): Promise<SessionExercise[]> => {
-  const rows: {
-    set_number: number;
-    actual_set_id: string | null;
-    load_value: number | null;
-    load_unit: SessionExerciseSet['loadUnit'];
-    load_kind: SessionExerciseSet['loadKind'];
-    reps: number | null;
-    rpe: number | null;
-    exercise_id: string;
-    exercises: { id: string; name: string }[];
-  }[] = [];
-  const pageSize = 500;
-  for (let offset = 0; ; offset += pageSize) {
-    const { data, error } = await supabase
-      .from('workout_exercise_sets')
-      .select(`
-      set_number,
-      actual_set_id,
-      load_value,
-      load_unit,
-      load_kind,
-      reps,
-      rpe,
-      exercise_id,
-      exercises ( id, name )
-    `)
-      .eq('session_id', sessionId)
-      .order('set_number', { ascending: true })
-      .order('actual_set_id', { ascending: true })
-      .range(offset, offset + pageSize - 1);
-    if (error) throw error;
-    rows.push(...(data ?? []));
-    if ((data ?? []).length < pageSize) break;
-  }
-
-  // Group sets by exercise
-  const map = new Map<string, SessionExercise>();
-  for (const row of rows) {
-    const exId: string = row.exercise_id;
-    const exName: string = row.exercises?.[0]?.name ?? 'Unknown exercise';
-    if (!map.has(exId)) {
-      map.set(exId, { exerciseId: exId, name: exName, sets: [] });
-    }
-    map.get(exId)!.sets.push({
-      setId: row.actual_set_id ?? `${sessionId}:${row.exercise_id}:${row.set_number}`,
-      setNumber: row.set_number,
-      loadValue: row.load_value != null ? Number(row.load_value) : null,
-      loadUnit: row.load_unit,
-      loadKind: row.load_kind,
-      reps: row.reps != null ? Number(row.reps) : null,
-      rpe: row.rpe != null ? Number(row.rpe) : null,
-    });
-  }
-
-  return Array.from(map.values());
-};
-
 interface SummaryMetricCardProps {
   icon: ReactNode;
   value: string;
@@ -325,7 +252,9 @@ export default function HistoryScreen() {
   const [workouts, setWorkouts] = useState<WorkoutEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [coverageNotice, setCoverageNotice] = useState<string | null>(null);
+  const [partialError, setPartialError] = useState<string | null>(null);
+  const [incomplete, setIncomplete] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
 
   // Session detail sheet state
   const [pendingEdit] = useState(createCompletedNavigation);
@@ -380,7 +309,7 @@ export default function HistoryScreen() {
     }
     setDetailLoading(true);
     try {
-      const exercises = await fetchSessionExercises(workout.sessionId);
+      const exercises = await fetchSessionExercises(supabase, workout.sessionId);
       if (detailRequests.isCurrent(generation)) setSessionExercises(exercises);
     } catch (cause) {
       if (detailRequests.isCurrent(generation)) {
@@ -462,7 +391,9 @@ export default function HistoryScreen() {
     try {
       setLoading(true);
       setError(null);
-      setCoverageNotice(null);
+      setPartialError(null);
+      setIncomplete(false);
+      setUnavailable(false);
       setWorkouts([]);
       setPrCount(null);
       detailRequests.cancel();
@@ -496,19 +427,23 @@ export default function HistoryScreen() {
 
       const result = await fetchPaginatedWorkoutHistory({ supabaseClient: supabase, userId: user.id, signal });
       if (signal.aborted || result.aborted) return;
-      if (!result.complete && result.items.length === 0) {
-        const cause = result.errors[0]?.error ?? new Error('Workout session history is unavailable.');
+      const displayState = historyDisplayState(result);
+      if (displayState === 'error') {
+        const cause = result.errors[0].error;
         reportSupabaseFailure('history.union', cause);
         setError(supabaseUserMessage(cause, 'Unable to refresh workout history.'));
         setWorkouts([]);
         return;
       }
+      if (displayState === 'unavailable') {
+        setUnavailable(true);
+        setWorkouts([]);
+        return;
+      }
+      for (const failure of result.errors) reportSupabaseFailure('history.union', failure.error);
       setWorkouts(result.items.map(toWorkoutEntry));
-      setCoverageNotice(!result.complete
-        ? 'Some history could not be loaded. Totals below reflect only the records shown.'
-        : result.unavailable.includes('workout_history')
-          ? 'Legacy history is not available on this server; showing supported workout sessions.'
-          : null);
+      setIncomplete(!result.complete);
+      if (result.errors.length > 0) setPartialError('Some workouts could not be loaded. Reopen History to retry.');
     } catch (fetchError) {
       if (signal.aborted) return;
       reportSupabaseFailure('history.load', fetchError);
@@ -559,6 +494,9 @@ export default function HistoryScreen() {
     }));
   }, [workouts]);
 
+  const noWorkoutSummary = summary.totalWorkouts === 0 &&
+    (loading || incomplete || unavailable || error !== null);
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -573,18 +511,18 @@ export default function HistoryScreen() {
         <View style={styles.summaryGrid}>
           <SummaryMetricCard
             icon={<CalendarDays color={theme.primary} size={24} />}
-            value={coverageNotice && summary.totalWorkouts === 0 ? '-' : `${summary.totalWorkouts}`}
-            label={coverageNotice ? 'Loaded Workouts' : 'Total Workouts'}
+            value={noWorkoutSummary ? '-' : `${summary.totalWorkouts}`}
+            label={incomplete ? 'Workouts Shown' : 'Total Workouts'}
           />
           <SummaryMetricCard
             icon={<Clock3 color={theme.secondary} size={24} />}
-            value={coverageNotice && summary.totalWorkouts === 0 ? '-' : `${summary.avgDuration}`}
+            value={noWorkoutSummary ? '-' : `${summary.avgDuration}`}
             label="Avg Duration (min)"
           />
           <SummaryMetricCard
             icon={<TrendingUp color={theme.success} size={24} />}
-            value={coverageNotice && summary.totalWorkouts === 0 ? '-' : formatCompactVolume(summary.totalVolumeLb)}
-            label="Total Volume (lbs)"
+            value={noWorkoutSummary ? '-' : formatCompactVolume(summary.totalVolumeLb)}
+            label={incomplete ? 'Volume Shown (lbs)' : 'Total Volume (lbs)'}
           />
           <SummaryMetricCard
             icon={<Medal color="#ffc200" size={24} />}
@@ -593,7 +531,7 @@ export default function HistoryScreen() {
             onPress={handleOpenPrHistory}
           />
         </View>
-        {coverageNotice && <Text style={styles.stateText}>{coverageNotice}</Text>}
+        {partialError && <Text style={styles.errorText}>{partialError}</Text>}
 
         {loading ? (
           <View style={styles.stateCard}>
@@ -603,6 +541,11 @@ export default function HistoryScreen() {
         ) : error ? (
           <View style={styles.errorCard}>
             <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : unavailable ? (
+          <View style={styles.stateCard}>
+            <Text style={styles.stateTitle}>History unavailable</Text>
+            <Text style={styles.stateText}>Workout history is not available on this server.</Text>
           </View>
         ) : monthSections.length === 0 ? (
           <View style={styles.stateCard}>

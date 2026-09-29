@@ -2,7 +2,7 @@
 
 ## Authority
 
-The [approved decision record](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECORD-2026-09-08.md) owns D-01–D-14 product decisions. The planning consolidation is complete; older pending-language in saved handoffs is historical. Bounded AP execution is active, but no document alone authorizes a database mutation, deployment, or release.
+The [approved decision record](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECORD-2026-09-08.md) owns D-01–D-14 product decisions. The [September 27 flexible program-sequence decision](/dev-doc/plans/active/ADAPTIVPUSH-FLEXIBLE-PROGRAM-SEQUENCE-DECISION-2026-09-27.md) supersedes the active calendar-authoritative portions of D-02. The planning consolidation is complete; older pending-language in saved handoffs is historical. Bounded AP execution is active, but no document alone authorizes a database mutation, deployment, or release.
 
 | Document | Owns |
 |---|---|
@@ -13,6 +13,7 @@ The [approved decision record](/reports/plans/ADAPTIVPUSH-PLANNING-DECISION-RECO
 | [Requirement/decision traceability](/dev-doc/plans/active/ADAPTIVPUSH-TRACEABILITY.md) | Individual legacy/new requirement dispositions, D decisions, contracts, code/data, AP slices, acceptance and expected evidence |
 | [Document inventory/archive map](/dev-doc/plans/active/ADAPTIVPUSH-DOCUMENT-INVENTORY.md) | 61-source classification, old-to-new paths, source hashes, conflicts and preservation |
 | [Research translation](/dev-doc/plans/active/ADAPTIVPUSH-RESEARCH-TRANSLATION.md) | Supporting research scope, caveats, provisional policies and source/calibration review |
+| [Flexible program-sequence decision](/dev-doc/plans/active/ADAPTIVPUSH-FLEXIBLE-PROGRAM-SEQUENCE-DECISION-2026-09-27.md) | AP-04 replacement direction: relative sequence, dormant dated backend, permitted alerts, and unresolved implementation contracts |
 
 The living spine summarizes these owners. Historical source plans never override an approved decision or a current evidence boundary. Each rule has one owner; this index does not create a competing roadmap.
 
@@ -22,7 +23,7 @@ The current approved lane combines AP-04.1-AP-04.3 with AP-05.1, including requi
 
 [TODO](/dev-doc/main/TODO.md) routes immediate work. AP-01 catalog authority and the AP-02/AP-03 durable workout/program baseline are deployed. Subsequent bounded extensions are also deployed: completed correction and effective occurrences (`20260915190000`, `20260915210000`), scoped removals (`20260917180000`), durable workout structure/composed future edits (`20260918160000`), and AP-04 schedule database authority (`20260925190000`). PRs #54-#58 are merged into `main`; AP-04/AP-05.1 client source remains on its feature branch. The hosted ledger has ten entries, exposes correction 2, removal 1, structure 1, and schedule 1, and was verified September 27.
 
-The published client includes resilient auth/draft recovery and the detailed scoped Add/Swap picker. The AP-04/AP-05.1 feature branch adds dated placement/Today/Plan, schedule commands, scheduled Finish/correction, adherence/reminders, and history coverage; its September 27 rerun passes 213 application cases, strict TypeScript, and lint with zero errors and two known warnings. The [AP-04 production report](/dev-doc/reports/ADAPTIVPUSH-SCHEDULE-HISTORY-2026-09-25.md) owns the latest deployment/recovery evidence. Physical Expo/iPhone acceptance remains user-led. Missing required work holds progression; AP-04 client publication/manual-device acceptance and AP-05.2/AP-05.3 remain open.
+The published client includes resilient auth/draft recovery and the detailed scoped Add/Swap picker. The AP-04/AP-05.1 feature branch contains dated placement/Today/Plan, schedule commands, scheduled Finish/correction, adherence/reminders, and history coverage. Those unreleased client behaviors are superseded by the flexible sequence decision and require replacement rather than publication. The deployed empty backend remains dormant; the [AP-04 production report](/dev-doc/reports/ADAPTIVPUSH-SCHEDULE-HISTORY-2026-09-25.md) remains the historical deployment/recovery evidence. Physical Expo/iPhone acceptance remains user-led. Missing required work holds progression; flexible AP-04 implementation and AP-05.2/AP-05.3 remain open.
 
 Approved release sequence: authority/provenance -> durable workouts/programs -> free schedules/progression -> advanced generation/equipment precision -> contextual coaching/recovery -> unlisted publishing/install -> optional health/themes -> operationally gated discovery/community. AP-16 operational obligations close with each relevant consumer.
 

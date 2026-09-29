@@ -68,6 +68,7 @@ export interface GeneratedProgramExplanation extends ExplanationMetadata {
 }
 
 export type ProgramWorkout = {
+    weekNumber?: number;
     sessionId?: string;
     isFinalized?: boolean;
     completionClass?: string;

@@ -23,6 +23,7 @@ import type { Theme } from '@/constants/themes';
 import { requireRollout, rollout } from '@/features/kernel/rollout';
 import { createOperationId } from '@/features/kernel/operationId';
 import { installProgram } from '@/features/programs/commands';
+import sequenceOperations from '@/features/programs/sequenceService';
 import {
     DEFAULT_PROGRAM_NAME,
     PROGRAM_POLICY_VERSION,
@@ -302,7 +303,13 @@ export default function CreateProgramScreen() {
             if (outcome.status === 'conflict') throw new OperationFailureError({ category: 'conflict', retryable: false }, outcome.message);
             if (outcome.status === 'unavailable') throw new OperationFailureError(outcome.failure, outcome.message);
 
-            Alert.alert('Program created', 'Your custom program has been saved.');
+            try {
+                await sequenceOperations.ensureInitialized(userId, outcome.receipt.programId);
+                Alert.alert('Program created', 'Your custom program is ready.');
+            } catch (setupError) {
+                reportSupabaseFailure('program.custom_sequence_setup', setupError);
+                Alert.alert('Program saved', 'Workout setup is not ready yet. Open Plan to retry without recreating your program.');
+            }
             router.replace('/plan');
         } catch (error: any) {
             reportSupabaseFailure('program.custom_save', error);

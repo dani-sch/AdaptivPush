@@ -37,7 +37,7 @@ import {
   resolveReadinessPreferences,
 } from '@/utils/profilePreferences';
 import { supabase } from '@/utils/supabase';
-import { clearScheduledWorkoutReminders } from '@/utils/notifications';
+import { clearOtherOwnerDraftNotifications, clearScheduledWorkoutReminders } from '@/utils/notifications';
 import { fetchPaginatedWorkoutHistory, type WorkoutHistoryRow } from '@/features/history/historyService';
 import { uploadAvatar } from '@/utils/uploadAvatar';
 import type { TrainingExperience } from '@/types/database';
@@ -429,6 +429,7 @@ export default function ProfileScreen() {
 
       try {
         await clearScheduledWorkoutReminders();
+        await clearOtherOwnerDraftNotifications(null);
       } catch (notificationError) {
         reportSupabaseFailure('auth.sign_out_reminders', notificationError);
         Alert.alert('Signed out', 'Some workout reminders could not be removed from this device.');

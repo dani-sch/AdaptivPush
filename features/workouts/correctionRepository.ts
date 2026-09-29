@@ -24,6 +24,12 @@ export function createWorkoutCorrectionRepository(client: SupabaseClient): Worko
           'The authenticated account changed. Return to the correct account before saving.',
         );
       }
+      if (request.expectedScheduleRevision !== undefined) {
+        throw new OperationFailureError(
+          { category: 'validation', retryable: false },
+          'A dated schedule correction is not program sequence authority. Keep the original session and review its exact link.',
+        );
+      }
       const { ownerId: _ownerId, ...payload } = request;
       const { data, error } = await runSupabaseOperation(
         (signal) => client.rpc(request.effectiveSlots ? 'correct_workout_structure_v1' : request.removals || request.programRemoval ? 'correct_workout_removals_v1' : 'correct_completed_workout_v1', { p_payload: payload })

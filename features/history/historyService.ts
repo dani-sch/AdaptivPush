@@ -54,8 +54,15 @@ const SOURCES: readonly WorkoutHistoryTable[] = ['workout_sessions', 'workout_hi
 const PAGE_SIZE = 500;
 
 function missingTable(error: { code?: string | null; message?: string | null }, table: WorkoutHistoryTable): boolean {
-  return error.code === 'PGRST205' &&
+  return (error.code === 'PGRST205' || error.code === '42P01') &&
     Boolean(error.message?.toLowerCase().includes(table));
+}
+
+export function historyDisplayState(result: PaginatedHistoryResult): 'records' | 'empty' | 'unavailable' | 'error' {
+  if (result.items.length > 0) return 'records';
+  if (result.errors.length > 0) return 'error';
+  if (result.unavailable.includes('workout_sessions')) return 'unavailable';
+  return 'empty';
 }
 
 function timestamp(item: HistoryItem): string {
@@ -112,9 +119,16 @@ export async function fetchPaginatedWorkoutHistory(
         else errors.push({ table, error: page.error });
         break;
       }
-      const rows = page.data ?? [];
+      if (!Array.isArray(page.data)) {
+        errors.push({ table, error: new Error(`Invalid ${table} history response.`) });
+        break;
+      }
+      const rows = page.data;
       for (const raw of rows) {
+        if (table === 'workout_sessions' && raw && typeof raw.id === 'string' &&
+          raw.ended_at == null && raw.lifecycle !== 'finalized') continue;
         if (!raw || typeof raw.id !== 'string' ||
+          (table === 'workout_sessions' && typeof raw.ended_at !== 'string') ||
           typeof (raw.ended_at ?? raw.completed_at ?? raw.created_at) !== 'string') {
           errors.push({ table, error: new Error(`Invalid ${table} history row.`) });
           continue;

@@ -4,12 +4,13 @@ import React from 'react';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { useTheme } from '@/contexts/ThemeContext';
+import { WorkoutLauncher } from '@/components/WorkoutLauncher';
 
 export default function TabLayout() {
   const { theme } = useTheme();
 
   return (
-    <Tabs
+    <WorkoutLauncher><Tabs
       screenOptions={{
         headerShown: false,
         tabBarButton: HapticTab,
@@ -69,6 +70,6 @@ export default function TabLayout() {
           ),
         }}
       />
-    </Tabs>
+    </Tabs></WorkoutLauncher>
   );
 }

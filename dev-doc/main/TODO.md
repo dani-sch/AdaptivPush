@@ -1,20 +1,33 @@
 # AdaptivPush active task board
 
+## [CLIENT UX OPEN] Home, Program, launcher, ad-hoc, and History
+
+- [SOURCE IMPLEMENTED; USER ACCEPTANCE OPEN] Simplified week-based Program and next/active Home; central four-tab Workout launcher and focused pending-day selection; shared workout summaries; automatic retryable sequence setup; shared multi-select catalog picker and grouped ad-hoc exercise cards; performed-exercise ID resolution in History. No backend mutation, integrator merge, or client distribution is implied.
+- [REQUIRES INSPECTION] Physical Expo/iPhone layout and routing (including the former fifth-looking tab), rest/alternate-day choice, ad-hoc and History identity across legacy records, keyboard/accessibility, restart and pending-request recovery, hosted end-to-end flows, and correction/progression reconciliation. Correct issues before user-led acceptance.
+
+## [BACKEND VERIFIED; CLIENT OPEN] Flexible program sequence
+
+- [HOSTED VERIFIED] Additive migration `20260927190000` is deployed after fresh encrypted recovery and isolated exact-packet rehearsal. Hosted owner/anonymous, replay/conflict, lineage, Finish/correction/ad-hoc and concurrency gates passed with no persistent synthetic fixtures. Ledger has 11 entries; AP-04 schedule tables remain empty and their dated writer RPCs are grant-disabled, not rewritten. See [authority evidence](/dev-doc/reports/ADAPTIVPUSH-FLEXIBLE-SEQUENCE-AUTHORITY-2026-09-27.md).
+- [OPEN] Replace superseded dated client readers/writers, Finish and reminders against this authority; verify pending retries, partial/alternate/ad-hoc, timer, and notification policy. Do not distribute the dated merged source.
+- [USER ACCEPTANCE] Physical-device workout, restart, permission, inactivity-nudge, and rest-timer checks are outstanding; automated tests cannot establish native alert acceptance.
+- [BLOCKED FOR DISTRIBUTION] Revision-backed program loading now covers every immutable day and exact cross-week route matching is tested; hosted end-to-end cross-week entry, restart, draft-removal, permission/device checks and correction/progression reconciliation remain open. Dedicated history-only ad-hoc capture is source-backed and locally tested; dated correction writes fail closed. Automated gates alone cannot establish native alert behavior or a release.
+
 ## [USER ACCEPTANCE] Current Expo/iPhone release
 
-- [AUTOMATED VERIFIED] The September 27 AP-04/AP-05.1 feature branch passes 213 application cases, strict TypeScript, and lint with zero errors and two known warnings. The published `origin/main` client remains at its earlier boundary.
+- [AUTOMATED VERIFIED] The September 27 AP-04/AP-05.1 dated client passed 213 application cases, strict TypeScript, and lint with zero errors and two known warnings. PR #59 merged that superseded source into `origin/main`; source merge is not approved device distribution or flexible-sequence acceptance.
 - [HOSTED VERIFIED] Supported ledger has ten entries through `20260925190000`; capabilities are correction 2, removal 1, structure 1, and schedule 1. The three schedule tables are empty, RLS-protected, owner-readable, and anonymous-denied. Latest recovery, schema/security, and data-preservation evidence is in the [AP-04 report](/dev-doc/reports/ADAPTIVPUSH-SCHEDULE-HISTORY-2026-09-25.md).
 - [USER ACCEPTANCE] With the ordinary hosted Expo server and existing account, verify cold launch/login, Continue Workout, unfinished-field restoration, Check/Finish validation, Add/Swap/Remove scopes, completed edit Save/Cancel/reopen, keyboard behavior, background/foreground, temporary disconnect/reconnect, and draft restoration.
 - [USER ACCEPTANCE] Check VoiceOver, dynamic type, modal dismissal/animation, swipe/scroll coexistence, and native restart/interruption.
 - [CONSTRAINT] Preserve device storage, credentials, user workouts, and exact pending requests. Do not reinstall/reset, create synthetic user data in the user's account, or redeploy migrations for acceptance.
 - [OPEN] Identify the installed phone client/build and capture the exact route/session for any remaining native startup or past-program editing failure before diagnosing it.
 
-## [NEXT] AP-04 client release and manual-control acceptance
+## [NEXT] Flexible AP-04 program sequence and active-workout timer
 
-- [HOSTED COMPLETE, CLIENT RELEASE OPEN 2026-09-27] The exact AP-04 schedule migration is deployed with a fresh encrypted 59-relation restore, exact rehearsal, single-file dry-run/apply, owner/anonymous checks, and zero non-ledger postflight differences. Initial placement, legacy-empty unplaced identity, dated Today/Plan, scheduled Finish/correction, history, recovery, adherence, and reminder foundations are implemented on the feature branch but are not merged, distributed, or device-accepted. Manual deviation UI breadth, physical-device acceptance, and AP-05.2/05.3 remain open. See [current state](/dev-doc/main/CURRENT-STATE.md) and [production evidence](/dev-doc/reports/ADAPTIVPUSH-SCHEDULE-HISTORY-2026-09-25.md).
-
-- [IN PROGRESS] The local deviation foundation previews, confirms, cancels, and exactly replays one planned workout move, skip, or rest replacement against the deployed revisioned command. Complete carry, swap, pause/resume, availability, recurrence, broader rest/work conversion, native notification rescheduling, source integration, and device acceptance.
-- [AUTOMATED VERIFIED] Durable AP-02/AP-03 occurrence identity and released correction/removal/structure behavior remain preserved through scheduled Finish/correction.
+- [HOSTED DORMANT 2026-09-27] The exact AP-04 schedule migration remains deployed, empty, RLS-protected, owner-readable, and reversible. Do not modify, redeploy, delete, or repurpose its tables/RPCs as hidden sequence state. Disable dated client writers and date-authoritative reads. The [flexible program-sequence decision](/dev-doc/plans/active/ADAPTIVPUSH-FLEXIBLE-PROGRAM-SEQUENCE-DECISION-2026-09-27.md) is the active behavior authority.
+- [APPROVED; NOT STARTED] User approved a separate additive owner-scoped sequence state/command/receipt migration, including gated deployment. Migration executor must review the exact packet, fresh recovery, isolated rehearsal and owner/replay/conflict checks before applying it. No AP-04 table/RPC reuse or modification. Suggested next is the first pending workout day in explicit order; a confirmed finalized partial resolves its selected day with logged-exercise-only progression. Unstarted days remain pending. No migration has been created or applied by this documentation update.
+- [OPEN] Contain dated Home/Plan/Finish and reminder writers/readers in merged PR #59 source before any distribution; then implement explicit alternate-day and history-only ad-hoc flows against the reviewed sequence contract.
+- [OPEN] Incomplete Finish asks Yes/No to submit partial; No returns to editing, Yes saves and resolves the selected day without a mandatory follow-up action. Offer Continue and Adjust upcoming program, and the 14-day long-pause review without automatic load or volume adjustment. Rebuild adherence as completed/partial/skipped/pending context, not a schedule score or streak.
+- [OPEN] Remove all scheduled-workout, PR, deload, and test notifications. Implement only the owner-scoped five-minute active-draft inactivity nudge and persisted, user-configured rest timer with one optional completion alert. Device acceptance remains user-led.
 - [OPEN] Publish the reviewed client branch through the normal source/integration lane, then obtain physical-device and accessibility evidence without creating synthetic data in the user's account.
 
 ## [WITH AP-04] AP-05.1 history; [AFTER] AP-05.2/05.3 progression and explanations

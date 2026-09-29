@@ -42,15 +42,16 @@ interface ExerciseCardProps {
   onUpdateSet: (setId: string, field: keyof WorkoutSet, value: string | boolean) => void;
   onToggleComplete: () => void;
   onPressHistory?: () => void;
-  onPressSwap: () => void;
+  onPressSwap?: () => void;
+  hideLoggedControl?: boolean;
   onSetExercise?: (setId: string) => void;
   onRemoveSet?: (setId: string) => void;
   onRemoveExercise?: () => void;
   onAddSet?: () => void;
 }
 let openRow: SwipeableMethods | null = null;
-function SetRow({ set, index, exercise, onUpdateSet, onSettings, onRemove }: {
-  set: WorkoutSet; index: number; exercise: Exercise; onUpdateSet: ExerciseCardProps['onUpdateSet']; onSettings: () => void; onRemove?: () => void;
+function SetRow({ set, index, exercise, onUpdateSet, onSettings, onRemove, hideLoggedControl }: {
+  set: WorkoutSet; index: number; exercise: Exercise; onUpdateSet: ExerciseCardProps['onUpdateSet']; onSettings: () => void; onRemove?: () => void; hideLoggedControl?: boolean;
 }) {
   const { theme } = useTheme();
   const swipe = useRef<SwipeableMethods>(null);
@@ -85,16 +86,16 @@ function SetRow({ set, index, exercise, onUpdateSet, onSettings, onRemove }: {
           value={set[field]} onChangeText={value => onUpdateSet(set.id, field, value)} selectTextOnFocus
           onFocus={() => { openRow?.close(); }}
           keyboardType={field === 'reps' ? 'number-pad' : 'decimal-pad'} placeholder={field === 'weight' && set.loadKind === 'bodyweight' ? 'BW' : '—'} placeholderTextColor={theme.placeholder} />{field === 'weight' && set.loadKind !== 'bodyweight' ? <Text style={{ fontSize: 10, color: theme.text }}>{loadUnitLabel(set)}</Text> : null}</View>)}
-        <Pressable style={[styles.check, { backgroundColor: set.logged ? theme.primary : theme.mutedBg, borderColor: theme.border }]}
+        {hideLoggedControl ? <View style={{ width: 44 }} /> : <Pressable style={[styles.check, { backgroundColor: set.logged ? theme.primary : theme.mutedBg, borderColor: theme.border }]}
           accessibilityRole="checkbox" aria-checked={set.logged} accessibilityLabel={exercise.name + ', set ' + (index + 1) + ' logged'} accessibilityState={{ checked: set.logged, disabled: exercise.readOnly }}
           disabled={exercise.readOnly} onPress={() => { if (!swiping.current) onUpdateSet(set.id, 'logged', !set.logged); }}>
           <Ionicons name="checkmark" size={18} color={set.logged ? theme.white : theme.placeholder} />
-        </Pressable>
+        </Pressable>}
       </View>
     </View>
   </ReanimatedSwipeable>;
 }
-export default function ExerciseCard({ exercise, onUpdateSet, onPressHistory, onPressSwap, onSetExercise, onRemoveSet, onRemoveExercise, onAddSet }: ExerciseCardProps) {
+export default function ExerciseCard({ exercise, onUpdateSet, onPressHistory, onPressSwap, onSetExercise, onRemoveSet, onRemoveExercise, onAddSet, hideLoggedControl }: ExerciseCardProps) {
   const { theme } = useTheme();
   const [menu, setMenu] = useState<string | null>(null);
   const [handoff] = useState(createModalHandoff);
@@ -118,7 +119,7 @@ export default function ExerciseCard({ exercise, onUpdateSet, onPressHistory, on
     <View style={styles.row}><View style={styles.number}><Text style={[styles.column, { color: theme.placeholder }]}>SET</Text></View>
       <Pressable style={{ flex: 1 }} disabled={exercise.readOnly} onPress={() => setMenu('loads')} accessibilityRole="button" accessibilityLabel="Load and unit settings"><Text style={[styles.column, { color: theme.placeholder }]}>{exerciseLoadLabel(exercise.sets)}</Text></Pressable>
       {['REPS', 'RPE'].map(label => <Text key={label} style={[styles.column, { flex: 1, color: theme.placeholder }]}>{label}</Text>)}<View style={{ width: 44 }} /></View>
-    {exercise.sets.map((set, index) => <SetRow key={set.id} {...{ set, index, exercise, onUpdateSet }} onSettings={() => setMenu(set.id)} onRemove={onRemoveSet ? () => onRemoveSet(set.id) : undefined} />)}
+    {exercise.sets.map((set, index) => <SetRow key={set.id} {...{ set, index, exercise, onUpdateSet, hideLoggedControl }} onSettings={() => setMenu(set.id)} onRemove={onRemoveSet ? () => onRemoveSet(set.id) : undefined} />)}
     {!exercise.readOnly && onAddSet ? button('Add set', onAddSet) : null}
     <Modal visible={menu !== null} transparent animationType="none" presentationStyle="overFullScreen" onDismiss={() => handoff.dismiss()} onRequestClose={() => closeThen()}>
       <View style={styles.backdrop} accessibilityViewIsModal aria-modal role="dialog"><Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={() => setMenu(null)} />
@@ -126,7 +127,7 @@ export default function ExerciseCard({ exercise, onUpdateSet, onPressHistory, on
           <ScrollView keyboardShouldPersistTaps="handled">
             <Text accessibilityRole="header" style={[styles.title, { color: theme.textPrimary }]}>{selected ? 'Set ' + (exercise.sets.indexOf(selected) + 1) : exercise.name}</Text>
             {menu === 'header' ? <>{onPressHistory ? button('History', () => closeThen(onPressHistory)) : null}
-              {!exercise.readOnly ? button('Swap exercise', () => closeThen(onPressSwap)) : null}
+              {!exercise.readOnly && onPressSwap ? button('Swap exercise', () => closeThen(onPressSwap)) : null}
               {(exercise.imageUrl || exercise.description) ? <ExerciseInfoPanel imageUrl={exercise.imageUrl} description={exercise.description} /> : null}</> : menu === 'loads' ?
               exercise.sets.map((set, i) => button('Set ' + (i + 1) + ' · ' + (set.loadKind ?? 'external') + ' · ' + (set.loadUnit ?? 'lb'), () => setMenu(set.id))) : selected ? <>
                 <Text style={{ color: theme.text }}>Load type</Text>
