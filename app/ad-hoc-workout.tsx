@@ -13,7 +13,7 @@ import type { Theme } from '@/constants/themes';
 import {
   adHocService, addAdHocExercises, appendAdHocSet, removeAdHocExercise, removeAdHocSet,
 } from '@/features/workouts/adHocService';
-import type { AdHocDraft, AdHocDraftSet } from '@/features/workouts/adHocFlow';
+import { adHocFinishCause, type AdHocDraft, type AdHocDraftSet } from '@/features/workouts/adHocFlow';
 import { reportSupabaseFailure, supabaseUserMessage } from '@/utils/supabaseResilience';
 
 export default function AdHocWorkoutScreen() {
@@ -117,8 +117,10 @@ function AdHocCapture({ ownerId, canRequest }: { ownerId: string | null; canRequ
       setPending(false);
       router.replace('/(tabs)/history');
     } catch (cause) {
-      reportSupabaseFailure('workout.ad_hoc_finish', cause);
-      setError(supabaseUserMessage(cause, 'Could not confirm this workout. Retry the exact request.'));
+      const failure = adHocFinishCause(cause);
+      const error = failure?.cause ?? cause;
+      reportSupabaseFailure(`workout.ad_hoc_finish.${failure?.stage ?? 'unknown'}`, error);
+      setError(supabaseUserMessage(error, 'Could not confirm this workout. Retry the exact request.'));
       try {
         const state = await adHocService.load(ownerId);
         draftRef.current = state.draft;

@@ -3,6 +3,7 @@
 ## [CLIENT UX OPEN] Home, Program, launcher, ad-hoc, and History
 
 - [SOURCE IMPLEMENTED; USER ACCEPTANCE OPEN] Simplified week-based Program and next/active Home; central four-tab Workout launcher and focused pending-day selection; shared workout summaries; automatic retryable sequence setup; shared multi-select catalog picker and grouped ad-hoc exercise cards; performed-exercise ID resolution in History. No backend mutation, integrator merge, or client distribution is implied.
+- [SOURCE FIX IN PROGRESS] Reproduce ad-hoc Finish with the stage-specific DEV diagnostic before changing durable persistence. History-only sessions remain non-editable until standalone correction semantics are designed and tested.
 - [REQUIRES INSPECTION] Physical Expo/iPhone layout and routing (including the former fifth-looking tab), rest/alternate-day choice, ad-hoc and History identity across legacy records, keyboard/accessibility, restart and pending-request recovery, hosted end-to-end flows, and correction/progression reconciliation. Correct issues before user-led acceptance.
 
 ## [BACKEND VERIFIED; CLIENT OPEN] Flexible program sequence

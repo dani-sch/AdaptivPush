@@ -119,11 +119,12 @@ test('one successful set out of four cannot increase load, even with high readin
   assert.equal(result.suggestedWeightLb, 50);
 });
 function readClient(options: { missingSession?: boolean; missingColumn?: boolean; missingRpc?: boolean; error?: object; lifecycle?: string;
-  capabilityError?: Error; scheduled?: boolean; scheduleRevision?: number } = {}) {
+  capabilityError?: Error; scheduled?: boolean; scheduleRevision?: number; unlinked?: boolean } = {}) {
   const query = (table: string) => {
     const response = { data: table === 'workout_sessions' ? options.missingSession ? null : {
       id: 'session', user_id: 'owner', lifecycle: options.lifecycle ?? 'finalized', correction_revision: options.missingColumn ? undefined : 0,
-      prescription_snapshot: draft().frozenPrescription, ended_at: '2026-09-15T12:30:00Z',
+      program_day_id: options.unlinked ? null : 'program-day', prescription_snapshot: options.unlinked ? null : draft().frozenPrescription,
+      ended_at: '2026-09-15T12:30:00Z',
     } : table === 'scheduled_days' ? options.scheduled ? { id: 'occurrence', schedule_id: 'schedule' } : null
       : table === 'program_schedules' ? { revision: options.scheduleRevision ?? 4 } : [], error: options.error ?? null };
     const chain = { select: () => chain, eq: () => chain, order: () => Promise.resolve(response), maybeSingle: () => Promise.resolve(response) };
@@ -146,6 +147,14 @@ test('capability 2 enables eligible workouts and gives specific reasons for othe
   const offline = await loadCompletedWorkout(readClient({ capabilityError: new Error('Failed to fetch') }), 'owner', 'session');
   assert.equal(offline.canCorrect, false); assert.equal(offline.session.id, 'session');
   assert.doesNotMatch(offline.correctionIssue!, /does not yet support/);
+});
+
+test('unlinked history-only workouts remain readable but are not offered program corrections', async () => {
+  const loaded = await loadCompletedWorkout(readClient({ unlinked: true }), 'owner', 'session');
+
+  assert.equal(loaded.canCorrect, false);
+  assert.match(loaded.correctionIssue!, /history-only workouts cannot be updated/i);
+  assert.equal(loaded.snapshot, null);
 });
 
 test('completed workout reads the authoritative dated schedule link when available', async () => {

@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import {
   addAdHocExercises, appendAdHocSet, createAdHocFlow, createAdHocSet, freezeAdHocDraft,
-  removeAdHocExercise, removeAdHocSet, verifyAdHocHistory,
+  adHocFinishCause, removeAdHocExercise, removeAdHocSet, verifyAdHocHistory,
   type AdHocDraft, type AdHocGateway, type AdHocPayload,
 } from '../../features/workouts/adHocFlow';
 
@@ -94,6 +94,19 @@ test('response loss preserves frozen request across restart and rejects edits un
   assert.equal(await restarted.finish(owner), 'a6000000-0000-4000-8000-000000000001');
   assert.deepEqual(calls[0], calls[1]);
   assert.equal((await restarted.load(owner)).draft, null);
+});
+
+test('finish preserves the exact failing stage and underlying error', async () => {
+  const { service, setResponseLost } = fixture();
+  await enteredDraft(service);
+  setResponseLost();
+
+  await assert.rejects(service.finish(owner), error => {
+    const failure = adHocFinishCause(error);
+    assert.equal(failure?.stage, 'submit');
+    assert.match(failure?.cause instanceof Error ? failure.cause.message : '', /response lost/);
+    return true;
+  });
 });
 
 test('stored program linkage or mismatched sets never clears exact pending recovery', async () => {

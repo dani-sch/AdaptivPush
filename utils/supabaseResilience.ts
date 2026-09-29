@@ -31,6 +31,8 @@ export class OperationFailureError extends Error {
 type ErrorLike = {
   name?: unknown;
   message?: unknown;
+  details?: unknown;
+  hint?: unknown;
   status?: unknown;
   statusCode?: unknown;
   code?: unknown;
@@ -282,6 +284,29 @@ export interface SupabaseDiagnostic {
   occurredAt: string;
 }
 
+export interface DevelopmentSupabaseDiagnostic extends SupabaseDiagnostic {
+  name?: string;
+  message?: string;
+  details?: string;
+  hint?: string;
+}
+
+const SENSITIVE_DIAGNOSTIC_VALUE = /\b(?:authorization|token|api[_-]?key|password|secret)\s*[:=]\s*(?:bearer\s+)?\S+|\bbearer\s+\S+/gi;
+const JWT_VALUE = /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g;
+const URL_VALUE = /\bhttps?:\/\/\S+/gi;
+const UUID_VALUE = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi;
+
+function diagnosticText(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const redacted = value
+    .replace(SENSITIVE_DIAGNOSTIC_VALUE, '[redacted]')
+    .replace(JWT_VALUE, '[redacted]')
+    .replace(URL_VALUE, '[url]')
+    .replace(UUID_VALUE, '[uuid]')
+    .trim();
+  return redacted ? redacted.slice(0, 240) : undefined;
+}
+
 export function sanitizedSupabaseDiagnostic(
   operation: string,
   error: unknown,
@@ -295,6 +320,31 @@ export function sanitizedSupabaseDiagnostic(
   };
 }
 
+export function developmentSupabaseDiagnostic(
+  operation: string,
+  error: unknown,
+  now = new Date(),
+): DevelopmentSupabaseDiagnostic {
+  const source = asErrorLike(error);
+  const diagnostic = sanitizedSupabaseDiagnostic(operation, error, now);
+  const name = diagnosticText(source.name);
+  const message = diagnosticText(source.message);
+  const details = diagnosticText(source.details);
+  const hint = diagnosticText(source.hint);
+  return {
+    operation: diagnostic.operation,
+    category: diagnostic.category,
+    retryable: diagnostic.retryable,
+    ...(diagnostic.status !== undefined ? { status: diagnostic.status } : {}),
+    ...(diagnostic.code !== undefined ? { code: diagnostic.code } : {}),
+    occurredAt: diagnostic.occurredAt,
+    ...(name ? { name } : {}),
+    ...(message ? { message } : {}),
+    ...(details ? { details } : {}),
+    ...(hint ? { hint } : {}),
+  };
+}
+
 export function reportSupabaseFailure(operation: string, error: unknown): void {
   if (typeof __DEV__ === 'undefined' || !__DEV__) return;
   const diagnostic = sanitizedSupabaseDiagnostic(operation, error);
@@ -305,7 +355,7 @@ export function reportSupabaseFailure(operation: string, error: unknown): void {
     console.warn('[Supabase availability]', diagnostic);
     return;
   }
-  console.error('[Supabase failure]', diagnostic);
+  console.error('[Supabase failure]', developmentSupabaseDiagnostic(operation, error));
 }
 
 type ResultWithError = { error?: unknown | null };

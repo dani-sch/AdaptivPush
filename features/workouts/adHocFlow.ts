@@ -64,6 +64,20 @@ export interface AdHocGateway {
   sets(sessionId: string): Promise<unknown>;
 }
 
+export type AdHocFinishStage = 'restore' | 'freeze' | 'submit' | 'verify';
+
+export class AdHocFinishFailure extends Error {
+  readonly name = 'AdHocFinishFailure';
+
+  constructor(readonly stage: AdHocFinishStage, readonly cause: unknown) {
+    super(cause instanceof Error ? cause.message : `Ad-hoc workout ${stage} failed.`);
+  }
+}
+
+export function adHocFinishCause(error: unknown): { stage: AdHocFinishStage; cause: unknown } | null {
+  return error instanceof AdHocFinishFailure ? { stage: error.stage, cause: error.cause } : null;
+}
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const KINDS = ['external', 'bodyweight', 'assistance', 'unknown'];
 const UNITS = ['lb', 'kg', 'none'];
@@ -284,19 +298,37 @@ export function createAdHocFlow(storage: AdHocStorage, gateway: AdHocGateway,
       await storage.setItem(key(draft.ownerId), JSON.stringify({ draft, pending: null }));
     },
     async finish(ownerId: string): Promise<string> {
-      const state = await read(ownerId);
+      let state: AdHocState | null;
+      try {
+        state = await read(ownerId);
+      } catch (cause) {
+        throw new AdHocFinishFailure('restore', cause);
+      }
       if (!state) throw new Error('Start a workout before finishing.');
       let payload = state.pending;
       if (!payload) {
-        payload = freezeAdHocDraft(state.draft, id(), now());
-        await storage.setItem(key(ownerId), JSON.stringify({ draft: state.draft, pending: payload }));
+        try {
+          payload = freezeAdHocDraft(state.draft, id(), now());
+          await storage.setItem(key(ownerId), JSON.stringify({ draft: state.draft, pending: payload }));
+        } catch (cause) {
+          throw new AdHocFinishFailure('freeze', cause);
+        }
       }
-      const receipt = await gateway.finalize(payload);
-      const session = await gateway.session(ownerId, payload.operationId);
-      const savedSets = await gateway.sets(text(record(receipt).sessionId));
-      const sessionId = verifyAdHocHistory(ownerId, payload, receipt, session, savedSets);
-      await storage.removeItem(key(ownerId));
-      return sessionId;
+      let receipt: unknown;
+      try {
+        receipt = await gateway.finalize(payload);
+      } catch (cause) {
+        throw new AdHocFinishFailure('submit', cause);
+      }
+      try {
+        const session = await gateway.session(ownerId, payload.operationId);
+        const savedSets = await gateway.sets(text(record(receipt).sessionId));
+        const sessionId = verifyAdHocHistory(ownerId, payload, receipt, session, savedSets);
+        await storage.removeItem(key(ownerId));
+        return sessionId;
+      } catch (cause) {
+        throw new AdHocFinishFailure('verify', cause);
+      }
     },
   };
 }
