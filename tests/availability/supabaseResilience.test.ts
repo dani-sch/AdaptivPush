@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   classifySupabaseError,
+  developmentSupabaseDiagnostic,
   loginErrorMessage,
   OperationFailureError,
   runSupabaseOperation,
@@ -85,6 +86,32 @@ test('diagnostics retain only bounded non-sensitive fields', () => {
     occurredAt: '2026-09-14T12:00:00.000Z',
   });
   assert.equal('message' in diagnostic, false);
+});
+
+test('development diagnostics retain a redacted bounded root cause', () => {
+  const diagnostic = developmentSupabaseDiagnostic(
+    'workout.ad_hoc_finish.submit',
+    {
+      name: 'PostgrestError',
+      code: '23502',
+      message: 'token=secret user 11111111-1111-4111-8111-111111111111 failed at https://example.test/rest',
+      details: 'Authorization: Bearer abc.def.ghi',
+      hint: 'Check the request.',
+    },
+    new Date('2026-09-29T21:00:00.000Z'),
+  );
+
+  assert.deepEqual(diagnostic, {
+    operation: 'workout.ad_hoc_finish.submit',
+    category: 'unknown',
+    retryable: false,
+    code: '23502',
+    occurredAt: '2026-09-29T21:00:00.000Z',
+    name: 'PostgrestError',
+    message: '[redacted] user [uuid] failed at [url]',
+    details: '[redacted]',
+    hint: 'Check the request.',
+  });
 });
 
 test('reads retry only within the configured bound', async () => {

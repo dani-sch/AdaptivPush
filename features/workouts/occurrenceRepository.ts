@@ -109,7 +109,9 @@ export async function loadCompletedWorkout(client: SupabaseClient, ownerId: stri
     workoutCorrectionIssue(client),
     loadCompletedWorkoutScheduleLink(client, ownerId, sessionId),
   ]);
-  const correctionIssue = session.lifecycle !== 'finalized'
+  const correctionIssue = session.program_day_id == null
+    ? 'History-only workouts cannot be updated until standalone workout corrections are supported.'
+    : session.lifecycle !== 'finalized'
     ? 'Only finalized workouts can be updated.'
     : !Number.isInteger(session.correction_revision) || session.correction_revision < 0
       ? 'This workout is missing the revision information required for safe updates.'

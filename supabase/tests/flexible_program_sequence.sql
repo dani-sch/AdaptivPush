@@ -43,6 +43,7 @@ DECLARE
   correction_request jsonb;
   ad_hoc jsonb;
   ad_hoc_request jsonb;
+  partial_ad_hoc jsonb;
   alternate jsonb;
   alternate_payload jsonb;
   alternate_op uuid;
@@ -195,19 +196,34 @@ BEGIN
     OR public.get_program_sequence_v1(pid)->'days'->0->>'actualCompletionClass'<>'partial'
     OR (SELECT revision FROM public.program_sequences WHERE program_id=pid)<>2
     THEN RAISE EXCEPTION 'second correction changed sequence or stale context'; END IF;
-  -- History-only ad-hoc has no program day, sequence receipt, or progression effect.
+  -- History-only ad-hoc has no program day or sequence receipt, but enqueues
+  -- progression evidence for logged actuals without fulfilling program work.
   ad_hoc_request:=jsonb_build_object('schemaVersion',1,'operationId',gen_random_uuid(),
     'draftId',gen_random_uuid(),'workoutName','Walk','startedAt','2026-09-27T11:00:00Z',
     'sets',jsonb_build_array(jsonb_build_object('setId',gen_random_uuid(),'exerciseId',ex,
       'order',1,'reps',8,'loadKind','bodyweight','loadUnit','none','loadSide','unknown')));
   ad_hoc:=public.finalize_ad_hoc_workout_v1(ad_hoc_request);
   IF (SELECT program_day_id FROM public.workout_sessions WHERE id=(ad_hoc->>'sessionId')::uuid) IS NOT NULL
-    OR EXISTS(SELECT 1 FROM public.workout_receipt_effects WHERE workout_session_id=(ad_hoc->>'sessionId')::uuid)
+    OR NOT EXISTS(SELECT 1 FROM public.workout_receipt_effects
+      WHERE workout_session_id=(ad_hoc->>'sessionId')::uuid AND effect_type='progression_projection')
+    OR EXISTS(SELECT 1 FROM public.workout_receipt_effects
+      WHERE workout_session_id=(ad_hoc->>'sessionId')::uuid AND effect_type<>'progression_projection')
     OR (SELECT revision FROM public.program_sequences WHERE program_id=pid)<>2
     OR (SELECT count(*) FROM public.workout_exercise_sets WHERE session_id=(ad_hoc->>'sessionId')::uuid)<>1
     THEN RAISE EXCEPTION 'ad-hoc wrote program or lost actual history'; END IF;
   IF NOT (public.finalize_ad_hoc_workout_v1(ad_hoc_request)->>'replayed')::boolean
     THEN RAISE EXCEPTION 'ad-hoc replay'; END IF;
+  partial_ad_hoc:=public.finalize_ad_hoc_workout_v1(jsonb_build_object(
+    'schemaVersion',1,'completionClass','partial','operationId',gen_random_uuid(),
+    'draftId',gen_random_uuid(),'workoutName','Stopped early','startedAt','2026-09-27T11:00:00Z',
+    'sets','[]'::jsonb));
+  IF partial_ad_hoc->>'completionClass'<>'partial'
+    OR partial_ad_hoc->>'setCount'<>'0'
+    OR (SELECT completion_class FROM public.workout_sessions WHERE id=(partial_ad_hoc->>'sessionId')::uuid)<>'partial'
+    OR (SELECT count(*) FROM public.workout_exercise_sets WHERE session_id=(partial_ad_hoc->>'sessionId')::uuid)<>0
+    OR EXISTS(SELECT 1 FROM public.workout_receipt_effects WHERE workout_session_id=(partial_ad_hoc->>'sessionId')::uuid)
+    OR (SELECT revision FROM public.program_sequences WHERE program_id=pid)<>2
+    THEN RAISE EXCEPTION 'empty partial ad-hoc wrote program or progression evidence'; END IF;
   rejected:=false;
   BEGIN PERFORM public.finalize_ad_hoc_workout_v1(ad_hoc_request||
     jsonb_build_object('operationId',gen_random_uuid(),
