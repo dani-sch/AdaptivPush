@@ -19,6 +19,8 @@ import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
 import { useCurrentProgram } from '@/hooks/useCurrentProgram';
 import { supabase } from '@/utils/supabase';
+import { programSequenceRepository } from '@/features/programs/sequenceRepository';
+import { reportSupabaseFailure, supabaseUserMessage } from '@/utils/supabaseResilience';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -34,6 +36,7 @@ interface OverviewExercise {
 
 interface OverviewDay {
   id: string;
+  stableDayId: string;
   sessionId?: string;
   name: string;
   dayIndex: number;
@@ -79,7 +82,8 @@ async function fetchProgramOverview(program: CurrentProgram, ownerId: string): P
     .order('week_number', { ascending: true })
     .order('day_index', { ascending: true });
 
-  if (error || !data) return [];
+  if (error) throw error;
+  if (!data) throw new Error('Program details are unavailable.');
 
   const masks = await programRemovalState(program.id);
   const resolved = await resolveProgramOccurrences({ ...program, workouts: (data ?? []).map(day => ({
@@ -98,8 +102,8 @@ async function fetchProgramOverview(program: CurrentProgram, ownerId: string): P
       .slice()
       .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))
       .map((pde: any) => ({
-        pdeId: pde.id,
-        name: pde.exercises?.name ?? 'Unknown exercise',
+        pdeId: pde.stable_slot_id ?? pde.id,
+        name: (Array.isArray(pde.exercises) ? pde.exercises[0] : pde.exercises)?.name ?? 'Exercise unavailable',
         sets: pde.set_count ?? 3,
         repMin: pde.rep_range_min ?? 8,
         repMax: pde.rep_range_max ?? 12,
@@ -107,16 +111,22 @@ async function fetchProgramOverview(program: CurrentProgram, ownerId: string): P
         weightLb: pde.suggested_weight_lb != null ? Number(pde.suggested_weight_lb) : null,
       }));
 
+    const shown = visibleProgramExercises(resolved.workouts.find(w => w.id === day.id)?.exercises ?? []);
     weekMap.get(weekNum)!.push({
       id: day.id,
+      stableDayId: day.stable_day_id,
       sessionId: resolved.workouts.find(w => w.id === day.id)?.sessionId,
       name: day.workout_name ?? `Day ${day.day_index}`,
       dayIndex: day.day_index ?? 1,
-      exercises: visibleProgramExercises(resolved.workouts.find(w => w.id === day.id)?.exercises ?? []).map(ex => ({
-        pdeId: ex.stableSlotId ?? ex.id, name: ex.name, sets: ex.sets ?? 0,
-        repMin: Number(ex.reps?.split('-')[0] ?? 0), repMax: Number(ex.reps?.split('-').at(-1) ?? 0),
-        targetRpe: null, weightLb: ex.weight ?? null,
-      })) ?? exercises,
+      exercises: shown.map(ex => {
+        const prescribed = exercises.find(item => item.pdeId === (ex.stableSlotId ?? ex.id));
+        return {
+          pdeId: ex.stableSlotId ?? ex.id, name: ex.name, sets: ex.sets ?? 0,
+          repMin: Number(ex.reps?.split('-')[0] ?? 0), repMax: Number(ex.reps?.split('-').at(-1) ?? 0),
+          targetRpe: ex.targetRpe ?? prescribed?.targetRpe ?? null,
+          weightLb: ex.weight ?? prescribed?.weightLb ?? null,
+        };
+      }),
     });
   }
 
@@ -155,37 +165,22 @@ function ExerciseRow({ ex, styles }: { ex: OverviewExercise; styles: ReturnType<
 
 function DayCard({
   day,
-  expanded,
-  onToggle,
   styles,
   theme,
 }: {
   day: OverviewDay;
-  expanded: boolean;
-  onToggle: () => void;
   styles: ReturnType<typeof createStyles>;
   theme: Theme;
 }) {
   return (
     <View style={styles.dayCard}>
-      <Pressable
-        style={({ pressed }) => [styles.dayHeader, pressed && { opacity: 0.8 }]}
-        onPress={onToggle}
-        accessibilityRole="button"
-        accessibilityLabel={`${expanded ? 'Collapse' : 'Expand'} ${day.name}`}
-      >
+      <View style={styles.dayHeader}>
         <View style={styles.dayHeaderLeft}>
           <Text style={styles.dayName}>{day.name}</Text>
           <Text style={styles.dayMeta}>{day.exercises.length} exercises</Text>
         </View>
-        <Ionicons
-          name={expanded ? 'chevron-up' : 'chevron-down'}
-          size={18}
-          color={theme.placeholder}
-        />
-      </Pressable>
+      </View>
 
-      {expanded && (
         <View style={styles.exerciseList}>
           {day.exercises.map((ex) => (
             <ExerciseRow key={ex.pdeId} ex={ex} styles={styles} />
@@ -196,7 +191,6 @@ function DayCard({
             <Text style={styles.weightText}>View or Update Workout</Text>
           </Pressable> : null}
         </View>
-      )}
     </View>
   );
 }
@@ -212,8 +206,9 @@ export default function ProgramOverviewScreen() {
 
   const [weeks, setWeeks] = useState<OverviewWeek[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(new Set());
-  const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
+  const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
+  const [currentWeek, setCurrentWeek] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [rationale, setRationale] = useState<ProgramRationale>({
     label: 'Rationale unknown',
     detail: 'This legacy program has no persisted generation context. No explanation has been fabricated.',
@@ -228,11 +223,18 @@ export default function ProgramOverviewScreen() {
     contextQuery = program.currentRevisionId
       ? contextQuery.eq('program_revision_id', program.currentRevisionId)
       : contextQuery.is('program_revision_id', null);
-    Promise.all([
+    void Promise.all([
       fetchProgramOverview(program, ownerId),
       contextQuery.maybeSingle(),
-    ]).then(([data, contextResult]) => {
+      programSequenceRepository.get(program.id).catch(cause => {
+        reportSupabaseFailure('program.overview_sequence', cause);
+        return null;
+      }),
+    ]).then(([data, contextResult, sequence]) => {
       setWeeks(data);
+      const suggestedWeek = data.find(week => week.days.some(day =>
+        day.stableDayId === sequence?.nextStableDayId))?.weekNumber ?? null;
+      setCurrentWeek(suggestedWeek);
       const context = contextResult.data as {
         goal?: string;
         policy_version?: string;
@@ -250,28 +252,15 @@ export default function ProgramOverviewScreen() {
           ].filter(Boolean).join(' · '),
         });
       }
-      setExpandedWeeks(new Set([program.currentWeek]));
+      setSelectedWeek(previous => previous && data.some(week => week.weekNumber === previous)
+        ? previous : suggestedWeek ?? data[0]?.weekNumber ?? null);
+      setLoading(false);
+    }).catch(cause => {
+      reportSupabaseFailure('program.overview', cause);
+      setError(supabaseUserMessage(cause, 'Could not load your program. Try again.'));
       setLoading(false);
     });
   }, [program, ownerId]);
-
-  const toggleWeek = (weekNum: number) => {
-    setExpandedWeeks((prev) => {
-      const next = new Set(prev);
-      if (next.has(weekNum)) next.delete(weekNum);
-      else next.add(weekNum);
-      return next;
-    });
-  };
-
-  const toggleDay = (dayId: string) => {
-    setExpandedDays((prev) => {
-      const next = new Set(prev);
-      if (next.has(dayId)) next.delete(dayId);
-      else next.add(dayId);
-      return next;
-    });
-  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -300,6 +289,13 @@ export default function ProgramOverviewScreen() {
           <ActivityIndicator size="large" color={theme.primary} />
           <Text style={styles.stateText}>Loading program…</Text>
         </View>
+      ) : error ? (
+        <View style={styles.stateWrap}>
+          <Text style={styles.stateText} accessibilityRole="alert">{error}</Text>
+          <Pressable accessibilityRole="button" onPress={() => void refresh()}>
+            <Text style={{ color: theme.primary }}>Retry</Text>
+          </Pressable>
+        </View>
       ) : weeks.length === 0 ? (
         <View style={styles.stateWrap}>
           <Text style={styles.stateText}>No program data found.</Text>
@@ -313,31 +309,29 @@ export default function ProgramOverviewScreen() {
             <Text style={styles.rationaleTitle}>{rationale.label}</Text>
             <Text style={styles.rationaleText}>{rationale.detail}</Text>
           </View>
-          {weeks.map((week) => {
-            const isCurrent = program?.currentWeek === week.weekNumber;
-            const isPast = (program?.currentWeek ?? 0) > week.weekNumber;
-            const isExpanded = expandedWeeks.has(week.weekNumber);
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8, paddingBottom: 16 }}>
+            {weeks.map(week => (
+              <Pressable key={week.weekNumber} accessibilityRole="button"
+                accessibilityState={{ selected: selectedWeek === week.weekNumber }}
+                accessibilityLabel={`Week ${week.weekNumber}`}
+                onPress={() => setSelectedWeek(week.weekNumber)}
+                style={[styles.weekHeader, selectedWeek === week.weekNumber && styles.weekHeaderCurrent,
+                  { minWidth: 90, minHeight: 48, alignItems: 'center', justifyContent: 'center' }]}>
+                <Text style={styles.weekTitle}>Week {week.weekNumber}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+          {weeks.filter(week => week.weekNumber === selectedWeek).map((week) => {
+            const isCurrent = currentWeek === week.weekNumber;
             const isDeload = week.days.some((d) => d.name.includes('(Deload)'));
 
             return (
               <View key={week.weekNumber} style={styles.weekSection}>
                 {/* Week header row */}
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.weekHeader,
-                    isCurrent && styles.weekHeaderCurrent,
-                    pressed && { opacity: 0.8 },
-                  ]}
-                  onPress={() => toggleWeek(week.weekNumber)}
-                  accessibilityRole="button"
-                >
+                <View style={[styles.weekHeader, isCurrent && styles.weekHeaderCurrent]}>
                   <View style={styles.weekHeaderLeft}>
-                    <Text
-                      style={[
-                        styles.weekTitle,
-                        isPast && !isCurrent && styles.weekTitleMuted,
-                      ]}
-                    >
+                    <Text style={styles.weekTitle}>
                       Week {week.weekNumber}
                     </Text>
                     {isCurrent && (
@@ -354,28 +348,19 @@ export default function ProgramOverviewScreen() {
                       {week.days.length} workout{week.days.length !== 1 ? 's' : ''}
                     </Text>
                   </View>
-                  <Ionicons
-                    name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                    size={20}
-                    color={isCurrent ? theme.textPrimary : theme.placeholder}
-                  />
-                </Pressable>
+                </View>
 
                 {/* Day cards inside expanded week */}
-                {isExpanded && (
                   <View style={styles.daysContainer}>
                     {week.days.map((day) => (
                       <DayCard
                         key={day.id}
                         day={day}
-                        expanded={expandedDays.has(day.id)}
-                        onToggle={() => toggleDay(day.id)}
                         styles={styles}
                         theme={theme}
                       />
                     ))}
                   </View>
-                )}
               </View>
             );
           })}

@@ -1,4 +1,9 @@
-import { visibleProgramExercises } from '@/features/workouts/visibleProgramExercises';
+import { useWorkoutLauncher } from '@/components/WorkoutLauncher';
+import { summarizeWorkout } from '@/features/workouts/workoutSummary';
+import sequenceOperations from '@/features/programs/sequenceService';
+import { sequenceOperationStore } from '@/features/programs/sequenceOperationStore';
+import { createOperationId } from '@/features/kernel/operationId';
+import { AppAlert as Alert } from '@/components/ui/AppDialog';
 import { workoutCorrectionsAvailable } from '@/features/workouts/occurrenceRepository';
 import { occurrenceAction, occurrenceState } from '@/features/workouts/effectiveOccurrence';
 import { Ionicons } from "@expo/vector-icons";
@@ -67,8 +72,15 @@ const HeaderDateBlock: React.FC<{ styles: ReturnType<typeof createStyles> }> = (
 
   return (
     <View style={styles.headerDateBlock}>
-      <Text style={styles.dayOfWeek}>{dayOfWeek}</Text>
-      <Text style={styles.date}>{date}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.dayOfWeek}>{dayOfWeek}</Text>
+        <Text style={styles.date}>{date}</Text>
+      </View>
+      <Pressable accessibilityRole="button" accessibilityLabel="Profile and settings"
+        style={{ minWidth: 48, minHeight: 48, justifyContent: 'center', alignItems: 'center' }}
+        onPress={() => router.push('/(tabs)/profile')}>
+        <Ionicons name="settings-outline" size={24} color={styles.dayOfWeek.color} />
+      </Pressable>
     </View>
   );
 };
@@ -81,7 +93,8 @@ const NextWorkoutSection: React.FC<{
   actionLabel?: string;
   workout?: WorkoutSummary;
   onPressStart?: () => void;
-}> = ({ workout, onPressStart, entryIssue, hasActiveDraft, actionLabel }) => {
+  onPressMore?: () => void;
+}> = ({ workout, onPressStart, onPressMore, entryIssue, hasActiveDraft, actionLabel }) => {
   return (
     <NextWorkoutCard
       entryIssue={entryIssue}
@@ -89,7 +102,8 @@ const NextWorkoutSection: React.FC<{
       hasActiveDraft={hasActiveDraft}
       workout={workout}
       onPressStart={onPressStart}
-      onPressCalendar={() => router.push('/(tabs)/plan')}
+      onPressMore={onPressMore}
+      statusLabel={hasActiveDraft ? 'In progress' : 'Next workout'}
     />
   );
 };
@@ -601,7 +615,10 @@ const ReadinessAdjustmentModal: React.FC<{
 
 export default function HomeScreen() {
   const { theme } = useTheme();
+  const openWorkout = useWorkoutLauncher();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const [showWorkoutOptions, setShowWorkoutOptions] = useState(false);
+  const [sequenceBusy, setSequenceBusy] = useState(false);
   useEffect(() => {
     void clearScheduledWorkoutReminders().catch(error =>
       reportSupabaseFailure('notifications.clear_superseded_reminders', error));
@@ -647,7 +664,7 @@ export default function HomeScreen() {
   useFocusEffect(useCallback(() => {
     let current = true;
     if (!ownerId || !sequenceProgramId) return () => { current = false; };
-    void programSequenceRepository.get(sequenceProgramId).then(result => {
+    void sequenceOperations.ensureInitialized(ownerId, sequenceProgramId).then(result => {
       if (current && result.programId === sequenceProgramId) {
         setSequence(result);
         setSequenceError(null);
@@ -781,18 +798,13 @@ export default function HomeScreen() {
 
   useFocusEffect(useCallback(() => {
     let active = true;
-    if (!ownerId || !program || !targetWorkout?.stableDayId) {
+    if (!ownerId || !program) {
       setLoadedDraft(null);
       return () => { active = false; };
     }
     const requestedOwnerId = ownerId;
     const requestedProgramId = program.id;
-    void workoutDraftStore.loadMatching(ownerId, {
-      programId: program.id,
-      prescriptionRevisionId: targetWorkout.prescriptionRevisionId,
-      stableDayId: targetWorkout.stableDayId,
-      programDayId: targetWorkout.id,
-    }).then((draft) => {
+    void workoutDraftStore.loadActiveForProgram(ownerId, program.id).then((draft) => {
       if (active && requestedOwnerId === ownerId && requestedProgramId === program.id) {
         setLoadedDraft(draft);
       }
@@ -801,35 +813,40 @@ export default function HomeScreen() {
       if (active) setLoadedDraft(null);
     });
     return () => { active = false; };
-  }, [ownerId, program, targetWorkout]));
+  }, [ownerId, program]));
 
-  const activeDraft = matchingActiveWorkoutDraft(program, targetWorkout ?? null, ownerId, loadedDraft);
-  const effectiveWorkout = effectiveCurrentWorkout(program, targetWorkout ?? null, ownerId, loadedDraft);
+  const draftWorkout = loadedDraft && program?.workouts.find(workout => workout.stableDayId === loadedDraft.stableDayId);
+  const shownWorkout = draftWorkout ?? targetWorkout;
+  const activeDraft = matchingActiveWorkoutDraft(program, shownWorkout ?? null, ownerId, loadedDraft);
+  const effectiveWorkout = effectiveCurrentWorkout(program, shownWorkout ?? null, ownerId, loadedDraft);
   const nextWorkoutSummary: WorkoutSummary | undefined = effectiveWorkout
-    ? {
-        id: effectiveWorkout.stableDayId ?? effectiveWorkout.id,
-        name: effectiveWorkout.name,
-        durationMinutes: effectiveWorkout.estimatedTime || 60,
-        exercises: visibleProgramExercises(effectiveWorkout.exercises).map((ex) => ({
-          id: ex.stableSlotId ?? ex.id,
-          name: ex.name,
-          prescription: `${ex.sets ?? 3}×${(ex.reps ?? "8-12").replace("-", "–")}`,
-        })),
-      }
-    : undefined;
+    ? summarizeWorkout(effectiveWorkout) : undefined;
 
-  const occurrenceDraft = matchingOccurrenceWorkoutDraft(program, targetWorkout ?? null, ownerId, loadedDraft);
+  const occurrenceDraft = matchingOccurrenceWorkoutDraft(program, shownWorkout ?? null, ownerId, loadedDraft);
   const homeState = occurrenceState(occurrenceDraft);
-  const handleStartWorkout = () => {
-    if (!sequence || sequence.paused || targetWorkout?.stableDayId !== sequence.nextStableDayId) return;
+  const handleStartWorkout = async () => {
+    if (!activeDraft && (!sequence || (sequence.paused || !shownWorkout ||
+      sequence.days.find(day => day.stableDayId === shownWorkout.stableDayId)?.status !== 'pending'))) return;
+    if (!activeDraft && program && shownWorkout) {
+      try {
+        const current = await programSequenceRepository.get(program.id);
+        if (current.paused || current.days.find(day => day.stableDayId === shownWorkout.stableDayId)?.status !== 'pending') {
+          throw new Error('This workout changed. Refresh before starting.');
+        }
+      } catch (cause) {
+        reportSupabaseFailure('home.workout_start', cause);
+        Alert.alert('Workout unavailable', supabaseUserMessage(cause, 'Could not confirm this workout. Retry.'));
+        return;
+      }
+    }
     if (occurrenceDraft?.finalizedReceipt) {
       router.push({ pathname: '/edit-workout', params: { sessionId: occurrenceDraft.finalizedReceipt.sessionId } });
       return;
     }
-    if (!program || !targetWorkout || workoutEntryIssue(program, targetWorkout)) return;
+    if (!program || !shownWorkout || workoutEntryIssue(program, shownWorkout)) return;
     router.push({
       pathname: "/next-workout",
-      params: activeDraft ? workoutRouteParamsForDraft(activeDraft) : workoutRouteParams(program, targetWorkout),
+      params: activeDraft ? workoutRouteParamsForDraft(activeDraft) : workoutRouteParams(program, shownWorkout),
     });
   };
 
@@ -886,43 +903,78 @@ export default function HomeScreen() {
             {actionError}
           </Text>
         ) : null}
-        {program ? (
-          <View style={{ backgroundColor: theme.mutedBg, borderColor: theme.border, borderWidth: 1, borderRadius: 14, padding: 16, marginHorizontal: 16, marginBottom: 12 }}>
-            <Text style={{ color: theme.textPrimary, fontWeight: '700', marginBottom: 5 }}>Suggested · Program sequence</Text>
-            <Text style={{ color: theme.text, lineHeight: 20 }}>
-              {!sequence || sequence.programId !== program.id
-                ? `Program sequence unavailable${sequenceError ? `: ${sequenceError}` : ''}. Open Plan to check or initialize it.`
-                : sequence.paused ? 'Program paused. No workout is suggested.'
-                  : sequence.nextStableDayId ? targetWorkout
-                    ? `Suggested next workout: ${targetWorkout.name}`
-                    : 'A pending program day is next. Open Plan to select its exact workout.'
-                    : 'No pending program workout is suggested.'}
-            </Text>
-            {activeDraft ? (
-              <Text style={{ color: theme.text, lineHeight: 20, marginTop: 6 }}>
-                Your saved draft will be preserved. Starting a workout only resolves the selected program day when you finalize it.
-              </Text>
-            ) : null}
-            <Pressable accessibilityRole="button" onPress={() => router.push('/(tabs)/plan')}
-              style={{ paddingVertical: 10 }}>
-              <Text style={{ color: theme.primary }}>Select another workout day or adjust program</Text>
-            </Pressable>
-          </View>
-        ) : null}
-        <Pressable accessibilityRole="button" onPress={() => router.push('/ad-hoc-workout')}
+        {program && !sequence && <View style={{ marginHorizontal: 16, padding: 16, borderRadius: 14,
+          backgroundColor: theme.cardBg, borderColor: theme.border, borderWidth: 1 }}>
+          <Text style={{ color: theme.textPrimary }}>Your workouts are not ready yet.</Text>
+          <Text style={{ color: theme.text }}>{sequenceError}</Text>
+          <Pressable accessibilityRole="button" style={{ paddingVertical: 12 }} onPress={() => openWorkout()}>
+            <Text style={{ color: theme.primary }}>Retry workout setup</Text>
+          </Pressable>
+        </View>}
+        {sequence?.paused && !activeDraft && <View style={{ marginHorizontal: 16, padding: 16 }}>
+          <Text style={{ color: theme.textPrimary, fontSize: 20, fontWeight: '600' }}>Program paused</Text>
+          <Text style={{ color: theme.text }}>Your next workout is waiting until you resume.</Text>
+        </View>}
+        {sequence && !sequence.paused && !shownWorkout && !activeDraft &&
+          <View style={{ marginHorizontal: 16, padding: 16 }}>
+            <Text style={{ color: theme.textPrimary, fontSize: 20, fontWeight: '600' }}>Program complete</Text>
+            <Text style={{ color: theme.text }}>You can review your program or log an ad-hoc workout.</Text>
+          </View>}
+        {(activeDraft || (sequence && sequence.programId === program?.id && !sequence.paused && shownWorkout))
+          ? <NextWorkoutSection
+            actionLabel={occurrenceAction(homeState, canCorrectWorkout)}
+            entryIssue={workoutEntryIssue(program, shownWorkout ?? null)}
+            hasActiveDraft={activeDraft !== null}
+            workout={nextWorkoutSummary}
+            onPressStart={() => void handleStartWorkout()}
+            onPressMore={() => setShowWorkoutOptions(value => !value)}
+          /> : null}
+        {showWorkoutOptions && shownWorkout && <View style={{ marginHorizontal: 16, marginBottom: 12,
+          backgroundColor: theme.cardBg, borderColor: theme.border, borderWidth: 1, borderRadius: 14 }}>
+          {!activeDraft && !sequence?.paused && <Pressable accessibilityRole="button"
+            style={{ minHeight: 48, justifyContent: 'center', paddingHorizontal: 16 }}
+            onPress={() => { setShowWorkoutOptions(false); openWorkout('choose'); }}>
+            <Text style={{ color: theme.textPrimary }}>Choose another workout</Text>
+          </Pressable>}
+          {!activeDraft && sequence && !sequence.paused && targetWorkout && (
+            <Pressable accessibilityRole="button" disabled={sequenceBusy}
+              style={{ minHeight: 48, justifyContent: 'center', paddingHorizontal: 16 }}
+              onPress={() => Alert.alert('Replace this workout with rest?', 'This program day will no longer be suggested as a workout.', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Make rest day', onPress: async () => {
+                  if (!ownerId || !program || sequenceBusy) return;
+                  setSequenceBusy(true);
+                  try {
+                    if ((await sequenceOperationStore.listPendingForOwner(ownerId))
+                      .some(operation => operation.programId === program.id)) {
+                      throw new Error('Finish syncing your previous program change before retrying.');
+                    }
+                    await sequenceOperations.change(ownerId, program.id, {
+                      schemaVersion: 1, programId: program.id, operationId: createOperationId(),
+                      expectedRevision: sequence.revision, kind: 'set_day',
+                      stableDayId: targetWorkout.stableDayId, status: 'replaced_with_rest',
+                    });
+                    setSequence(await sequenceOperations.ensureInitialized(ownerId, program.id));
+                    setShowWorkoutOptions(false);
+                  } catch (cause) {
+                    reportSupabaseFailure('home.rest_day', cause);
+                    Alert.alert('Workout unchanged', supabaseUserMessage(cause, 'Could not make this a rest day. Retry.'));
+                  } finally { setSequenceBusy(false); }
+                } },
+              ])}>
+              <Text style={{ color: theme.textPrimary }}>Replace this workout with rest</Text>
+            </Pressable>)}
+          <Pressable accessibilityRole="button" style={{ minHeight: 48, justifyContent: 'center', paddingHorizontal: 16 }}
+            onPress={() => { setShowWorkoutOptions(false); router.push('/program-overview'); }}>
+            <Text style={{ color: theme.textPrimary }}>View workout details</Text>
+          </Pressable>
+        </View>}
+        {!activeDraft && <Pressable accessibilityRole="button" onPress={() => router.push('/ad-hoc-workout')}
           style={{ marginHorizontal: 16, marginBottom: 12, padding: 14,
             backgroundColor: theme.cardBg, borderRadius: 12, borderColor: theme.border, borderWidth: 1 }}>
           <Text style={{ color: theme.textPrimary }}>Ad-hoc workout</Text>
-          <Text style={{ color: theme.text }}>History only. Does not fulfill or change your program.</Text>
-        </Pressable>
-        {sequence && sequence.programId === program?.id && !sequence.paused && targetWorkout
-          ? <NextWorkoutSection
-            actionLabel={occurrenceAction(homeState, canCorrectWorkout)}
-            entryIssue={workoutEntryIssue(program, targetWorkout ?? null)}
-            hasActiveDraft={activeDraft !== null}
-            workout={nextWorkoutSummary}
-            onPressStart={handleStartWorkout}
-          /> : null}
+          <Text style={{ color: theme.text }}>Train outside your program</Text>
+        </Pressable>}
         {lastWorkoutId && lastWorkoutOwner === ownerId ? <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/edit-workout', params: { sessionId: lastWorkoutId } })} style={{ padding: 16 }}>
           <Text style={{ color: theme.primary, fontWeight: '700' }}>Last Workout · {lastWorkoutDate} · {occurrenceAction('finalized', canCorrectWorkout)}</Text>
         </Pressable> : null}
@@ -1061,6 +1113,8 @@ function createStyles(theme: Theme) {
       paddingHorizontal: 20,
       paddingTop: 8,
       paddingBottom: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
     },
     dayOfWeek: {
       color: theme.textPrimary,

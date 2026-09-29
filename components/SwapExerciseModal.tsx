@@ -49,6 +49,8 @@ interface ExerciseOptionRowProps {
     isSelected: boolean;
     onSelect: (id: string) => void;
     onToggleInfo: (id: string) => void;
+    multiple?: boolean;
+    disabled?: boolean;
     styles: ReturnType<typeof createStyles>;
     theme: Theme;
 }
@@ -59,6 +61,8 @@ const ExerciseOptionRow = memo(function ExerciseOptionRow({
     isSelected,
     onSelect,
     onToggleInfo,
+    multiple,
+    disabled,
     styles,
     theme,
 }: ExerciseOptionRowProps) {
@@ -67,13 +71,15 @@ const ExerciseOptionRow = memo(function ExerciseOptionRow({
             <View style={styles.exerciseRow}>
                 <Pressable
                     onPress={() => onSelect(exercise.id)}
+                    disabled={disabled}
                     style={({ pressed }) => [styles.exerciseSelection, pressed && styles.rowPressed]}
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked: isSelected }}
-                    accessibilityLabel={`Select ${exercise.name}`}
+                    accessibilityRole={multiple ? 'checkbox' : 'radio'}
+                    accessibilityState={{ checked: isSelected, disabled }}
+                    accessibilityLabel={disabled ? `${exercise.name}, already added` : `Select ${exercise.name}`}
                     hitSlop={4}
                 >
                     <Text style={styles.exerciseName}>{exercise.name}</Text>
+                    {disabled ? <Text style={styles.exerciseMeta}>Already in workout</Text> : null}
                     <Text style={styles.exerciseMeta}>{exercise.equipment}</Text>
                     <View style={styles.exerciseStatsRow}>
                         <Text style={styles.statText}>{exercise.sets} sets</Text>
@@ -148,19 +154,23 @@ type Props = {
     mode: 'add';
     loadAdditionScope: () => Promise<RemovalPreview>;
     onAdd: (args: AddExerciseSelection) => unknown | Promise<unknown>;
+} | {
+    mode: 'ad_hoc';
+    excludedExerciseIds: readonly string[];
+    onAddExercises: (exercises: readonly { id: CatalogExerciseId; name: string; equipment: string }[]) => unknown | Promise<unknown>;
 });
 
 export function SwapExerciseModal(props: Props) {
     const { ownerId } = useAuth();
     // Account/target changes discard selections and invalidate outstanding requests.
-    return <ExercisePicker key={`${ownerId}/${props.mode ?? 'swap'}/${props.mode === 'add' ? '' : props.exerciseId}`} {...props} />;
+    return <ExercisePicker key={`${ownerId}/${props.mode ?? 'swap'}/${props.mode === 'swap' || props.mode === undefined ? props.exerciseId : ''}`} {...props} />;
 }
 
 function ExercisePicker(props: Props) {
     const { embedded } = props;
     const mode = props.mode ?? 'swap';
-    const program = props.mode === 'add' ? undefined : props.program;
-    const exerciseId = props.mode === 'add' ? undefined : props.exerciseId;
+    const program = props.mode === 'swap' || props.mode === undefined ? props.program : undefined;
+    const exerciseId = props.mode === 'swap' || props.mode === undefined ? props.exerciseId : undefined;
     const interaction = useRef(new InteractionScope());
     useEffect(() => {
         const session = interaction.current;
@@ -174,6 +184,7 @@ function ExercisePicker(props: Props) {
     const [searchQuery, setSearchQuery] = useState('');
     const [scope, setScope] = useState<'workout_only' | 'rest_of_program'>('workout_only');
     const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null);
+    const [selectedExerciseIds, setSelectedExerciseIds] = useState<string[]>([]);
     const [applying, setApplying] = useState(false);
     const [applyError, setApplyError] = useState<string | null>(null);
     const [historyIssue, setHistoryIssue] = useState<{ exerciseId: string; message: string } | null>(null);
@@ -239,9 +250,10 @@ function ExercisePicker(props: Props) {
         const isCurrent = () => !cancelled && active();
         void Promise.resolve().then(async () => {
             if (!isCurrent()) return;
-            setLoadingExercises(true); setSelectedExerciseId(null); setAlternatives([]); setCatalogUnavailable(false);
+            setLoadingExercises(true); setSelectedExerciseId(null); setSelectedExerciseIds([]);
+            setAlternatives([]); setCatalogUnavailable(false);
             try {
-                const data = await loadExercisePickerCatalog(supabase, mode === 'add' ? undefined : resolvedMuscleGroup, isCurrent);
+                const data = await loadExercisePickerCatalog(supabase, mode === 'swap' ? resolvedMuscleGroup : undefined, isCurrent);
                 if (!isCurrent()) return;
                 let availableEquipment = '';
                 if (mode === 'swap') {
@@ -256,8 +268,8 @@ function ExercisePicker(props: Props) {
                 const options: SwapOption[] = data.flatMap(ex => !isCatalogExerciseId(ex.id) ? [] : [{
                     id: ex.id, catalogExerciseId: ex.id, name: ex.name,
                     muscleGroup: ex.primary_muscle as MuscleGroup, equipment: ex.equipment as Equipment,
-                    sets: mode === 'add' ? 1 : currentExercise?.sets,
-                    reps: mode === 'add' ? '8-12' : currentExercise?.reps,
+                    sets: mode !== 'swap' ? 1 : currentExercise?.sets,
+                    reps: mode !== 'swap' ? '8-12' : currentExercise?.reps,
                     imageUrl: ex.image_url ?? undefined,
                     description: ex.instructions?.join('\n') || undefined,
                 }]);
@@ -273,8 +285,9 @@ function ExercisePicker(props: Props) {
                     setAlternatives(getAlternativesFor(resolvedMuscleGroup, currentExercise?.exerciseId ? [currentExercise.exerciseId] : [])
                         .map(ex => ({ ...ex, sets: currentExercise?.sets, reps: currentExercise?.reps })));
                 } else setAlternatives(options);
-            } catch {
+            } catch (error) {
                 if (!isCurrent()) return;
+                reportSupabaseFailure('workout.exercise_picker_catalog', error);
                 setCatalogUnavailable(true);
                 if (mode === 'swap' && resolvedMuscleGroup) {
                     setAlternatives(getAlternativesFor(resolvedMuscleGroup, currentExercise?.exerciseId ? [currentExercise.exerciseId] : [])
@@ -288,7 +301,7 @@ function ExercisePicker(props: Props) {
     }, [mode, currentExercise, resolvedMuscleGroup, catalogAttempt]);
 
     const deferredSearchQuery = useDeferredValue(searchQuery);
-    const filteredAlternatives = useMemo(() => filterExercisePickerOptions(alternatives, deferredSearchQuery, mode, currentExercise),
+    const filteredAlternatives = useMemo(() => filterExercisePickerOptions(alternatives, deferredSearchQuery, mode === 'ad_hoc' ? 'add' : mode, currentExercise),
         [alternatives, deferredSearchQuery, mode, currentExercise]);
 
     const selectedExercise = useMemo(
@@ -329,13 +342,15 @@ function ExercisePicker(props: Props) {
     const handleSelect = useCallback((id: string) => {
         selectionStartedAtRef.current = interactionNow();
         setApplyError(null);
-        setSelectedExerciseId((selected) => selected === id ? null : id);
-    }, []);
+        if (mode === 'ad_hoc') {
+            setSelectedExerciseIds(selected => selected.includes(id) ? selected.filter(value => value !== id) : [...selected, id]);
+        } else setSelectedExerciseId((selected) => selected === id ? null : id);
+    }, [mode]);
 
     useEffect(() => {
         reportDevelopmentInteraction('selection-commit', selectionStartedAtRef.current);
         selectionStartedAtRef.current = null;
-    }, [selectedExerciseId]);
+    }, [selectedExerciseId, selectedExerciseIds]);
 
     const handleToggleInfo = useCallback((id: string) => {
         setExpandedId((expanded) => expanded === id ? null : id);
@@ -352,6 +367,26 @@ function ExercisePicker(props: Props) {
     }, [scope]);
 
     const handleApply = async () => {
+        if (props.mode === 'ad_hoc') {
+            const selected = selectedExerciseIds.map(id => alternatives.find(exercise => exercise.id === id));
+            const valid = selected.flatMap(exercise => exercise && isCatalogExerciseId(exercise.catalogExerciseId)
+                && !props.excludedExerciseIds.includes(exercise.catalogExerciseId)
+                ? [{ id: exercise.catalogExerciseId, name: exercise.name, equipment: String(exercise.equipment) }]
+                : []);
+            if (!selected.length || valid.length !== selected.length) {
+                setApplyError('Refresh the catalog and choose exercises not already in this workout.');
+                return;
+            }
+            await applyExercisePickerSelection({
+                gate: applyGateRef.current, interaction: interaction.current,
+                started: () => { setApplying(true); setApplyError(null); },
+                apply: () => props.onAddExercises(valid),
+                succeeded: onClose,
+                failed: error => setApplyError(error instanceof Error ? error.message : 'Could not add exercises. Try again.'),
+                settled: () => setApplying(false),
+            });
+            return;
+        }
         const catalogExerciseId = selectedExercise?.catalogExerciseId;
         if (!selectedExercise || !canApplySelectedExercise || !isCatalogExerciseId(catalogExerciseId)) return;
         await applyExercisePickerSelection({
@@ -385,13 +420,15 @@ function ExercisePicker(props: Props) {
         <ExerciseOptionRow
             exercise={item}
             isExpanded={expandedId === item.id}
-            isSelected={selectedExerciseId === item.id}
+            isSelected={mode === 'ad_hoc' ? selectedExerciseIds.includes(item.id) : selectedExerciseId === item.id}
             onSelect={handleSelect}
             onToggleInfo={handleToggleInfo}
+            multiple={mode === 'ad_hoc'}
+            disabled={props.mode === 'ad_hoc' && props.excludedExerciseIds.includes(item.id)}
             styles={styles}
             theme={theme}
         />
-    ), [expandedId, handleSelect, handleToggleInfo, selectedExerciseId, styles, theme]);
+    ), [expandedId, handleSelect, handleToggleInfo, selectedExerciseId, selectedExerciseIds, styles, theme, mode, props]);
 
     const futureUnavailable = mode === 'add' && (scopeLoading || !additionPreview?.futureCount);
     const canApplySelectedExercise = isCatalogExerciseId(selectedExercise?.catalogExerciseId)
@@ -404,8 +441,8 @@ function ExercisePicker(props: Props) {
             {/* Header */}
             <View style={styles.header}>
                 <View style={{ flex: 1 }}>
-                    <Text style={styles.headerTitle}>{mode === 'add' ? 'Add Exercise' : 'Swap Exercise'}</Text>
-                    <Text style={styles.headerSubtitle}>{mode === 'add' ? 'Add one blank, unperformed set' : `Replace ${currentExercise?.name}`}</Text>
+                    <Text style={styles.headerTitle}>{mode === 'ad_hoc' ? 'Choose exercises' : mode === 'add' ? 'Add Exercise' : 'Swap Exercise'}</Text>
+                    <Text style={styles.headerSubtitle}>{mode === 'ad_hoc' ? 'Select multiple exercises for this history-only workout' : mode === 'add' ? 'Add one blank, unperformed set' : `Replace ${currentExercise?.name}`}</Text>
                 </View>
 
                 <Pressable style={styles.iconBtn} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close exercise picker">
@@ -444,10 +481,10 @@ function ExercisePicker(props: Props) {
                 showsVerticalScrollIndicator={false}
                 ListHeaderComponent={(
                     <>
-                        <Text style={styles.sectionLabel}>{mode === 'add' ? 'ALL' : (resolvedMuscleGroup ?? 'General').toUpperCase()} EXERCISES</Text>
+                        <Text style={styles.sectionLabel}>{mode !== 'swap' ? 'ALL' : (resolvedMuscleGroup ?? 'General').toUpperCase()} EXERCISES</Text>
                         {catalogUnavailable ? (
                             <View>
-                                <Text style={styles.catalogUnavailableText}>{mode === 'add' ? 'The exercise catalog could not be loaded.' : 'Reconnect to use these preview exercises in your workout.'}</Text>
+                                <Text style={styles.catalogUnavailableText}>{mode !== 'swap' ? 'The exercise catalog could not be loaded.' : 'Reconnect to use these preview exercises in your workout.'}</Text>
                                 <Pressable accessibilityRole="button" onPress={() => setCatalogAttempt(value => value + 1)} style={styles.scopeButton}>
                                     <Text style={styles.switchText}>Retry catalog</Text>
                                 </Pressable>
@@ -466,6 +503,15 @@ function ExercisePicker(props: Props) {
 
             {/* Footer */}
             <View style={styles.footer}>
+                {mode === 'ad_hoc' ? <>
+                    {applyError ? <Text style={styles.applyError} accessibilityLiveRegion="assertive">{applyError}</Text> : null}
+                    <Pressable accessibilityRole="button" accessibilityState={{ disabled: !selectedExerciseIds.length || applying || catalogUnavailable }}
+                        disabled={!selectedExerciseIds.length || applying || catalogUnavailable}
+                        style={[styles.swapBtn, (!selectedExerciseIds.length || applying || catalogUnavailable) && styles.swapBtnDisabled]}
+                        onPress={() => void handleApply()}>
+                        <Text style={styles.swapBtnText}>{applying ? 'Adding...' : `Add ${selectedExerciseIds.length} exercise${selectedExerciseIds.length === 1 ? '' : 's'}`}</Text>
+                    </Pressable>
+                </> : <>
                 <Text style={styles.scopeLabel}>SCOPE</Text>
                 <View style={styles.scopeOptions}>
                     <Pressable
@@ -530,6 +576,7 @@ function ExercisePicker(props: Props) {
                             : mode === 'add' ? 'Add' : 'Apply swap'}
                     </Text>
                 </Pressable>
+                </>}
             </View>
         </>
     );

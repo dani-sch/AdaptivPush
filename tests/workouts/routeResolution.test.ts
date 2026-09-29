@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { createWorkoutDraft, updateWorkoutSet, validateWorkoutDraft } from '../../features/workouts/contracts';
-import { activeWorkoutDraftMatches, workoutDraftMatches } from '../../features/workouts/draftStore';
+import { activeWorkoutDraftMatches, selectActiveProgramDraft, workoutDraftMatches } from '../../features/workouts/draftStore';
 import {
   draftLookupForRoute,
   resolveProgramWorkout,
@@ -106,6 +106,16 @@ test('a selected later sequence day resolves its exact prescription rather than 
   assert.equal(resolveProgramWorkout(allDays, target)?.id, laterDay.id);
   assert.equal(resolveProgramWorkout(allDays, { ...target, programDayId }), null);
   assert.equal(resolveProgramWorkout(program, target), null);
+});
+
+test('the latest unfinished owner draft wins over the suggested day without changing its identity', () => {
+  const otherDay = { ...draft, draftId: '90000000-0000-4000-8000-000000000002',
+    stableDayId: '40000000-0000-4000-8000-000000000002',
+    programDayId: '50000000-0000-4000-8000-000000000002',
+    startedAt: '2026-09-12T12:00:00.000Z' };
+  assert.equal(selectActiveProgramDraft([draft, otherDay], ownerId, programId)?.stableDayId, otherDay.stableDayId);
+  assert.equal(selectActiveProgramDraft([{ ...otherDay, ownerId: 'another-owner' },
+    { ...draft, lifecycle: 'finalized' }], ownerId, programId), null);
 });
 
 test('loading never becomes unavailable before program and draft resolution settle', () => {

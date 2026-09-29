@@ -1,5 +1,11 @@
 # AdaptivPush current state
 
+## Client presentation and history correction (2026-09-28)
+
+The feature branch now contains an unreleased Home/Program/History presentation refactor. Home presents the next or active workout without a sequence explanation card; Program shows week-oriented prescriptions rather than per-day sequence controls; a central Workout action opens a launcher and focused pending-day chooser without adding a fifth tab. The route-local pending-operation component was moved outside Expo Router's tab tree. Program creation and restoration attempt sequence setup automatically and retain an explicit retry state if setup cannot be confirmed. Ad-hoc entry shares the detailed exercise picker and exercise cards, while remaining history-only.
+
+History resolves performed sets by catalog exercise ID and the single joined exercise record, and reports failed or partial reads separately from empty history. The previous "Unknown exercise" fallback is no longer used for valid joined sets. Local automated gates do not prove physical-device layout, native routing, legacy-record identity, or hosted end-to-end acceptance. The branch is not accepted, integrated, or distributable; the earlier backend authority and pending-request invariants remain unchanged.
+
 ## Flexible sequence backend gate (2026-09-27)
 
 The additive owner-scoped sequence authority `20260927190000` is deployed and verified: hosted ledger 11 entries, exact migration SHA-256 `c0d1bc62a606c55c49d15363afb7f21584b367200340567270c911685011ed32`, fresh encrypted recovery, isolated restore and exact rehearsal, hosted schema/security and non-ledger data parity, rolled-back authenticated/anonymous/replay/lineage/Finish/correction/ad-hoc checks, and separate-session concurrency. All three AP-04 schedule tables remain empty and untouched. Authenticated access to the two dated schedule-creation/revision RPCs was revoked by explicit user approval, leaving their bodies in place. [Backend authority evidence](/dev-doc/reports/ADAPTIVPUSH-FLEXIBLE-SEQUENCE-AUTHORITY-2026-09-27.md) owns the details.

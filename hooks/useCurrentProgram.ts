@@ -458,6 +458,7 @@ function useCurrentProgramState() {
 
                     return {
                         id: d.id, // program_day id
+                        weekNumber: d.week_number,
                         stableDayId: d.stable_day_id,
                         prescriptionRevisionId: d.program_revision_id ?? prog.current_revision_id ?? undefined,
                         name: d.workout_name,

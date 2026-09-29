@@ -9,6 +9,7 @@ import { supabase } from '@/utils/supabase';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
 import { restoreProgram } from '@/features/programs/commands';
+import sequenceOperations from '@/features/programs/sequenceService';
 import { programRepository } from '@/features/programs/repository';
 import { isMissingRelationOrColumnError } from '@/utils/profilePreferences';
 import { reportSupabaseFailure, supabaseSaveFailureMessage, supabaseUserMessage } from '@/utils/supabaseResilience';
@@ -126,6 +127,12 @@ export default function ArchivedProgramsScreen() {
                 .maybeSingle<{ id: string }>();
             if (activeError) throw activeError;
             await restoreProgram(programRepository, user.id, programId, mode, active?.id ?? null);
+            try {
+                await sequenceOperations.ensureInitialized(user.id, programId);
+            } catch (setupError) {
+                reportSupabaseFailure('program.restore_sequence_setup', setupError);
+                Alert.alert('Program restored', 'Workout setup is not ready yet. Open Plan to retry.');
+            }
 
             await loadArchivedPrograms();
             router.back();

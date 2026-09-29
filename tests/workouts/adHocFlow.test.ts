@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
-  createAdHocFlow, createAdHocSet, freezeAdHocDraft, verifyAdHocHistory,
+  addAdHocExercises, appendAdHocSet, createAdHocFlow, createAdHocSet, freezeAdHocDraft,
+  removeAdHocExercise, removeAdHocSet, verifyAdHocHistory,
   type AdHocDraft, type AdHocGateway, type AdHocPayload,
 } from '../../features/workouts/adHocFlow';
 
@@ -129,7 +130,7 @@ test('storage failure prevents RPC, and corrupted frozen recovery is never repla
 test('validation refuses empty, duplicate, malformed and non-actual sets without freezing', async () => {
   const { service, calls } = fixture();
   const draft = await service.start(owner);
-  await assert.rejects(service.finish(owner), /name and at least one actual set/);
+  await assert.rejects(service.finish(owner), /at least one actual set/);
   const first = createAdHocSet(exercise, 'Press', 1, id);
   const unfinished = { ...draft, workoutName: 'Press', sets: [first] };
   await service.save(unfinished);
@@ -150,7 +151,7 @@ test('validation refuses empty, duplicate, malformed and non-actual sets without
 
 test('verification checks set identities and actual values, not only receipt counts', async () => {
   const draft: AdHocDraft = { ownerId: owner, draftId: id(), workoutName: 'Walk', startedAt,
-    sets: [{ ...createAdHocSet(exercise, 'Press', 1, id), reps: '8' }] };
+    sets: [{ ...createAdHocSet(exercise, 'Press', 1, id, 'Bodyweight'), reps: '8' }] };
   const payload = freezeAdHocDraft(draft, id(), endedAt);
   const receipt = { sessionId: id(), operationId: payload.operationId, draftId: payload.draftId,
     revision: 1, completionClass: 'complete', setCount: 1, replayed: false };
@@ -165,4 +166,77 @@ test('verification checks set identities and actual values, not only receipt cou
   assert.equal(verifyAdHocHistory(owner, payload, receipt, session, [row]), receipt.sessionId);
   assert.throws(() => verifyAdHocHistory(owner, payload, receipt, session, [{ ...row, reps: 9 }]), /set differs/);
   assert.throws(() => verifyAdHocHistory(owner, payload, receipt, session, [{ ...row, actual_set_id: id() }]), /identity/);
+});
+
+test('an unnamed ad-hoc workout receives a neutral title without changing its actual sets', () => {
+  const draft: AdHocDraft = { ownerId: owner, draftId: id(), workoutName: ' ', startedAt,
+    sets: [{ ...createAdHocSet(exercise, 'Press', 1, id, 'Bodyweight'), reps: '8' }] };
+  const payload = freezeAdHocDraft(draft, id(), endedAt);
+  assert.equal(payload.workoutName, 'Ad-hoc workout');
+  assert.equal(payload.sets[0].exerciseId, exercise);
+});
+
+test('catalog multi-selection creates distinct groups and derives blank load metadata', () => {
+  const draft: AdHocDraft = { ownerId: owner, draftId: id(), workoutName: 'Training', startedAt, sets: [] };
+  const bodyweightId = 'a2000000-0000-4000-8000-000000000002';
+  const grouped = addAdHocExercises(draft, [
+    { id: exercise, name: 'Press', equipment: 'Dumbbell' },
+    { id: bodyweightId, name: 'Push-up', equipment: 'Bodyweight' },
+  ], id);
+
+  assert.deepEqual(grouped.sets.map(set => [set.exerciseId, set.order, set.loadKind, set.loadUnit, set.loadValue]), [
+    [exercise, 1, 'external', 'lb', ''],
+    [bodyweightId, 1, 'bodyweight', 'none', ''],
+  ]);
+  assert.notEqual(grouped.sets[0].setId, grouped.sets[1].setId);
+  assert.equal(grouped.sets[0].loadSide, 'per_hand');
+  assert.throws(() => addAdHocExercises(grouped, [{ id: exercise, name: 'Press', equipment: 'Dumbbell' }], id), /already/);
+  assert.throws(() => addAdHocExercises(draft, [{ id: 'invalid', name: 'Press', equipment: 'Barbell' }], id), /catalog/);
+});
+
+test('adding and removing grouped sets keeps per-exercise order and preserves frozen actual identity', () => {
+  const draft: AdHocDraft = { ownerId: owner, draftId: id(), workoutName: 'Training', startedAt, sets: [] };
+  const otherExercise = 'a2000000-0000-4000-8000-000000000002';
+  const initial = addAdHocExercises(draft, [
+    { id: exercise, name: 'Press', equipment: 'Barbell' },
+    { id: otherExercise, name: 'Row', equipment: 'Cable' },
+  ], id);
+  const withSecond = appendAdHocSet(initial, exercise, id);
+  const withThird = appendAdHocSet(withSecond, exercise, id);
+  const shortened = removeAdHocSet(withThird, withSecond.sets[2].setId);
+  const entered = { ...shortened, sets: shortened.sets.map(set => ({ ...set, reps: '8', loadValue: '30' })) };
+  const payload = freezeAdHocDraft(entered, id(), endedAt);
+
+  assert.deepEqual(shortened.sets.map(set => [set.exerciseId, set.order]), [
+    [exercise, 1], [otherExercise, 1], [exercise, 2],
+  ]);
+  assert.deepEqual(payload.sets.map(set => [set.setId, set.exerciseId, set.order]), shortened.sets.map(set =>
+    [set.setId, set.exerciseId, set.order]));
+  assert.deepEqual(removeAdHocExercise(shortened, exercise).sets.map(set => set.exerciseId), [otherExercise]);
+  assert.throws(() => appendAdHocSet(draft, exercise, id), /Choose an exercise/);
+});
+
+test('multi-exercise draft restores and retries the same history-only request after a lost response', async () => {
+  const { service, storage, gateway, calls, setResponseLost } = fixture();
+  const initial = await service.start(owner);
+  const secondExercise = 'a2000000-0000-4000-8000-000000000002';
+  const grouped = appendAdHocSet(addAdHocExercises(initial, [
+    { id: exercise, name: 'Press', equipment: 'Dumbbell' },
+    { id: secondExercise, name: 'Push-up', equipment: 'Bodyweight' },
+  ], id), exercise, id);
+  const entered = { ...grouped, workoutName: 'Training',
+    sets: grouped.sets.map(set => ({ ...set, reps: '8', loadValue: set.loadKind === 'external' ? '20' : '' })) };
+  await service.save(entered);
+  setResponseLost();
+
+  await assert.rejects(service.finish(owner), /response lost/);
+  const restarted = createAdHocFlow(storage, gateway, () => { throw new Error('must not create new ID'); }, () => endedAt);
+  assert.deepEqual((await restarted.load(owner)).draft?.sets, entered.sets);
+  await restarted.finish(owner);
+
+  assert.deepEqual(calls[0], calls[1]);
+  assert.deepEqual(calls[0].sets.map(set => [set.exerciseId, set.order]), [
+    [exercise, 1], [secondExercise, 1], [exercise, 2],
+  ]);
+  assert.equal((await restarted.load(owner)).draft, null);
 });

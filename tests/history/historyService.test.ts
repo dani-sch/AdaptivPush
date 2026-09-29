@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { fetchPaginatedWorkoutHistory } from '../../features/history/historyService';
+import { fetchPaginatedWorkoutHistory, historyDisplayState } from '../../features/history/historyService';
 
-type Row = { id: string; ended_at?: string; completed_at?: string; session_id?: string };
-type Source = Row[] | { error: { code?: string; message: string } };
+type Row = { id: string; ended_at?: string; completed_at?: string; session_id?: string; lifecycle?: string };
+type Source = Row[] | null | { error: { code?: string; message: string } };
 
 function clientFor(sources: Record<string, Source>, owner = 'owner', failPage = -1): SupabaseClient {
   return {
@@ -19,7 +19,8 @@ function clientFor(sources: Record<string, Source>, owner = 'owner', failPage = 
           assert.equal(expectedOwner, owner);
           if (start === failPage) return { data: null, error: { message: 'later page failed' } };
           const source = sources[table];
-          if (!source) return { data: null, error: { code: 'PGRST205', message: `missing ${table}` } };
+          if (source === undefined) return { data: null, error: { code: 'PGRST205', message: `missing ${table}` } };
+          if (source === null) return { data: null, error: null };
           return Array.isArray(source)
             ? { data: source.slice(start, end + 1), error: null }
             : { data: null, error: source.error };
@@ -88,4 +89,57 @@ test('account mismatch rejects and pre-aborted requests never return cached data
   const result = await fetchPaginatedWorkoutHistory({ supabaseClient: client, signal: controller.signal });
   assert.equal(result.aborted, true);
   assert.equal(result.items.length, 0);
+});
+
+test('empty supported history is empty, while missing relations and failed reads have separate states', async () => {
+  const empty = await fetchPaginatedWorkoutHistory({ supabaseClient: clientFor({
+    workout_sessions: [], workout_history: [],
+  }) });
+  assert.equal(historyDisplayState(empty), 'empty');
+  assert.equal(empty.complete, true);
+
+  const unavailable = await fetchPaginatedWorkoutHistory({ supabaseClient: clientFor({}) });
+  assert.equal(historyDisplayState(unavailable), 'unavailable');
+  assert.equal(unavailable.errors.length, 0);
+
+  const failed = await fetchPaginatedWorkoutHistory({ supabaseClient: clientFor({
+    workout_sessions: { error: { message: 'connection failed' } }, workout_history: [],
+  }) });
+  assert.equal(historyDisplayState(failed), 'error');
+  assert.deepEqual(failed.unavailable, []);
+  assert.equal(failed.errors.length, 1);
+
+  const missing = await fetchPaginatedWorkoutHistory({ supabaseClient: clientFor({
+    workout_sessions: { error: { code: '42P01', message: 'relation workout_sessions does not exist' } },
+    workout_history: [],
+  }) });
+  assert.equal(historyDisplayState(missing), 'unavailable');
+  assert.deepEqual(missing.unavailable, ['workout_sessions']);
+
+  const malformed = await fetchPaginatedWorkoutHistory({ supabaseClient: clientFor({
+    workout_sessions: [{ id: 'finalized-without-end', lifecycle: 'finalized', completed_at: date }],
+    workout_history: [],
+  }) });
+  assert.equal(historyDisplayState(malformed), 'error');
+
+  const invalidResponse = await fetchPaginatedWorkoutHistory({ supabaseClient: clientFor({
+    workout_sessions: null, workout_history: [],
+  }) });
+  assert.equal(historyDisplayState(invalidResponse), 'error');
+});
+
+test('unfinished sessions are not actual history and partial reads retain loaded records', async () => {
+  const client = clientFor({
+    workout_sessions: [
+      { id: 'draft', ended_at: undefined, completed_at: date },
+      { id: 'finished', ended_at: date },
+    ],
+    workout_history: { error: { message: 'legacy query failed' } },
+  });
+  const result = await fetchPaginatedWorkoutHistory({ supabaseClient: client });
+  assert.deepEqual(result.items.map(item => item.row.id), ['finished']);
+  assert.equal(historyDisplayState(result), 'records');
+  assert.equal(result.complete, false);
+  assert.equal(result.partial, true);
+  assert.equal(result.errors.length, 1);
 });

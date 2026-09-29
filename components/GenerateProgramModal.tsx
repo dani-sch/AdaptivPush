@@ -5,6 +5,7 @@ import { X } from 'lucide-react-native';
 import { supabase } from '@/utils/supabase';
 import { generateProgram } from '@/utils/programGenerator';
 import { saveProgramToDb } from '@/utils/saveProgramToDb';
+import sequenceOperations from '@/features/programs/sequenceService';
 import { computeCyclePhase } from '@/utils/cyclePhase';
 import type { ProgramGenParams, TrainingGoal, MuscleGroup, GeneratedProgram } from '@/types/program';
 import type { TrainingExperience } from '@/types/database';
@@ -150,13 +151,19 @@ export function GenerateProgramModal({
       };
 
       const programName = customName.trim() || pendingProgram.name;
-      await saveProgramToDb(
+      const savedProgramId = await saveProgramToDb(
         user.id,
         params,
         { ...pendingProgram, name: programName },
         { programGenerationContextMode: 'create' },
       );
 
+      try {
+        await sequenceOperations.ensureInitialized(user.id, savedProgramId);
+      } catch (setupError) {
+        reportSupabaseFailure('program.generated_sequence_setup', setupError);
+        Alert.alert('Program saved', 'Workout setup is not ready yet. Open Plan to retry without recreating your program.');
+      }
       onProgramCreated();
       onClose();
     } catch (err: any) {

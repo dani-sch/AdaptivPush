@@ -1,5 +1,5 @@
 import { SymbolView } from "expo-symbols";
-import { ChevronDown, ChevronUp } from "lucide-react-native";
+import { ChevronDown, ChevronUp, MoreHorizontal } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -27,6 +27,10 @@ interface NextWorkoutCardProps {
   workout?: WorkoutSummary;
   onPressStart?: () => void;
   onPressCalendar?: () => void;
+  onPressMore?: () => void;
+  statusLabel?: string;
+  compact?: boolean;
+  showAllExercises?: boolean;
 }
 
 
@@ -35,24 +39,27 @@ const CardHeader: React.FC<{
   title: string;
   duration: number;
   onPressCalendar?: () => void;
+  onPressMore?: () => void;
+  statusLabel: string;
   styles: ReturnType<typeof createStyles>;
   theme: Theme;
-}> = ({ title, duration, onPressCalendar, styles, theme }) => (
+}> = ({ title, duration, onPressCalendar, onPressMore, statusLabel, styles, theme }) => (
   <View style={styles.header}>
     <View style={styles.headerLeft}>
-      <Text style={styles.label}>Next workout · not a dated Today assignment</Text>
+      <Text style={styles.label}>{statusLabel}</Text>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.duration}>{duration} min</Text>
     </View>
-    <Pressable
-      onPress={onPressCalendar}
+    {(onPressMore || onPressCalendar) && <Pressable
+      onPress={onPressMore ?? onPressCalendar}
       style={styles.calendarButton}
       hitSlop={8}
       accessibilityRole="button"
-      accessibilityLabel="View program plan"
+      accessibilityLabel={onPressMore ? "Workout options" : "View program plan"}
     >
-      <SymbolView name="calendar" size={24} tintColor={theme.white} />
-    </Pressable>
+      {onPressMore ? <MoreHorizontal color={theme.textPrimary} size={24} /> :
+        <SymbolView name="calendar" size={24} tintColor={theme.textPrimary} />}
+    </Pressable>}
   </View>
 );
 
@@ -94,6 +101,10 @@ export default function NextWorkoutCard({
   workout,
   onPressStart,
   onPressCalendar,
+  onPressMore,
+  statusLabel = "Next workout",
+  compact = false,
+  showAllExercises = false,
 }: NextWorkoutCardProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -101,7 +112,7 @@ export default function NextWorkoutCard({
 
   if (!workout) return null;
   const expanded = expandedWorkoutId === workout.id;
-  const displayExercises = visibleWorkoutExercises(workout.exercises, expanded);
+  const displayExercises = visibleWorkoutExercises(workout.exercises, expanded || showAllExercises);
 
   // calculate remaining exercises
   const totalExercises = workout.exercises.length;
@@ -112,13 +123,13 @@ export default function NextWorkoutCard({
 
   return (
     <View style={styles.card}>
-      <View style={styles.gradientLayer} />
-
       <View style={styles.cardContent}>
         <CardHeader
           title={workout.name}
           duration={workout.durationMinutes}
           onPressCalendar={onPressCalendar}
+          onPressMore={onPressMore}
+          statusLabel={statusLabel}
           styles={styles}
           theme={theme}
         />
@@ -129,7 +140,7 @@ export default function NextWorkoutCard({
           ))}
         </View>
 
-        {remainingCount > 0 && (
+        {!compact && remainingCount > 0 && (
           <Pressable
             onPress={() => setExpandedWorkoutId((value) => value === workout.id ? null : workout.id)}
             style={({ pressed }) => [styles.moreExercisesButton, pressed && styles.pressed]}
@@ -146,13 +157,13 @@ export default function NextWorkoutCard({
                 : `Show ${remainingCount} more exercise${remainingCount === 1 ? "" : "s"}`}
             </Text>
             {expanded
-              ? <ChevronUp color={theme.white} size={18} />
-              : <ChevronDown color={theme.white} size={18} />}
+              ? <ChevronUp color={theme.text} size={18} />
+              : <ChevronDown color={theme.text} size={18} />}
           </Pressable>
         )}
 
         {entryIssue ? <Text style={styles.exercisePrescription}>{entryIssue}</Text>
-          : <StartWorkoutButton label={actionLabel} continuing={hasActiveDraft} onPress={onPressStart} styles={styles} />}
+          : onPressStart ? <StartWorkoutButton label={actionLabel} continuing={hasActiveDraft} onPress={onPressStart} styles={styles} /> : null}
       </View>
     </View>
   );
@@ -162,21 +173,13 @@ function createStyles(theme: Theme) {
   return StyleSheet.create({
     card: {
       borderRadius: 24,
-      backgroundColor: theme.primary,
+      backgroundColor: theme.cardBg,
+      borderColor: theme.border,
+      borderWidth: 1,
       overflow: "hidden",
       marginHorizontal: 16,
       marginVertical: 12,
 
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.15,
-      shadowRadius: 12,
-      elevation: 8,
-    },
-    gradientLayer: {
-      ...StyleSheet.absoluteFill,
-      backgroundColor: theme.primary,
-      opacity: 0.95,
     },
     cardContent: {
       padding: 24,
@@ -192,7 +195,7 @@ function createStyles(theme: Theme) {
       flex: 1,
     },
     label: {
-      color: theme.white,
+      color: theme.text,
       fontSize: 13,
       fontWeight: "500",
       opacity: 0.7,
@@ -201,13 +204,13 @@ function createStyles(theme: Theme) {
       letterSpacing: 0.5,
     },
     title: {
-      color: theme.white,
+      color: theme.textPrimary,
       fontSize: 26,
       fontWeight: "700",
       marginBottom: 4,
     },
     duration: {
-      color: theme.white,
+      color: theme.text,
       fontSize: 15,
       fontWeight: "500",
       opacity: 0.85,
@@ -216,8 +219,7 @@ function createStyles(theme: Theme) {
       width: 44,
       height: 44,
       borderRadius: 12,
-      backgroundColor: theme.white,
-      opacity: 0.15,
+      backgroundColor: theme.mutedBg,
       alignItems: "center",
       justifyContent: "center",
     },
@@ -230,16 +232,16 @@ function createStyles(theme: Theme) {
       alignItems: "center",
       paddingVertical: 10,
       borderBottomWidth: 1,
-      borderBottomColor: "rgba(255, 255, 255, 0.1)",
+      borderBottomColor: theme.border,
     },
     exerciseName: {
-      color: theme.white,
+      color: theme.textPrimary,
       fontSize: 16,
       fontWeight: "500",
       flex: 1,
     },
     exercisePrescription: {
-      color: theme.white,
+      color: theme.text,
       fontSize: 15,
       fontWeight: "600",
       opacity: 0.8,
@@ -255,7 +257,7 @@ function createStyles(theme: Theme) {
       marginBottom: 12,
     },
     moreExercises: {
-      color: theme.white,
+      color: theme.text,
       fontSize: 14,
       fontWeight: "500",
       opacity: 0.85,
@@ -264,7 +266,7 @@ function createStyles(theme: Theme) {
       opacity: 0.7,
     },
     startButton: {
-      backgroundColor: theme.white,
+      backgroundColor: theme.primary,
       borderRadius: 16,
       paddingVertical: 16,
       alignItems: "center",
@@ -272,7 +274,7 @@ function createStyles(theme: Theme) {
       marginTop: 8,
     },
     startButtonText: {
-      color: theme.primary,
+      color: theme.white,
       fontSize: 17,
       fontWeight: "700",
     },

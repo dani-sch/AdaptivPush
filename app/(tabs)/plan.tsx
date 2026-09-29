@@ -1,25 +1,23 @@
-import { visibleProgramExercises } from '@/features/workouts/visibleProgramExercises';
 import { AppAlert as Alert } from '@/components/ui/AppDialog';
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { Link, router, useFocusEffect } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View, Pressable, Modal, Platform } from 'react-native';
 import { Plus, ChevronRight, MoreVertical, LayoutList, Archive } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useCurrentProgram } from '@/hooks/useCurrentProgram';
-import { WorkoutTemplateModal } from '@/components/WorkoutTemplateModal';
 import { GenerateProgramModal } from '@/components/GenerateProgramModal';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
-import { workoutRouteParams } from '@/features/workouts/routeResolution';
-import { createCompletedNavigation } from '@/features/workouts/effectiveOccurrence';
 import { reportSupabaseFailure, supabaseSaveFailureMessage } from '@/utils/supabaseResilience';
-import { PendingSequenceBanner } from './components/PendingSequenceBanner';
-import { programSequenceRepository, type ProgramSequenceState } from '@/features/programs/sequenceRepository';
+import { PendingSequenceBanner } from '@/components/PendingSequenceBanner';
+import type { ProgramSequenceState } from '@/features/programs/sequenceRepository';
 import sequenceOperations from '@/features/programs/sequenceService';
-import { sequenceOperationStore } from '@/features/programs/sequenceOperationStore';
 import { createOperationId } from '@/features/kernel/operationId';
+import { sequenceOperationStore } from '@/features/programs/sequenceOperationStore';
 import { supabase } from '@/utils/supabase';
+import NextWorkoutCard from '@/components/NextWorkoutCard';
+import { summarizeWorkout } from '@/features/workouts/workoutSummary';
 
 function LoadingState({ styles }: { styles: ReturnType<typeof createStyles> }) {
     return (
@@ -118,7 +116,7 @@ function EmptyState({
                     },
                 ]}
             >
-                <Text style={{ color: theme.white, fontWeight: '700' }}>{busy ? 'Working…' : 'Create Program'}</Text>
+                <Text style={{ color: theme.textPrimary, fontWeight: '700' }}>{busy ? 'Working…' : 'Create Program'}</Text>
             </Pressable>
 
             <Pressable
@@ -141,8 +139,8 @@ function EmptyState({
                 ]}
             >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Archive size={16} color={theme.white} />
-                    <Text style={{ color: theme.white, fontWeight: '700' }}>Archived Programs</Text>
+                    <Archive size={16} color={theme.textPrimary} />
+                    <Text style={{ color: theme.textPrimary, fontWeight: '700' }}>Archived Programs</Text>
                 </View>
             </Pressable>
         </View>
@@ -154,17 +152,6 @@ export default function PlanScreen() {
     const { theme } = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
 
-    const [selectedWorkout, setSelectedWorkout] = useState<string | null>(null);
-    const [pendingEdit] = useState(createCompletedNavigation);
-    const navigateAfterDismiss = useCallback(() => {
-        const sessionId = pendingEdit.dismiss();
-        if (sessionId) router.push({ pathname: '/edit-workout', params: { sessionId } });
-    }, [pendingEdit]);
-    useEffect(() => {
-        if (Platform.OS === 'ios' || selectedWorkout || !pendingEdit.pending()) return;
-        const frame = requestAnimationFrame(navigateAfterDismiss);
-        return () => cancelAnimationFrame(frame);
-    }, [selectedWorkout, navigateAfterDismiss, pendingEdit]);
     const [showMenu, setShowMenu] = useState(false);
     const [showGenModal, setShowGenModal] = useState(false);
 
@@ -176,19 +163,20 @@ export default function PlanScreen() {
         unavailable,
         availabilityMessage,
         refresh,
-        swapExercise,
         endCurrentProgram,
     } = useCurrentProgram();
     const [sequence, setSequence] = useState<ProgramSequenceState | null>(null);
     const [sequenceError, setSequenceError] = useState<string | null>(null);
     const [sequenceBusy, setSequenceBusy] = useState(false);
+    const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
+    const suggestedWeek = program?.workouts.find(workout =>
+        workout.stableDayId === sequence?.nextStableDayId)?.weekNumber ?? program?.currentWeek ?? 1;
     const [longPause, setLongPause] = useState(false);
     const sequenceProgramId = program?.id ?? null;
     const loadSequence = useCallback(async () => {
         if (!ownerId || !sequenceProgramId) { setSequence(null); return; }
         try {
-            await programSequenceRepository.capability();
-            const state = await programSequenceRepository.get(sequenceProgramId);
+            const state = await sequenceOperations.ensureInitialized(ownerId, sequenceProgramId);
             if (state.programId !== sequenceProgramId) throw new Error('Program sequence belongs to a different program.');
             const linked = state.days.flatMap(day => day.sessionId ? [day.sessionId] : []);
             if (linked.length) {
@@ -231,11 +219,6 @@ export default function PlanScreen() {
             await loadSequence();
         } finally { setSequenceBusy(false); }
     };
-
-    const selectedWorkoutObj = useMemo(
-        () => program?.workouts.find((workout) => workout.id === selectedWorkout) ?? null,
-        [program, selectedWorkout],
-    );
 
     const contentPaddingTop = useMemo(() => {
         return insets.top + 18;
@@ -313,6 +296,13 @@ export default function PlanScreen() {
                 {/* Menu Dropdown */}
                 {showMenu && (
                     <View style={styles.menuCard}>
+                        {sequence && <>
+                            <Pressable accessibilityRole="button" disabled={sequenceBusy}
+                                style={styles.menuItem} onPress={() => { setShowMenu(false); void changeSequence(sequence.paused ? 'resume' : 'pause'); }}>
+                                <Text style={styles.menuText}>{sequence.paused ? 'Resume program' : 'Pause program'}</Text>
+                            </Pressable>
+                            <View style={styles.menuDivider} />
+                        </>}
                         <Pressable
                             style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
                             onPress={() => {
@@ -381,43 +371,15 @@ export default function PlanScreen() {
                     </View>
                 )}
 
-                <View style={[styles.section, { backgroundColor: theme.mutedBg, borderRadius: 14, padding: 14 }]}>
-                    {sequence ? (
-                        <Text style={{ color: theme.text, lineHeight: 20 }}>
-                            {sequence.paused ? 'Program paused. No workout is suggested.' : sequence.nextStableDayId
-                                ? `Suggested next: ${program.workouts.find(workout => workout.stableDayId === sequence.nextStableDayId)?.name ?? 'a pending program day'}.`
-                                : 'No pending program workout is suggested.'}
-                        </Text>
-                    ) : (
-                        <Text style={{ color: theme.text, lineHeight: 20 }}>
-                            {sequenceError ?? 'Loading program sequence...'} No workout is suggested until sequence authority is available.
-                        </Text>
-                    )}
-                    {!sequence && <Pressable accessibilityRole="button" disabled={!ownerId || sequenceBusy}
-                        onPress={async () => {
-                            if (!ownerId) return;
-                            setSequenceBusy(true);
-                            try {
-                                if ((await sequenceOperationStore.listPendingForOwner(ownerId))
-                                    .some(operation => operation.programId === program.id)) {
-                                    throw new Error('Retry the existing sequence operation before initializing again.');
-                                }
-                                await programSequenceRepository.capability();
-                                await sequenceOperations.initialize(ownerId, {
-                                    schemaVersion: 1, programId: program.id, operationId: createOperationId(),
-                                });
-                                await loadSequence();
-                            } catch (error) {
-                                reportSupabaseFailure('program.sequence_initialize', error);
-                                Alert.alert('Sequence not ready', error instanceof Error ? error.message : 'Retry the pending operation.');
-                            } finally { setSequenceBusy(false); }
-                        }} style={{ padding: 12 }}>
-                        <Text style={{ color: theme.primary }}>Initialize this program sequence</Text>
-                    </Pressable>}
-                    {sequence && <Text style={{ color: theme.text, marginTop: 8 }}>
-                        {sequence.counts.completed} completed · {sequence.counts.partial} partial · {sequence.counts.skipped} skipped · {sequence.counts.pending} pending · {sequence.counts.rest + sequence.counts.replacedWithRest} rest
-                    </Text>}
-                </View>
+                {!sequence && (
+                    <View style={[styles.section, { backgroundColor: theme.mutedBg, borderRadius: 14, padding: 14 }]}>
+                        <Text style={{ color: theme.text }}>Your workouts are not ready yet. {sequenceError}</Text>
+                        <Pressable accessibilityRole="button" onPress={() => void loadSequence()}
+                            style={{ paddingVertical: 12 }}>
+                            <Text style={{ color: theme.primary }}>Retry workout setup</Text>
+                        </Pressable>
+                    </View>
+                )}
                 {sequence && longPause && (
                     <View style={[styles.section, { backgroundColor: theme.mutedBg, padding: 14, borderRadius: 12 }]}>
                         <Text style={{ color: theme.text, marginBottom: 8 }}>
@@ -441,71 +403,34 @@ export default function PlanScreen() {
                 )}
                 <PendingSequenceBanner key={`${ownerId}-${sequenceBusy}`} ownerId={ownerId}
                     refreshProgram={() => { void loadSequence(); void refresh(); }} />
-                <Pressable accessibilityRole="button" onPress={() => router.push('/ad-hoc-workout')}
-                    style={[styles.section, { backgroundColor: theme.cardBg, padding: 14, borderRadius: 12 }]}>
-                    <Text style={{ color: theme.text }}>Ad-hoc workout (history only)</Text>
-                </Pressable>
-                {sequence && <Pressable accessibilityRole="button" disabled={sequenceBusy}
-                    onPress={() => void changeSequence(sequence.paused ? 'resume' : 'pause')}
-                    style={[styles.section, { backgroundColor: theme.mutedBg, padding: 14, borderRadius: 12 }]}>
-                    <Text style={{ color: theme.text }}>{sequence.paused ? 'Resume program unchanged' : 'Pause program'}</Text>
-                </Pressable>}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Program sequence</Text>
-                    <View style={{ marginTop: 18 }}>
-                        {sequence?.days.map((day, idx) => {
-                            const workout = program.workouts.find(item => item.stableDayId === day.stableDayId);
-                            return <View key={day.stableDayId} style={[styles.workoutCard, idx > 0 && { marginTop: 12 }]}>
-                                <View style={styles.workoutTopRow}>
-                                    <View style={styles.workoutLeft}>
-                                        <View style={styles.workoutIndexBox}>
-                                            <Text style={styles.workoutIndexText}>{idx + 1}</Text>
-                                        </View>
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={styles.workoutName}>{workout?.name ?? (day.originalKind === 'rest' ? 'Rest day' : `Program workout ${idx + 1}`)}</Text>
-                                            <Text style={styles.workoutMeta}>
-                                                {day.status === 'replaced_with_rest' ? 'Rest replacement' : day.status}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                    {workout && day.originalKind === 'workout' && <Pressable
-                                        onPress={() => { pendingEdit.reset(); setSelectedWorkout(workout.id); }}
-                                        style={({ pressed }) => [styles.chevronButton, pressed && { opacity: 0.85 }]}
-                                        accessibilityRole="button"
-                                        accessibilityLabel={`${day.status === 'pending' ? 'Select other workout day' : 'View program day'}: ${workout.name}`}
-                                    >
-                                        <ChevronRight color={theme.textPrimary} size={20} />
-                                    </Pressable>}
-                                </View>
-                                {workout && <Text style={styles.exerciseCount}>{visibleProgramExercises(workout.exercises).length} exercises</Text>}
-                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-                                    {workout && day.status === 'pending' && !sequence.paused &&
-                                        <Pressable accessibilityRole="button" disabled={sequenceBusy}
-                                            onPress={() => { pendingEdit.reset(); setSelectedWorkout(workout.id); }}
-                                            style={{ backgroundColor: theme.mutedBg, padding: 10, borderRadius: 10 }}>
-                                            <Text style={{ color: theme.text }}>Select this workout day</Text>
-                                        </Pressable>}
-                                    {day.originalKind === 'workout' && day.status !== 'completed' && day.status !== 'partial' &&
-                                        (['pending', 'skipped', 'replaced_with_rest'] as const)
-                                            .filter(status => status !== day.status).map(status =>
-                                                <Pressable key={status} accessibilityRole="button" disabled={sequenceBusy}
-                                                    onPress={() => void changeSequence('set_day', { stableDayId: day.stableDayId, status })}
-                                                    style={{ backgroundColor: theme.mutedBg, padding: 10, borderRadius: 10 }}>
-                                                    <Text style={{ color: theme.text }}>{status === 'pending' ? 'Restore pending'
-                                                        : status === 'skipped' ? 'Skip' : 'Replace with rest'}</Text>
-                                                </Pressable>)}
-                                    {idx > 0 && <Pressable accessibilityRole="button" disabled={sequenceBusy}
-                                        onPress={() => {
-                                            const order = sequence.days.map(item => item.stableDayId);
-                                            [order[idx - 1], order[idx]] = [order[idx], order[idx - 1]];
-                                            void changeSequence('reorder', { dayIds: order });
-                                        }} style={{ backgroundColor: theme.mutedBg, padding: 10, borderRadius: 10 }}>
-                                        <Text style={{ color: theme.text }}>Move earlier</Text>
-                                    </Pressable>}
-                                </View>
-                            </View>;
-                        })}
-                    </View>
+                    <Text style={styles.sectionTitle}>Your program</Text>
+                    <Text style={styles.subtitle}>{program.totalWeeks} weeks · {program.daysPerWeek} days per week</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={{ gap: 8, paddingVertical: 16 }}>
+                        {Array.from(new Set(program.workouts.map(workout => workout.weekNumber ?? program.currentWeek)))
+                            .sort((a, b) => a - b).map(week => (
+                                <Pressable key={week} accessibilityRole="button"
+                                    accessibilityState={{ selected: (selectedWeek ?? suggestedWeek) === week }}
+                                    onPress={() => setSelectedWeek(week)}
+                                    style={{ minHeight: 48, minWidth: 80, borderRadius: 12, borderWidth: 1,
+                                        justifyContent: 'center', alignItems: 'center', padding: 10,
+                                        borderColor: theme.border, backgroundColor:
+                                            (selectedWeek ?? suggestedWeek) === week ? theme.mutedBg : theme.cardBg }}>
+                                    <Text style={{ color: theme.textPrimary }}>Week {week}</Text>
+                                </Pressable>
+                            ))}
+                    </ScrollView>
+                    {program.workouts.filter(workout => (workout.weekNumber ?? program.currentWeek) ===
+                        (selectedWeek ?? suggestedWeek)).map(workout => (
+                        workout.exercises.length ? <NextWorkoutCard key={workout.id} compact showAllExercises
+                            statusLabel={`Week ${workout.weekNumber ?? program.currentWeek} · ${workout.day}`}
+                            workout={summarizeWorkout(workout)} />
+                            : <View key={workout.id} style={styles.workoutCard}>
+                                <Text style={styles.workoutName}>{workout.name || 'Rest day'}</Text>
+                                <Text style={styles.workoutMeta}>{workout.day} · Rest</Text>
+                            </View>
+                    ))}
                 </View>
 
                 {/* View Full Program */}
@@ -534,31 +459,6 @@ export default function PlanScreen() {
                     </Link>
                 </View>
             </ScrollView>
-
-            {/* Workout Template Modal */}
-                <Modal visible={!!selectedWorkoutObj} transparent animationType={Platform.OS === 'ios' ? 'slide' : 'none'} onDismiss={navigateAfterDismiss} onRequestClose={() => setSelectedWorkout(null)}>
-                    {selectedWorkoutObj ? <WorkoutTemplateModal
-                        workout={selectedWorkoutObj}
-                        program={program}
-                        onSwapExercise={swapExercise}
-                        onClose={() => setSelectedWorkout(null)}
-                        onStart={() => {
-                            if (selectedWorkoutObj.sessionId) {
-                                if (pendingEdit.request(selectedWorkoutObj.sessionId)) setSelectedWorkout(null);
-                                return;
-                            }
-                            if (!sequence || sequence.paused ||
-                                sequence.days.find(day => day.stableDayId === selectedWorkoutObj.stableDayId)?.status !== 'pending') {
-                                Alert.alert('Workout start unavailable', 'This exact program day is not pending in the current sequence. Refresh the sequence or select a different day.');
-                                return;
-                            }
-                            setSelectedWorkout(null);
-                            router.push({ pathname: '/next-workout', params: {
-                                ...workoutRouteParams(program, selectedWorkoutObj),
-                            } });
-                        }}
-                    /> : null}
-                </Modal>
 
             {/* Generate Program Modal */}
             <Modal visible={showGenModal} transparent animationType="slide">

@@ -1,5 +1,6 @@
 import { isCatalogExerciseId } from '@/features/catalog/contracts';
 import { isOperationId } from '@/features/kernel/operationId';
+import { entryLoadDefaults } from './loadPresentation';
 
 export interface AdHocDraftSet {
   setId: string;
@@ -91,12 +92,56 @@ function numeric(value: string, label: string, optional = false): number | null 
   return parsed;
 }
 
-export function createAdHocSet(exerciseId: string, exerciseName: string, order: number, id: () => string): AdHocDraftSet {
+export function createAdHocSet(exerciseId: string, exerciseName: string, order: number, id: () => string,
+  equipment?: string): AdHocDraftSet {
   if (!isCatalogExerciseId(exerciseId) || !exerciseName.trim() || !Number.isSafeInteger(order) || order < 1) {
     throw new Error('Choose an exercise from the catalog.');
   }
-  return { setId: id(), exerciseId, exerciseName, order, reps: '', loadKind: 'bodyweight',
-    loadValue: '', loadUnit: 'none', loadSide: 'unknown', rpe: '' };
+  const normalizedEquipment = equipment?.toLowerCase().trim();
+  const bodyweight = normalizedEquipment === 'bodyweight';
+  const knownExternal = Boolean(normalizedEquipment && normalizedEquipment !== 'other'
+    && normalizedEquipment !== 'unknown');
+  const defaults = bodyweight ? entryLoadDefaults('bodyweight')
+    : knownExternal ? entryLoadDefaults('external') : { loadKind: 'unknown' as const, loadUnit: 'none' as const };
+  const loadSide = normalizedEquipment === 'dumbbell' ? 'per_hand' as const
+    : normalizedEquipment === 'barbell' ? 'external_total' as const : 'unknown' as const;
+  return { setId: id(), exerciseId, exerciseName, order, reps: '', ...defaults,
+    loadValue: '', loadSide, rpe: '' };
+}
+
+export function addAdHocExercises(draft: AdHocDraft,
+  exercises: readonly { id: string; name: string; equipment: string }[], id: () => string): AdHocDraft {
+  const existing = new Set(draft.sets.map(set => set.exerciseId));
+  const sets = [...draft.sets];
+  for (const exercise of exercises) {
+    if (existing.has(exercise.id)) throw new Error(`${exercise.name} is already in this workout.`);
+    sets.push(createAdHocSet(exercise.id, exercise.name, 1, id, exercise.equipment));
+    existing.add(exercise.id);
+  }
+  return { ...draft, sets };
+}
+
+export function appendAdHocSet(draft: AdHocDraft, exerciseId: string, id: () => string): AdHocDraft {
+  const group = draft.sets.filter(set => set.exerciseId === exerciseId);
+  if (!group.length) throw new Error('Choose an exercise from this workout.');
+  const previous = group[group.length - 1];
+  return { ...draft, sets: [...draft.sets, {
+    ...createAdHocSet(exerciseId, previous.exerciseName, Math.max(...group.map(set => set.order)) + 1, id),
+    loadKind: previous.loadKind, loadUnit: previous.loadUnit, loadSide: previous.loadSide,
+  }] };
+}
+
+export function removeAdHocSet(draft: AdHocDraft, setId: string): AdHocDraft {
+  const removed = draft.sets.find(set => set.setId === setId);
+  if (!removed) throw new Error('Set is not in this workout.');
+  let order = 0;
+  return { ...draft, sets: draft.sets.filter(set => set.setId !== setId).map(set =>
+    set.exerciseId === removed.exerciseId ? { ...set, order: ++order } : set) };
+}
+
+export function removeAdHocExercise(draft: AdHocDraft, exerciseId: string): AdHocDraft {
+  if (!draft.sets.some(set => set.exerciseId === exerciseId)) throw new Error('Exercise is not in this workout.');
+  return { ...draft, sets: draft.sets.filter(set => set.exerciseId !== exerciseId) };
 }
 
 function validateDraft(draft: AdHocDraft, ownerId: string): void {
@@ -126,8 +171,8 @@ export function freezeAdHocDraft(draft: AdHocDraft, operationId: string, endedAt
   if (!isOperationId(operationId) || !date(endedAt) || Date.parse(endedAt) < Date.parse(draft.startedAt)) {
     throw new Error('Workout finish time or operation identity is invalid.');
   }
-  const workoutName = draft.workoutName.trim();
-  if (!workoutName || draft.sets.length === 0) throw new Error('Enter a workout name and at least one actual set.');
+  const workoutName = draft.workoutName.trim() || 'Ad-hoc workout';
+  if (draft.sets.length === 0) throw new Error('Log at least one actual set.');
   const sets = draft.sets.map((set): AdHocActualSet => {
     const reps = numeric(set.reps, 'Reps');
     if (reps === null || !Number.isSafeInteger(reps) || reps < 1) throw new Error('Reps must be a positive whole number.');

@@ -63,7 +63,27 @@ export function activeWorkoutDraftMatches(
     && draft.stableDayId === lookup.stableDayId;
 }
 
-export const workoutDraftStore: WorkoutDraftStore = {
+export function selectActiveProgramDraft(
+  drafts: readonly WorkoutDraft[], ownerId: string, programId: string,
+): WorkoutDraft | null {
+  return drafts.filter(draft => activeWorkoutDraftMatches(draft, ownerId, {
+    programId, stableDayId: draft.stableDayId,
+  })).sort((left, right) => right.startedAt.localeCompare(left.startedAt))[0] ?? null;
+}
+
+export const workoutDraftStore: WorkoutDraftStore & {
+  loadActiveForProgram(ownerId: string, programId: string): Promise<WorkoutDraft | null>;
+} = {
+  async loadActiveForProgram(ownerId, programId) {
+    if (!ownerId || !programId) throw new Error('Owner and program are required to restore a workout.');
+    const prefix = `${ACTIVE_STABLE_PREFIX}/${ownerId}/${programId}/`;
+    const keys = (await AsyncStorage.getAllKeys()).filter(key => key.startsWith(prefix));
+    if (keys.length === 0) return null;
+    const entries = await AsyncStorage.multiGet(keys);
+    const drafts = entries.filter((entry): entry is [string, string] => entry[1] !== null)
+      .map(([, serialized]) => JSON.parse(serialized) as WorkoutDraft);
+    return selectActiveProgramDraft(drafts, ownerId, programId);
+  },
   async load(ownerId, programDayId) {
     const serialized = await AsyncStorage.getItem(draftKey(ownerId, programDayId));
     if (!serialized) return null;

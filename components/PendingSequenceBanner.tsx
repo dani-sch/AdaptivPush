@@ -32,10 +32,10 @@ export const PendingSequenceBanner: React.FC<{ ownerId: string | null | undefine
   if (!ownerId || (pending.length === 0 && !failure)) return null;
   return (
     <View style={{ backgroundColor: theme.cardBg, borderColor: theme.border, borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 12 }}>
-      <Text style={{ color: theme.text, marginBottom: 8 }}>You have {pending.length} pending program operation(s) that need confirmation on the server.</Text>
+      <Text style={{ color: theme.text, marginBottom: 8 }}>A program change is still syncing. Retry to confirm it before making another change.</Text>
       {pending.some(operation => operation.kind === 'finalize_day' || operation.kind === 'finalize_ad_hoc') && (
         <Text style={{ color: theme.text, marginBottom: 8 }}>
-          A workout Finish may already have succeeded. Reopen its exact draft to verify and retry; do not start a replacement workout.
+          A workout may already have finished. Reopen it to confirm your saved results before starting another.
         </Text>
       )}
       {failure && <Text style={{ color: theme.text, marginBottom: 8 }}>{failure}</Text>}
@@ -46,7 +46,7 @@ export const PendingSequenceBanner: React.FC<{ ownerId: string | null | undefine
             if (p.kind === 'finalize_day' || p.kind === 'finalize_ad_hoc') continue;
             try {
               if (p.kind === 'initialize') {
-                await sequenceOperations.initialize(p.ownerId, p.payload);
+                await sequenceOperations.ensureInitialized(p.ownerId, p.programId);
               } else {
                 await sequenceOperations.change(p.ownerId, p.programId, p.payload);
               }
@@ -61,7 +61,7 @@ export const PendingSequenceBanner: React.FC<{ ownerId: string | null | undefine
             setFailureState({ ownerId, message: error instanceof Error ? error.message : 'Pending operation recovery failed.' });
           }
         }} style={{ backgroundColor: theme.primary, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10 }}>
-          <Text style={{ color: theme.white, fontWeight: '700' }}>Retry pending</Text>
+          <Text style={{ color: theme.white, fontWeight: '700' }}>Retry sync</Text>
         </Pressable>
       </View>
     </View>

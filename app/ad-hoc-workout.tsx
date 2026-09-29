@@ -2,21 +2,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { router } from 'expo-router';
 import {
   ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable,
-  SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View,
+  SafeAreaView, ScrollView, StyleSheet, Text, TextInput,
 } from 'react-native';
 
+import ExerciseCard, { type WorkoutSet } from '@/components/ExerciseCard';
+import { SwapExerciseModal } from '@/components/SwapExerciseModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/constants/themes';
-import { adHocService, createAdHocSet } from '@/features/workouts/adHocService';
+import {
+  adHocService, addAdHocExercises, appendAdHocSet, removeAdHocExercise, removeAdHocSet,
+} from '@/features/workouts/adHocService';
 import type { AdHocDraft, AdHocDraftSet } from '@/features/workouts/adHocFlow';
-import { loadExercisePickerCatalog } from '@/features/workouts/occurrenceRepository';
-import { supabase } from '@/utils/supabase';
 import { reportSupabaseFailure, supabaseUserMessage } from '@/utils/supabaseResilience';
-
-type CatalogRow = Awaited<ReturnType<typeof loadExercisePickerCatalog>>[number];
-const LOAD_KINDS: AdHocDraftSet['loadKind'][] = ['external', 'bodyweight', 'assistance', 'unknown'];
-const LOAD_SIDES: AdHocDraftSet['loadSide'][] = ['external_total', 'per_hand', 'combined', 'unilateral', 'unknown'];
 
 export default function AdHocWorkoutScreen() {
   const { ownerId, canRequest } = useAuth();
@@ -33,10 +31,7 @@ function AdHocCapture({ ownerId, canRequest }: { ownerId: string | null; canRequ
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
-  const [catalog, setCatalog] = useState<CatalogRow[] | null>(null);
-  const [catalogError, setCatalogError] = useState<string | null>(null);
   const [picker, setPicker] = useState(false);
-  const [search, setSearch] = useState('');
   const saves = useRef<Promise<void>>(Promise.resolve());
   const saveFailed = useRef(false);
 
@@ -79,32 +74,33 @@ function AdHocCapture({ ownerId, canRequest }: { ownerId: string | null; canRequ
     persist(change(draftRef.current));
   };
 
-  const loadCatalog = async () => {
-    if (!canRequest || busyRef.current || pending) return;
-    setCatalogError(null);
-    setPicker(true);
-    if (catalog) return;
-    try {
-      const rows = await loadExercisePickerCatalog(supabase);
-      setCatalog(rows);
-    } catch (cause) {
-      reportSupabaseFailure('workout.ad_hoc_catalog', cause);
-      setCatalogError(supabaseUserMessage(cause, 'Could not load the exercise catalog. Retry.'));
-    }
-  };
-
-  const addSet = (exercise: CatalogRow) => {
-    update((value) => ({
-      ...value,
-      sets: [...value.sets, createAdHocSet(exercise.id, exercise.name, value.sets.length + 1)],
-    }));
-    setPicker(false);
-  };
-
   const changeSet = (setId: string, fields: Partial<AdHocDraftSet>) => {
     update((value) => ({
       ...value, sets: value.sets.map((set) => set.setId === setId ? { ...set, ...fields } : set),
     }));
+  };
+
+  const groups = useMemo(() => {
+    const byExercise = new Map<string, AdHocDraftSet[]>();
+    for (const set of draft?.sets ?? []) {
+      const group = byExercise.get(set.exerciseId) ?? [];
+      group.push(set);
+      byExercise.set(set.exerciseId, group);
+    }
+    return [...byExercise.entries()];
+  }, [draft]);
+
+  const updateCardSet = (setId: string, field: keyof WorkoutSet, value: string | boolean) => {
+    const current = draftRef.current?.sets.find(set => set.setId === setId);
+    if (!current) return;
+    if (field === 'weight' && typeof value === 'string') changeSet(setId, { loadValue: value });
+    if (field === 'reps' && typeof value === 'string') changeSet(setId, { reps: value });
+    if (field === 'rpe' && typeof value === 'string') changeSet(setId, { rpe: value });
+    if (field === 'loadKind' && (value === 'bodyweight' || value === 'external' || value === 'assistance')) {
+      changeSet(setId, { loadKind: value, loadValue: value === 'bodyweight' ? '' : current.loadValue,
+        loadUnit: value === 'bodyweight' ? 'none' : current.loadUnit === 'kg' ? 'kg' : 'lb' });
+    }
+    if (field === 'loadUnit' && (value === 'lb' || value === 'kg')) changeSet(setId, { loadUnit: value });
   };
 
   const finish = async () => {
@@ -119,7 +115,7 @@ function AdHocCapture({ ownerId, canRequest }: { ownerId: string | null; canRequ
       draftRef.current = null;
       setDraft(null);
       setPending(false);
-      router.replace('/workout-history');
+      router.replace('/(tabs)/history');
     } catch (cause) {
       reportSupabaseFailure('workout.ad_hoc_finish', cause);
       setError(supabaseUserMessage(cause, 'Could not confirm this workout. Retry the exact request.'));
@@ -140,15 +136,13 @@ function AdHocCapture({ ownerId, canRequest }: { ownerId: string | null; canRequ
   };
 
   const editable = Boolean(ownerId && canRequest && draft && !pending && !loading && !busy);
-  const filtered = catalog?.filter((row) =>
-    `${row.name} ${row.primary_muscle} ${row.equipment}`.toLowerCase().includes(search.trim().toLowerCase())) ?? [];
 
   return (
     <SafeAreaView style={styles.page}>
       <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Text style={styles.heading}>New ad-hoc workout</Text>
-          <Text style={styles.muted}>History only. This does not complete or change your program.</Text>
+          <Text style={styles.heading}>{draft?.sets.length ? 'Ad-hoc workout' : 'New ad-hoc workout'}</Text>
+          <Text style={styles.muted}>Train outside your program.</Text>
           {!canRequest && <Text style={styles.warning}>Sign in and reconnect before editing or finishing.</Text>}
           {loading && <ActivityIndicator accessibilityLabel="Restoring workout" />}
           {error && <Text style={styles.warning} accessibilityRole="alert">{error}</Text>}
@@ -161,71 +155,32 @@ function AdHocCapture({ ownerId, canRequest }: { ownerId: string | null; canRequ
           )}
           {draft && (
             <>
-              <Text style={styles.label}>Workout name</Text>
+              <Text style={styles.label}>Workout name (optional)</Text>
               <TextInput style={styles.input} value={draft.workoutName} editable={editable}
                 onChangeText={(workoutName) => update((value) => ({ ...value, workoutName }))}
                 placeholder="Workout name" placeholderTextColor={theme.placeholder} accessibilityLabel="Workout name" />
-              <Text style={styles.label}>Actual sets</Text>
-              {draft.sets.length === 0 && <Text style={styles.muted}>Select an exercise and log at least one set.</Text>}
-              {draft.sets.map((set) => (
-                <View key={set.setId} style={styles.card}>
-                  <Text style={styles.setTitle}>{set.order}. {set.exerciseName}</Text>
-                  <Pressable accessibilityRole="button" disabled={!editable}
-                    accessibilityLabel={`Remove set ${set.order} of ${set.exerciseName}`}
-                    onPress={() => update((value) => ({
-                      ...value, sets: value.sets.filter((entry) => entry.setId !== set.setId)
-                        .map((entry, index) => ({ ...entry, order: index + 1 })),
-                    }))}><Text style={styles.link}>Remove set</Text></Pressable>
-                  <View style={styles.row}>
-                    <View style={styles.field}>
-                      <Text style={styles.label}>Reps</Text>
-                      <TextInput style={styles.input} value={set.reps} editable={editable} keyboardType="number-pad"
-                        accessibilityLabel={`Reps for ${set.exerciseName} set ${set.order}`}
-                        onChangeText={(reps) => changeSet(set.setId, { reps })} />
-                    </View>
-                    <View style={styles.field}>
-                      <Text style={styles.label}>RPE (optional)</Text>
-                      <TextInput style={styles.input} value={set.rpe} editable={editable} keyboardType="decimal-pad"
-                        accessibilityLabel={`RPE for ${set.exerciseName} set ${set.order}`}
-                        onChangeText={(rpe) => changeSet(set.setId, { rpe })} />
-                    </View>
-                  </View>
-                  <Text style={styles.label}>Load type</Text>
-                  <View style={styles.choices}>{LOAD_KINDS.map((kind) =>
-                    <Pressable key={kind} accessibilityRole="radio" accessibilityState={{ checked: set.loadKind === kind }}
-                      disabled={!editable} onPress={() => changeSet(set.setId, {
-                        loadKind: kind, loadUnit: kind === 'external' || kind === 'assistance' ? 'lb' : 'none',
-                        loadValue: '',
-                      })} style={[styles.choice, set.loadKind === kind && styles.selected]}>
-                      <Text style={styles.text}>{kind}</Text>
-                    </Pressable>)}</View>
-                  {(set.loadKind === 'external' || set.loadKind === 'assistance') && (
-                    <>
-                      <Text style={styles.label}>Load</Text>
-                      <View style={styles.row}>
-                        <TextInput style={[styles.input, styles.field]} value={set.loadValue} editable={editable}
-                          keyboardType="decimal-pad" accessibilityLabel={`Load for ${set.exerciseName} set ${set.order}`}
-                          onChangeText={(loadValue) => changeSet(set.setId, { loadValue })} />
-                        {(['lb', 'kg'] as const).map((unit) =>
-                          <Pressable key={unit} accessibilityRole="radio" accessibilityState={{ checked: set.loadUnit === unit }}
-                            disabled={!editable} onPress={() => changeSet(set.setId, { loadUnit: unit })}
-                            style={[styles.choice, set.loadUnit === unit && styles.selected]}>
-                            <Text style={styles.text}>{unit}</Text>
-                          </Pressable>)}
-                      </View>
-                    </>
-                  )}
-                  <Text style={styles.label}>Load side</Text>
-                  <View style={styles.choices}>{LOAD_SIDES.map((side) =>
-                    <Pressable key={side} accessibilityRole="radio" accessibilityState={{ checked: set.loadSide === side }}
-                      disabled={!editable} onPress={() => changeSet(set.setId, { loadSide: side })}
-                      style={[styles.choice, set.loadSide === side && styles.selected]}>
-                      <Text style={styles.text}>{side.replace(/_/g, ' ')}</Text>
-                    </Pressable>)}</View>
-                </View>
+              <Text style={styles.label}>Exercises and actual sets</Text>
+              {groups.length === 0 && <Text style={styles.muted}>Choose exercises, then enter reps and load for each set.</Text>}
+              {groups.map(([exerciseId, sets]) => (
+                <ExerciseCard key={exerciseId} hideLoggedControl
+                  exercise={{
+                    id: exerciseId, exerciseId, name: sets[0].exerciseName,
+                    prescription: 'Enter each set you performed. RPE is optional.',
+                    completed: false, readOnly: !editable,
+                    sets: sets.map(set => ({
+                      id: set.setId, weight: set.loadValue, reps: set.reps, rpe: set.rpe,
+                      logged: false, loadKind: set.loadKind, loadUnit: set.loadUnit,
+                    })),
+                  }}
+                  onUpdateSet={updateCardSet}
+                  onToggleComplete={() => {}}
+                  onRemoveSet={editable ? setId => update(value => removeAdHocSet(value, setId)) : undefined}
+                  onRemoveExercise={editable ? () => update(value => removeAdHocExercise(value, exerciseId)) : undefined}
+                  onAddSet={editable ? () => update(value => appendAdHocSet(value, exerciseId)) : undefined}
+                />
               ))}
               <Pressable accessibilityRole="button" disabled={!editable} style={styles.action}
-                onPress={() => void loadCatalog()}><Text style={styles.actionText}>Add exercise / set</Text></Pressable>
+                onPress={() => setPicker(true)}><Text style={styles.actionText}>Add exercises</Text></Pressable>
               <Pressable accessibilityRole="button" disabled={!canRequest || busy || loading || (!pending && !draft.sets.length)}
                 style={styles.action} onPress={() => void finish()}>
                 <Text style={styles.actionText}>{busy ? 'Confirming...' : pending ? 'Retry exact finish' : 'Finish workout'}</Text>
@@ -236,27 +191,16 @@ function AdHocCapture({ ownerId, canRequest }: { ownerId: string | null; canRequ
       </KeyboardAvoidingView>
       <Modal visible={picker} animationType="slide" onRequestClose={() => setPicker(false)}>
         <SafeAreaView style={styles.page}>
-          <View style={styles.content}>
-            <Pressable accessibilityRole="button" onPress={() => setPicker(false)}><Text style={styles.link}>Close catalog</Text></Pressable>
-            <TextInput style={styles.input} value={search} onChangeText={setSearch}
-              placeholder="Search exercises" placeholderTextColor={theme.placeholder}
-              accessibilityLabel="Search catalog exercises" />
-            {catalogError && <Text style={styles.warning}>{catalogError}</Text>}
-            {catalogError && <Pressable accessibilityRole="button" onPress={() => { setPicker(false); void loadCatalog(); }}>
-              <Text style={styles.link}>Retry catalog</Text>
-            </Pressable>}
-            {!catalog && !catalogError && <ActivityIndicator accessibilityLabel="Loading catalog" />}
-            <ScrollView keyboardShouldPersistTaps="handled">
-              {catalog && filtered.length === 0 && <Text style={styles.muted}>No matching catalog exercises.</Text>}
-              {filtered.map((exercise) =>
-                <Pressable key={exercise.id} accessibilityRole="button" accessibilityLabel={`Add ${exercise.name}`}
-                  style={styles.card} onPress={() => addSet(exercise)}>
-                  <Text style={styles.text}>{exercise.name}</Text>
-                  <Text style={styles.muted}>{exercise.primary_muscle} · {exercise.equipment}</Text>
-                  {exercise.instructions?.length ? <Text style={styles.muted} numberOfLines={3}>{exercise.instructions.join(' ')}</Text> : null}
-                </Pressable>)}
-            </ScrollView>
-          </View>
+          {picker && <SwapExerciseModal mode="ad_hoc" embedded
+            excludedExerciseIds={groups.map(([exerciseId]) => exerciseId)}
+            onClose={() => setPicker(false)}
+            onAddExercises={async exercises => {
+              if (!editable || !draftRef.current) throw new Error('This workout is not editable.');
+              const next = addAdHocExercises(draftRef.current, exercises);
+              update(() => next);
+              await saves.current;
+            }}
+          />}
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
@@ -269,21 +213,11 @@ function makeStyles(theme: Theme) {
     page: { flex: 1, backgroundColor: theme.background },
     content: { padding: 18, paddingBottom: 48 },
     heading: { color: theme.textPrimary, fontSize: 24, fontWeight: '700', marginBottom: 8 },
-    text: { color: theme.textPrimary, fontSize: 15 },
     muted: { color: theme.text, marginVertical: 8 },
     warning: { color: theme.error, marginVertical: 12 },
     label: { color: theme.textPrimary, marginTop: 12, marginBottom: 5 },
-    setTitle: { color: theme.textPrimary, fontSize: 18, fontWeight: '600' },
-    link: { color: theme.primaryLight, paddingVertical: 12 },
     input: { color: theme.textPrimary, borderColor: theme.border, backgroundColor: theme.cardBg,
       borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, minHeight: 48 },
-    card: { backgroundColor: theme.cardBg, borderColor: theme.border, borderWidth: 1,
-      borderRadius: 12, marginVertical: 8, padding: 14 },
-    row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    field: { flex: 1 },
-    choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    choice: { borderWidth: 1, borderColor: theme.border, borderRadius: 8, padding: 12, minHeight: 44 },
-    selected: { borderColor: theme.primary, backgroundColor: theme.mutedBg },
     action: { backgroundColor: theme.primary, borderRadius: 8, padding: 16, marginTop: 18, minHeight: 48 },
     actionText: { color: theme.white, textAlign: 'center', fontWeight: '600' },
   });

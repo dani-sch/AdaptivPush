@@ -4,8 +4,13 @@ import { createOperationId } from '@/features/kernel/operationId';
 import { supabase } from '@/utils/supabase';
 import { runSupabaseOperation } from '@/utils/supabaseResilience';
 import {
+  addAdHocExercises as addExercises,
+  appendAdHocSet as appendSet,
   createAdHocFlow,
   createAdHocSet as makeSet,
+  removeAdHocExercise,
+  removeAdHocSet,
+  type AdHocDraft,
   type AdHocDraftSet,
   type AdHocPayload,
 } from './adHocFlow';
@@ -15,6 +20,17 @@ export type { AdHocDraft, AdHocDraftSet } from './adHocFlow';
 export function createAdHocSet(exerciseId: string, exerciseName: string, order: number): AdHocDraftSet {
   return makeSet(exerciseId, exerciseName, order, createOperationId);
 }
+
+export function addAdHocExercises(draft: AdHocDraft,
+  exercises: readonly { id: string; name: string; equipment: string }[]): AdHocDraft {
+  return addExercises(draft, exercises, createOperationId);
+}
+
+export function appendAdHocSet(draft: AdHocDraft, exerciseId: string): AdHocDraft {
+  return appendSet(draft, exerciseId, createOperationId);
+}
+
+export { removeAdHocExercise, removeAdHocSet };
 
 export const adHocService = createAdHocFlow(AsyncStorage, {
   async finalize(payload: AdHocPayload): Promise<unknown> {

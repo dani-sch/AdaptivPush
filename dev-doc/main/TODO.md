@@ -1,5 +1,10 @@
 # AdaptivPush active task board
 
+## [CLIENT UX OPEN] Home, Program, launcher, ad-hoc, and History
+
+- [SOURCE IMPLEMENTED; USER ACCEPTANCE OPEN] Simplified week-based Program and next/active Home; central four-tab Workout launcher and focused pending-day selection; shared workout summaries; automatic retryable sequence setup; shared multi-select catalog picker and grouped ad-hoc exercise cards; performed-exercise ID resolution in History. No backend mutation, integrator merge, or client distribution is implied.
+- [REQUIRES INSPECTION] Physical Expo/iPhone layout and routing (including the former fifth-looking tab), rest/alternate-day choice, ad-hoc and History identity across legacy records, keyboard/accessibility, restart and pending-request recovery, hosted end-to-end flows, and correction/progression reconciliation. Correct issues before user-led acceptance.
+
 ## [BACKEND VERIFIED; CLIENT OPEN] Flexible program sequence
 
 - [HOSTED VERIFIED] Additive migration `20260927190000` is deployed after fresh encrypted recovery and isolated exact-packet rehearsal. Hosted owner/anonymous, replay/conflict, lineage, Finish/correction/ad-hoc and concurrency gates passed with no persistent synthetic fixtures. Ledger has 11 entries; AP-04 schedule tables remain empty and their dated writer RPCs are grant-disabled, not rewritten. See [authority evidence](/dev-doc/reports/ADAPTIVPUSH-FLEXIBLE-SEQUENCE-AUTHORITY-2026-09-27.md).
