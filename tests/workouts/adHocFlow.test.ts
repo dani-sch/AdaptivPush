@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import {
   addAdHocExercises, appendAdHocSet, createAdHocFlow, createAdHocSet, freezeAdHocDraft,
-  adHocFinishCause, removeAdHocExercise, removeAdHocSet, verifyAdHocHistory,
+  adHocFinishCause, hasIncompleteAdHocSets, isAdHocValidationError, removeAdHocExercise, removeAdHocSet, verifyAdHocHistory,
   type AdHocDraft, type AdHocGateway, type AdHocPayload,
 } from '../../features/workouts/adHocFlow';
 
@@ -26,7 +26,7 @@ function fixture() {
       calls.push(structuredClone(payload));
       if (responseLost) { responseLost = false; throw new Error('response lost'); }
       return { sessionId: 'a6000000-0000-4000-8000-000000000001', operationId: payload.operationId,
-        draftId: payload.draftId, revision: 1, completionClass: 'complete',
+        draftId: payload.draftId, revision: 1, completionClass: payload.completionClass ?? 'complete',
         setCount: payload.sets.length, replayed: calls.length > 1 };
     },
     async session(userId, operationId) {
@@ -36,7 +36,7 @@ function fixture() {
         program_revision_id: null, workout_name: payload.workoutName,
         started_at: '2026-09-27T11:00:00+00:00', ended_at: '2026-09-27T11:30:00+00:00',
         duration_min: payload.durationMin,
-        schema_version: 2, revision: 1, lifecycle: 'finalized', completion_class: 'complete' };
+        schema_version: 2, revision: 1, lifecycle: 'finalized', completion_class: payload.completionClass ?? 'complete' };
     },
     async sets(sessionId) {
       return calls.at(-1)!.sets.map((set) => ({
@@ -96,6 +96,27 @@ test('response loss preserves frozen request across restart and rejects edits un
   assert.equal((await restarted.load(owner)).draft, null);
 });
 
+test('cancelling an editable draft removes only its local owner-scoped recovery state', async () => {
+  const { service, values } = fixture();
+  await enteredDraft(service);
+
+  await service.cancel(owner);
+
+  assert.equal((await service.load(owner)).draft, null);
+  assert.equal(values.size, 0);
+});
+
+test('cancelling refuses to discard an uncertain frozen Finish request', async () => {
+  const { service, setResponseLost } = fixture();
+  await enteredDraft(service);
+  setResponseLost();
+  await assert.rejects(service.finish(owner), /response lost/);
+
+  await assert.rejects(service.cancel(owner), /awaiting confirmation/);
+
+  assert.equal((await service.load(owner)).pending, true);
+});
+
 test('finish preserves the exact failing stage and underlying error', async () => {
   const { service, setResponseLost } = fixture();
   await enteredDraft(service);
@@ -143,11 +164,19 @@ test('storage failure prevents RPC, and corrupted frozen recovery is never repla
 test('validation refuses empty, duplicate, malformed and non-actual sets without freezing', async () => {
   const { service, calls } = fixture();
   const draft = await service.start(owner);
-  await assert.rejects(service.finish(owner), /at least one actual set/);
+  await assert.rejects(service.finish(owner), error => {
+    assert.equal(isAdHocValidationError(adHocFinishCause(error)?.cause), true);
+    return true;
+  });
   const first = createAdHocSet(exercise, 'Press', 1, id);
   const unfinished = { ...draft, workoutName: 'Press', sets: [first] };
   await service.save(unfinished);
-  await assert.rejects(service.finish(owner), /Reps/);
+  await assert.rejects(service.finish(owner), error => {
+    const cause = adHocFinishCause(error)?.cause;
+    assert.equal(isAdHocValidationError(cause), true);
+    assert.match(cause instanceof Error ? cause.message : '', /Reps/);
+    return true;
+  });
   assert.equal((await service.load(owner)).pending, false);
   assert.equal(calls.length, 0);
   assert.throws(() => freezeAdHocDraft({ ...unfinished, sets: [
@@ -160,6 +189,41 @@ test('validation refuses empty, duplicate, malformed and non-actual sets without
     { ...first, reps: '8', rpe: '11' },
   ] }, id(), endedAt), /RPE/);
   assert.throws(() => freezeAdHocDraft(unfinished, id(), '2026-09-27T10:00:00.000Z'), /finish time/);
+});
+
+test('partial ad-hoc Finish omits sets without reps and persists a partial session', async () => {
+  const { service, calls } = fixture();
+  const draft = await service.start(owner);
+  const completed = createAdHocSet(exercise, 'Press', 1, id);
+  const omitted = createAdHocSet('a2000000-0000-4000-8000-000000000002', 'Row', 1, id);
+  await service.save({
+    ...draft,
+    sets: [
+      { ...completed, reps: '8', loadKind: 'external', loadValue: '20', loadUnit: 'lb' },
+      omitted,
+    ],
+  });
+
+  assert.equal(hasIncompleteAdHocSets((await service.load(owner)).draft!), true);
+  await service.finish(owner, 'partial');
+
+  assert.equal(calls[0].completionClass, 'partial');
+  assert.deepEqual(calls[0].sets.map(set => set.exerciseId), [exercise]);
+});
+
+test('partial ad-hoc Finish accepts an empty actual history when every set has no reps', () => {
+  const draft: AdHocDraft = {
+    ownerId: owner,
+    draftId: id(),
+    workoutName: 'Walk',
+    startedAt,
+    sets: [createAdHocSet(exercise, 'Press', 1, id, 'Bodyweight')],
+  };
+
+  const payload = freezeAdHocDraft(draft, id(), endedAt, 'partial');
+
+  assert.equal(payload.completionClass, 'partial');
+  assert.deepEqual(payload.sets, []);
 });
 
 test('verification checks set identities and actual values, not only receipt counts', async () => {

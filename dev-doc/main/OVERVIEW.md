@@ -9,7 +9,7 @@ The trusted catalog, durable workout/program foundations, and AP-04 dated-schedu
 | Boundary | Current fact |
 |---|---|
 | Hosted capabilities | correction 2, removal 1, structure 1, schedule 1 |
-| Hosted ledger | Ten supported migrations through `20260925190000_ap04_dated_schedules.sql` |
+| Hosted ledger | Twelve supported migrations through `20260929180000_ad_hoc_progression_effects.sql`; standalone ad-hoc partial finalization is deployed |
 | Source publication | PRs #54-#58 merged; AP-04/AP-05.1 client source remains on `codex/ap04-ap05-schedule-history` and is not released |
 | Published client behavior | Resilient auth/session hydration; owner-scoped draft and pending-operation recovery; stable occurrence routing; detailed Add/Swap picker; atomic Finish/Save with receipt verification |
 | Superseded feature-branch behavior | Dated Today/Plan, schedule commands, scheduled Finish/correction, adherence/reminders, and history coverage; not approved for publication |

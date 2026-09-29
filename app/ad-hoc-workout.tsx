@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { router } from 'expo-router';
 import {
-  ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable,
+  ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable,
   SafeAreaView, ScrollView, StyleSheet, Text, TextInput,
 } from 'react-native';
 
@@ -13,7 +13,13 @@ import type { Theme } from '@/constants/themes';
 import {
   adHocService, addAdHocExercises, appendAdHocSet, removeAdHocExercise, removeAdHocSet,
 } from '@/features/workouts/adHocService';
-import { adHocFinishCause, type AdHocDraft, type AdHocDraftSet } from '@/features/workouts/adHocFlow';
+import {
+  adHocFinishCause,
+  hasIncompleteAdHocSets,
+  isAdHocValidationError,
+  type AdHocDraft,
+  type AdHocDraftSet,
+} from '@/features/workouts/adHocFlow';
 import { reportSupabaseFailure, supabaseUserMessage } from '@/utils/supabaseResilience';
 
 export default function AdHocWorkoutScreen() {
@@ -103,7 +109,7 @@ function AdHocCapture({ ownerId, canRequest }: { ownerId: string | null; canRequ
     if (field === 'loadUnit' && (value === 'lb' || value === 'kg')) changeSet(setId, { loadUnit: value });
   };
 
-  const finish = async () => {
+  const finish = async (completionClass: 'complete' | 'partial' = 'complete') => {
     if (!ownerId || !canRequest || busyRef.current || !draftRef.current) return;
     busyRef.current = true;
     setBusy(true);
@@ -111,7 +117,7 @@ function AdHocCapture({ ownerId, canRequest }: { ownerId: string | null; canRequ
     try {
       await saves.current;
       if (saveFailed.current) throw new Error('Save the draft before finishing.');
-      await adHocService.finish(ownerId);
+      await adHocService.finish(ownerId, completionClass);
       draftRef.current = null;
       setDraft(null);
       setPending(false);
@@ -119,22 +125,73 @@ function AdHocCapture({ ownerId, canRequest }: { ownerId: string | null; canRequ
     } catch (cause) {
       const failure = adHocFinishCause(cause);
       const error = failure?.cause ?? cause;
-      reportSupabaseFailure(`workout.ad_hoc_finish.${failure?.stage ?? 'unknown'}`, error);
-      setError(supabaseUserMessage(error, 'Could not confirm this workout. Retry the exact request.'));
-      try {
-        const state = await adHocService.load(ownerId);
-        draftRef.current = state.draft;
-        setDraft(state.draft);
-        setPending(state.pending);
-      } catch (restoreError) {
-        reportSupabaseFailure('workout.ad_hoc_pending_restore', restoreError);
-        setError(supabaseUserMessage(restoreError, 'Recovery could not be read. Reopen this screen before editing.'));
-        setPending(true);
+      if (isAdHocValidationError(error)) {
+        setError(error.message);
+      } else {
+        reportSupabaseFailure(`workout.ad_hoc_finish.${failure?.stage ?? 'unknown'}`, error);
+        setError(supabaseUserMessage(error, 'Could not confirm this workout. Retry the exact request.'));
+        try {
+          const state = await adHocService.load(ownerId);
+          draftRef.current = state.draft;
+          setDraft(state.draft);
+          setPending(state.pending);
+        } catch (restoreError) {
+          reportSupabaseFailure('workout.ad_hoc_pending_restore', restoreError);
+          setError(supabaseUserMessage(restoreError, 'Recovery could not be read. Reopen this screen before editing.'));
+          setPending(true);
+        }
       }
     } finally {
       busyRef.current = false;
       setBusy(false);
     }
+  };
+
+  const requestFinish = () => {
+    const current = draftRef.current;
+    if (!current || pending || busyRef.current) return void finish();
+    if (!hasIncompleteAdHocSets(current)) return void finish();
+    Alert.alert(
+      'Submit incomplete workout?',
+      'Sets without reps will not be logged.',
+      [
+        { text: 'No', style: 'cancel' },
+        { text: 'Yes', onPress: () => void finish('partial') },
+      ],
+    );
+  };
+
+  const cancel = async () => {
+    if (!ownerId || !canRequest || busyRef.current || pending) return;
+    busyRef.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      await saves.current;
+      if (saveFailed.current) throw new Error('Save the draft before cancelling.');
+      await adHocService.cancel(ownerId);
+      draftRef.current = null;
+      setDraft(null);
+      router.replace('/(tabs)/home');
+    } catch (cause) {
+      reportSupabaseFailure('workout.ad_hoc_cancel', cause);
+      setError(supabaseUserMessage(cause, 'Could not cancel this workout. Retry to protect your draft.'));
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  };
+
+  const confirmCancel = () => {
+    if (!draft || pending || busy) return;
+    Alert.alert(
+      'Cancel ad-hoc workout?',
+      'Your unsaved workout draft and logged sets will be discarded. This cannot be undone.',
+      [
+        { text: 'Keep workout', style: 'cancel' },
+        { text: 'Discard workout', style: 'destructive', onPress: () => void cancel() },
+      ],
+    );
   };
 
   const editable = Boolean(ownerId && canRequest && draft && !pending && !loading && !busy);
@@ -184,9 +241,15 @@ function AdHocCapture({ ownerId, canRequest }: { ownerId: string | null; canRequ
               <Pressable accessibilityRole="button" disabled={!editable} style={styles.action}
                 onPress={() => setPicker(true)}><Text style={styles.actionText}>Add exercises</Text></Pressable>
               <Pressable accessibilityRole="button" disabled={!canRequest || busy || loading || (!pending && !draft.sets.length)}
-                style={styles.action} onPress={() => void finish()}>
+                style={styles.action} onPress={requestFinish}>
                 <Text style={styles.actionText}>{busy ? 'Confirming...' : pending ? 'Retry exact finish' : 'Finish workout'}</Text>
               </Pressable>
+              {!pending && (
+                <Pressable accessibilityRole="button" disabled={!editable} style={styles.cancelAction}
+                  onPress={confirmCancel}>
+                  <Text style={styles.cancelActionText}>Cancel workout</Text>
+                </Pressable>
+              )}
             </>
           )}
         </ScrollView>
@@ -222,5 +285,7 @@ function makeStyles(theme: Theme) {
       borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, minHeight: 48 },
     action: { backgroundColor: theme.primary, borderRadius: 8, padding: 16, marginTop: 18, minHeight: 48 },
     actionText: { color: theme.white, textAlign: 'center', fontWeight: '600' },
+    cancelAction: { borderColor: theme.error, borderWidth: 1, borderRadius: 8, padding: 16, marginTop: 12, minHeight: 48 },
+    cancelActionText: { color: theme.error, textAlign: 'center', fontWeight: '600' },
   });
 }

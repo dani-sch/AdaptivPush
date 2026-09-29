@@ -38,6 +38,7 @@ export interface AdHocActualSet {
 
 export interface AdHocPayload {
   schemaVersion: 1;
+  completionClass?: 'partial';
   operationId: string;
   draftId: string;
   workoutName: string;
@@ -74,8 +75,20 @@ export class AdHocFinishFailure extends Error {
   }
 }
 
+export class AdHocValidationError extends Error {
+  readonly name = 'AdHocValidationError';
+}
+
 export function adHocFinishCause(error: unknown): { stage: AdHocFinishStage; cause: unknown } | null {
   return error instanceof AdHocFinishFailure ? { stage: error.stage, cause: error.cause } : null;
+}
+
+export function isAdHocValidationError(error: unknown): error is AdHocValidationError {
+  return error instanceof AdHocValidationError;
+}
+
+export function hasIncompleteAdHocSets(draft: AdHocDraft): boolean {
+  return draft.sets.some(set => set.reps.trim() === '');
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -100,9 +113,9 @@ function date(value: string): boolean {
 
 function numeric(value: string, label: string, optional = false): number | null {
   if (optional && value.trim() === '') return null;
-  if (!/^(?:\d+)(?:\.\d+)?$/.test(value.trim())) throw new Error(`${label} must be a non-negative number.`);
+  if (!/^(?:\d+)(?:\.\d+)?$/.test(value.trim())) throw new AdHocValidationError(`${label} must be a non-negative number.`);
   const parsed = Number(value);
-  if (!Number.isFinite(parsed)) throw new Error(`${label} must be finite.`);
+  if (!Number.isFinite(parsed)) throw new AdHocValidationError(`${label} must be finite.`);
   return parsed;
 }
 
@@ -180,31 +193,32 @@ function validateDraft(draft: AdHocDraft, ownerId: string): void {
   }
 }
 
-export function freezeAdHocDraft(draft: AdHocDraft, operationId: string, endedAt: string): AdHocPayload {
+export function freezeAdHocDraft(draft: AdHocDraft, operationId: string, endedAt: string,
+  completionClass: 'complete' | 'partial' = 'complete'): AdHocPayload {
   validateDraft(draft, draft.ownerId);
   if (!isOperationId(operationId) || !date(endedAt) || Date.parse(endedAt) < Date.parse(draft.startedAt)) {
     throw new Error('Workout finish time or operation identity is invalid.');
   }
   const workoutName = draft.workoutName.trim() || 'Ad-hoc workout';
-  if (draft.sets.length === 0) throw new Error('Log at least one actual set.');
-  const sets = draft.sets.map((set): AdHocActualSet => {
+  if (draft.sets.length === 0) throw new AdHocValidationError('Log at least one actual set.');
+  const sets = draft.sets.filter(set => completionClass === 'complete' || set.reps.trim() !== '').map((set): AdHocActualSet => {
     const reps = numeric(set.reps, 'Reps');
-    if (reps === null || !Number.isSafeInteger(reps) || reps < 1) throw new Error('Reps must be a positive whole number.');
+    if (reps === null || !Number.isSafeInteger(reps) || reps < 1) throw new AdHocValidationError('Reps must be a positive whole number.');
     const loadValue = numeric(set.loadValue, 'Load', set.loadKind === 'bodyweight' || set.loadKind === 'unknown');
     if (set.loadKind === 'external' || set.loadKind === 'assistance') {
       if (loadValue === null || !['lb', 'kg'].includes(set.loadUnit)) {
-        throw new Error('External or assistance load needs a value in lb or kg.');
+        throw new AdHocValidationError('External or assistance load needs a value in lb or kg.');
       }
     } else if (set.loadUnit !== 'none' || (loadValue !== null && loadValue !== 0)) {
-      throw new Error('Bodyweight or unknown load must use none and no added weight.');
+      throw new AdHocValidationError('Bodyweight or unknown load must use none and no added weight.');
     }
     const rpe = numeric(set.rpe, 'RPE', true);
-    if (rpe !== null && rpe > 10) throw new Error('RPE must be between 0 and 10.');
+    if (rpe !== null && rpe > 10) throw new AdHocValidationError('RPE must be between 0 and 10.');
     return { setId: set.setId, exerciseId: set.exerciseId, order: set.order, reps,
       loadKind: set.loadKind, loadValue, loadUnit: set.loadUnit, loadSide: set.loadSide,
       rpe, loggedAt: endedAt };
   });
-  return { schemaVersion: 1, operationId, draftId: draft.draftId, workoutName,
+  return { schemaVersion: 1, ...(completionClass === 'partial' ? { completionClass } : {}), operationId, draftId: draft.draftId, workoutName,
     startedAt: draft.startedAt, endedAt,
     durationMin: Math.max(0, Math.floor((Date.parse(endedAt) - Date.parse(draft.startedAt)) / 60000)), sets };
 }
@@ -213,9 +227,10 @@ export function verifyAdHocHistory(ownerId: string, payload: AdHocPayload, recei
   sessionValue: unknown, setsValue: unknown): string {
   const receipt = record(receiptValue);
   const session = record(sessionValue);
+  const completionClass = payload.completionClass ?? 'complete';
   if (!UUID.test(text(receipt.sessionId)) || receipt.operationId !== payload.operationId
     || receipt.draftId !== payload.draftId || receipt.revision !== 1
-    || receipt.completionClass !== 'complete' || receipt.setCount !== payload.sets.length
+    || receipt.completionClass !== completionClass || receipt.setCount !== payload.sets.length
     || typeof receipt.replayed !== 'boolean'
     || session.id !== receipt.sessionId || session.user_id !== ownerId
     || session.operation_id !== payload.operationId || session.draft_id !== payload.draftId
@@ -226,7 +241,7 @@ export function verifyAdHocHistory(ownerId: string, payload: AdHocPayload, recei
     || session.duration_min !== payload.durationMin
     || session.schema_version !== 2
     || session.revision !== 1 || session.lifecycle !== 'finalized'
-    || session.completion_class !== 'complete') {
+    || session.completion_class !== completionClass) {
     throw new Error('Stored ad-hoc session does not match the frozen request. Exact retry is preserved.');
   }
   if (!Array.isArray(setsValue) || setsValue.length !== payload.sets.length) {
@@ -266,10 +281,12 @@ export function createAdHocFlow(storage: AdHocStorage, gateway: AdHocGateway,
     if (state.pending !== null) {
       const pending = record(state.pending);
       if (pending.draftId !== draft.draftId || !isOperationId(text(pending.operationId))
-        || pending.schemaVersion !== 1 || !Array.isArray(pending.sets)) {
+        || pending.schemaVersion !== 1 || !Array.isArray(pending.sets)
+        || (pending.completionClass !== undefined && pending.completionClass !== 'partial')) {
         throw new Error('Frozen ad-hoc request is invalid. Recovery is preserved.');
       }
-      const expected = freezeAdHocDraft(draft, text(pending.operationId), text(pending.endedAt));
+      const expected = freezeAdHocDraft(draft, text(pending.operationId), text(pending.endedAt),
+        pending.completionClass === 'partial' ? 'partial' : 'complete');
       if (JSON.stringify(expected) !== JSON.stringify(state.pending)) {
         throw new Error('Frozen ad-hoc request differs from its draft. Recovery is preserved.');
       }
@@ -297,7 +314,15 @@ export function createAdHocFlow(storage: AdHocStorage, gateway: AdHocGateway,
       }
       await storage.setItem(key(draft.ownerId), JSON.stringify({ draft, pending: null }));
     },
-    async finish(ownerId: string): Promise<string> {
+    async cancel(ownerId: string): Promise<void> {
+      const state = await read(ownerId);
+      if (!state) return;
+      if (state.pending) {
+        throw new Error('A finish request is awaiting confirmation. Retry the exact request before cancelling.');
+      }
+      await storage.removeItem(key(ownerId));
+    },
+    async finish(ownerId: string, completionClass: 'complete' | 'partial' = 'complete'): Promise<string> {
       let state: AdHocState | null;
       try {
         state = await read(ownerId);
@@ -308,7 +333,7 @@ export function createAdHocFlow(storage: AdHocStorage, gateway: AdHocGateway,
       let payload = state.pending;
       if (!payload) {
         try {
-          payload = freezeAdHocDraft(state.draft, id(), now());
+          payload = freezeAdHocDraft(state.draft, id(), now(), completionClass);
           await storage.setItem(key(ownerId), JSON.stringify({ draft: state.draft, pending: payload }));
         } catch (cause) {
           throw new AdHocFinishFailure('freeze', cause);

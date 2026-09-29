@@ -22,6 +22,12 @@ import type { ProgressionContext, LoggedSet } from '@/types/progression';
 import type { TrainingExperience } from '@/types/database';
 import { computeCyclePhase } from '@/utils/cyclePhase';
 import { isCatalogExerciseId } from '@/features/catalog/contracts';
+import {
+    asFrozenWorkoutPrescription,
+    hasRequiredAdHocSetCoverage,
+    selectLatestProgressionEvidence,
+    toAdHocProgressionEvidence,
+} from '@/features/workouts/progressionEvidence';
 import { archiveProgram, reviseProgramExercise } from '@/features/programs/commands';
 import { programRepository } from '@/features/programs/repository';
 import { isMissingRelationOrColumnError } from '@/utils/profilePreferences';
@@ -603,16 +609,35 @@ function useCurrentProgramState() {
                 const exerciseName: string = (pde.exercises as any)?.name ?? '';
 
                 // Include a newer occurrence with no actual rows: omission must hold, not reuse older success.
-                const { data: latestSession, error: latestSessionError } = await supabase
+                const { data: latestProgramSession, error: latestSessionError } = await supabase
                     .from('workout_sessions')
-                    .select('id,prescription_snapshot')
+                    .select('id,prescription_snapshot,ended_at')
                     .eq('user_id', userId)
                     .or('prescription_snapshot->slots.cs.' + JSON.stringify([{ prescribedExerciseId: pde.exercise_id }])
                         + ',prescription_snapshot->effectiveSlots.cs.' + JSON.stringify([{ actualExerciseId: pde.exercise_id }]))
                     .order('ended_at', { ascending: false })
                     .limit(1);
                 if (latestSessionError) throw latestSessionError;
-                const latestSessionId = latestSession?.[0]?.id;
+                const { data: latestAdHocSet, error: latestAdHocSetError } = await supabase
+                    .from('workout_exercise_sets')
+                    .select('session_id,workout_sessions!inner(id,ended_at,user_id,program_day_id)')
+                    .eq('exercise_id', pde.exercise_id)
+                    .eq('workout_sessions.user_id', userId)
+                    .is('workout_sessions.program_day_id', null)
+                    .order('logged_at', { ascending: false })
+                    .limit(1);
+                if (latestAdHocSetError) throw latestAdHocSetError;
+                const adHocSession = latestAdHocSet?.[0]?.workout_sessions;
+                const latestSession = selectLatestProgressionEvidence(
+                    latestProgramSession?.[0] ? {
+                        id: latestProgramSession[0].id,
+                        endedAt: latestProgramSession[0].ended_at,
+                        prescriptionSnapshot: asFrozenWorkoutPrescription(latestProgramSession[0].prescription_snapshot),
+                        source: 'program',
+                    } : null,
+                    toAdHocProgressionEvidence(adHocSession),
+                );
+                const latestSessionId = latestSession?.id;
 
                 let recentSets = null;
                 if (latestSessionId) {
@@ -641,7 +666,9 @@ function useCurrentProgramState() {
                     : null;
                 const baselineWeight = liftedWeightAvg ?? (pde.suggested_weight_lb ?? 0);
 
-                const fullCoverage = hasOriginalExerciseEvidence((latestSession?.[0] as any)?.prescription_snapshot, pde.exercise_id, recentSets ?? []);
+                const fullCoverage = latestSession?.source === 'ad_hoc'
+                    ? hasRequiredAdHocSetCoverage(lastSessionSets.length, pde.set_count)
+                    : hasOriginalExerciseEvidence(latestSession?.prescriptionSnapshot, pde.exercise_id, recentSets ?? []);
                 const ctx: ProgressionContext = {
                     pdeId:           pde.id,
                     exerciseName,
